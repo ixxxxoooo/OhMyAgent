@@ -12,7 +12,7 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 ### 模块地图(`Sources/`)
 - `ACPKit`:JSON-RPC、ACP v1 模型、连接 actor、脚本化 Agent(测试用)。
 - `AgentHost`:子进程、工具链定位、Agent 注册表、Bridge。
-- `ChatKit`:会话模型、时间线、补全、Markdown 解析、更新检查、AttentionCenter(运行/未读状态)、RecentStore(无视图)。
+- `ChatKit`:会话模型(含运行中引导/排队/图片/目标)、时间线、补全(来源徽标、@子 Agent)、客户端斜杠命令(`LocalCommands`)、Markdown 解析、更新检查、AttentionCenter(运行/未读状态)、RecentStore(无视图)。
 - `WorkbenchKit`:工作台模型(多项目、项目→会话树、布局与状态持久化,无视图)。
 - `ClaudeConfigKit`:读写 `~/.claude`、`.mcp.json` 等配置。
 - `DiffKit` / `EditorKit`:Diff 与编辑器。
