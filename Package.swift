@@ -13,6 +13,8 @@ let package = Package(
         .executable(name: "OhMyAgentBridge", targets: ["OhMyAgentBridge"]),
     ],
     targets: [
+        // 统一日志:os.Logger + 文件轮转 + 脱敏 + 协议流量日志
+        .target(name: "OMLog"),
         // 协议层:JSON-RPC、ACP v1 模型、连接 actor
         .target(name: "ACPKit"),
         // 宿主层:子进程、Agent 注册表、路径探测、Bridge、直连兜底
@@ -42,6 +44,7 @@ let package = Package(
         .executableTarget(name: "ACPSpike", dependencies: ["ACPKit", "AgentHost"]),
         .executableTarget(name: "EditorSpike", dependencies: ["EditorKit"]),
         // 测试
+        .testTarget(name: "OMLogTests", dependencies: ["OMLog"]),
         .testTarget(name: "ACPKitTests", dependencies: ["ACPKit"]),
         .testTarget(name: "AgentHostTests", dependencies: ["AgentHost", "ACPKit", "FakeAgent"]),
         .testTarget(name: "ChatKitTests", dependencies: ["ChatKit", "ACPKit", "AgentHost", "FakeAgent"]),
