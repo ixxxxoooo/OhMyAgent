@@ -190,6 +190,8 @@ struct PaletteOverlay: View {
                                 PaletteRow(item: item, selected: index == palette.selection)
                                     .id(item.id)
                                     .onTapGesture { palette.selection = index; run(items) }
+                                    .accessibilityElement(children: .combine)
+                                    .accessibilityAddTraits(index == palette.selection ? [.isButton, .isSelected] : .isButton)
                             }
                         }
                         .padding(.vertical, 4)

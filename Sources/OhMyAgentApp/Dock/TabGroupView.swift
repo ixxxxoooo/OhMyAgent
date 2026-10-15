@@ -271,7 +271,8 @@ struct TabItemView: View {
         .contextMenu { menu }
         .help(helpText)
         .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(isActive ? .isSelected : [])
+        .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAction(named: Text("关闭标签")) { AppActions.shared.requestCloseTab(tab.id) }
     }
 
     /// 尾部:固定图标 / 未保存点 / 关闭按钮(悬停或激活时可见)。

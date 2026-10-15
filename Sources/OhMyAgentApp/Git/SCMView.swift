@@ -357,6 +357,11 @@ private struct ChangeRow: View {
         .onHover { hovering = $0 }
         .onTapGesture(count: 2) { workbench.openFile(model.absolutePath(change.path), preview: false) }
         .onTapGesture { openDiff() }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(name + (dir.isEmpty ? "" : "," + dir))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction(named: Text("查看差异")) { openDiff() }
+        .accessibilityAction(named: Text("在编辑器中打开")) { workbench.openFile(model.absolutePath(change.path), preview: false) }
         .contextMenu {
             Button("查看差异") { openDiff() }
             Button("在编辑器中打开") { workbench.openFile(model.absolutePath(change.path), preview: false) }

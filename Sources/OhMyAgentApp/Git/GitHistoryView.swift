@@ -99,6 +99,8 @@ struct GitHistoryTabView: View {
                     ForEach(rows) { row in
                         CommitRow(row: row, laneWidth: path == nil ? laneWidth : 0, isSelected: selected == row.commit.hash)
                             .onTapGesture { selected = row.commit.hash }
+                            .accessibilityElement(children: .combine)
+                            .accessibilityAddTraits(selected == row.commit.hash ? [.isButton, .isSelected] : .isButton)
                             .contextMenu {
                                 Button("拷贝提交哈希") {
                                     NSPasteboard.general.clearContents()
@@ -252,6 +254,8 @@ private struct CommitDetailView: View {
                         .background(selectedFile == file.path ? OMColors.accent.opacity(0.14) : .clear)
                         .contentShape(Rectangle())
                         .onTapGesture { selectedFile = file.path }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityAddTraits(selectedFile == file.path ? [.isButton, .isSelected] : .isButton)
                         .contextMenu {
                             Button("在编辑器中打开当前版本") {
                                 if let root = Optional(repo.root.path) { workbench.openFile(root + "/" + file.path, preview: false) }

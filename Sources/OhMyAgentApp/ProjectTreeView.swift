@@ -297,6 +297,10 @@ private struct ProjectGroup: View {
         .onHover { hovering = $0 }
         .onTapGesture { workbench.select(project: project.id) }
         .help((project.id as NSString).abbreviatingWithTildeInPath)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(project.name)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction(named: Text("新对话")) { workbench.newConversation(in: project.id) }
         .contextMenu {
             Button("新对话") { workbench.newConversation(in: project.id) }
             Divider()

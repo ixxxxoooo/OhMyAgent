@@ -175,4 +175,25 @@ struct SourceGuardTests {
         }
         #expect(offenders.isEmpty, "仍使用 SF Symbol:\(offenders.joined(separator: ", "))")
     }
+
+    @Test("无障碍:用 onTapGesture 充当按钮的行必须声明无障碍特征(紧随其后 10 行内)")
+    func tapGesturesAreAccessible() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let sources = root.appendingPathComponent("Sources/OhMyAgentApp")
+        let enumerator = FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil)
+        var offenders: [String] = []
+        while let url = enumerator?.nextObject() as? URL {
+            guard url.pathExtension == "swift" else { continue }
+            let lines = try String(contentsOf: url, encoding: .utf8).split(separator: "\n", omittingEmptySubsequences: false)
+            for (index, line) in lines.enumerated() where line.contains(".onTapGesture") {
+                // 双击是单击的补充手势;点击空白关闭浮层是纯装饰性的背景手势
+                if line.contains("count: 2") || line.contains("dismiss()") { continue }
+                let window = lines[index..<min(index + 11, lines.count)]
+                if !window.contains(where: { $0.contains("accessibility") }) {
+                    offenders.append("\(url.lastPathComponent):\(index + 1)")
+                }
+            }
+        }
+        #expect(offenders.isEmpty, "缺少无障碍声明的点击手势:\(offenders.joined(separator: ", "))")
+    }
 }

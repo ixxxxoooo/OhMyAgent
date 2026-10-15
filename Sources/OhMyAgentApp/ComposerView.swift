@@ -187,6 +187,8 @@ struct CompletionPopup: View {
                         row(item, isSelected: index == selected)
                             .id(index)
                             .onTapGesture { onPick(item) }
+                            .accessibilityElement(children: .combine)
+                            .accessibilityAddTraits(index == selected ? [.isButton, .isSelected] : .isButton)
                     }
                 }
                 .padding(4)
