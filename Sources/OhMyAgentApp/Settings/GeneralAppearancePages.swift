@@ -13,9 +13,26 @@ struct GeneralPage: View {
     @AppStorage(ClientPrefs.Key.showMenuBar) private var showMenuBar = false
     @AppStorage(ClientPrefs.Key.autoUpdate) private var autoUpdate = true
     @AppStorage(ClientPrefs.Key.updateChannel) private var channel = "stable"
+    @AppStorage(ClientPrefs.Key.updateFeedURL) private var feedURL = ""
+    @State private var updates = UpdateModel.shared
     @State private var language = Self.currentLanguage()
     @State private var confirmReset = false
     @State private var restartHint = false
+
+    /// 更新检查状态文案。
+    @ViewBuilder
+    private var updateStatus: some View {
+        switch updates.state {
+        case .idle: EmptyView()
+        case .checking: ProgressView().controlSize(.small)
+        case .result(.upToDate): Text("已是最新版本").foregroundStyle(.secondary)
+        case .result(.available(let info)):
+            Button("下载 \(info.version)") { updates.openDownload(info) }
+            if let notes = info.notes { Text(notes).foregroundStyle(.secondary).lineLimit(1) }
+        case .result(.unsupportedSystem(let info)): Text("\(info.version) 需要 macOS \(info.minimumSystemVersion ?? "")").foregroundStyle(.orange)
+        case .result(.failed(let message)): Text(message).foregroundStyle(.red).lineLimit(2)
+        }
+    }
 
     var body: some View {
         SettingsForm {
@@ -50,7 +67,14 @@ struct GeneralPage: View {
                     Text("稳定").tag("stable")
                     Text("预览").tag("preview")
                 }
-                Note("自动更新机制随发布里程碑(M8)接入,此处先保存你的偏好。")
+                TextField("更新源地址 (https)", text: $feedURL, prompt: Text("https://example.com/oma/appcast.json"))
+                    .textFieldStyle(.roundedBorder)
+                LabeledContent("当前版本", value: "\(updates.currentVersion) (\(updates.currentBuild))")
+                HStack {
+                    Button("立即检查") { updates.checkNow() }.disabled(updates.state == .checking)
+                    updateStatus
+                }
+                Note("发现新版本后在浏览器中下载 Developer ID 公证的安装包;发布源格式见 开发进度.md。")
             }
             Section("重置") {
                 Button("重置所有客户端设置…", role: .destructive) { confirmReset = true }

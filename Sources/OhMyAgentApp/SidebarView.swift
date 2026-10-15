@@ -33,7 +33,7 @@ struct SidebarView: View {
             }
             Section("对话") {
                 Label {
-                    Text(model.sessionTitle ?? "当前对话").lineLimit(1)
+                    Text(model.sessionTitle ?? String(localized: "当前对话")).lineLimit(1)
                 } icon: {
                     Image(systemName: model.isRunning ? "ellipsis.bubble" : "bubble.left")
                 }
@@ -87,7 +87,7 @@ struct SidebarView: View {
                     Button("退出登录", role: .destructive) { model.logout() }
                 }
             } label: {
-                Label(model.authStatus ?? "账号", systemImage: "person.crop.circle")
+                Label(model.authStatus ?? String(localized: "账号"), systemImage: "person.crop.circle")
                     .font(OMFonts.caption)
                     .lineLimit(1)
             }
@@ -109,10 +109,10 @@ struct SidebarView: View {
 
     private var statusText: String {
         switch model.phase {
-        case .idle: return "未连接"
-        case .connecting: return "正在启动 \(model.agentName)…"
-        case .ready: return "\(model.agentName) 已就绪"
-        case .failed: return "\(model.agentName) 未连接"
+        case .idle: return String(localized: "未连接")
+        case .connecting: return String(localized: "正在启动 \(model.agentName)…")
+        case .ready: return String(localized: "\(model.agentName) 已就绪")
+        case .failed: return String(localized: "\(model.agentName) 未连接")
         }
     }
 }
@@ -124,7 +124,7 @@ struct HistoryRow: View {
     var body: some View {
         Label {
             VStack(alignment: .leading, spacing: 1) {
-                Text(item.title ?? "未命名对话").lineLimit(1)
+                Text(item.title ?? String(localized: "未命名对话")).lineLimit(1)
                 if let time = relativeTime {
                     Text(time).font(OMFonts.caption).foregroundStyle(OMColors.secondaryText)
                 }

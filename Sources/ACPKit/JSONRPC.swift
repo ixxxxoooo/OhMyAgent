@@ -144,13 +144,15 @@ public struct LineFramer: Sendable {
     public mutating func push(_ chunk: Data) -> [Data] {
         buffer.append(chunk)
         var lines: [Data] = []
-        while let newline = buffer.firstIndex(of: 0x0A) {
-            let line = buffer[buffer.startIndex..<newline]
-            buffer.removeSubrange(buffer.startIndex...newline)
-            var trimmed = Data(line)
-            if trimmed.last == 0x0D { trimmed.removeLast() }
-            if !trimmed.isEmpty { lines.append(trimmed) }
+        // 一次扫描切出所有完整行,最后只移除一次已消费前缀(避免逐行移除导致的平方复杂度)
+        var lineStart = buffer.startIndex
+        while let newline = buffer[lineStart...].firstIndex(of: 0x0A) {
+            var end = newline
+            if end > lineStart, buffer[buffer.index(before: end)] == 0x0D { end = buffer.index(before: end) }
+            if end > lineStart { lines.append(Data(buffer[lineStart..<end])) }
+            lineStart = buffer.index(after: newline)
         }
+        if lineStart > buffer.startIndex { buffer.removeSubrange(buffer.startIndex..<lineStart) }
         if buffer.count > maxLineLength {
             buffer.removeAll(keepingCapacity: false)
         }

@@ -61,6 +61,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         BridgeServer.cleanStaleSockets()
         AppearanceModel.shared.applyAll()
         Task { await Toolchain.shared.setOverrides(ClientPrefs.pathOverrides()) }
+        // 首帧之后再做自动更新检查,不占用启动关键路径
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(8))
+            UpdateModel.shared.autoCheckIfNeeded()
+        }
         // 由脚本启动(open -g)时不抢占前台焦点
         if ProcessInfo.processInfo.environment["OMA_DRAFT"] == nil && ProcessInfo.processInfo.environment["OMA_OPEN_EXTENSIONS"] == nil && ProcessInfo.processInfo.environment["OMA_OPEN_SETTINGS"] == nil { NSApp.activate() }
     }
@@ -114,6 +119,9 @@ struct WorkspaceCommands: Commands {
                 if let url = WorkspaceStore.chooseDirectory() { openWindow(value: url) }
             }
             .keyboardShortcut(shortcuts.shortcut(for: .openWorkspace))
+        }
+        CommandGroup(after: .appInfo) {
+            Button("检查更新…") { UpdateModel.shared.checkInteractively() }
         }
         CommandGroup(after: .toolbar) {
             Button("扩展管理…") { openWindow(id: "extensions", value: WorkspaceStore.defaultWorkspace) }

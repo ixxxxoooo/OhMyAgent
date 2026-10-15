@@ -58,7 +58,7 @@ struct ComposerView: View {
                     .transition(.opacity)
             }
         }
-        .animation(.easeOut(duration: 0.12), value: items.isEmpty)
+        .animation(omShouldReduceMotion() ? nil : .easeOut(duration: 0.12), value: items.isEmpty)
     }
 
     // MARK: - 补全
@@ -104,9 +104,9 @@ struct ComposerView: View {
 
     private var placeholder: String {
         switch model.phase {
-        case .connecting: return "正在连接 Agent,可以先输入…"
-        case .failed: return "Agent 未连接,发送将尝试重新连接"
-        default: return "向 \(model.agentName) 提问,Return 发送,Shift+Return 换行"
+        case .connecting: return String(localized: "正在连接 Agent,可以先输入…")
+        case .failed: return String(localized: "Agent 未连接,发送将尝试重新连接")
+        default: return String(localized: "向 \(model.agentName) 提问,Return 发送,Shift+Return 换行")
         }
     }
 

@@ -215,6 +215,8 @@ struct UsageButton: View {
             if usage.size != nil { UsageRing(fraction: fraction) } else { Image(systemName: "gauge.with.needle") }
         }
         .help("用量详情")
+        .accessibilityLabel("用量详情")
+        .accessibilityValue(usage.size != nil ? "上下文已使用 \(Int(fraction * 100))%" : "暂无数据")
         .popover(isPresented: $shown, arrowEdge: .bottom) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("会话用量").font(OMFonts.title)

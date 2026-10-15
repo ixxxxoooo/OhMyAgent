@@ -150,7 +150,7 @@ public final class BridgeServer: @unchecked Sendable {
         while state.withLock({ $0.running }) {
             let client = accept(listenFD, nil, nil)
             if client < 0 { if errno == EINTR { continue } else { break } }
-            state.withLock { $0.connections.insert(client) }
+            _ = state.withLock { $0.connections.insert(client) }
             let thread = Thread { [weak self] in self?.serve(client) }
             thread.name = "OhMyAgent.Bridge.client"
             thread.start()

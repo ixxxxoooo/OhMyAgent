@@ -19,7 +19,7 @@ struct ToolCardView: View {
             let isExpanded = expanded ?? defaultExpanded(tool)
             VStack(alignment: .leading, spacing: 0) {
                 Button {
-                    withAnimation(.snappy(duration: 0.2)) { expanded = !isExpanded }
+                    omWithAnimation(.snappy(duration: 0.2)) { expanded = !isExpanded }
                 } label: {
                     header(tool, isExpanded: isExpanded)
                 }

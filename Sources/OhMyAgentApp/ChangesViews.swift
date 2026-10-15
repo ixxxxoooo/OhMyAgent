@@ -50,7 +50,7 @@ struct FileChangeRow: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
                 Button {
-                    withAnimation(.snappy(duration: 0.2)) { expanded.toggle() }
+                    omWithAnimation(.snappy(duration: 0.2)) { expanded.toggle() }
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "chevron.right")
@@ -75,6 +75,7 @@ struct FileChangeRow: View {
                 }
                 .buttonStyle(.plain)
                 .help("在编辑器中打开")
+                .accessibilityLabel("在编辑器中打开 \(change.path)")
                 if change.status == .pending || change.status == .partiallyReverted {
                     Button("撤销") { model.revert(change) }
                         .buttonStyle(.plain)

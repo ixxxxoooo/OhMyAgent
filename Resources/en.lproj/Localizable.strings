@@ -1,0 +1,112 @@
+/* @author ygw — 英文本地化。键为简体中文原文(开发语言);未收录的文案回退显示中文。 */
+
+/* 菜单与应用 */
+"打开工作区" = "Open Workspace";
+"打开工作区…" = "Open Workspace…";
+"扩展管理" = "Extensions";
+"扩展管理…" = "Extensions…";
+"设置…" = "Settings…";
+"退出 OhMyAgent" = "Quit OhMyAgent";
+"选择 Agent 要在其中工作的项目目录" = "Choose the project folder for the Agent to work in";
+
+/* 侧边栏 */
+"%@ 已就绪" = "%@ ready";
+"%@ 未连接" = "%@ not connected";
+"使用「%@」登录" = "Sign in with “%@”";
+"删除" = "Delete";
+"历史" = "History";
+"对话" = "Conversations";
+"工作区" = "Workspace";
+"当前对话" = "Current Conversation";
+"打开" = "Open";
+"未命名对话" = "Untitled Conversation";
+"未连接" = "Not Connected";
+"正在启动 %@…" = "Starting %@…";
+"账号" = "Account";
+"退出登录" = "Sign Out";
+
+/* 工具栏与状态 */
+"MCP、Skills、子 Agent、Hooks、插件与记忆 (⇧⌘E)" = "MCP, Skills, subagents, hooks, plugins and memory (⇧⌘E)";
+"新对话 (⌘N)" = "New Conversation (⌘N)";
+"新对话" = "New Conversation";
+"切换 Agent(会在此窗口开始新会话)" = "Switch Agent (starts a new session in this window)";
+"管理 Agent…" = "Manage Agents…";
+"工作中" = "Working";
+"正在连接…" = "Connecting…";
+"连接失败" = "Connection Failed";
+"用量详情" = "Usage Details";
+"会话用量" = "Session Usage";
+"暂无数据" = "No data";
+"上下文 %@ / %@ tokens(%lld%%)" = "Context %@ / %@ tokens (%lld%%)";
+"上下文已使用 %lld%%" = "Context used: %lld%%";
+"上下文用量 %lld%%" = "Context usage %lld%%";
+"已用 %@ tokens" = "%@ tokens used";
+"累计费用 %@ %@" = "Total cost %@ %@";
+"已超过预算提醒阈值" = "Budget alert threshold exceeded";
+"数据来自 Agent 上报,订阅账号可能不显示费用。" = "Reported by the Agent; subscription accounts may not show cost.";
+
+/* 对话与输入框 */
+"有什么可以帮你?" = "How can I help?";
+"重试" = "Retry";
+"Agent 未连接,发送将尝试重新连接" = "Agent not connected; sending will try to reconnect";
+"正在连接 Agent,可以先输入…" = "Connecting to the Agent — you can start typing…";
+"向 %@ 提问,Return 发送,Shift+Return 换行" = "Ask %@ — Return to send, Shift+Return for a new line";
+"连接后发送:%@" = "Will send once connected: %@";
+"补全候选" = "Completion Suggestions";
+"停止 (Esc)" = "Stop (Esc)";
+"停止生成" = "Stop Generating";
+"发送 (Return)" = "Send (Return)";
+"发送" = "Send";
+"你:%@" = "You: %@";
+"已思考 %lld 秒" = "Thought for %lld s";
+"思考中… %lld 秒" = "Thinking… %lld s";
+"计划" = "Plan";
+
+/* 本轮改动 */
+"全部撤销" = "Revert All";
+"关闭" = "Close";
+"撤销" = "Revert";
+"已撤销" = "Reverted";
+"部分撤销" = "Partially Reverted";
+"新建" = "New";
+"在编辑器中打开" = "Open in Editor";
+"在编辑器中打开 %@" = "Open %@ in Editor";
+"文件已被修改,未撤销" = "File was modified; not reverted";
+"无法读取文件(可能已被删除或不是文本文件)" = "Cannot read the file (deleted or not a text file)";
+"本轮修改了 %lld 个文件" = "%lld files changed in this turn";
+
+/* 设置侧边栏 */
+"通用" = "General";
+"外观" = "Appearance";
+"Agent 与模型" = "Agent & Model";
+"Agent 扩展" = "Agent Extensions";
+"权限" = "Permissions";
+"扩展(Skills 等)" = "Extensions (Skills, etc.)";
+"记忆与指令" = "Memory & Instructions";
+"终端" = "Terminal";
+"编辑器" = "Editor";
+"快捷键" = "Shortcuts";
+"账号与鉴权" = "Account & Auth";
+"用量与成本" = "Usage & Cost";
+"隐私与遥测" = "Privacy & Telemetry";
+"高级" = "Advanced";
+"诊断" = "Diagnostics";
+"无工作区" = "No Workspace";
+
+/* 快捷键 */
+"发送消息" = "Send Message";
+
+/* 更新 */
+"检查更新…" = "Check for Updates…";
+"OhMyAgent 有新版本" = "A new version of OhMyAgent is available";
+"已是最新版本" = "You're up to date";
+"发现新版本 %@" = "Version %@ is available";
+"前往下载" = "Download";
+"稍后" = "Later";
+"新版本 %@ 需要 macOS %@" = "Version %@ requires macOS %@";
+"检查更新失败" = "Update Check Failed";
+"自动检查更新" = "Check for updates automatically";
+"更新通道" = "Update Channel";
+"立即检查" = "Check Now";
+"当前版本" = "Current Version";
+"更新" = "Updates";

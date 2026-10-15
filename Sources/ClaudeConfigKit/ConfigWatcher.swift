@@ -119,7 +119,8 @@ public final class ConfigWatcher: @unchecked Sendable {
     static func realPath(_ url: URL) -> String {
         var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
         guard realpath(url.path, &buffer) != nil else { return url.path }
-        return String(cString: buffer)
+        let bytes = buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+        return String(decoding: bytes, as: UTF8.self)
     }
 
     private static func modificationDate(_ url: URL) -> Date? {

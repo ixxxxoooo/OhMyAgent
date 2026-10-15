@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Developer ID 分发、非沙盒(需要启动 node/claude 子进程并读写 ~/.claude)。
+         启用 Hardened Runtime 后无需额外例外:应用不加载未签名插件,也不使用 JIT。 -->
+    <key>com.apple.security.cs.disable-library-validation</key><false/>
+</dict>
+</plist>

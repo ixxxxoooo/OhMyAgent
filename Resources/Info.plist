@@ -3,6 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleDevelopmentRegion</key><string>zh-Hans</string>
+    <key>CFBundleLocalizations</key><array><string>zh-Hans</string><string>en</string></array>
     <key>CFBundleExecutable</key><string>OhMyAgent</string>
     <key>CFBundleIdentifier</key><string>com.ygw.OhMyAgent</string>
     <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>

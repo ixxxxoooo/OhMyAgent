@@ -12,6 +12,8 @@ public enum ClientPrefs {
         public static let showMenuBar = "general.showMenuBar"
         public static let autoUpdate = "update.auto"
         public static let updateChannel = "update.channel"
+        public static let updateFeedURL = "update.feedURL"
+        public static let updateLastCheck = "update.lastCheck"
         public static let editorFontSize = "editor.fontSize"
         public static let editorWrap = "editor.wrap"
         public static let editorLargeFileLines = "editor.largeFileLines"

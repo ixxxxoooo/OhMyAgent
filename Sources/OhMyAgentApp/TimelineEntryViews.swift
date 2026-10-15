@@ -63,7 +63,7 @@ struct ThoughtView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Button {
-                withAnimation(.snappy(duration: 0.2)) { expanded.toggle() }
+                omWithAnimation(.snappy(duration: 0.2)) { expanded.toggle() }
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "chevron.right")
@@ -91,7 +91,7 @@ struct ThoughtView: View {
             }
         }
         .onChange(of: entry.isStreaming) { _, streaming in
-            if !streaming { withAnimation(.snappy(duration: 0.25)) { expanded = false } }
+            if !streaming { omWithAnimation(.snappy(duration: 0.25)) { expanded = false } }
         }
     }
 }

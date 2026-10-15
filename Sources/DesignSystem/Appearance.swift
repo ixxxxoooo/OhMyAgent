@@ -126,3 +126,18 @@ public final class AppearanceModel {
         UserDefaults.standard.set(value, forKey: Self.prefix + key)
     }
 }
+
+/// 是否应减弱动效(应用内开关或系统「减弱动态效果」任一开启)。
+@MainActor
+public func omShouldReduceMotion() -> Bool {
+    AppearanceModel.shared.reduceMotion || NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+}
+
+/// 遵循「减弱动态效果」的 withAnimation:减弱时直接执行、不产生动画。
+/// - Parameters:
+///   - animation: 正常情况下使用的动画
+///   - body: 状态变更闭包
+@MainActor
+public func omWithAnimation(_ animation: Animation = .snappy(duration: 0.2), _ body: () -> Void) {
+    if omShouldReduceMotion() { body() } else { withAnimation(animation, body) }
+}

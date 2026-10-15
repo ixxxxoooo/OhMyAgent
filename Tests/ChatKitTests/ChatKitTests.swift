@@ -599,3 +599,72 @@ struct AgentIntegrationTests {
         #expect(received?.0 == "t")
     }
 }
+
+@Suite("渲染性能基线")
+struct RenderPerformanceTests {
+    @Test("Markdown 解析 300KB 文本 < 1s(debug 构建)")
+    func markdownParseBudget() {
+        let section = "## 标题\n\n这是一段包含 **加粗**、`行内代码` 与 [链接](https://example.com) 的正文,用来模拟长回答。\n\n- 列表项一\n- 列表项二\n\n```swift\nlet value = 42\nprint(value)\n```\n\n"
+        let text = String(repeating: section, count: 1500)
+        let clock = ContinuousClock()
+        var blocks = 0
+        let elapsed = clock.measure { blocks = MarkdownParser.parse(text).count }
+        let seconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
+        print("【基线】Markdown \(text.utf8.count / 1024)KB 解析 \(String(format: "%.3f", seconds))s,\(blocks) 块")
+        #expect(seconds < 1)
+        #expect(blocks > 1000)
+    }
+}
+
+@Suite("更新检查")
+struct UpdateCheckerTests {
+    private func feed(_ version: String, build: Int? = nil, minimum: String? = nil, url: String = "https://example.com/a.dmg") -> Data {
+        var info: [String: Any] = ["version": version, "url": url]
+        if let build { info["build"] = build }
+        if let minimum { info["minimumSystemVersion"] = minimum }
+        return try! JSONSerialization.data(withJSONObject: ["stable": info, "preview": ["version": "9.0.0", "url": "https://example.com/p.dmg"]])
+    }
+
+    @Test("点分版本比较")
+    func compareVersions() {
+        #expect(UpdateChecker.compare("0.10.0", "0.9.9") == 1)
+        #expect(UpdateChecker.compare("1.0", "1.0.0") == 0)
+        #expect(UpdateChecker.compare("1.2.3-beta", "1.2.4") == -1)
+    }
+
+    @Test("发现新版本 / 已是最新 / 同版本更高构建号")
+    func evaluateResults() {
+        #expect(UpdateChecker.evaluate(data: feed("0.2.0"), channel: "stable", currentVersion: "0.1.0", currentBuild: 1) == .available(UpdateInfo(version: "0.2.0", url: "https://example.com/a.dmg")))
+        #expect(UpdateChecker.evaluate(data: feed("0.1.0"), channel: "stable", currentVersion: "0.1.0", currentBuild: 1) == .upToDate)
+        #expect(UpdateChecker.evaluate(data: feed("0.1.0", build: 5), channel: "stable", currentVersion: "0.1.0", currentBuild: 1) != .upToDate)
+        if case .available(let info) = UpdateChecker.evaluate(data: feed("0.2.0"), channel: "preview", currentVersion: "0.1.0", currentBuild: 1) { #expect(info.version == "9.0.0") } else { Issue.record("预览通道应返回 9.0.0") }
+    }
+
+    @Test("系统版本不满足、坏数据与坏地址")
+    func failures() {
+        #expect(UpdateChecker.evaluate(data: feed("0.2.0", minimum: "99.0"), channel: "stable", currentVersion: "0.1.0", currentBuild: 1, systemVersion: "27.0") == .unsupportedSystem(UpdateInfo(version: "0.2.0", url: "https://example.com/a.dmg", minimumSystemVersion: "99.0")))
+        #expect(UpdateChecker.evaluate(data: Data("{}".utf8), channel: "stable", currentVersion: "0.1.0", currentBuild: 1) == .failed("发布源缺少 stable 通道"))
+        #expect(UpdateChecker.evaluate(data: Data("nope".utf8), channel: "stable", currentVersion: "0.1.0", currentBuild: 1) == .failed("发布源格式不正确"))
+        #expect(UpdateChecker.evaluate(data: feed("0.2.0", url: "javascript:alert(1)"), channel: "stable", currentVersion: "0.1.0", currentBuild: 1) == .failed("发布源中的下载地址无效"))
+    }
+
+    @Test("拉取:拒绝非 https、支持注入数据、网络错误转为失败")
+    func fetching() async {
+        let data = feed("0.2.0")
+        #expect(await UpdateChecker.check(feedURL: "", channel: "stable", currentVersion: "0.1.0", currentBuild: 1) == .failed("尚未配置更新源地址"))
+        #expect(await UpdateChecker.check(feedURL: "http://evil.example.com/feed.json", channel: "stable", currentVersion: "0.1.0", currentBuild: 1) == .failed("更新源必须使用 https"))
+        let ok = await UpdateChecker.check(feedURL: "https://example.com/feed.json", channel: "stable", currentVersion: "0.1.0", currentBuild: 1, fetch: { _ in data })
+        if case .available = ok {} else { Issue.record("应发现更新") }
+        struct Boom: Error {}
+        let bad = await UpdateChecker.check(feedURL: "https://example.com/feed.json", channel: "stable", currentVersion: "0.1.0", currentBuild: 1, fetch: { _ in throw Boom() })
+        if case .failed = bad {} else { Issue.record("应失败") }
+    }
+
+    @Test("自动检查 24 小时节流")
+    func throttle() {
+        let now = Date()
+        #expect(UpdateChecker.shouldAutoCheck(last: nil, now: now))
+        #expect(!UpdateChecker.shouldAutoCheck(last: now.addingTimeInterval(-3600), now: now))
+        #expect(UpdateChecker.shouldAutoCheck(last: now.addingTimeInterval(-25 * 3600), now: now))
+    }
+}

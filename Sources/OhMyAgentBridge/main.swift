@@ -25,7 +25,7 @@ guard fd >= 0, connected == 0 else {
 }
 
 /// 把 source 读到的内容全部写入 target,直到 EOF。
-func pump(from source: Int32, to target: Int32) {
+@Sendable func pump(from source: Int32, to target: Int32) {
     var buffer = [UInt8](repeating: 0, count: 16384)
     while true {
         let count = read(source, &buffer, buffer.count)
