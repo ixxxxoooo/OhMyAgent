@@ -58,6 +58,8 @@ struct FileTabView: View {
     let tab: WorkbenchTab
     let path: String
     private let store = FileDocumentStore.shared
+    @AppStorage(ClientPrefs.Key.editorLSP) private var lspEnabled = true
+    @State private var lsp: EditorLSPController?
 
     var body: some View {
         let doc = store.document(for: path)
@@ -65,7 +67,8 @@ struct FileTabView: View {
             banner(doc)
             Group {
                 if let text = doc.text {
-                    CodeEditor(text: text, language: SyntaxLanguage.detect(path: path), isEditable: !doc.isReadOnly, revealLine: tab.line) { newText in
+                    CodeEditor(text: text, language: SyntaxLanguage.detect(path: path), isEditable: !doc.isReadOnly, revealLine: tab.line,
+                               diagnostics: lsp?.diagnostics ?? [], features: lsp?.features ?? EditorLanguageFeatures()) { newText in
                         doc.text = newText
                     }
                 } else if let failure = doc.loadError {
@@ -75,8 +78,22 @@ struct FileTabView: View {
                 }
             }
         }
-        .onChange(of: doc.isDirty, initial: true) { _, dirty in
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let lsp, lsp.status != .off { LSPStatusBar(controller: lsp) }
+        }
+        .onChange(of: doc.isDirty, initial: true) { wasDirty, dirty in
             workbench.dock.setDirty(dirty, for: tab.id)
+            if wasDirty, !dirty { lsp?.didSave() }
+        }
+        .onChange(of: doc.text) { _, newText in
+            if let newText { lsp?.textChanged(newText) }
+        }
+        .task(id: "\(path)|\(lspEnabled)|\(doc.text != nil)") {
+            await startLanguageServer(doc)
+        }
+        .onDisappear {
+            lsp?.detach()
+            lsp = nil
         }
         .task(id: path) {
             // 轮询磁盘修改时间:Agent 或其它程序改动文件后,未编辑的标签自动刷新
@@ -85,6 +102,25 @@ struct FileTabView: View {
                 await store.checkExternalChange(path)
             }
         }
+    }
+
+    /// 文本加载完成后接入语言服务器(开关关闭、文件过大或类型不支持时不启动)。
+    private func startLanguageServer(_ doc: FileDocument) async {
+        lsp?.detach()
+        lsp = nil
+        guard lspEnabled, let text = doc.text, !doc.isReadOnly, EditorLSPController.isSupported(path: path) else { return }
+        let controller = EditorLSPController(path: path, projectRoot: projectRoot())
+        controller.openLocation = { [weak workbench] target, line in workbench?.openFile(target, line: line, preview: false) }
+        lsp = controller
+        await controller.attach(text: text)
+    }
+
+    /// 文件所属项目的根目录(取最长匹配);不在任何项目内则用文件所在目录。
+    private func projectRoot() -> String {
+        let match = workbench.projects.map(\.id)
+            .filter { path == $0 || path.hasPrefix($0 + "/") }
+            .max { $0.count < $1.count }
+        return match ?? (path as NSString).deletingLastPathComponent
     }
 
     /// 只读与外部修改提示条。
@@ -248,5 +284,55 @@ struct SubagentTabView: View {
         }
         .padding(.horizontal, 16)
         .frame(height: 38)
+    }
+}
+
+/// 文件标签底部的语言服务器状态条:服务器状态与诊断统计。
+struct LSPStatusBar: View {
+    let controller: EditorLSPController
+
+    var body: some View {
+        HStack(spacing: 8) {
+            switch controller.status {
+            case .off:
+                EmptyView()
+            case .starting:
+                ProgressView().controlSize(.mini)
+                Text("语言服务器启动中…").foregroundStyle(OMColors.secondaryText)
+            case .ready(let name):
+                Image.om("circle-check", size: 12).foregroundStyle(Color.green)
+                Text(name).foregroundStyle(OMColors.secondaryText)
+                Spacer()
+                if controller.errorCount == 0, controller.warningCount == 0 {
+                    Text("没有问题").foregroundStyle(OMColors.secondaryText)
+                } else {
+                    HStack(spacing: 3) {
+                        Image.om("circle-x", size: 12)
+                        Text("\(controller.errorCount)")
+                    }
+                    .foregroundStyle(.red)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(controller.errorCount) 个错误")
+                    HStack(spacing: 3) {
+                        Image.om("triangle-alert", size: 12)
+                        Text("\(controller.warningCount)")
+                    }
+                    .foregroundStyle(.orange)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(controller.warningCount) 个警告")
+                }
+            case .unavailable(let hint):
+                Image.om("info", size: 12).foregroundStyle(OMColors.secondaryText)
+                Text("未找到语言服务器:\(hint)").foregroundStyle(OMColors.secondaryText).lineLimit(1)
+            case .failed(let message):
+                Image.om("triangle-alert", size: 12).foregroundStyle(OMColors.warning)
+                Text("语言服务器不可用:\(message)").foregroundStyle(OMColors.secondaryText).lineLimit(1)
+            }
+            if case .ready = controller.status {} else { Spacer() }
+        }
+        .font(OMFonts.small)
+        .padding(.horizontal, 12).padding(.vertical, 4)
+        .background(.bar)
+        .overlay(alignment: .top) { Divider() }
     }
 }

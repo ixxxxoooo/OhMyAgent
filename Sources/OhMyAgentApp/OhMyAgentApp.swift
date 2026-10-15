@@ -5,6 +5,7 @@ import AgentHost
 import AppKit
 import ChatKit
 import DesignSystem
+import LSPKit
 import OMLog
 import SwiftUI
 import WorkbenchKit
@@ -88,7 +89,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         Log.app.info("应用即将退出", ["sessions": "\(AppEnvironment.shared.workbench.sessions.count)"])
         AppEnvironment.shared.workbench.shutdownAll()
+        stopLanguageServers()
         LogSystem.shared.flush()
+    }
+}
+
+/// 退出前礼貌关闭所有语言服务器(shutdown → exit),最多等待 1.5 秒,避免残留子进程。
+@MainActor
+private func stopLanguageServers() {
+    var finished = false
+    Task {
+        await LSPManager.shared.shutdownAll()
+        finished = true
+    }
+    let deadline = Date().addingTimeInterval(1.5)
+    while !finished, Date() < deadline {
+        RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.02))
     }
 }
 

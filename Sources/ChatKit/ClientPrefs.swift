@@ -18,6 +18,8 @@ public enum ClientPrefs {
         public static let editorFontSize = "editor.fontSize"
         public static let editorWrap = "editor.wrap"
         public static let editorLargeFileLines = "editor.largeFileLines"
+        /// 编辑器是否启用语言服务器(诊断/悬停/跳转/补全)
+        public static let editorLSP = "editor.lsp"
         public static let terminalFontSize = "terminal.fontSize"
         public static let terminalOutputKB = "terminal.outputLimitKB"
         public static let terminalInheritEnv = "terminal.inheritEnvironment"

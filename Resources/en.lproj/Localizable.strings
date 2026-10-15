@@ -355,3 +355,13 @@
 "二进制文件,不显示差异。" = "Binary file, diff not shown.";
 "无法追溯" = "Cannot Blame";
 "文件不在 Git 仓库中,或尚未提交。" = "The file is not in a Git repository or is not committed yet.";
+"语言服务器启动中…" = "Starting language server…";
+"没有问题" = "No problems";
+"未找到语言服务器:%@" = "Language server not found: %@";
+"语言服务器不可用:%@" = "Language server unavailable: %@";
+"语言服务器已退出" = "Language server exited";
+"%lld 个错误" = "%lld errors";
+"%lld 个警告" = "%lld warnings";
+"语言服务器(LSP)" = "Language Server (LSP)";
+"启用诊断、悬停提示、跳转定义与补全" = "Enable diagnostics, hover, go to definition and completion";
+"Swift 使用 Xcode 自带的 sourcekit-lsp;TypeScript/JavaScript 需要 typescript-language-server,Python 需要 pyright(npm i -g typescript-language-server typescript pyright)。悬停停留查看类型,⌘ 点击或 F12 跳转定义,⌃Space 补全,输入 . 自动补全。" = "Swift uses the sourcekit-lsp bundled with Xcode; TypeScript/JavaScript needs typescript-language-server and Python needs pyright (npm i -g typescript-language-server typescript pyright). Hover to see types, ⌘-click or F12 to jump to a definition, ⌃Space to complete; typing . triggers completion automatically.";

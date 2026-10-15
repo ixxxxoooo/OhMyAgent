@@ -11,6 +11,7 @@ struct EditorPage: View {
     @AppStorage(ClientPrefs.Key.editorFontSize) private var fontSize = 12.5
     @AppStorage(ClientPrefs.Key.editorWrap) private var wrap = true
     @AppStorage(ClientPrefs.Key.editorLargeFileLines) private var largeFileLines = 20_000
+    @AppStorage(ClientPrefs.Key.editorLSP) private var lspEnabled = true
 
     var body: some View {
         SettingsForm {
@@ -23,6 +24,10 @@ struct EditorPage: View {
                     TextField("", value: $largeFileLines, format: .number).frame(width: 100).multilineTextAlignment(.trailing)
                 }
                 Note("超过该行数的文件会强制换行并关闭复杂高亮以保持流畅(范围 2,000–200,000)。新打开的文件立即生效。")
+            }
+            Section("语言服务器(LSP)") {
+                Toggle("启用诊断、悬停提示、跳转定义与补全", isOn: $lspEnabled)
+                Note("Swift 使用 Xcode 自带的 sourcekit-lsp;TypeScript/JavaScript 需要 typescript-language-server,Python 需要 pyright(npm i -g typescript-language-server typescript pyright)。悬停停留查看类型,⌘ 点击或 F12 跳转定义,⌃Space 补全,输入 . 自动补全。")
             }
             Section("预览") {
                 Text("func greet(name: String) -> String {\n    return \"Hello, \\(name)\"\n}")
