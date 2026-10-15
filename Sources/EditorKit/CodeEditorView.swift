@@ -310,6 +310,7 @@ final class LineNumberRulerView: NSRulerView {
         self.theme = theme
         super.init(scrollView: scrollView, orientation: .verticalRuler)
         ruleThickness = 52
+        clipsToBounds = true
         clientView = scrollView.documentView
     }
 
@@ -318,8 +319,9 @@ final class LineNumberRulerView: NSRulerView {
     override var isOpaque: Bool { true }
 
     override func drawHashMarksAndLabels(in rect: NSRect) {
+        // macOS 14+ 视图默认不再裁剪到自身边界;只在标尺自己的范围内绘制,否则灰色底会盖住整个编辑区
         theme.gutterBackground.setFill()
-        rect.fill()
+        bounds.fill()
         guard let textView = clientView as? NSTextView,
               let layoutManager = textView.textLayoutManager,
               let contentStorage = layoutManager.textContentManager as? NSTextContentStorage,

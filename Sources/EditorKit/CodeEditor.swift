@@ -26,6 +26,11 @@ public struct CodeEditor: NSViewRepresentable {
         self.markers = markers
     }
 
+    /// 占满父级给出的空间,不把内部滚动视图的内容尺寸当作理想尺寸向上传递(否则会撑破标签页布局)。
+    public func sizeThatFits(_ proposal: ProposedViewSize, nsView: CodeEditorView, context: Context) -> CGSize? {
+        CGSize(width: proposal.width ?? 480, height: proposal.height ?? 320)
+    }
+
     public func makeCoordinator() -> Coordinator { Coordinator() }
 
     public func makeNSView(context: Context) -> CodeEditorView {
