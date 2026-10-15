@@ -6,6 +6,7 @@ import ACPKit
 import ChatKit
 import DesignSystem
 import SwiftUI
+import WorkbenchKit
 
 /// 输入区视图。
 struct ComposerView: View {
@@ -227,5 +228,43 @@ struct CompletionPopup: View {
         case .localCommand: return "terminal"
         case .file: return "doc.text"
         }
+    }
+}
+
+/// 输入区下方的上下文条:当前 Git 分支与运行环境(目前仅「本机」)。
+struct ComposerFooter: View {
+    let model: SessionModel
+    @State private var head: GitHead?
+
+    var body: some View {
+        HStack(spacing: 14) {
+            if let head {
+                Label(head.displayName, om: "git-branch")
+                    .help("当前分支")
+            }
+            Menu {
+                Button { } label: { Label("本机", om: "checkmark") }
+            } label: {
+                Label("本机", om: "laptop")
+            }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+            .help("运行环境")
+            Spacer()
+        }
+        .font(OMFonts.caption)
+        .foregroundStyle(OMColors.secondaryText)
+        .padding(.horizontal, 12)
+        .task(id: model.workspace.path) { await refresh() }
+        .onChange(of: model.isRunning) { _, running in
+            if !running { Task { await refresh() } }
+        }
+    }
+
+    /// 在后台线程读取 HEAD,避免主线程磁盘 I/O。
+    private func refresh() async {
+        let directory = model.workspace
+        head = await Task.detached(priority: .utility) { GitHead.read(at: directory) }.value
     }
 }

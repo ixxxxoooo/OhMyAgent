@@ -5,6 +5,7 @@ import IconKit
 import ChatKit
 import DesignSystem
 import SwiftUI
+import WorkbenchKit
 
 /// 对话视图。
 struct ChatView: View {
@@ -31,7 +32,9 @@ struct ChatView: View {
                 if case .failed(let message) = model.phase {
                     ConnectionFailureCard(message: message) { model.reconnect() }
                 }
+                PlanDock(model: model)
                 ComposerView(model: model)
+                ComposerFooter(model: model)
             }
             .frame(maxWidth: OMMetrics.timelineMaxWidth)
             .padding(.horizontal, 16)

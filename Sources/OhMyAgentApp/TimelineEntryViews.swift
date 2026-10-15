@@ -143,3 +143,37 @@ struct NoticeView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
+
+/// 输入区上方的待办折叠卡:默认收起为一行「已完成 x / n」,点击展开完整计划。
+struct PlanDock: View {
+    let model: SessionModel
+    @State private var expanded = false
+
+    var body: some View {
+        if let entry = model.timeline.entries.last(where: { $0.kind == .plan }), !entry.plan.isEmpty {
+            let done = entry.plan.filter { $0.status == "completed" }.count
+            VStack(spacing: 0) {
+                Button {
+                    omWithAnimation { expanded.toggle() }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image.om(expanded ? "chevron.down" : "chevron.right", size: 10)
+                        Image.om("list-checks", size: 12)
+                        Text("待办 \(done)/\(entry.plan.count)").font(OMFonts.small.weight(.medium))
+                        Spacer()
+                    }
+                    .foregroundStyle(OMColors.secondaryText)
+                    .padding(.horizontal, 12)
+                    .frame(height: 28)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(expanded ? "收起待办" : "展开待办")
+                if expanded {
+                    PlanView(entry: entry).padding([.horizontal, .bottom], 4)
+                }
+            }
+            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.primary.opacity(0.05)))
+        }
+    }
+}

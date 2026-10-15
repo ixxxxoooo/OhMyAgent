@@ -153,3 +153,10 @@
 "没有项目" = "No Projects";
 "输出" = "Output";
 "改动" = "Changes";
+"本机" = "This Mac";
+"当前分支" = "Current branch";
+"运行环境" = "Environment";
+"待办" = "To-do";
+"收起待办" = "Collapse to-do";
+"展开待办" = "Expand to-do";
+"待办 %lld/%lld" = "To-do %lld/%lld";
