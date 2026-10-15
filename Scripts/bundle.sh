@@ -17,6 +17,7 @@ cp "$BIN/FakeAgent" "$APP/Contents/MacOS/FakeAgent"
 cp "$BIN/DirectAgent" "$APP/Contents/MacOS/DirectAgent"
 cp "$BIN/OhMyAgentBridge" "$APP/Contents/MacOS/OhMyAgentBridge"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
+cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 for lproj in Resources/*.lproj(N); do cp -R "$lproj" "$APP/Contents/Resources/"; done
 codesign --force --sign - --deep "$APP" >/dev/null 2>&1 || true
 echo "已生成 $APP"
