@@ -335,6 +335,25 @@ public struct DockLayout: Codable, Equatable, Sendable {
         }
     }
 
+    // MARK: 启动恢复
+
+    /// 返回适合启动时恢复的布局:剔除不可恢复的临时标签(子 Agent、预览、终端)与已不存在项目的标签,并校正结构。
+    /// - Parameter projectIDs: 当前仍存在的项目 ID
+    public func restoredForLaunch(projectIDs: Set<String>) -> DockLayout {
+        var copy = self
+        copy.maximizedGroupID = nil
+        copy.closeTabs { tab in
+            switch tab.kind {
+            case .subagent, .preview, .terminal: return true
+            case .chat(let id), .changes(let id): return !projectIDs.contains(id)
+            case .file(let path), .diff(let path):
+                return !projectIDs.contains { path == $0 || path.hasPrefix($0 + "/") } || !FileManager.default.fileExists(atPath: path)
+            }
+        }
+        copy.sanitize()
+        return copy
+    }
+
     // MARK: 内部实现
 
     private mutating func focus(group id: UUID, activating tabID: UUID) {

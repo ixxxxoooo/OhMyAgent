@@ -120,6 +120,8 @@ public struct WorkbenchState: Codable, Equatable, Sendable {
     public var layout = WorkbenchLayout()
     public var projects: [ProjectEntry] = []
     public var selectedProjectID: String?
+    /// 停靠布局(旧版本状态文件没有该字段)
+    public var dock: DockLayout?
 
     public init() {}
 }

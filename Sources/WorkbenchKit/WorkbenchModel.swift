@@ -18,6 +18,8 @@ public final class WorkbenchModel {
     public private(set) var sessions: [String: SessionModel] = [:]
     /// 主窗口当前显示的内容:工作台或设置整页(不持久化,启动时总是工作台)。
     public var mode: WorkbenchMode = .workspace
+    /// 停靠布局:标签组与分屏(持久化)。
+    public var dock: DockLayout { didSet { if dock != oldValue { scheduleSave() } } }
 
     @ObservationIgnored private let store: WorkbenchStore
     @ObservationIgnored private let makeSession: @MainActor (URL) -> SessionModel
@@ -39,6 +41,7 @@ public final class WorkbenchModel {
         projects = alive
         selectedProjectID = selected
         layout = state.layout
+        dock = (state.dock ?? DockLayout()).restoredForLaunch(projectIDs: Set(alive.map(\.id)))
         log.info("工作台状态已加载", ["projects": "\(alive.count)", "selected": selected ?? "-"])
     }
 
@@ -84,9 +87,11 @@ public final class WorkbenchModel {
 
     /// 选中项目;会话尚未创建时创建并预热连接。
     public func select(project id: String) {
-        guard projects.contains(where: { $0.id == id }) else { return }
+        guard let project = projects.first(where: { $0.id == id }) else { return }
         selectedProjectID = id
         ensureSession(for: id)
+        dock.open(.chat(projectID: id), title: project.name)
+        mode = .workspace
         scheduleSave()
     }
 
@@ -96,6 +101,7 @@ public final class WorkbenchModel {
         sessions[id]?.shutdown()
         sessions[id] = nil
         projects.remove(at: index)
+        dock.closeTabs { Self.belongs($0.kind, toProject: id) }
         if selectedProjectID == id { selectedProjectID = orderedProjects.first?.id }
         if let selected = selectedProjectID { ensureSession(for: selected) }
         log.info("移除项目", ["path": id])
@@ -106,6 +112,63 @@ public final class WorkbenchModel {
     public func togglePin(_ id: String) {
         guard let index = projects.firstIndex(where: { $0.id == id }) else { return }
         projects[index].pinned.toggle()
+        scheduleSave()
+    }
+
+    // MARK: 标签与停靠
+
+    /// 标签内容是否归属某项目(会话/改动按项目 ID,文件/Diff 按路径前缀)。
+    static func belongs(_ kind: TabKind, toProject id: String) -> Bool {
+        switch kind {
+        case .chat(let p), .changes(let p), .subagent(let p, _): return p == id
+        case .file(let path), .diff(let path): return path == id || path.hasPrefix(id + "/")
+        case .terminal, .preview: return false
+        }
+    }
+
+    /// 打开文件标签(单击预览,双击固化)。
+    /// - Parameters:
+    ///   - path: 绝对路径
+    ///   - line: 定位行(1 起)
+    ///   - preview: 是否预览方式
+    @discardableResult
+    public func openFile(_ path: String, line: Int? = nil, preview: Bool = true) -> UUID {
+        mode = .workspace
+        return dock.open(.file(path: path), title: (path as NSString).lastPathComponent, preview: preview, line: line)
+    }
+
+    /// 打开单个文件的差异标签。
+    @discardableResult
+    public func openDiff(_ path: String) -> UUID {
+        mode = .workspace
+        return dock.open(.diff(path: path), title: String(localized: "差异") + " · " + (path as NSString).lastPathComponent, preview: true)
+    }
+
+    /// 打开本轮改动汇总标签。
+    @discardableResult
+    public func openChanges(project id: String) -> UUID {
+        mode = .workspace
+        return dock.open(.changes(projectID: id), title: String(localized: "改动"))
+    }
+
+    /// 激活标签;会话标签同时切换当前项目。
+    public func activateTab(_ id: UUID) {
+        dock.activate(id)
+        syncSelectionFromDock()
+    }
+
+    /// 关闭标签;关闭后焦点落到相邻标签时同步当前项目。
+    public func closeTab(_ id: UUID) {
+        dock.close(id)
+        syncSelectionFromDock()
+    }
+
+    /// 聚焦组内激活标签若为会话,则把它所属项目设为当前项目。
+    public func syncSelectionFromDock() {
+        guard case .chat(let id)? = dock.focusedGroup?.active?.kind, id != selectedProjectID,
+              projects.contains(where: { $0.id == id }) else { return }
+        selectedProjectID = id
+        ensureSession(for: id)
         scheduleSave()
     }
 
@@ -245,6 +308,7 @@ public final class WorkbenchModel {
         state.layout = layout
         state.projects = projects
         state.selectedProjectID = selectedProjectID
+        state.dock = dock
         do { try store.save(state) } catch { log.error("保存工作台状态失败", error: error, ["file": store.fileURL.path]) }
     }
 }
