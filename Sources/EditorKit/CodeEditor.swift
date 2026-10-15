@@ -10,6 +10,8 @@ public struct CodeEditor: NSViewRepresentable {
     public var isEditable: Bool
     public var revealLine: Int?
     public var markers: [Int: LineMarker]
+    /// 用户编辑后回调(传出完整文本);仅可编辑时有意义。
+    public var onChange: ((String) -> Void)?
 
     /// 创建编辑器。
     /// - Parameters:
@@ -18,7 +20,9 @@ public struct CodeEditor: NSViewRepresentable {
     ///   - isEditable: 是否可编辑
     ///   - revealLine: 需要跳转的行(1 起始)
     ///   - markers: 行标记
-    public init(text: String, language: SyntaxLanguage, isEditable: Bool = false, revealLine: Int? = nil, markers: [Int: LineMarker] = [:]) {
+    ///   - onChange: 编辑回调
+    public init(text: String, language: SyntaxLanguage, isEditable: Bool = false, revealLine: Int? = nil, markers: [Int: LineMarker] = [:], onChange: ((String) -> Void)? = nil) {
+        self.onChange = onChange
         self.text = text
         self.language = language
         self.isEditable = isEditable
@@ -36,11 +40,23 @@ public struct CodeEditor: NSViewRepresentable {
     public func makeNSView(context: Context) -> CodeEditorView {
         let view = CodeEditorView(isEditable: isEditable)
         context.coordinator.loadedText = text
+        context.coordinator.loadedLanguage = language
+        wire(view, context.coordinator)
         view.setText(text, language: language)
         return view
     }
 
+    /// 把编辑回调接到编辑器:先记录已装载文本,避免随后的 `updateNSView` 把用户输入当作外部变更而整体重置(光标跳动)。
+    private func wire(_ view: CodeEditorView, _ coordinator: Coordinator) {
+        view.onTextChange = { [weak coordinator] text in
+            coordinator?.loadedText = text
+            coordinator?.onChange?(text)
+        }
+    }
+
     public func updateNSView(_ view: CodeEditorView, context: Context) {
+        context.coordinator.onChange = onChange
+        wire(view, context.coordinator)
         if context.coordinator.loadedText != text || context.coordinator.loadedLanguage != language {
             context.coordinator.loadedText = text
             context.coordinator.loadedLanguage = language
@@ -64,5 +80,6 @@ public struct CodeEditor: NSViewRepresentable {
         var loadedText: String?
         var loadedLanguage: SyntaxLanguage?
         var revealedLine: Int?
+        var onChange: ((String) -> Void)?
     }
 }

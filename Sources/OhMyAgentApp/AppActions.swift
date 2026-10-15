@@ -45,6 +45,60 @@ final class AppActions {
         showMainWindow()
     }
 
+    /// 把所有文件标签的「未保存」标记与文档状态对齐(保存/重新载入后调用)。
+    func refreshDirtyFlags() {
+        let workbench = AppEnvironment.shared.workbench
+        for tab in workbench.dock.allTabs {
+            if case .file(let path) = tab.kind {
+                workbench.dock.setDirty(FileDocumentStore.shared.documents[path]?.isDirty ?? false, for: tab.id)
+            }
+        }
+    }
+
+    /// 保存当前聚焦标签对应的文件。
+    func saveActiveFile() {
+        let workbench = AppEnvironment.shared.workbench
+        guard case .file(let path)? = workbench.dock.focusedGroup?.active?.kind else { return }
+        Task { _ = await FileDocumentStore.shared.save(path); refreshDirtyFlags() }
+    }
+
+    /// 保存所有未保存的文件。
+    func saveAllFiles() {
+        Task { _ = await FileDocumentStore.shared.saveAll(); refreshDirtyFlags() }
+    }
+
+    /// 是否存在可保存的当前文件(供菜单启用状态)。
+    var canSaveActiveFile: Bool {
+        guard case .file(let path)? = AppEnvironment.shared.workbench.dock.focusedGroup?.active?.kind else { return false }
+        return FileDocumentStore.shared.documents[path]?.isDirty ?? false
+    }
+
+    /// 请求关闭标签:文件有未保存修改时询问「保存 / 不保存 / 取消」。
+    func requestCloseTab(_ id: UUID) {
+        let workbench = AppEnvironment.shared.workbench
+        guard let tab = workbench.dock.tab(id) else { return }
+        guard case .file(let path) = tab.kind, let doc = FileDocumentStore.shared.documents[path], doc.isDirty else {
+            workbench.closeTab(id)
+            return
+        }
+        let alert = NSAlert()
+        alert.messageText = String(localized: "要保存对 \((path as NSString).lastPathComponent) 的修改吗?")
+        alert.informativeText = String(localized: "如果不保存,你的修改将会丢失。")
+        alert.addButton(withTitle: String(localized: "保存"))
+        alert.addButton(withTitle: String(localized: "不保存"))
+        alert.addButton(withTitle: String(localized: "取消"))
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            Task {
+                if await FileDocumentStore.shared.save(path) { FileDocumentStore.shared.discard(path); workbench.closeTab(id) }
+            }
+        case .alertSecondButtonReturn:
+            FileDocumentStore.shared.discard(path)
+            workbench.closeTab(id)
+        default: break
+        }
+    }
+
     /// 打开预览标签(如放大的 Mermaid 图)。
     func openPreview(id: String, title: String) {
         AppEnvironment.shared.workbench.openPreview(id: id, title: title)

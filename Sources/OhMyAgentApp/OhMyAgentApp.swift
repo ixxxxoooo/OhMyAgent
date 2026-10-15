@@ -61,6 +61,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
+    /// 退出前若有未保存的文件,询问保存。
+    @MainActor
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        let dirty = FileDocumentStore.shared.dirtyDocuments
+        guard !dirty.isEmpty else { return .terminateNow }
+        let alert = NSAlert()
+        alert.messageText = String(localized: "有 \(dirty.count) 个文件尚未保存")
+        alert.informativeText = dirty.prefix(5).map { ($0.path as NSString).lastPathComponent }.joined(separator: "、")
+        alert.addButton(withTitle: String(localized: "全部保存并退出"))
+        alert.addButton(withTitle: String(localized: "不保存直接退出"))
+        alert.addButton(withTitle: String(localized: "取消"))
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            Task {
+                let ok = await FileDocumentStore.shared.saveAll()
+                NSApp.reply(toApplicationShouldTerminate: ok)
+            }
+            return .terminateLater
+        case .alertSecondButtonReturn: return .terminateNow
+        default: return .terminateCancel
+        }
+    }
+
     @MainActor
     func applicationWillTerminate(_ notification: Notification) {
         Log.app.info("应用即将退出", ["sessions": "\(AppEnvironment.shared.workbench.sessions.count)"])
@@ -103,6 +126,20 @@ struct WorkbenchCommands: Commands {
                 if let url = WorkspaceStore.chooseDirectory() { AppActions.shared.openWorkspace(url) }
             }
             .keyboardShortcut(shortcuts.shortcut(for: .openWorkspace))
+        }
+        CommandGroup(replacing: .saveItem) {
+            Button("保存") { AppActions.shared.saveActiveFile() }
+                .keyboardShortcut(shortcuts.shortcut(for: .saveFile))
+            Button("全部保存") { AppActions.shared.saveAllFiles() }
+                .keyboardShortcut("s", modifiers: [.command, .option])
+        }
+        CommandGroup(after: .textEditing) {
+            Button("快速打开文件…") { PaletteModel.shared.present(.files, workbench: workbench) }
+                .keyboardShortcut(shortcuts.shortcut(for: .quickOpen))
+            Button("命令面板…") { PaletteModel.shared.present(.commands, workbench: workbench) }
+                .keyboardShortcut(shortcuts.shortcut(for: .commandPalette))
+            Button("在文件中搜索") { workbench.showRight(.search); SearchModel.shared.requestFocus() }
+                .keyboardShortcut(shortcuts.shortcut(for: .globalSearch))
         }
         CommandGroup(replacing: .appSettings) {
             Button("设置…") { AppActions.shared.openSettings() }

@@ -21,9 +21,9 @@ public enum LeftPane: String, Codable, CaseIterable, Sendable {
 
 /// 右栏视图。
 public enum RightPane: String, Codable, CaseIterable, Sendable {
-    case changes, plan, outline, problems
+    case changes, plan, outline, problems, files, search
 
-    public static var available: [RightPane] { [.changes, .plan] }
+    public static var available: [RightPane] { [.changes, .plan, .files, .search] }
 }
 
 /// 底部面板视图。

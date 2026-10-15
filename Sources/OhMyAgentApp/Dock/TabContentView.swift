@@ -19,7 +19,7 @@ struct TabContentView: View {
     var body: some View {
         switch tab.kind {
         case .chat(let projectID): ChatPane(workbench: workbench, projectID: projectID)
-        case .file(let path): FileTabView(path: path, line: tab.line)
+        case .file(let path): FileTabView(workbench: workbench, tab: tab, path: path)
         case .diff(let path): DiffTabView(workbench: workbench, path: path)
         case .changes(let projectID): ChangesTabView(workbench: workbench, projectID: projectID)
         case .subagent(let projectID, let toolCallID): SubagentTabView(workbench: workbench, projectID: projectID, toolCallID: toolCallID)
@@ -54,31 +54,63 @@ private struct ChatPane: View {
     }
 }
 
-/// 文件标签:后台读取,EditorKit 只读展示并定位到指定行。
+/// 文件标签:可编辑的代码编辑器;文本保存在 `FileDocumentStore`,切换标签不丢失未保存内容。
 struct FileTabView: View {
+    let workbench: WorkbenchModel
+    let tab: WorkbenchTab
     let path: String
-    let line: Int?
-    @State private var text: String?
-    @State private var failure: String?
+    private let store = FileDocumentStore.shared
 
     var body: some View {
-        Group {
-            if let text {
-                CodeEditor(text: text, language: SyntaxLanguage.detect(path: path), isEditable: false, revealLine: line)
-            } else if let failure {
-                Text(failure).foregroundStyle(OMColors.secondaryText).frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+        let doc = store.document(for: path)
+        VStack(spacing: 0) {
+            banner(doc)
+            Group {
+                if let text = doc.text {
+                    CodeEditor(text: text, language: SyntaxLanguage.detect(path: path), isEditable: !doc.isReadOnly, revealLine: tab.line) { newText in
+                        doc.text = newText
+                    }
+                } else if let failure = doc.loadError {
+                    Text(failure).foregroundStyle(OMColors.secondaryText).frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
             }
         }
-        .task(id: path) {
-            let target = path
-            let result = await Task.detached(priority: .userInitiated) { () -> String? in
-                try? String(contentsOfFile: target, encoding: .utf8)
-            }.value
-            Log.ui.info("文件标签读取", ["path": target, "ok": "\(result != nil)", "len": "\(result?.count ?? -1)"])
-            if let result { text = result; failure = nil } else { failure = String(localized: "无法读取文件(可能已被删除或不是文本文件)") }
+        .onChange(of: doc.isDirty, initial: true) { _, dirty in
+            workbench.dock.setDirty(dirty, for: tab.id)
         }
+        .task(id: path) {
+            // 轮询磁盘修改时间:Agent 或其它程序改动文件后,未编辑的标签自动刷新
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                await store.checkExternalChange(path)
+            }
+        }
+    }
+
+    /// 只读与外部修改提示条。
+    @ViewBuilder
+    private func banner(_ doc: FileDocument) -> some View {
+        if doc.isReadOnly {
+            noticeBar(icon: "lock", text: String(localized: "文件超过 5 MB,以只读方式打开")) { EmptyView() }
+        } else if doc.externalChange {
+            noticeBar(icon: "triangle-alert", text: String(localized: "文件已在磁盘上被修改,与你的未保存编辑冲突")) {
+                Button("重新载入") { Task { await store.reload(path) } }.controlSize(.small)
+                Button("保留我的") { Task { await store.save(path); AppActions.shared.refreshDirtyFlags() } }.controlSize(.small)
+            }
+        }
+    }
+
+    private func noticeBar<Actions: View>(icon: String, text: String, @ViewBuilder actions: () -> Actions) -> some View {
+        HStack(spacing: 8) {
+            Image.om(icon, size: 13).foregroundStyle(OMColors.warning)
+            Text(text).font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
+            Spacer()
+            actions()
+        }
+        .padding(.horizontal, 12).padding(.vertical, 6)
+        .background(OMColors.warning.opacity(0.12))
     }
 }
 

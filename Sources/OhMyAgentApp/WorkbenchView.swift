@@ -27,6 +27,7 @@ struct WorkbenchView: View {
                 workspaceBody
             }
         }
+        .overlay { PaletteOverlay(workbench: workbench) }
         .tint(appearance.accent.color)
         .frame(minWidth: 860, minHeight: 560)
         .background(WindowFocusReader(onWindow: { actions.mainWindow = $0 }, onChange: { key in
@@ -130,6 +131,30 @@ struct WorkbenchView: View {
             // 调试:等待子 Agent 条目出现后以标签打开其只读会话
             for _ in 0..<60 where model.timeline.toolEntry(id: toolID) == nil { try? await Task.sleep(for: .milliseconds(100)) }
             workbench.openSubagent(project: project, toolCallID: toolID, title: model.timeline.toolEntry(id: toolID)?.tool?.title ?? toolID)
+        }
+        if let pane = env["OMA_RIGHT_PANE"], let value = RightPane(rawValue: pane) {
+            workbench.showRight(value)
+            if let query = env["OMA_SEARCH_QUERY"] {
+                SearchModel.shared.root = workbench.selectedProjectID
+                WorkspaceIndexModel.shared.refresh(root: workbench.selectedProjectID)
+                SearchModel.shared.query = query
+            }
+        }
+        if let mode = env["OMA_PALETTE"] {
+            // 调试:打开命令面板/快速打开,可预填查询
+            PaletteModel.shared.present(mode == "commands" ? .commands : .files, workbench: workbench)
+            try? await Task.sleep(for: .milliseconds(600))
+            PaletteModel.shared.query = env["OMA_PALETTE_QUERY"] ?? ""
+        }
+        if let append = env["OMA_EDIT_APPEND"], !append.isEmpty, let file = env["OMA_OPEN_FILE"] {
+            // 调试:等文件载入后追加文本,验证「未保存」标记;OMA_EDIT_SAVE=1 继续保存
+            let doc = FileDocumentStore.shared.document(for: file)
+            for _ in 0..<50 where doc.text == nil { try? await Task.sleep(for: .milliseconds(100)) }
+            doc.text = (doc.text ?? "") + append
+            if env["OMA_EDIT_SAVE"] == "1" {
+                try? await Task.sleep(for: .milliseconds(800))
+                actions.saveActiveFile()
+            }
         }
         if let source = env["OMA_OPEN_MERMAID"], !source.isEmpty {
             // 调试:直接以预览标签打开一段 Mermaid 源码(\n 表示换行)

@@ -281,7 +281,7 @@ struct TabItemView: View {
             } else if tab.isDirty && !hovering {
                 Circle().fill(OMColors.secondaryText).frame(width: 7, height: 7)
             } else if hovering || isActive {
-                Button { workbench.closeTab(tab.id) } label: {
+                Button { AppActions.shared.requestCloseTab(tab.id) } label: {
                     Image.om("xmark", size: 10, weight: .bold)
                 }
                 .buttonStyle(.plain)
@@ -301,7 +301,7 @@ struct TabItemView: View {
 
     @ViewBuilder
     private var menu: some View {
-        Button("关闭") { workbench.closeTab(tab.id) }
+        Button("关闭") { AppActions.shared.requestCloseTab(tab.id) }
         Button("关闭其它") { workbench.dock.closeOthers(tab.id) }
             .disabled(group.tabs.count < 2)
         Divider()

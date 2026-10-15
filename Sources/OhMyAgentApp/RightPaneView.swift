@@ -21,6 +21,19 @@ struct RightPaneView: View {
             .labelsHidden()
             .padding(10)
             Divider()
+            switch workbench.layout.rightPane {
+            case .files: ExplorerView(workbench: workbench)
+            case .search: SearchPaneView(workbench: workbench)
+            default: sessionContent
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(OMColors.surface)
+    }
+
+    @ViewBuilder
+    private var sessionContent: some View {
+        VStack(spacing: 0) {
             if let model = workbench.activeSession {
                 content(model: model)
             } else {
@@ -52,7 +65,7 @@ struct RightPaneView: View {
             } else {
                 ContentUnavailableView { Label("暂无计划", om: "checklist", size: 28) } description: { Text("Agent 制定任务计划后会显示在这里。") }
             }
-        case .outline, .problems:
+        case .outline, .problems, .files, .search:
             EmptyView()
         }
     }
@@ -64,6 +77,8 @@ struct RightPaneView: View {
         case .plan: return "list-checks"
         case .outline: return "list"
         case .problems: return "triangle-alert"
+        case .files: return "folder"
+        case .search: return "search"
         }
     }
 
@@ -73,6 +88,8 @@ struct RightPaneView: View {
         case .plan: return String(localized: "计划")
         case .outline: return String(localized: "大纲")
         case .problems: return String(localized: "问题")
+        case .files: return String(localized: "文件")
+        case .search: return String(localized: "搜索")
         }
     }
 }

@@ -37,6 +37,9 @@ public final class CodeEditorView: NSView {
     /// 当前是否处于大文件模式。
     public private(set) var isLargeFileMode = false
 
+    /// 用户编辑后回调(传出完整文本)。程序化 `setText` 不触发。
+    public var onTextChange: ((String) -> Void)?
+
     /// 行标记,变更后刷新标尺。
     public var lineMarkers: [Int: LineMarker] = [:] {
         didSet { ruler.lineMarkers = lineMarkers }
@@ -71,6 +74,7 @@ public final class CodeEditorView: NSView {
         scrollView.contentView.backgroundColor = theme.background
         scrollView.contentView.postsBoundsChangedNotifications = true
 
+        textView.delegate = self
         textView.isEditable = isEditable
         textView.isSelectable = true
         textView.isRichText = false
@@ -157,6 +161,39 @@ public final class CodeEditorView: NSView {
                 self.scheduleHighlight()
             }
         }
+    }
+
+    /// 用户编辑后:同步更新行索引(小文件)、防抖重做词法并回调。
+    fileprivate func handleEdit() {
+        let text = textView.string
+        generation += 1
+        let current = generation
+        let language = self.language
+        let engine = self.engine
+        if text.utf16.count <= 300_000 {
+            let index = LineIndex(text: text)
+            lineIndex = index
+            ruler.lineIndex = index
+        } else {
+            ruler.needsDisplay = true
+        }
+        rebuildTask?.cancel()
+        rebuildTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(180))
+            guard !Task.isCancelled else { return }
+            let index = await Task.detached(priority: .userInitiated) { LineIndex(text: text) }.value
+            _ = await engine.rebuild(text: text, language: language)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard let self, self.generation == current else { return }
+                self.lineIndex = index
+                self.ruler.lineIndex = index
+                self.applyLargeFileMode(index.lineCount > Self.largeFileLineThreshold)
+                self.highlightedRange = NSRange(location: 0, length: 0)
+                self.scheduleHighlight()
+            }
+        }
+        onTextChange?(text)
     }
 
     /// 滚动到指定行并选中该行。
@@ -263,6 +300,14 @@ public final class CodeEditorView: NSView {
         }
         storage.endEditing()
         highlightedRange = desired
+    }
+}
+
+// MARK: - 文本编辑回调
+
+extension CodeEditorView: NSTextViewDelegate {
+    public func textDidChange(_ notification: Notification) {
+        handleEdit()
     }
 }
 
