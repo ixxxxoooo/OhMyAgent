@@ -3,6 +3,14 @@
 
 import Foundation
 
+/// 主窗口显示的内容。
+public enum WorkbenchMode: Equatable, Sendable {
+    /// 工作台(左栏 + 中栏 + 右栏)
+    case workspace
+    /// 设置整页(并入主窗口,通过「返回」回到工作台)
+    case settings
+}
+
 /// 左栏视图。
 public enum LeftPane: String, Codable, CaseIterable, Sendable {
     case sessions, files, git, search
@@ -74,6 +82,10 @@ public struct ProjectEntry: Codable, Equatable, Sendable, Identifiable {
     public var pinned = false
     public var collapsed = false
     public var sessions: [CachedSession] = []
+    /// 已置顶的会话 ID(按置顶先后排列)
+    public var pinnedSessions: [String] = []
+    /// 已归档的会话 ID(不在列表中显示,可在「已归档」中恢复)
+    public var archivedSessions: [String] = []
 
     public var url: URL { URL(fileURLWithPath: id) }
 
@@ -82,6 +94,24 @@ public struct ProjectEntry: Codable, Equatable, Sendable, Identifiable {
         name = url.lastPathComponent.isEmpty ? url.path : url.lastPathComponent
         addedAt = now
         lastOpenedAt = now
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, addedAt, lastOpenedAt, pinned, collapsed, sessions, pinnedSessions, archivedSessions
+    }
+
+    /// 容错解码:新增字段缺失时使用默认值,旧版本状态文件可继续读取。
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        addedAt = try c.decode(Date.self, forKey: .addedAt)
+        lastOpenedAt = try c.decode(Date.self, forKey: .lastOpenedAt)
+        pinned = try c.decodeIfPresent(Bool.self, forKey: .pinned) ?? false
+        collapsed = try c.decodeIfPresent(Bool.self, forKey: .collapsed) ?? false
+        sessions = try c.decodeIfPresent([CachedSession].self, forKey: .sessions) ?? []
+        pinnedSessions = try c.decodeIfPresent([String].self, forKey: .pinnedSessions) ?? []
+        archivedSessions = try c.decodeIfPresent([String].self, forKey: .archivedSessions) ?? []
     }
 }
 

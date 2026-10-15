@@ -16,6 +16,8 @@ public final class WorkbenchModel {
     public var layout: WorkbenchLayout { didSet { if layout != oldValue { scheduleSave() } } }
     /// 每个项目的活动会话(按需创建)
     public private(set) var sessions: [String: SessionModel] = [:]
+    /// 主窗口当前显示的内容:工作台或设置整页(不持久化,启动时总是工作台)。
+    public var mode: WorkbenchMode = .workspace
 
     @ObservationIgnored private let store: WorkbenchStore
     @ObservationIgnored private let makeSession: @MainActor (URL) -> SessionModel
@@ -106,6 +108,49 @@ public final class WorkbenchModel {
         projects[index].pinned.toggle()
         scheduleSave()
     }
+
+    // MARK: 会话置顶与归档
+
+    /// 会话是否已置顶。
+    public func isSessionPinned(_ sessionId: String, in project: String) -> Bool {
+        projects.first { $0.id == project }?.pinnedSessions.contains(sessionId) ?? false
+    }
+
+    /// 会话是否已归档。
+    public func isSessionArchived(_ sessionId: String, in project: String) -> Bool {
+        projects.first { $0.id == project }?.archivedSessions.contains(sessionId) ?? false
+    }
+
+    /// 切换会话置顶(归档的会话置顶时自动取消归档)。
+    public func toggleSessionPin(_ sessionId: String, in project: String) {
+        guard !sessionId.isEmpty, let index = projects.firstIndex(where: { $0.id == project }) else { return }
+        if let at = projects[index].pinnedSessions.firstIndex(of: sessionId) {
+            projects[index].pinnedSessions.remove(at: at)
+        } else {
+            projects[index].pinnedSessions.append(sessionId)
+            projects[index].archivedSessions.removeAll { $0 == sessionId }
+        }
+        scheduleSave()
+    }
+
+    /// 归档或取消归档会话(归档同时取消置顶)。
+    public func setSessionArchived(_ archived: Bool, sessionId: String, in project: String) {
+        guard !sessionId.isEmpty, let index = projects.firstIndex(where: { $0.id == project }) else { return }
+        projects[index].archivedSessions.removeAll { $0 == sessionId }
+        if archived {
+            projects[index].archivedSessions.append(sessionId)
+            projects[index].pinnedSessions.removeAll { $0 == sessionId }
+        }
+        scheduleSave()
+    }
+
+    // MARK: 设置整页
+
+    /// 进入设置整页。
+    public func openSettings() { mode = .settings }
+
+    /// 返回工作台。
+    public func closeSettings() { mode = .workspace }
 
     /// 切换项目树节点折叠。
     public func toggleCollapsed(_ id: String) {
