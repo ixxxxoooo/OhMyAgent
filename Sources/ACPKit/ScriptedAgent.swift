@@ -331,7 +331,7 @@ public actor ScriptedAgent: ACPRequestHandler {
 
         // 文本流
         let reply = text.contains("slow")
-            ? Array(repeating: "慢速输出分片。", count: 60)
+            ? Array(repeating: "慢速输出分片。", count: text.contains("#long") ? 400 : 60)
             : ["你好,", "这是", "脚本化 ", "Agent ", "的回复:", text.isEmpty ? "(空)" : String(text.prefix(40))]
         for piece in reply {
             if cancelled.contains(sessionId) { return ["stopReason": "cancelled"] }

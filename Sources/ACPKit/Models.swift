@@ -448,6 +448,13 @@ public struct SessionSummary: Sendable, Hashable, Identifiable {
     public var cwd: String
     public var title: String?
     public var updatedAt: String?
+
+    public init(sessionId: String, cwd: String, title: String? = nil, updatedAt: String? = nil) {
+        self.sessionId = sessionId
+        self.cwd = cwd
+        self.title = title
+        self.updatedAt = updatedAt
+    }
 }
 
 /// MCP 服务器配置(用于 `session/new` 的 `mcpServers`)。

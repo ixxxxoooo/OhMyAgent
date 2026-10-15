@@ -668,3 +668,84 @@ struct UpdateCheckerTests {
         #expect(UpdateChecker.shouldAutoCheck(last: now.addingTimeInterval(-25 * 3600), now: now))
     }
 }
+
+@MainActor
+@Suite("注意力中心与最近记录")
+struct AttentionTests {
+    private func update(_ center: AttentionCenter, _ id: String, running: Bool, needsInput: Bool = false) {
+        center.update(id: id, title: "T", project: "P", workspacePath: "/tmp/p", sessionId: "s-\(id)", running: running, needsInput: needsInput)
+    }
+
+    @Test("运行闪烁 → 结束未读常亮 → 已读消失")
+    func lifecycle() {
+        let center = AttentionCenter()
+        var finished: [String] = []
+        center.onFinished = { finished.append($0.id) }
+        #expect(center.indicator == .none)
+        update(center, "a", running: true)
+        #expect(center.indicator == .running)
+        update(center, "a", running: false)
+        #expect(center.indicator == .unread)
+        #expect(finished == ["a"])
+        center.markRead("a")
+        #expect(center.indicator == .none)
+    }
+
+    @Test("待处理优先于运行,运行优先于未读")
+    func priority() {
+        let center = AttentionCenter()
+        update(center, "a", running: true); update(center, "a", running: false)   // a 未读
+        update(center, "b", running: true)
+        #expect(center.indicator == .running)
+        update(center, "c", running: true, needsInput: true)
+        #expect(center.indicator == .needsInput)
+        update(center, "c", running: true)
+        #expect(center.indicator == .running)
+        #expect(center.count(of: .unreadDone) == 1)
+    }
+
+    @Test("正在被查看的会话结束时不产生未读;聚焦会清除未读")
+    func focus() {
+        let center = AttentionCenter()
+        center.setFocus("a")
+        update(center, "a", running: true)
+        update(center, "a", running: false)
+        #expect(center.indicator == .none)
+        update(center, "b", running: true); update(center, "b", running: false)
+        #expect(center.indicator == .unread)
+        center.setFocus("b")
+        #expect(center.indicator == .none)
+    }
+
+    @Test("会话关闭保留未读,清除其余;全部已读")
+    func closing() {
+        let center = AttentionCenter()
+        update(center, "a", running: true)
+        center.sessionClosed("a")
+        #expect(center.indicator == .none)
+        update(center, "b", running: true); update(center, "b", running: false)
+        center.sessionClosed("b")
+        #expect(center.indicator == .unread)
+        center.markAllRead()
+        #expect(center.indicator == .none)
+    }
+
+    @Test("最近会话去重、限量、按时间排序;最近项目去重置顶")
+    func recents() {
+        let defaults = UserDefaults(suiteName: "oma-test-\(UUID().uuidString)")!
+        for index in 0..<25 {
+            RecentStore.record(RecentSession(workspacePath: "/tmp/\(index)", sessionId: "s\(index)", title: "t\(index)", date: Date(timeIntervalSince1970: Double(index))), defaults)
+        }
+        RecentStore.record(RecentSession(workspacePath: "/tmp/3", sessionId: "s3", title: "更新", date: Date(timeIntervalSince1970: 100)), defaults)
+        let list = RecentStore.sessions(defaults)
+        #expect(list.count == 20)
+        #expect(list.first?.sessionId == "s3" && list.first?.title == "更新")
+        #expect(list.filter { $0.sessionId == "s3" }.count == 1)
+        RecentStore.recordProject("/tmp", defaults)
+        RecentStore.recordProject(NSHomeDirectory(), defaults)
+        RecentStore.recordProject("/tmp", defaults)
+        #expect(RecentStore.projects(defaults) == ["/tmp", NSHomeDirectory()])
+        RecentStore.recordProject("/不存在的目录", defaults)
+        #expect(!RecentStore.projects(defaults).contains("/不存在的目录"))
+    }
+}

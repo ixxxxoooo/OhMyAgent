@@ -10,6 +10,7 @@ public enum ClientPrefs {
         public static let restoreWindows = "general.restoreWindows"
         public static let showDock = "general.showDock"
         public static let showMenuBar = "general.showMenuBar"
+        public static let notifyFinished = "notify.finished"
         public static let autoUpdate = "update.auto"
         public static let updateChannel = "update.channel"
         public static let updateFeedURL = "update.feedURL"
@@ -28,6 +29,18 @@ public enum ClientPrefs {
         public static let featureFileSystem = "feature.fileSystem"
         public static let featureTerminal = "feature.terminal"
         public static let featureElicitation = "feature.elicitation"
+    }
+
+    /// 托盘图标是否启用:菜单栏开关打开,或 Dock 图标被隐藏(此时必须有托盘才能打开窗口)。默认开启。
+    public static func trayEnabled(_ defaults: UserDefaults = .standard) -> Bool {
+        let dock = defaults.object(forKey: Key.showDock) as? Bool ?? true
+        let bar = defaults.object(forKey: Key.showMenuBar) as? Bool ?? true
+        return bar || !dock
+    }
+
+    /// 任务完成时是否发送系统通知,默认开启。
+    public static func notifiesOnFinish(_ defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: Key.notifyFinished) as? Bool ?? true
     }
 
     /// 终端输出缓冲上限(字节),默认 1 MB,范围 64 KB–16 MB。

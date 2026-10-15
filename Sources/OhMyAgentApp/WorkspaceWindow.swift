@@ -14,6 +14,7 @@ struct WorkspaceWindow: View {
     @Environment(\.openSettings) private var openSettings
     private let appearance = AppearanceModel.shared
     @State private var model: SessionModel
+    private let actions = AppActions.shared
 
     /// - Parameter workspace: 工作区目录
     init(workspace: URL) {
@@ -26,6 +27,17 @@ struct WorkspaceWindow: View {
         let model = SessionModel(workspace: workspace, descriptor: descriptor)
         model.notifier = { title, message in AppNotifier.send(title: title, message: message) }
         return model
+    }
+
+    /// 响应托盘/通知发起的「打开会话」请求:仅处理属于本工作区、且连接就绪时的请求。
+    private func consumeSessionRequest() {
+        guard let request = actions.sessionRequest, request.workspacePath == workspace.path, model.phase == .ready else { return }
+        actions.sessionRequest = nil
+        AttentionCenter.shared.markRead(model.uid)
+        guard let sessionId = request.sessionId, sessionId != model.sessionId else { return }
+        let summary = model.history.first { $0.sessionId == sessionId }
+            ?? SessionSummary(sessionId: sessionId, cwd: workspace.path, title: request.title, updatedAt: nil)
+        model.openSession(summary)
     }
 
     /// 窗口内切换 Agent:结束旧会话进程,用新描述符开始新会话。
@@ -58,7 +70,15 @@ struct WorkspaceWindow: View {
         .navigationSubtitle(model.workspace.abbreviatingHome)
         .toolbar { WindowToolbar(model: model, switchAgent: switchAgent) }
         .frame(minWidth: 760, minHeight: 520)
-        .onAppear { DiagnosticsStore.shared.markFirstFrame() }
+        .background(WindowFocusReader { focused in
+            AttentionCenter.shared.setFocus(focused ? model.uid : (AttentionCenter.shared.focusedID == model.uid ? nil : AttentionCenter.shared.focusedID))
+        })
+        .onAppear {
+            DiagnosticsStore.shared.markFirstFrame()
+            actions.capture(openWindow: openWindow, openSettings: openSettings)
+        }
+        .onChange(of: model.phase) { _, _ in consumeSessionRequest() }
+        .onChange(of: actions.sessionRequest) { _, _ in consumeSessionRequest() }
         .task {
             WorkspaceStore.remember(workspace)
             SessionRegistry.shared.register(model)
@@ -66,6 +86,11 @@ struct WorkspaceWindow: View {
             model.connect()
             // 调试钩子:预置输入框内容(用于不抢焦点的界面验证)
             if let draft = ProcessInfo.processInfo.environment["OMA_DRAFT"], !draft.isEmpty { model.draft = draft }
+            // 调试钩子:连接就绪后自动发送一条消息(用于验证运行中/未读状态点)
+            if let text = ProcessInfo.processInfo.environment["OMA_AUTOSEND"], !text.isEmpty {
+                for _ in 0..<100 where model.phase != .ready { try? await Task.sleep(for: .milliseconds(100)) }
+                model.send(text)
+            }
             if ProcessInfo.processInfo.environment["OMA_OPEN_EXTENSIONS"] != nil { openWindow(id: "extensions", value: workspace) }
             if ProcessInfo.processInfo.environment["OMA_OPEN_SETTINGS"] != nil {
                 openSettings()
@@ -240,6 +265,42 @@ struct UsageButton: View {
             }
             .padding(14)
             .frame(width: 260, alignment: .leading)
+        }
+    }
+}
+
+
+/// 读取宿主窗口的 key 状态:窗口成为 key 时回调 true,失去时回调 false。
+struct WindowFocusReader: NSViewRepresentable {
+    let onChange: (Bool) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = FocusView()
+        view.onChange = onChange
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        (nsView as? FocusView)?.onChange = onChange
+    }
+
+    private final class FocusView: NSView {
+        var onChange: ((Bool) -> Void)?
+        private var observers: [NSObjectProtocol] = []
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            observers.forEach(NotificationCenter.default.removeObserver)
+            observers = []
+            guard let window else { return }
+            let center = NotificationCenter.default
+            observers.append(center.addObserver(forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.onChange?(true) }
+            })
+            observers.append(center.addObserver(forName: NSWindow.didResignKeyNotification, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.onChange?(false) }
+            })
+            if window.isKeyWindow { onChange?(true) }
         }
     }
 }

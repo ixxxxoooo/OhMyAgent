@@ -24,6 +24,7 @@ enum WorkspaceStore {
     /// - Parameter url: 目录
     static func remember(_ url: URL) {
         UserDefaults.standard.set(url.path, forKey: lastKey)
+        RecentStore.recordProject(url.path)
     }
 
     /// 弹出目录选择面板。
@@ -67,6 +68,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Log.app.info("应用启动完成", ["showDock": "\(showDock)", "agentOverride": ProcessInfo.processInfo.environment["OMA_AGENT"] ?? "-", "project": ProcessInfo.processInfo.environment["OMA_PROJECT_ROOT"] ?? "-"])
         NSApp.setActivationPolicy(showDock ? .regular : .accessory)
         BridgeServer.cleanStaleSockets()
+        // 迁移:托盘改为默认开启,旧版本写入的「关闭」默认值不应继续生效(仅执行一次)
+        if !UserDefaults.standard.bool(forKey: "migration.trayDefaultOn") {
+            UserDefaults.standard.removeObject(forKey: ClientPrefs.Key.showMenuBar)
+            UserDefaults.standard.set(true, forKey: "migration.trayDefaultOn")
+        }
+        AppNotifier.shared.install()
+        StatusItemController.shared.start()
         AppearanceModel.shared.applyAll()
         Task { await Toolchain.shared.setOverrides(ClientPrefs.pathOverrides()) }
         // 首帧之后再做自动更新检查,不占用启动关键路径
@@ -78,7 +86,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if ProcessInfo.processInfo.environment["OMA_DRAFT"] == nil && ProcessInfo.processInfo.environment["OMA_OPEN_EXTENSIONS"] == nil && ProcessInfo.processInfo.environment["OMA_OPEN_SETTINGS"] == nil { NSApp.activate() }
     }
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    /// 托盘启用时,关闭最后一个窗口后应用继续在菜单栏运行(⌘Q 或托盘菜单退出)。
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { !ClientPrefs.trayEnabled() }
+
+    /// 点击 Dock 图标且没有可见窗口时重新打开窗口。
+    @MainActor
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag { AppActions.shared.showMainWindow() }
+        return true
+    }
 
     @MainActor
     func applicationWillTerminate(_ notification: Notification) {
@@ -91,8 +107,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @main
 struct OhMyAgentApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
-    @AppStorage(ClientPrefs.Key.showMenuBar) private var showMenuBar = false
-    @AppStorage(ClientPrefs.Key.showDock) private var showDock = true
 
     init() {
         Log.bootstrap(process: "app")
@@ -115,9 +129,6 @@ struct OhMyAgentApp: App {
 
         Settings { SettingsView() }
 
-        MenuBarExtra("OhMyAgent", systemImage: "sparkles", isInserted: .constant(showMenuBar || !showDock)) {
-            MenuBarContent()
-        }
     }
 }
 
@@ -143,21 +154,3 @@ struct WorkspaceCommands: Commands {
     }
 }
 
-/// 菜单栏图标菜单。
-struct MenuBarContent: View {
-    @Environment(\.openWindow) private var openWindow
-
-    var body: some View {
-        Button("打开工作区…") {
-            NSApp.activate()
-            if let url = WorkspaceStore.chooseDirectory() { openWindow(value: url) }
-        }
-        Button("扩展管理…") {
-            NSApp.activate()
-            openWindow(id: "extensions", value: WorkspaceStore.defaultWorkspace)
-        }
-        SettingsLink { Text("设置…") }
-        Divider()
-        Button("退出 OhMyAgent") { NSApp.terminate(nil) }
-    }
-}

@@ -214,18 +214,22 @@ public final class SessionModel {
     public let timeline = TimelineStore()
 
     public private(set) var phase: SessionPhase = .idle
-    public private(set) var isRunning = false
+    public private(set) var isRunning = false { didSet { if isRunning != oldValue { publishAttention() } } }
     public private(set) var agentName: String
     public private(set) var configOptions: [SessionConfigOption] = []
     public private(set) var availableCommands: [AvailableCommand] = []
     public private(set) var usage: UsageUpdate?
-    public private(set) var sessionTitle: String?
+    public private(set) var sessionTitle: String? { didSet { if sessionTitle != oldValue { recordRecent() } } }
     public private(set) var authStatus: String?
-    public private(set) var pendingPermissions: [PermissionPrompt] = []
-    public private(set) var pendingElicitations: [ElicitationPrompt] = []
+    public private(set) var pendingPermissions: [PermissionPrompt] = [] { didSet { if pendingPermissions.isEmpty != oldValue.isEmpty { publishAttention() } } }
+    public private(set) var pendingElicitations: [ElicitationPrompt] = [] { didSet { if pendingElicitations.isEmpty != oldValue.isEmpty { publishAttention() } } }
     /// 终端会话(按终端 ID)
     public private(set) var terminals: [String: TerminalSession] = [:]
-    public private(set) var sessionId: String?
+    public private(set) var sessionId: String? { didSet { if sessionId != oldValue { publishAttention(); recordRecent() } } }
+    /// 进程内唯一标识(注意力中心与通知使用)
+    public let uid = UUID().uuidString
+    /// 注意力中心(测试可注入)
+    @ObservationIgnored public var attention: AttentionCenter = .shared
     /// 最近一次连接(启动适配器 + 握手 + 新建会话)耗时,用于诊断
     public private(set) var connectDuration: Duration?
     /// 当前工作区的历史会话(来自 `session/list`)
@@ -902,10 +906,31 @@ public final class SessionModel {
         if let supervisor { Task { await supervisor.stop() } }
     }
 
+    /// 把运行/待处理状态同步给注意力中心。
+    private func publishAttention() {
+        guard !isShuttingDown else { return }
+        attention.update(
+            id: uid,
+            title: sessionTitle ?? workspace.lastPathComponent,
+            project: workspace.lastPathComponent,
+            workspacePath: workspace.path,
+            sessionId: sessionId,
+            running: isRunning,
+            needsInput: !pendingPermissions.isEmpty || !pendingElicitations.isEmpty
+        )
+    }
+
+    /// 记录最近会话(有会话 ID 与标题时)。
+    private func recordRecent() {
+        guard !isShuttingDown, let sessionId, let title = sessionTitle, !title.isEmpty else { return }
+        RecentStore.record(RecentSession(workspacePath: workspace.path, sessionId: sessionId, title: title, date: Date()))
+    }
+
     /// 关闭窗口时调用:终止 Agent 子进程。
     public func shutdown() {
         log.info("关闭会话")
         isShuttingDown = true
+        attention.sessionClosed(uid)
         cancelPendingPrompts()
         for session in terminals.values { session.stop() }
         if let manager = terminalManager { Task { await manager.shutdown() } }

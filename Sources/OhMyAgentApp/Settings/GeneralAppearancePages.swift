@@ -10,7 +10,8 @@ import SwiftUI
 struct GeneralPage: View {
     @AppStorage(ClientPrefs.Key.restoreWindows) private var restoreWindows = true
     @AppStorage(ClientPrefs.Key.showDock) private var showDock = true
-    @AppStorage(ClientPrefs.Key.showMenuBar) private var showMenuBar = false
+    @AppStorage(ClientPrefs.Key.showMenuBar) private var showMenuBar = true
+    @AppStorage(ClientPrefs.Key.notifyFinished) private var notifyFinished = true
     @AppStorage(ClientPrefs.Key.autoUpdate) private var autoUpdate = true
     @AppStorage(ClientPrefs.Key.updateChannel) private var channel = "stable"
     @AppStorage(ClientPrefs.Key.updateFeedURL) private var feedURL = ""
@@ -59,7 +60,9 @@ struct GeneralPage: View {
                     }
                 Toggle("在菜单栏显示图标", isOn: $showMenuBar)
                     .disabled(!showDock)
-                Note("隐藏 Dock 图标时会自动开启菜单栏图标,以便仍可打开窗口。")
+                Note("隐藏 Dock 图标时会自动开启菜单栏图标,以便仍可打开窗口。关闭最后一个窗口后,应用会继续在菜单栏中运行(⌘Q 退出)。")
+                Toggle("任务完成时发送系统通知", isOn: $notifyFinished)
+                Note("运行中的会话在菜单栏图标上显示闪烁的点;完成后点常亮,打开对应会话或点击通知后消失。")
             }
             Section("更新") {
                 Toggle("自动检查更新", isOn: $autoUpdate)
@@ -85,7 +88,7 @@ struct GeneralPage: View {
             Button("重置", role: .destructive) {
                 ClientPrefs.resetAll()
                 AppearanceModel.shared.reset()
-                restoreWindows = true; showDock = true; showMenuBar = false; autoUpdate = true; channel = "stable"
+                restoreWindows = true; showDock = true; showMenuBar = true; notifyFinished = true; autoUpdate = true; channel = "stable"
                 NSApp.setActivationPolicy(.regular)
             }
         } message: {
