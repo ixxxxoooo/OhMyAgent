@@ -232,7 +232,9 @@ public final class SessionModel {
     /// 最近一次连接(启动适配器 + 握手 + 新建会话)耗时,用于诊断
     public private(set) var connectDuration: Duration?
     /// 当前工作区的历史会话(来自 `session/list`)
-    public private(set) var history: [SessionSummary] = []
+    public private(set) var history: [SessionSummary] = [] { didSet { onHistoryChanged?(history) } }
+    /// 历史会话列表变化回调(工作台用于缓存,使项目树无需启动 Agent 即可显示会话)
+    @ObservationIgnored public var onHistoryChanged: (([SessionSummary]) -> Void)?
     /// Agent 能力与鉴权方式
     public private(set) var capabilities = AgentCapabilities()
     /// 正在回放历史会话
