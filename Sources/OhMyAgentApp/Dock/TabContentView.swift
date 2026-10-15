@@ -129,6 +129,8 @@ private func latestChange(for path: String, in workbench: WorkbenchModel) -> (mo
 struct DiffTabView: View {
     let workbench: WorkbenchModel
     let path: String
+    /// 并排/统一显示模式,跨标签记忆
+    @AppStorage("diff.sideBySide") private var sideBySide = true
 
     var body: some View {
         if let found = latestChange(for: path, in: workbench) {
@@ -139,6 +141,14 @@ struct DiffTabView: View {
                         Text("+\(found.change.diff.added)").foregroundStyle(OMColors.diffAdded)
                         Text("−\(found.change.diff.removed)").foregroundStyle(OMColors.diffRemoved)
                         Spacer()
+                        Picker("显示模式", selection: $sideBySide) {
+                            Text("并排").tag(true)
+                            Text("统一").tag(false)
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .frame(width: 100)
+                        .accessibilityLabel("Diff 显示模式")
                         Button("在编辑器中打开") { workbench.openFile(path, line: found.change.diff.hunks.first?.newStart, preview: false) }
                             .controlSize(.small)
                         if found.change.status == .pending || found.change.status == .partiallyReverted {
@@ -146,9 +156,14 @@ struct DiffTabView: View {
                         }
                     }
                     .font(OMFonts.small)
-                    DiffView(diff: found.change.diff, onRevertHunk: found.change.status == .reverted ? nil : { hunk in
+                    let revert: ((Int) -> Void)? = found.change.status == .reverted ? nil : { hunk in
                         found.model.revert(found.change, hunks: [hunk])
-                    })
+                    }
+                    if sideBySide {
+                        SideBySideDiffView(diff: found.change.diff, onRevertHunk: revert)
+                    } else {
+                        DiffView(diff: found.change.diff, onRevertHunk: revert)
+                    }
                 }
                 .padding(14)
             }
