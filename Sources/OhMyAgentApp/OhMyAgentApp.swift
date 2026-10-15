@@ -76,6 +76,11 @@ struct OhMyAgentApp: App {
         }
         .defaultSize(width: 1120, height: 780)
         .commands { WorkspaceCommands() }
+
+        WindowGroup("扩展管理", id: "extensions", for: URL.self) { $workspace in
+            ExtensionsWindow(workspace: workspace ?? WorkspaceStore.defaultWorkspace)
+        }
+        .defaultSize(width: 1040, height: 700)
     }
 }
 
@@ -89,6 +94,10 @@ struct WorkspaceCommands: Commands {
                 if let url = WorkspaceStore.chooseDirectory() { openWindow(value: url) }
             }
             .keyboardShortcut("o", modifiers: .command)
+        }
+        CommandGroup(after: .toolbar) {
+            Button("扩展管理…") { openWindow(id: "extensions", value: WorkspaceStore.defaultWorkspace) }
+                .keyboardShortcut("e", modifiers: [.command, .shift])
         }
     }
 }

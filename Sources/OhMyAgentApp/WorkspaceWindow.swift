@@ -9,6 +9,7 @@ import SwiftUI
 /// 工作区窗口根视图。
 struct WorkspaceWindow: View {
     let workspace: URL
+    @Environment(\.openWindow) private var openWindow
     @State private var model: SessionModel
 
     /// - Parameter workspace: 工作区目录
@@ -39,6 +40,7 @@ struct WorkspaceWindow: View {
             model.connect()
             // 调试钩子:预置输入框内容(用于不抢焦点的界面验证)
             if let draft = ProcessInfo.processInfo.environment["OMA_DRAFT"], !draft.isEmpty { model.draft = draft }
+            if ProcessInfo.processInfo.environment["OMA_OPEN_EXTENSIONS"] != nil { openWindow(id: "extensions", value: workspace) }
         }
         .onDisappear {
             model.shutdown()
@@ -57,6 +59,7 @@ extension URL {
 /// 窗口工具栏:连接状态、用量、新对话。
 struct WindowToolbar: ToolbarContent {
     let model: SessionModel
+    @Environment(\.openWindow) private var openWindow
 
     var body: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
@@ -66,6 +69,12 @@ struct WindowToolbar: ToolbarContent {
             if let usage = model.usage, usage.used != nil || usage.costAmount != nil {
                 UsageButton(usage: usage)
             }
+        }
+        ToolbarItem(placement: .primaryAction) {
+            Button { openWindow(id: "extensions", value: model.workspace) } label: {
+                Label("扩展管理", systemImage: "puzzlepiece.extension")
+            }
+            .help("MCP、Skills、子 Agent、Hooks、插件与记忆 (⇧⌘E)")
         }
         ToolbarItem(placement: .primaryAction) {
             Button {
