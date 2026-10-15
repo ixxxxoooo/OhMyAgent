@@ -265,6 +265,61 @@ public actor ScriptedAgent: ACPRequestHandler {
         await update(sessionId, ["sessionUpdate": "tool_call_update", "toolCallId": "sub_1", "status": "completed"])
     }
 
+    // MARK: 工具展示场景(`#showcase`:覆盖读/搜/写/改/终端/MCP/联网/失败,无需权限)
+
+    /// 发送一次完整的工具调用:进行中 → 完成(或失败)。
+    private func emitTool(
+        _ sessionId: String, id: String, title: String, kind: String, name: String,
+        input: JSONValue, output: String? = nil, extra: [JSONValue] = [], fail: Bool = false,
+        locations: JSONValue = .array([])
+    ) async {
+        await update(sessionId, [
+            "sessionUpdate": "tool_call", "toolCallId": .string(id), "title": .string(title), "kind": .string(kind),
+            "name": .string(name), "status": "in_progress", "rawInput": input, "locations": locations,
+        ])
+        await pause()
+        var content = extra
+        if let output { content.append(["type": "content", "content": ["type": "text", "text": .string(output)]]) }
+        await update(sessionId, [
+            "sessionUpdate": "tool_call_update", "toolCallId": .string(id),
+            "status": fail ? "failed" : "completed", "content": .array(content),
+        ])
+        await pause()
+    }
+
+    /// 覆盖各类工具的展示场景。
+    private func runToolsShowcase(sessionId: String) async {
+        let cwd = sessions[sessionId] ?? "/tmp"
+        let main = cwd + "/Sources/App/main.swift"
+        await emitTool(sessionId, id: "t_read1", title: "读取 main.swift", kind: "read", name: "Read",
+                       input: ["file_path": .string(main), "offset": 10, "limit": 50],
+                       output: "let app = App()\napp.run()", locations: [["path": .string(main), "line": 10]])
+        await emitTool(sessionId, id: "t_read2", title: "读取 Package.swift", kind: "read", name: "Read",
+                       input: ["file_path": .string(cwd + "/Package.swift")], output: "// swift-tools-version: 6.4")
+        await emitTool(sessionId, id: "t_grep", title: "搜索 TODO", kind: "search", name: "Grep",
+                       input: ["pattern": "TODO", "path": .string(cwd + "/Sources")],
+                       output: "\(main):12:    // TODO: 处理错误\n\(cwd)/Sources/App/Util.swift:40:    // TODO: 缓存\n\(cwd)/Sources/App/Model.swift:7:// TODO(ygw): 拆分")
+        await emitTool(sessionId, id: "t_glob", title: "查找 *.swift", kind: "search", name: "Glob",
+                       input: ["pattern": "**/*.swift"], output: "\(main)\n\(cwd)/Sources/App/Util.swift\n\(cwd)/Package.swift")
+        await emitTool(sessionId, id: "t_write", title: "写入 NOTES.md", kind: "edit", name: "Write",
+                       input: ["file_path": .string(cwd + "/NOTES.md")],
+                       extra: [["type": "diff", "path": .string(cwd + "/NOTES.md"), "newText": "# 笔记\n\n- 第一条\n- 第二条\n"]],
+                       locations: [["path": .string(cwd + "/NOTES.md")]])
+        await emitTool(sessionId, id: "t_edit", title: "编辑 main.swift", kind: "edit", name: "Edit",
+                       input: ["file_path": .string(main)],
+                       extra: [["type": "diff", "path": .string(main), "oldText": "let app = App(debug: false)\napp.run()\n", "newText": "let app = App(debug: true)\napp.configure()\napp.run()\n"]],
+                       locations: [["path": .string(main), "line": 1]])
+        await emitTool(sessionId, id: "t_bash", title: "运行 swift test", kind: "execute", name: "Bash",
+                       input: ["command": "swift test --filter Tool", "description": "运行工具相关测试"],
+                       output: "\u{1B}[32m✔\u{1B}[0m Test one passed\n\u{1B}[31m✘\u{1B}[0m Test two failed\n\u{1B}[1;33mwarning:\u{1B}[0m something\nexit 1")
+        await emitTool(sessionId, id: "t_mcp", title: "mcp__github__create_issue", kind: "other", name: "mcp__github__create_issue",
+                       input: ["title": "修复崩溃", "repo": "ygw/demo"], output: "{\"number\": 42}")
+        await emitTool(sessionId, id: "t_fetch", title: "获取 example.com", kind: "fetch", name: "WebFetch",
+                       input: ["url": "https://example.com/docs"], output: "Example Domain")
+        await emitTool(sessionId, id: "t_fail", title: "运行 false", kind: "execute", name: "Bash",
+                       input: ["command": "false"], output: "command failed with exit code 1", fail: true)
+    }
+
     private func runPrompt(_ p: JSONValue) async throws -> JSONValue {
         guard let sessionId = p["sessionId"]?.stringValue else {
             throw JSONRPCError(code: JSONRPCError.invalidParams, message: "缺少 sessionId")
@@ -317,6 +372,7 @@ public actor ScriptedAgent: ACPRequestHandler {
         if text.contains("#ask") { try await runAsk(sessionId: sessionId) }
         if text.contains("#term") { try await runTerminal(sessionId: sessionId) }
         if text.contains("#sub") { await runSubagent(sessionId: sessionId) }
+        if text.contains("#showcase") { await runToolsShowcase(sessionId: sessionId) }
 
         if text.contains("plan") || text.contains("计划") {
             await update(sessionId, [

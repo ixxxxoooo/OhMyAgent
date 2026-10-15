@@ -102,7 +102,8 @@ struct WorkbenchView: View {
     /// 调试钩子(脚本化界面验证用,不影响正常使用)。
     private func runDebugHooks() async {
         let env = ProcessInfo.processInfo.environment
-        for _ in 0..<50 where workbench.activeSession == nil && !workbench.projects.isEmpty { try? await Task.sleep(for: .milliseconds(100)) }
+        let wantsSession = env["OMA_AUTOSEND"] != nil || env["OMA_DRAFT"] != nil
+        for _ in 0..<80 where workbench.activeSession == nil && (wantsSession || !workbench.projects.isEmpty) { try? await Task.sleep(for: .milliseconds(100)) }
         if let draft = env["OMA_DRAFT"], !draft.isEmpty { workbench.activeSession?.draft = draft }
         if let text = env["OMA_AUTOSEND"], !text.isEmpty, let model = workbench.activeSession {
             Log.app.debug("调试钩子:等待就绪后自动发送", ["project": model.workspace.lastPathComponent])

@@ -730,6 +730,14 @@ public final class SessionModel {
         session.startPolling(manager: manager)
     }
 
+    /// 中断正在运行的终端命令(工具卡片上的“停止”按钮)。
+    /// - Parameter terminalId: 终端 ID
+    public func interruptTerminal(_ terminalId: String) {
+        guard let manager = terminalManager else { return }
+        log.info("用户中断终端", ["terminalId": terminalId])
+        Task { try? await manager.kill(terminalId) }
+    }
+
     // MARK: - 检查点与改动汇总
 
     /// 工具完成时:与开始前的快照比较并记录改动。

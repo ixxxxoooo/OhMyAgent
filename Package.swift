@@ -52,6 +52,7 @@ let package = Package(
         .testTarget(name: "ChatKitTests", dependencies: ["ChatKit", "ACPKit", "AgentHost", "FakeAgent"]),
         .testTarget(name: "ClaudeConfigKitTests", dependencies: ["ClaudeConfigKit"]),
         .testTarget(name: "DiffKitTests", dependencies: ["DiffKit"]),
+        .testTarget(name: "OhMyAgentAppTests", dependencies: ["OhMyAgentApp", "ChatKit", "ACPKit", "DesignSystem"]),
         .testTarget(name: "WorkbenchKitTests", dependencies: ["WorkbenchKit", "ChatKit", "ACPKit", "AgentHost", "FakeAgent"]),
     ]
 )

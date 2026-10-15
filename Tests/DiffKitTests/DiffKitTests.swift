@@ -174,3 +174,38 @@ struct CheckpointTests {
         try? FileManager.default.removeItem(atPath: path)
     }
 }
+
+@Suite("行内差异")
+struct InlineDiffTests {
+    @Test("去掉公共前后缀并扩展到词边界")
+    func ranges() throws {
+        let r = try #require(InlineDiff.changedRanges(old: "let value = computeTotal(items)", new: "let value = computeSum(items)"))
+        let old = Array("let value = computeTotal(items)")
+        let new = Array("let value = computeSum(items)")
+        #expect(String(old[r.old]) == "computeTotal")
+        #expect(String(new[r.new]) == "computeSum")
+    }
+
+    @Test("相同、差异过大或过长的行不做行内高亮")
+    func skipped() {
+        #expect(InlineDiff.changedRanges(old: "a", new: "a") == nil)
+        #expect(InlineDiff.changedRanges(old: "completely different", new: "nothing alike here") == nil)
+        #expect(InlineDiff.changedRanges(old: String(repeating: "a", count: 700), new: String(repeating: "b", count: 700)) == nil)
+    }
+
+    @Test("块内删除段与新增段按顺序配对")
+    func pairing() {
+        let lines = [
+            DiffLine(kind: .context, text: "x", oldNumber: 1, newNumber: 1),
+            DiffLine(kind: .removed, text: "foo(1)", oldNumber: 2, newNumber: nil),
+            DiffLine(kind: .removed, text: "bar(2)", oldNumber: 3, newNumber: nil),
+            DiffLine(kind: .added, text: "foo(10)", oldNumber: nil, newNumber: 2),
+            DiffLine(kind: .added, text: "bar(2)!", oldNumber: nil, newNumber: 3),
+            DiffLine(kind: .added, text: "extra", oldNumber: nil, newNumber: 4),
+        ]
+        let marks = InlineDiff.highlights(for: lines)
+        #expect(marks.count == 6)
+        #expect(marks[0] == nil && marks[5] == nil)
+        #expect(marks[1] != nil && marks[3] != nil && marks[2] != nil && marks[4] != nil)
+    }
+}

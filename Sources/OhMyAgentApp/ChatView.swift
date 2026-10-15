@@ -10,6 +10,7 @@ struct ChatView: View {
     let model: SessionModel
     @State private var position = ScrollPosition(edge: .bottom)
     @State private var isPinnedToBottom = true
+    @State private var scrollPhase: ScrollPhase = .idle
 
     var body: some View {
         ZStack {
@@ -45,8 +46,8 @@ struct ChatView: View {
                     EmptyStateView(model: model)
                         .padding(.top, 80)
                 }
-                ForEach(model.timeline.entries) { entry in
-                    TimelineEntryView(entry: entry)
+                ForEach(TimelineGrouping.group(model.timeline.entries)) { item in
+                    TimelineItemView(item: item)
                 }
                 Color.clear.frame(height: 24).id("bottom")
             }
@@ -57,10 +58,16 @@ struct ChatView: View {
         }
         .scrollPosition($position)
         .scrollEdgeEffectStyle(.soft, for: [.top, .bottom])
+        .onScrollPhaseChange { _, phase in scrollPhase = phase }
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.contentOffset.y + geometry.containerSize.height >= geometry.contentSize.height - 48
         } action: { _, atBottom in
-            isPinnedToBottom = atBottom
+            // 内容增高(工具详情异步展开、Diff 计算完成)会让“是否在底部”暂时为假;
+            // 只有用户主动滚动(非空闲阶段)离开底部才取消跟随。
+            if atBottom { isPinnedToBottom = true } else if scrollPhase != .idle { isPinnedToBottom = false }
+        }
+        .onScrollGeometryChange(for: CGFloat.self) { $0.contentSize.height } action: { _, _ in
+            if isPinnedToBottom { position.scrollTo(edge: .bottom) }
         }
         .onChange(of: model.timeline.revision) {
             if isPinnedToBottom { position.scrollTo(edge: .bottom) }

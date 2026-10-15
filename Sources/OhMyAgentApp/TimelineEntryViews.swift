@@ -15,7 +15,7 @@ struct TimelineEntryView: View {
         case .user: UserMessageView(entry: entry)
         case .assistant: AssistantMessageView(entry: entry)
         case .thought: ThoughtView(entry: entry)
-        case .tool: ToolCardView(entry: entry)
+        case .tool: ToolRowView(entry: entry)
         case .plan: PlanView(entry: entry)
         case .notice: NoticeView(entry: entry)
         case .changes: ChangesSummaryView(entry: entry)

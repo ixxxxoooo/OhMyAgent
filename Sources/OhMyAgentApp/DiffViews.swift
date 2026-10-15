@@ -63,8 +63,9 @@ struct HunkView: View {
             .padding(.vertical, 3)
             Divider()
             VStack(alignment: .leading, spacing: 0) {
-                ForEach(Array(hunk.lines.enumerated()), id: \.offset) { _, line in
-                    DiffLineRow(line: line)
+                let marks = InlineDiff.highlights(for: hunk.lines)
+                ForEach(Array(hunk.lines.enumerated()), id: \.offset) { index, line in
+                    DiffLineRow(line: line, mark: marks[index])
                 }
             }
         }
@@ -77,6 +78,8 @@ struct HunkView: View {
 /// 单行。
 struct DiffLineRow: View {
     let line: DiffLine
+    /// 行内变化区间(词级高亮),nil 表示整行同色
+    var mark: Range<Int>?
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
@@ -88,7 +91,7 @@ struct DiffLineRow: View {
                 .foregroundStyle(OMColors.tertiaryText)
             Text(sign)
                 .frame(width: 18)
-            Text(line.text.isEmpty ? " " : line.text)
+            Text(content)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.trailing, 8)
         }
@@ -98,6 +101,18 @@ struct DiffLineRow: View {
         .background(background)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(accessibilityKind) \(line.text)")
+    }
+
+    /// 正文:有行内区间时,变化部分使用更深的底色。
+    private var content: AttributedString {
+        var text = AttributedString(line.text.isEmpty ? " " : line.text)
+        guard let mark, line.kind != .context else { return text }
+        let characters = text.characters
+        guard mark.upperBound <= characters.count, mark.lowerBound < mark.upperBound else { return text }
+        let start = characters.index(characters.startIndex, offsetBy: mark.lowerBound)
+        let end = characters.index(characters.startIndex, offsetBy: mark.upperBound)
+        text[start..<end].backgroundColor = (line.kind == .added ? OMColors.diffAdded : OMColors.diffRemoved).opacity(0.38)
+        return text
     }
 
     private var sign: String {
@@ -130,20 +145,24 @@ struct SnippetDiffView: View {
     let path: String
     let oldText: String?
     let newText: String
+    /// 是否显示文件名与统计头(工具行已显示时可关闭)
+    var showHeader = true
     @State private var diff: FileDiff?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                Image(systemName: "doc.text")
-                Text((path as NSString).lastPathComponent).font(OMFonts.small.weight(.medium))
-                if let diff {
-                    Text("+\(diff.added)").foregroundStyle(OMColors.diffAdded)
-                    Text("−\(diff.removed)").foregroundStyle(OMColors.diffRemoved)
+            if showHeader {
+                HStack(spacing: 6) {
+                    Image(systemName: "doc.text")
+                    Text((path as NSString).lastPathComponent).font(OMFonts.small.weight(.medium))
+                    if let diff {
+                        Text("+\(diff.added)").foregroundStyle(OMColors.diffAdded)
+                        Text("−\(diff.removed)").foregroundStyle(OMColors.diffRemoved)
+                    }
+                    Spacer()
                 }
-                Spacer()
+                .font(OMFonts.small)
             }
-            .font(OMFonts.small)
             if let diff {
                 DiffView(diff: diff)
             } else {
