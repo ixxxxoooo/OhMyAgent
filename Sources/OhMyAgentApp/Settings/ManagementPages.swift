@@ -35,7 +35,7 @@ struct EditorPage: View {
                 Note("Swift 使用 Xcode 自带的 sourcekit-lsp;TypeScript/JavaScript 需要 typescript-language-server,Python 需要 pyright(npm i -g typescript-language-server typescript pyright)。悬停停留查看类型,⌘ 点击或 F12 跳转定义,⌃Space 补全,输入 . 自动补全。")
             }
             Section("预览") {
-                Text("func greet(name: String) -> String {\n    return \"Hello, \\(name)\"\n}")
+                Text(verbatim: "func greet(name: String) -> String {\n    return \"Hello, \\(name)\"\n}")
                     .font(.system(size: fontSize, design: .monospaced))
                     .padding(8).frame(maxWidth: .infinity, alignment: .leading)
                     .background(OMColors.surface, in: RoundedRectangle(cornerRadius: 8))

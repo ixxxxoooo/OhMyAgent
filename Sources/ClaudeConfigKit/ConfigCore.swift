@@ -31,9 +31,9 @@ public enum ConfigScope: String, Sendable, CaseIterable, Hashable, Identifiable 
     /// 界面展示名。
     public var displayName: String {
         switch self {
-        case .user: return "用户"
-        case .project: return "项目"
-        case .local: return "本地"
+        case .user: return String(localized: "用户")
+        case .project: return String(localized: "scope.project", defaultValue: "项目")
+        case .local: return String(localized: "本地")
         }
     }
 }

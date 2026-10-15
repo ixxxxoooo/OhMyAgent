@@ -43,7 +43,7 @@ struct ScopeHeader: View {
                 .pickerStyle(.segmented).labelsHidden().frame(width: 220)
                 Spacer()
             }
-            Text(LocalizedStringKey(hint)).font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
+            Text(verbatim: omLocalized(hint)).font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
             if !model.canWriteCurrentScope {
                 Label("当前没有工作区,无法写入此层;请先打开一个工作区。", om: "exclamationmark.triangle").font(OMFonts.caption).foregroundStyle(OMColors.warning)
             }
@@ -52,9 +52,9 @@ struct ScopeHeader: View {
 
     private var hint: String {
         switch model.scope {
-        case .user: return "~/.claude/settings.json,对所有项目生效"
-        case .project: return "<工作区>/.claude/settings.json,可提交到版本库与团队共享"
-        case .local: return "<工作区>/.claude/settings.local.json,仅本机,不入版本库"
+        case .user: return String(localized: "~/.claude/settings.json,对所有项目生效")
+        case .project: return String(localized: "<工作区>/.claude/settings.json,可提交到版本库与团队共享")
+        case .local: return String(localized: "<工作区>/.claude/settings.local.json,仅本机,不入版本库")
         }
     }
 }
@@ -75,6 +75,14 @@ struct Note: View {
     init(_ text: String) { self.text = text }
 
     var body: some View {
-        Text(text).font(OMFonts.caption).foregroundStyle(OMColors.secondaryText).fixedSize(horizontal: false, vertical: true)
+        Text(verbatim: omLocalized(text)).font(OMFonts.caption).foregroundStyle(OMColors.secondaryText).fixedSize(horizontal: false, vertical: true)
     }
+}
+
+/// 把以 `String` 传入的中文文案按当前语言取译文(未收录则原样返回)。
+/// 返回纯文本:不经过 Markdown 解析,避免 `~`、`*`、`_` 等字符被吞掉。
+/// - Parameter key: 中文原文(即 `Localizable.strings` 的键)。
+/// - Returns: 当前语言下的译文。
+func omLocalized(_ key: String) -> String {
+    Bundle.main.localizedString(forKey: key, value: nil, table: nil)
 }

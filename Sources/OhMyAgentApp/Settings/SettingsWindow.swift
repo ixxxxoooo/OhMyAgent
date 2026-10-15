@@ -26,20 +26,20 @@ enum SettingsPage: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .general: return "通用"
-        case .appearance: return "外观"
-        case .shortcuts: return "快捷键"
-        case .agent: return "Agent 与模型"
-        case .providers: return "模型提供商"
-        case .permissions: return "权限"
-        case .tools: return "工具与扩展"
-        case .agentExtensions: return "Agent 注册表"
-        case .editor: return "编辑器"
-        case .terminal: return "终端"
-        case .usage: return "用量与成本"
-        case .privacy: return "隐私与遥测"
-        case .advanced: return "高级"
-        case .diagnostics: return "诊断"
+        case .general: return String(localized: "通用")
+        case .appearance: return String(localized: "外观")
+        case .shortcuts: return String(localized: "快捷键")
+        case .agent: return String(localized: "Agent 与模型")
+        case .providers: return String(localized: "模型提供商")
+        case .permissions: return String(localized: "权限")
+        case .tools: return String(localized: "工具与扩展")
+        case .agentExtensions: return String(localized: "Agent 注册表")
+        case .editor: return String(localized: "编辑器")
+        case .terminal: return String(localized: "终端")
+        case .usage: return String(localized: "用量与成本")
+        case .privacy: return String(localized: "隐私与遥测")
+        case .advanced: return String(localized: "高级")
+        case .diagnostics: return String(localized: "诊断")
         }
     }
 
@@ -159,7 +159,7 @@ struct SettingsView: View {
             .padding(.vertical, 8)
             List(selection: $router.page) {
                 ForEach(filteredGroups, id: \.title) { group in
-                    Section(group.title) {
+                    Section(LocalizedStringKey(group.title)) {
                         ForEach(group.pages) { page in
                             Label(page.title, om: page.icon).tag(page)
                         }

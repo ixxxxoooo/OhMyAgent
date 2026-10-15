@@ -110,6 +110,7 @@ public extension Label where Title == Text, Icon == Image {
 
     /// 使用 Lucide 图标的 Label(动态字符串标题)。
     init<S: StringProtocol>(_ title: S, om symbol: String, size: CGFloat = 14) {
-        self.init { Text(title) } icon: { Image.om(symbol, size: size) }
+        // 字面量会优先匹配到本重载,故在此按键查找译文(未收录则原样显示)
+        self.init { Text(verbatim: Bundle.main.localizedString(forKey: String(title), value: nil, table: nil)) } icon: { Image.om(symbol, size: size) }
     }
 }

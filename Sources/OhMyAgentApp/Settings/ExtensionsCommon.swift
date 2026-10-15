@@ -91,8 +91,8 @@ struct EmptyHint: View {
     var body: some View {
         VStack(spacing: 8) {
             Image.om(icon, size: 28).foregroundStyle(OMColors.tertiaryText)
-            Text(LocalizedStringKey(title)).font(OMFonts.title)
-            if let message { Text(LocalizedStringKey(message)).font(OMFonts.small).foregroundStyle(OMColors.secondaryText).multilineTextAlignment(.center) }
+            Text(verbatim: omLocalized(title)).font(OMFonts.title)
+            if let message { Text(verbatim: omLocalized(message)).font(OMFonts.small).foregroundStyle(OMColors.secondaryText).multilineTextAlignment(.center) }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(24)
@@ -108,11 +108,11 @@ struct FormRow<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text(LocalizedStringKey(label)).font(OMFonts.small).foregroundStyle(OMColors.secondaryText).frame(width: 84, alignment: .trailing)
+                Text(verbatim: omLocalized(label)).font(OMFonts.small).foregroundStyle(OMColors.secondaryText).frame(width: 84, alignment: .trailing)
                 content
             }
             if let hint {
-                Text(LocalizedStringKey(hint)).font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText).padding(.leading, 94)
+                Text(verbatim: omLocalized(hint)).font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText).padding(.leading, 94)
             }
         }
     }
