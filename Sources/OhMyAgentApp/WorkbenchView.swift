@@ -46,22 +46,25 @@ struct WorkbenchView: View {
     /// 工作台主体:左栏 + 中栏 + 右栏 + 状态栏。
     private var workspaceBody: some View {
         VStack(spacing: 0) {
-            NavigationSplitView(columnVisibility: columnVisibility) {
-                ProjectTreeView(workbench: workbench)
-                    .id(appearance.fontRevision)
-                    .navigationSplitViewColumnWidth(min: 220, ideal: CGFloat(workbench.layout.leftWidth), max: 420)
-            } detail: {
-                CenterColumn(workbench: workbench)
-                    .navigationTitle(title)
-                    .navigationSubtitle(subtitle)
-                    .toolbar { WorkbenchToolbar(workbench: workbench, switchAgent: switchAgent) }
-            }
-            .inspector(isPresented: $workbench.layout.rightVisible) {
-                RightPaneView(workbench: workbench)
-                    .inspectorColumnWidth(min: 280, ideal: CGFloat(workbench.layout.rightWidth), max: 640)
-                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
-                        if width > 0 { workbench.layout.rightWidth = Double(width) }
-                    }
+            HStack(spacing: 0) {
+                NavigationSplitView(columnVisibility: columnVisibility) {
+                    ProjectTreeView(workbench: workbench)
+                        .id(appearance.fontRevision)
+                        .navigationSplitViewColumnWidth(min: 220, ideal: CGFloat(workbench.layout.leftWidth), max: 420)
+                } detail: {
+                    CenterColumn(workbench: workbench)
+                        .navigationTitle(title)
+                        .navigationSubtitle(subtitle)
+                        .toolbar { WorkbenchToolbar(workbench: workbench, switchAgent: switchAgent) }
+                }
+                .inspector(isPresented: $workbench.layout.rightVisible) {
+                    RightPaneView(workbench: workbench)
+                        .inspectorColumnWidth(min: 280, ideal: CGFloat(workbench.layout.rightWidth), max: 640)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
+                            if width > 0 { workbench.layout.rightWidth = Double(width) }
+                        }
+                }
+                if !workbench.layout.rightVisible { RightRail(workbench: workbench) }
             }
             StatusBarView(workbench: workbench)
         }

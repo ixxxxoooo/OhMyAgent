@@ -57,12 +57,58 @@ struct RightPaneView: View {
         }
     }
 
-    private static func title(_ pane: RightPane) -> String {
+    /// 右栏视图对应的图标(Lucide 名)。
+    static func icon(_ pane: RightPane) -> String {
+        switch pane {
+        case .changes: return "file-diff"
+        case .plan: return "list-checks"
+        case .outline: return "list"
+        case .problems: return "triangle-alert"
+        }
+    }
+
+    static func title(_ pane: RightPane) -> String {
         switch pane {
         case .changes: return String(localized: "改动")
         case .plan: return String(localized: "计划")
         case .outline: return String(localized: "大纲")
         case .problems: return String(localized: "问题")
         }
+    }
+}
+
+/// 右栏收起时贴在窗口右缘的快捷列表:一键展开右栏并切换到对应视图,或打开底部面板。
+struct RightRail: View {
+    @Bindable var workbench: WorkbenchModel
+
+    var body: some View {
+        VStack(spacing: 6) {
+            ForEach(RightPane.available, id: \.self) { pane in
+                railButton(title: RightPaneView.title(pane), icon: RightPaneView.icon(pane)) {
+                    workbench.showRight(pane)
+                }
+            }
+            railButton(title: String(localized: "输出"), icon: "panel-bottom") {
+                workbench.showBottom(.output)
+            }
+            Spacer()
+        }
+        .padding(.top, 10)
+        .frame(width: 34)
+        .frame(maxHeight: .infinity)
+        .background(.regularMaterial)
+        .overlay(alignment: .leading) { Divider() }
+    }
+
+    private func railButton(title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image.om(icon, size: 15)
+                .frame(width: 26, height: 26)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(OMColors.secondaryText)
+        .help(title)
+        .accessibilityLabel(title)
     }
 }
