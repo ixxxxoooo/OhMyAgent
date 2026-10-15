@@ -1,5 +1,5 @@
 // @author ygw
-// 设置窗口(⌘,):16 个页面。Claude Code 自身的设置写回 settings.json 并热更新,客户端设置存 UserDefaults。
+// 设置窗口(⌘,):15 个页面。Claude Code 自身的设置写回 settings.json 并热更新,客户端设置存 UserDefaults。
 
 import ChatKit
 import ClaudeConfigKit
@@ -9,7 +9,7 @@ import SwiftUI
 /// 设置页。
 enum SettingsPage: String, CaseIterable, Identifiable {
     case general, appearance, agent, permissions, mcp, extensions, memory, editor
-    case terminal, shortcuts, account, usage, agentExtensions, privacy, advanced, diagnostics
+    case terminal, shortcuts, usage, agentExtensions, privacy, advanced, diagnostics
     var id: String { rawValue }
 
     var title: String {
@@ -24,7 +24,6 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .editor: return "编辑器"
         case .terminal: return "终端"
         case .shortcuts: return "快捷键"
-        case .account: return "账号与鉴权"
         case .usage: return "用量与成本"
         case .agentExtensions: return "Agent 扩展"
         case .privacy: return "隐私与遥测"
@@ -45,7 +44,6 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .editor: return "chevron.left.forwardslash.chevron.right"
         case .terminal: return "terminal"
         case .shortcuts: return "keyboard"
-        case .account: return "person.crop.circle"
         case .usage: return "chart.bar"
         case .agentExtensions: return "square.stack.3d.up"
         case .privacy: return "hand.raised"
@@ -112,7 +110,6 @@ struct SettingsView: View {
         case .editor: EditorPage()
         case .terminal: TerminalPage()
         case .shortcuts: ShortcutsPage()
-        case .account: AccountPage(center: center)
         case .usage: UsagePage(paths: model.paths)
         case .agentExtensions: AgentExtensionsPage()
         case .privacy: PrivacyPage(model: model)

@@ -1,5 +1,5 @@
 // @author ygw
-// 侧栏:工作区、当前对话、历史会话(session/list)与账号/连接信息。
+// 侧栏:工作区、当前对话、历史会话(session/list)与连接状态。
 
 import ACPKit
 import ChatKit
@@ -67,35 +67,10 @@ struct SidebarView: View {
                 OMStatusDot(statusDot)
                 Text(statusText).font(OMFonts.small)
             }
-            accountMenu
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-    }
-
-    /// 账号菜单:显示登录状态,提供 Agent 通告的登录方式与退出登录。
-    @ViewBuilder
-    private var accountMenu: some View {
-        if model.authStatus != nil || !model.authMethods.isEmpty || model.capabilities.canLogout {
-            Menu {
-                ForEach(model.authMethods) { method in
-                    Button("使用「\(method.name)」登录") { model.authenticate(method) }
-                }
-                if model.capabilities.canLogout {
-                    Divider()
-                    Button("退出登录", role: .destructive) { model.logout() }
-                }
-            } label: {
-                Label(model.authStatus ?? String(localized: "账号"), systemImage: "person.crop.circle")
-                    .font(OMFonts.caption)
-                    .lineLimit(1)
-            }
-            .menuStyle(.button)
-            .buttonStyle(.plain)
-            .foregroundStyle(OMColors.secondaryText)
-            .disabled(model.phase != .ready)
-        }
     }
 
     private var statusDot: OMStatusDot.State {

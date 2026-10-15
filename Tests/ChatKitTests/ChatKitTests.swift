@@ -448,17 +448,6 @@ struct HistoryTests {
         #expect(files.first?.insertText == "@hello.txt ")
         model.shutdown()
     }
-
-    @Test("鉴权方式来自 initialize,可发起登录")
-    func auth() async throws {
-        let ws = try M3ScenarioTests.tempWorkspace()
-        defer { try? FileManager.default.removeItem(at: ws) }
-        let model = try await M3ScenarioTests.readyModel(workspace: ws)
-        let method = try #require(model.authMethods.first)
-        model.authenticate(method)
-        #expect(await SessionModelTests.wait { model.timeline.entries.contains { $0.text.contains("已通过") } })
-        model.shutdown()
-    }
 }
 
 @Suite("客户端偏好")

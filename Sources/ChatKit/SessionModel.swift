@@ -220,7 +220,6 @@ public final class SessionModel {
     public private(set) var availableCommands: [AvailableCommand] = []
     public private(set) var usage: UsageUpdate?
     public private(set) var sessionTitle: String? { didSet { if sessionTitle != oldValue { recordRecent() } } }
-    public private(set) var authStatus: String?
     public private(set) var pendingPermissions: [PermissionPrompt] = [] { didSet { if pendingPermissions.isEmpty != oldValue.isEmpty { publishAttention() } } }
     public private(set) var pendingElicitations: [ElicitationPrompt] = [] { didSet { if pendingElicitations.isEmpty != oldValue.isEmpty { publishAttention() } } }
     /// 终端会话(按终端 ID)
@@ -236,7 +235,6 @@ public final class SessionModel {
     public private(set) var history: [SessionSummary] = []
     /// Agent 能力与鉴权方式
     public private(set) var capabilities = AgentCapabilities()
-    public private(set) var authMethods: [AuthMethod] = []
     /// 正在回放历史会话
     public private(set) var isReplaying = false
     /// 工作区文件索引(供 @ 补全)
@@ -388,7 +386,6 @@ public final class SessionModel {
         self.client = client
         agentName = result.agentTitle ?? result.agentName
         capabilities = result.capabilities
-        authMethods = result.authMethods
         let coalescer = EventCoalescer()
         self.coalescer = coalescer
         // 后台:读取事件并合并
@@ -489,7 +486,7 @@ public final class SessionModel {
             if let error {
                 if !self.isShuttingDown {
                     if let rpc = error as? JSONRPCError, rpc.code == -32000 {
-                        self.timeline.appendNotice("需要登录后才能继续:请在侧栏「账号」中选择登录方式。", isError: true)
+                        self.timeline.appendNotice("Claude Code 尚未登录或登录已失效:请在终端运行 claude 完成登录后重试。", isError: true)
                     } else {
                         self.timeline.appendNotice("请求失败:\(error.localizedDescription)", isError: true)
                     }
@@ -616,35 +613,6 @@ public final class SessionModel {
     private func settleEvents() async {
         coalescer?.flush()
         try? await Task.sleep(for: .milliseconds(40))
-    }
-
-    // MARK: - 鉴权
-
-    /// 使用指定方式登录。
-    /// - Parameter method: 鉴权方式
-    public func authenticate(_ method: AuthMethod) {
-        guard let client else { return }
-        Task { [weak self] in
-            do {
-                try await client.authenticate(methodId: method.id)
-                self?.timeline.appendNotice("已通过「\(method.name)」完成登录。")
-            } catch {
-                self?.timeline.appendNotice("登录失败:\(error.localizedDescription)", isError: true)
-            }
-        }
-    }
-
-    /// 退出登录(Agent 需支持)。
-    public func logout() {
-        guard let client else { return }
-        Task { [weak self] in
-            do {
-                try await client.logout()
-                self?.timeline.appendNotice("已退出登录。")
-            } catch {
-                self?.timeline.appendNotice("退出登录失败:\(error.localizedDescription)", isError: true)
-            }
-        }
     }
 
     // MARK: - 补全
@@ -848,8 +816,8 @@ public final class SessionModel {
             case .sessionUpdate(let id, let update):
                 guard sessionId == nil || sessionId == id else { continue }
                 handle(update)
-            case .authStatus(let kind, let label, let detail):
-                authStatus = [label, detail].compactMap { $0 }.first ?? kind
+            case .authStatus:
+                break   // 不展示账号状态:登录完全由本机 claude 管理
             case .stderr(let text):
                 log.debug("Agent stderr", ["text": LogRedactor.truncate(text, limit: 1000)])
                 diagnostics.append(text)
