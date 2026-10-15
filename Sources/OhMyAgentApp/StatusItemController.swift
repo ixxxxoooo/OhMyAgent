@@ -166,6 +166,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             menu.addItem(.separator())
         }
         menu.addItem(item("打开 OhMyAgent") { AppActions.shared.showMainWindow() })
+        menu.addItem(item("新对话", key: "n") { AppActions.shared.newConversation() })
         menu.addItem(item("打开项目…", key: "o") {
             NSApp.activate()
             if let url = WorkspaceStore.chooseDirectory() { AppActions.shared.openWorkspace(url) }

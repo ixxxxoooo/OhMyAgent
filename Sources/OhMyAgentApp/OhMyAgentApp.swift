@@ -7,26 +7,10 @@ import ChatKit
 import DesignSystem
 import OMLog
 import SwiftUI
+import WorkbenchKit
 
-/// 工作区记录(最近使用)。
+/// 工作区目录选择。
 enum WorkspaceStore {
-    private static let lastKey = "lastWorkspacePath"
-
-    /// 默认工作区:最近使用的目录,否则为用户主目录。
-    static var defaultWorkspace: URL {
-        if let path = UserDefaults.standard.string(forKey: lastKey), FileManager.default.fileExists(atPath: path) {
-            return URL(fileURLWithPath: path)
-        }
-        return FileManager.default.homeDirectoryForCurrentUser
-    }
-
-    /// 记录最近使用的工作区。
-    /// - Parameter url: 目录
-    static func remember(_ url: URL) {
-        UserDefaults.standard.set(url.path, forKey: lastKey)
-        RecentStore.recordProject(url.path)
-    }
-
     /// 弹出目录选择面板。
     /// - Returns: 选中的目录;取消时为 nil
     @MainActor
@@ -35,30 +19,10 @@ enum WorkspaceStore {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
-        panel.prompt = "打开工作区"
+        panel.prompt = "打开项目"
         panel.message = "选择 Agent 要在其中工作的项目目录"
         return panel.runModal() == .OK ? panel.url : nil
     }
-}
-
-/// 会话注册表:应用退出时统一回收所有 Agent 子进程。
-@MainActor
-final class SessionRegistry {
-    static let shared = SessionRegistry()
-    private var storage: [ObjectIdentifier: SessionModel] = [:]
-
-    /// 当前所有会话(设置页读取用量与鉴权信息)。
-    var models: [SessionModel] { Array(storage.values) }
-
-    func register(_ model: SessionModel) {
-        storage[ObjectIdentifier(model)] = model
-        Log.session.info("会话已注册", ["workspace": model.workspace.path, "total": "\(storage.count)"])
-    }
-    func unregister(_ model: SessionModel) {
-        storage[ObjectIdentifier(model)] = nil
-        Log.session.info("会话已注销", ["workspace": model.workspace.path, "total": "\(storage.count)"])
-    }
-    func shutdownAll() { for model in storage.values { model.shutdown() } }
 }
 
 /// 应用代理:激活策略与退出清理。
@@ -74,6 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             UserDefaults.standard.set(true, forKey: "migration.trayDefaultOn")
         }
         AppNotifier.shared.install()
+        AppEnvironment.shared.bootstrap()
         StatusItemController.shared.start()
         AppearanceModel.shared.applyAll()
         Task { await Toolchain.shared.setOverrides(ClientPrefs.pathOverrides()) }
@@ -98,8 +63,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @MainActor
     func applicationWillTerminate(_ notification: Notification) {
-        Log.app.info("应用即将退出", ["sessions": "\(SessionRegistry.shared.models.count)"])
-        SessionRegistry.shared.shutdownAll()
+        Log.app.info("应用即将退出", ["sessions": "\(AppEnvironment.shared.workbench.sessions.count)"])
+        AppEnvironment.shared.workbench.shutdownAll()
         LogSystem.shared.flush()
     }
 }
@@ -114,42 +79,50 @@ struct OhMyAgentApp: App {
     }
 
     var body: some Scene {
-        WindowGroup("OhMyAgent", for: URL.self) { $workspace in
-            WorkspaceWindow(workspace: workspace)
-        } defaultValue: {
-            WorkspaceStore.defaultWorkspace
+        Window("OhMyAgent", id: "main") {
+            WorkbenchView(workbench: AppEnvironment.shared.workbench)
         }
-        .defaultSize(width: 1120, height: 780)
-        .commands { WorkspaceCommands() }
+        .defaultSize(width: 1280, height: 820)
+        .commands { WorkbenchCommands() }
 
         Settings { SettingsView() }
-
     }
 }
 
-/// 菜单命令:打开工作区。
-struct WorkspaceCommands: Commands {
-    @Environment(\.openWindow) private var openWindow
+/// 菜单命令:文件(打开项目、新对话)、视图(三栏与面板开关)、工具与扩展。
+struct WorkbenchCommands: Commands {
     @Environment(\.openSettings) private var openSettings
     private let shortcuts = ShortcutStore.shared
+    private let workbench = AppEnvironment.shared.workbench
 
     var body: some Commands {
         CommandGroup(after: .newItem) {
-            Button("打开工作区…") {
-                if let url = WorkspaceStore.chooseDirectory() { openWindow(value: url) }
+            Button("新对话") {
+                if let id = workbench.selectedProjectID { workbench.newConversation(in: id) }
+            }
+            .keyboardShortcut(shortcuts.shortcut(for: .newConversation))
+            .disabled(workbench.activeSession?.phase != .ready)
+            Button("打开项目…") {
+                if let url = WorkspaceStore.chooseDirectory() { AppActions.shared.openWorkspace(url) }
             }
             .keyboardShortcut(shortcuts.shortcut(for: .openWorkspace))
         }
         CommandGroup(after: .appInfo) {
             Button("检查更新…") { UpdateModel.shared.checkInteractively() }
         }
-        CommandGroup(after: .toolbar) {
+        CommandGroup(replacing: .sidebar) {
+            Button(workbench.layout.leftVisible ? "隐藏左栏" : "显示左栏") { workbench.toggleLeft() }
+                .keyboardShortcut(shortcuts.shortcut(for: .toggleSidebar))
+            Button(workbench.layout.rightVisible ? "隐藏右栏" : "显示右栏") { workbench.toggleRight() }
+                .keyboardShortcut(shortcuts.shortcut(for: .toggleInspector))
+            Button(workbench.layout.bottomVisible ? "隐藏底部面板" : "显示底部面板") { workbench.toggleBottom() }
+                .keyboardShortcut(shortcuts.shortcut(for: .togglePanel))
+            Divider()
             Button("工具与扩展…") {
                 SettingsRouter.shared.go(.tools)
                 openSettings()
             }
-                .keyboardShortcut(shortcuts.shortcut(for: .extensions))
+            .keyboardShortcut(shortcuts.shortcut(for: .extensions))
         }
     }
 }
-

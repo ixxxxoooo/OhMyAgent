@@ -18,7 +18,7 @@ struct UsagePage: View {
     var body: some View {
         SettingsForm {
             Section("当前会话") {
-                if let model = SessionRegistry.shared.models.first, let usage = model.usage {
+                if let model = AppEnvironment.shared.sessionModels.first, let usage = model.usage {
                     if let used = usage.used {
                         let size = usage.size ?? 0
                         LabeledContent("上下文", value: size > 0 ? "\(used.formatted()) / \(size.formatted()) tokens(\(Int(Double(used) / Double(size) * 100))%)" : "\(used.formatted()) tokens")

@@ -34,7 +34,7 @@ struct DiagnosticsPage: View {
         SettingsForm {
             Section("启动耗时") {
                 LabeledContent("启动到首帧", value: DiagnosticsStore.shared.firstFrameMilliseconds.map { "\($0) ms" } ?? "未记录")
-                if let model = SessionRegistry.shared.models.first {
+                if let model = AppEnvironment.shared.sessionModels.first {
                     LabeledContent("Agent 连接", value: model.connectDuration.map { "\($0.components.seconds * 1000 + $0.components.attoseconds / 1_000_000_000_000_000) ms" } ?? "未连接")
                 }
             }
@@ -150,7 +150,7 @@ struct DiagnosticsPage: View {
         let settings = ClaudeSettingsModel(paths: center.paths)
         lines += ["", "## settings.json env 键名", settings.dictionary(["env"]).keys.sorted().joined(separator: ", ")]
         if let doctorOutput { lines += ["", "## claude doctor", doctorOutput] }
-        for model in SessionRegistry.shared.models {
+        for model in AppEnvironment.shared.sessionModels {
             lines += ["", "## Agent 日志(\(model.agentName))"] + model.diagnostics
         }
         lines += ["", "## 最近应用日志(最多 500 条)"] + LogSystem.shared.recent(limit: 500).map(\.line)

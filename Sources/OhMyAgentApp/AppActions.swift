@@ -21,9 +21,9 @@ final class AppActions {
 
     /// 待处理的会话打开请求(由对应工作区窗口消费)
     var sessionRequest: SessionOpenRequest?
-    /// 「新对话」请求计数(当前 key 窗口响应)
-    var newChatTick = 0
 
+    /// 主窗口(由工作台视图登记;窗口关闭后系统会释放它)
+    @ObservationIgnored weak var mainWindow: NSWindow?
     @ObservationIgnored private var openWindowAction: OpenWindowAction?
     @ObservationIgnored private var openSettingsAction: OpenSettingsAction?
 
@@ -33,11 +33,11 @@ final class AppActions {
         openSettingsAction = openSettings
     }
 
-    /// 打开(或前置)某工作区窗口。
+    /// 把目录加入工作台(已存在则选中)并前置主窗口。
     func openWorkspace(_ url: URL) {
-        Log.app.info("打开工作区窗口", ["path": url.path])
-        NSApp.activate()
-        openWindowAction?(value: url)
+        Log.app.info("打开项目", ["path": url.path])
+        AppEnvironment.shared.workbench.openProject(url)
+        showMainWindow()
     }
 
     /// 打开设置(可深链到某页)。
@@ -47,22 +47,30 @@ final class AppActions {
         openSettingsAction?()
     }
 
-    /// 打开某个会话(点击通知或托盘菜单):打开工作区窗口并请求切换到会话。
+    /// 打开某个会话(点击通知或托盘菜单):选中项目并请求切换到会话。
     func openSession(workspacePath: String, sessionId: String?, title: String?, uid: String? = nil) {
         Log.app.info("请求打开会话", ["workspace": workspacePath, "session": sessionId ?? "-"])
         if let uid { AttentionCenter.shared.markRead(uid) }
+        guard AppEnvironment.shared.workbench.openProject(URL(fileURLWithPath: workspacePath)) != nil else { return }
         sessionRequest = SessionOpenRequest(workspacePath: workspacePath, sessionId: sessionId, title: title)
-        openWorkspace(URL(fileURLWithPath: workspacePath))
+        showMainWindow()
     }
 
-    /// 前置已有窗口;没有窗口时打开默认工作区。
+    /// 在当前项目下开始新对话并前置主窗口。
+    func newConversation() {
+        let workbench = AppEnvironment.shared.workbench
+        if let id = workbench.selectedProjectID { workbench.newConversation(in: id) }
+        showMainWindow()
+    }
+
+    /// 前置主窗口;窗口已被关闭时重新打开。
     func showMainWindow() {
         NSApp.activate()
-        if let window = NSApp.windows.first(where: { $0.canBecomeMain }) {
+        if let window = mainWindow {
             if window.isMiniaturized { window.deminiaturize(nil) }
             window.makeKeyAndOrderFront(nil)
         } else {
-            openWorkspace(WorkspaceStore.defaultWorkspace)
+            openWindowAction?(id: "main")
         }
     }
 }

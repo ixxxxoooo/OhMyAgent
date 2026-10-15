@@ -8,14 +8,18 @@ import SwiftUI
 /// 可自定义的动作。
 enum ShortcutAction: String, CaseIterable, Identifiable {
     case newConversation, openWorkspace, extensions, send
+    case toggleSidebar, toggleInspector, togglePanel
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .newConversation: return "新对话"
-        case .openWorkspace: return "打开工作区"
+        case .openWorkspace: return "打开项目"
         case .extensions: return "工具与扩展"
         case .send: return "发送消息"
+        case .toggleSidebar: return "切换左栏"
+        case .toggleInspector: return "切换右栏"
+        case .togglePanel: return "切换底部面板"
         }
     }
 
@@ -26,6 +30,9 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
         case .openWorkspace: return ShortcutBinding(key: "o", modifiers: ["command"])
         case .extensions: return ShortcutBinding(key: "e", modifiers: ["command", "shift"])
         case .send: return ShortcutBinding(key: "return", modifiers: ["command"])
+        case .toggleSidebar: return ShortcutBinding(key: "b", modifiers: ["command"])
+        case .toggleInspector: return ShortcutBinding(key: "b", modifiers: ["command", "option"])
+        case .togglePanel: return ShortcutBinding(key: "j", modifiers: ["command"])
         }
     }
 }

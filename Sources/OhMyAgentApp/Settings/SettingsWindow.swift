@@ -75,10 +75,12 @@ final class SettingsRouter {
     }
 }
 
-/// 设置窗口所用的工作区:最近使用的目录;主目录视为"无工作区"(项目/本地层与用户层相同)。
+/// 设置窗口所用的工作区:工作台当前选中的项目;主目录视为"无项目"(项目/本地层与用户层相同)。
 enum SettingsContext {
+    @MainActor
     static var workspace: URL? {
-        let url = WorkspaceStore.defaultWorkspace
+        guard let project = AppEnvironment.shared.workbench.selectedProject else { return nil }
+        let url = project.url
         return url.standardizedFileURL.path == FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL.path ? nil : url
     }
 }
