@@ -302,8 +302,9 @@ public actor ACPClient {
 
     // MARK: 会话
 
-    private func sessionParams(cwd: String, mcpServers: [MCPServerConfig], additionalDirectories: [String]) -> [String: JSONValue] {
+    private func sessionParams(cwd: String, mcpServers: [MCPServerConfig], additionalDirectories: [String], meta: JSONValue? = nil) -> [String: JSONValue] {
         var params: [String: JSONValue] = ["cwd": .string(cwd), "mcpServers": .array(mcpServers.map(\.json))]
+        if let meta { params["_meta"] = meta }
         if capabilities.additionalDirectories, !additionalDirectories.isEmpty {
             params["additionalDirectories"] = .array(additionalDirectories.map(JSONValue.string))
         }
@@ -320,30 +321,31 @@ public actor ACPClient {
     }
 
     /// 创建会话。
-    public func newSession(cwd: String, mcpServers: [MCPServerConfig] = [], additionalDirectories: [String] = []) async throws -> SessionSetup {
-        let result = try await connection.request("session/new", params: .object(sessionParams(cwd: cwd, mcpServers: mcpServers, additionalDirectories: additionalDirectories)))
+    /// - Parameter meta: 会话级 `_meta`(如 claude-agent-acp 的 `claudeCode.options`,用于按会话指定模型提供商)
+    public func newSession(cwd: String, mcpServers: [MCPServerConfig] = [], additionalDirectories: [String] = [], meta: JSONValue? = nil) async throws -> SessionSetup {
+        let result = try await connection.request("session/new", params: .object(sessionParams(cwd: cwd, mcpServers: mcpServers, additionalDirectories: additionalDirectories, meta: meta)))
         return parseSetup(result)
     }
 
     /// 加载会话(Agent 会回放历史)。
-    public func loadSession(sessionId: String, cwd: String, mcpServers: [MCPServerConfig] = [], additionalDirectories: [String] = []) async throws -> SessionSetup {
-        var params = sessionParams(cwd: cwd, mcpServers: mcpServers, additionalDirectories: additionalDirectories)
+    public func loadSession(sessionId: String, cwd: String, mcpServers: [MCPServerConfig] = [], additionalDirectories: [String] = [], meta: JSONValue? = nil) async throws -> SessionSetup {
+        var params = sessionParams(cwd: cwd, mcpServers: mcpServers, additionalDirectories: additionalDirectories, meta: meta)
         params["sessionId"] = .string(sessionId)
         let result = try await connection.request("session/load", params: .object(params))
         return parseSetup(result, fallbackId: sessionId)
     }
 
     /// 恢复会话(不回放历史)。
-    public func resumeSession(sessionId: String, cwd: String, mcpServers: [MCPServerConfig] = [], additionalDirectories: [String] = []) async throws -> SessionSetup {
-        var params = sessionParams(cwd: cwd, mcpServers: mcpServers, additionalDirectories: additionalDirectories)
+    public func resumeSession(sessionId: String, cwd: String, mcpServers: [MCPServerConfig] = [], additionalDirectories: [String] = [], meta: JSONValue? = nil) async throws -> SessionSetup {
+        var params = sessionParams(cwd: cwd, mcpServers: mcpServers, additionalDirectories: additionalDirectories, meta: meta)
         params["sessionId"] = .string(sessionId)
         let result = try await connection.request("session/resume", params: .object(params))
         return parseSetup(result, fallbackId: sessionId)
     }
 
     /// 分叉会话。
-    public func forkSession(sessionId: String, cwd: String, mcpServers: [MCPServerConfig] = []) async throws -> SessionSetup {
-        var params = sessionParams(cwd: cwd, mcpServers: mcpServers, additionalDirectories: [])
+    public func forkSession(sessionId: String, cwd: String, mcpServers: [MCPServerConfig] = [], meta: JSONValue? = nil) async throws -> SessionSetup {
+        var params = sessionParams(cwd: cwd, mcpServers: mcpServers, additionalDirectories: [], meta: meta)
         params["sessionId"] = .string(sessionId)
         let result = try await connection.request("session/fork", params: .object(params))
         return parseSetup(result)

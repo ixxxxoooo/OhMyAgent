@@ -315,6 +315,7 @@ public final class SessionModel {
                     return await self.awaitElicitation(method: method, params: params)
                 }
             )
+            await self.resolveProvider(for: descriptor)
             let features = self.features
             let supervisor = AgentSupervisor(provider: AgentProviders.make(descriptor), cwd: cwd, delegate: delegate,
                                              fileSystem: features.fileSystem, terminal: features.terminal,
@@ -327,7 +328,7 @@ public final class SessionModel {
                 let prepared = self.prepareMCPServers(registry: registry, environment: tools.environment)
                 self.mcpServers = prepared.servers
                 self.bridge = prepared.bridge
-                let setup = try await client.newSession(cwd: cwd, mcpServers: prepared.servers)
+                let setup = try await client.newSession(cwd: cwd, mcpServers: prepared.servers, meta: self.providerMeta)
                 self.sessionId = setup.sessionId
                 self.configOptions = setup.configOptions
                 self.phase = .ready
@@ -448,6 +449,17 @@ public final class SessionModel {
         start(prompt: queued)
     }
 
+    /// 当前会话使用的模型提供商名称(未启用提供商时为 nil,即沿用 ~/.claude 配置)
+    public private(set) var providerName: String?
+    /// 提供商的会话 `_meta`(含密钥,仅内存持有,禁止记录)
+    @ObservationIgnored private var providerMeta: JSONValue?
+    /// 提供商地址(发送前探测用)
+    @ObservationIgnored private var providerURL: URL?
+    /// 提供商目录(测试可注入;默认 Application Support)
+    @ObservationIgnored public var providerDirectory: URL = ProviderStorage.defaultDirectory
+    /// 提供商解析使用的环境(测试可注入)
+    @ObservationIgnored public var providerEnvironment: [String: String] = ProcessInfo.processInfo.environment
+
     /// 模型网关探测器(默认探测 `ANTHROPIC_BASE_URL`;测试可注入)。
     @ObservationIgnored public var gatewayChecker: (@Sendable () async -> GatewayStatus)?
     /// 最近一次收到 Agent 事件的时间(卡死看门狗使用)
@@ -456,11 +468,39 @@ public final class SessionModel {
     /// 无事件超过该时长则怀疑卡死并重新探测网关
     static let stallThreshold: Duration = .seconds(20)
 
-    /// 发送前探测网关;仅对真实 Claude 通道生效。
+    /// 发送前探测网关;仅对真实 Claude 通道生效。启用了模型提供商时探测提供商地址。
     private func probeGateway() async -> GatewayStatus {
         if let gatewayChecker { return await gatewayChecker() }
         guard activeDescriptor.kind == .claudeACP else { return .notConfigured }
+        if let providerURL { return await ModelGateway.probe(providerURL) }
         return await ModelGateway.check()
+    }
+
+    /// 解析启用的模型提供商(后台读盘);缺密钥/配置无效时提示并回退到 ~/.claude 默认配置。
+    private func resolveProvider(for descriptor: AgentDescriptor) async {
+        providerName = nil
+        providerMeta = nil
+        providerURL = nil
+        guard descriptor.kind == .claudeACP else { return }
+        let directory = providerDirectory
+        let environment = providerEnvironment
+        let outcome = await Task.detached(priority: .userInitiated) { () -> Result<ResolvedProvider?, ProviderStorage.ResolveError> in
+            do { return .success(try ProviderStorage.resolveActive(directory: directory, environment: environment)) }
+            catch let error as ProviderStorage.ResolveError { return .failure(error) }
+            catch { return .success(nil) }
+        }.value
+        switch outcome {
+        case .success(let resolved?):
+            providerName = resolved.provider.name
+            providerMeta = resolved.meta
+            providerURL = resolved.provider.url
+            log.info("使用模型提供商", ["provider": resolved.provider.id, "model": resolved.provider.model, "baseURL": ModelGateway.origin(of: resolved.provider.url ?? workspace)])
+        case .success(nil):
+            break
+        case .failure(let error):
+            log.warning("模型提供商不可用,回退默认配置", ["reason": error.localizedDescription])
+            timeline.appendNotice(error.localizedDescription, isError: true)
+        }
     }
 
     private func start(prompt: String) {
@@ -601,9 +641,10 @@ public final class SessionModel {
         turnChangeOrder.removeAll()
         Task { await checkpoints.reset() }
         let servers = mcpServers
+        let meta = providerMeta
         Task { [weak self] in
             do {
-                let setup = try await client.newSession(cwd: cwd, mcpServers: servers)
+                let setup = try await client.newSession(cwd: cwd, mcpServers: servers, meta: meta)
                 self?.sessionId = setup.sessionId
                 self?.configOptions = setup.configOptions
             } catch {
@@ -642,11 +683,12 @@ public final class SessionModel {
         let cwd = workspace.path
         let canLoad = capabilities.loadSession
         let servers = mcpServers
+        let meta = providerMeta
         Task { [weak self] in
             do {
                 let setup = canLoad
-                    ? try await client.loadSession(sessionId: summary.sessionId, cwd: cwd, mcpServers: servers)
-                    : try await client.resumeSession(sessionId: summary.sessionId, cwd: cwd, mcpServers: servers)
+                    ? try await client.loadSession(sessionId: summary.sessionId, cwd: cwd, mcpServers: servers, meta: meta)
+                    : try await client.resumeSession(sessionId: summary.sessionId, cwd: cwd, mcpServers: servers, meta: meta)
                 self?.configOptions = setup.configOptions.isEmpty ? (self?.configOptions ?? []) : setup.configOptions
             } catch {
                 self?.timeline.appendNotice("打开会话失败:\(error.localizedDescription)", isError: true)
@@ -662,9 +704,10 @@ public final class SessionModel {
         guard let client, let sessionId, capabilities.canFork, !isRunning else { return }
         let cwd = workspace.path
         let servers = mcpServers
+        let meta = providerMeta
         Task { [weak self] in
             do {
-                let setup = try await client.forkSession(sessionId: sessionId, cwd: cwd, mcpServers: servers)
+                let setup = try await client.forkSession(sessionId: sessionId, cwd: cwd, mcpServers: servers, meta: meta)
                 self?.sessionId = setup.sessionId
                 self?.timeline.appendNotice("已从此处分叉出新会话,后续对话不会影响原会话。")
                 if !setup.configOptions.isEmpty { self?.configOptions = setup.configOptions }

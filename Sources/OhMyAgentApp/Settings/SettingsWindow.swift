@@ -9,7 +9,7 @@ import SwiftUI
 /// 设置页。
 enum SettingsPage: String, CaseIterable, Identifiable {
     case general, appearance, shortcuts
-    case agent, permissions, tools, agentExtensions
+    case agent, providers, permissions, tools, agentExtensions
     case editor, terminal
     case usage, privacy, advanced, diagnostics
     var id: String { rawValue }
@@ -17,7 +17,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
     /// 侧栏分组(从上到下)。
     static let groups: [(title: String, pages: [SettingsPage])] = [
         ("客户端", [.general, .appearance, .shortcuts]),
-        ("Agent", [.agent, .permissions, .tools, .agentExtensions]),
+        ("Agent", [.agent, .providers, .permissions, .tools, .agentExtensions]),
         ("工作台", [.editor, .terminal]),
         ("其他", [.usage, .privacy, .advanced, .diagnostics]),
     ]
@@ -28,6 +28,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .appearance: return "外观"
         case .shortcuts: return "快捷键"
         case .agent: return "Agent 与模型"
+        case .providers: return "模型提供商"
         case .permissions: return "权限"
         case .tools: return "工具与扩展"
         case .agentExtensions: return "Agent 注册表"
@@ -46,6 +47,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .appearance: return "paintbrush"
         case .shortcuts: return "keyboard"
         case .agent: return "cpu"
+        case .providers: return "server.rack"
         case .permissions: return "lock.shield"
         case .tools: return "puzzlepiece.extension"
         case .agentExtensions: return "square.stack.3d.up"
@@ -133,6 +135,7 @@ struct SettingsView: View {
         case .general: GeneralPage()
         case .appearance: AppearancePage()
         case .agent: AgentModelPage(model: model)
+        case .providers: ModelProvidersPage()
         case .permissions: PermissionsPage(model: model)
         case .tools: ToolsExtensionsPage(center: center, router: router)
         case .editor: EditorPage()
