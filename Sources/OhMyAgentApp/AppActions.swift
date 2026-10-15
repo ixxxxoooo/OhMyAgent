@@ -45,6 +45,17 @@ final class AppActions {
         showMainWindow()
     }
 
+    /// 回到对话并把文本追加到当前会话的输入框(设置页里的「在对话中使用」)。
+    /// - Parameter text: 要插入的文本(如 `/review ` 或 `@agent-explorer `)
+    func insertIntoComposer(_ text: String) {
+        let workbench = AppEnvironment.shared.workbench
+        workbench.closeSettings()
+        guard let id = workbench.selectedProjectID, let model = workbench.sessions[id] else { return }
+        let separator = model.draft.isEmpty || model.draft.hasSuffix(" ") || model.draft.hasSuffix("\n") ? "" : " "
+        model.draft += separator + text
+        showMainWindow()
+    }
+
     /// 把所有文件标签的「未保存」标记与文档状态对齐(保存/重新载入后调用)。
     func refreshDirtyFlags() {
         let workbench = AppEnvironment.shared.workbench

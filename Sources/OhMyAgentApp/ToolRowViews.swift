@@ -102,6 +102,7 @@ struct ToolRowView: View {
                 .frame(width: 16)
                 .foregroundStyle(tool.status == .failed ? Color.red : OMColors.secondaryText)
             if let server = p.mcpServer { OMTag(server, tint: OMColors.accent) }
+            if let agentType = p.agentType { OMTag(agentType, tint: OMColors.accent) }
             if !p.verb.isEmpty {
                 Text(p.verb)
                     .font(OMFonts.small)
@@ -168,6 +169,19 @@ struct ToolRowView: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(p.plainText),\(Self.statusText(tool.status))")
         .accessibilityAddTraits(canExpand ? .isButton : [])
+        .contextMenu {
+            if p.category == .subagent {
+                if entry.childStore != nil {
+                    Button("在标签中打开子 Agent 会话") {
+                        let workbench = AppEnvironment.shared.workbench
+                        if let project = workbench.projectID(of: model) {
+                            workbench.openSubagent(project: project, toolCallID: tool.toolCallId, title: tool.title)
+                        }
+                    }
+                }
+                Button("查看子 Agent 定义…") { AppActions.shared.openSettings(page: .tools, section: .agents) }
+            }
+        }
     }
 
     @ViewBuilder

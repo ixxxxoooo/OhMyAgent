@@ -33,6 +33,9 @@ struct ChatView: View {
                     ConnectionFailureCard(message: message) { model.reconnect() }
                 }
                 PlanDock(model: model)
+                SubagentActivityStrip(model: model, workbench: AppEnvironment.shared.workbench)
+                GoalChip(model: model)
+                FollowUpQueueView(model: model)
                 ComposerView(model: model)
                 ComposerFooter(model: model)
             }
@@ -41,6 +44,7 @@ struct ChatView: View {
             .padding(.bottom, 12)
             .frame(maxWidth: .infinity)
         }
+        .task(id: ObjectIdentifier(model)) { ChatBindings.bind(model) }
     }
 
     private var timeline: some View {

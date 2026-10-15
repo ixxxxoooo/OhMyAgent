@@ -20,23 +20,91 @@ struct TimelineEntryView: View {
         case .plan: PlanView(entry: entry)
         case .notice: NoticeView(entry: entry)
         case .changes: ChangesSummaryView(entry: entry)
+        case .planDoc: PlanDocView(entry: entry)
         }
     }
 }
 
-/// 用户消息:纯色卡片。
+/// 用户消息:纯色卡片(可带图片缩略图;运行中引导的消息带「引导」标记)。
 struct UserMessageView: View {
     let entry: TimelineEntry
 
     var body: some View {
-        Text(entry.text)
-            .font(OMFonts.reading)
-            .textSelection(.enabled)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .omSolidCard()
-            .accessibilityLabel("你:\(entry.text)")
+        VStack(alignment: .leading, spacing: 8) {
+            if entry.isSteered {
+                Label("运行中引导", om: "corner-down-right")
+                    .font(OMFonts.small)
+                    .foregroundStyle(OMColors.secondaryText)
+            }
+            if !entry.attachments.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(entry.attachments) { item in
+                            AttachmentThumbnail(attachment: item, size: 72)
+                        }
+                    }
+                }
+            }
+            if !entry.text.isEmpty {
+                Text(entry.text)
+                    .font(OMFonts.reading)
+                    .textSelection(.enabled)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .omSolidCard()
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("你:\(entry.text)")
+    }
+}
+
+/// 图片附件缩略图(解码结果缓存,避免滚动时重复解码)。
+struct AttachmentThumbnail: View {
+    let attachment: ImageAttachment
+    var size: CGFloat = 56
+    /// 非 nil 时在右上角显示移除按钮
+    var onRemove: (() -> Void)?
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Group {
+                if let image = AttachmentImageCache.image(for: attachment) {
+                    Image(nsImage: image).resizable().scaledToFill()
+                } else {
+                    Image.om("image", size: 18).foregroundStyle(OMColors.secondaryText)
+                }
+            }
+            .frame(width: size, height: size)
+            .background(OMColors.card)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(OMColors.hairline))
+            .accessibilityLabel("图片 \(attachment.name)")
+            if let onRemove {
+                Button(action: onRemove) {
+                    Image.om("circle-x", size: 14)
+                        .foregroundStyle(.white, Color.black.opacity(0.6))
+                }
+                .buttonStyle(.plain)
+                .padding(2)
+                .accessibilityLabel("移除图片")
+            }
+        }
+    }
+}
+
+/// 缩略图解码缓存。
+@MainActor
+enum AttachmentImageCache {
+    private static let cache = NSCache<NSUUID, NSImage>()
+
+    static func image(for attachment: ImageAttachment) -> NSImage? {
+        let key = attachment.id as NSUUID
+        if let hit = cache.object(forKey: key) { return hit }
+        guard let image = NSImage(data: attachment.data) else { return nil }
+        cache.setObject(image, forKey: key)
+        return image
     }
 }
 
@@ -131,16 +199,55 @@ struct PlanView: View {
     }
 }
 
-/// 提示 / 错误。
+/// 提示 / 错误(可带 Markdown 详情,如压缩提示、`/help`、`/status`)。
 struct NoticeView: View {
     let entry: TimelineEntry
 
+    private var tint: Color {
+        switch entry.severity {
+        case "error": return .red
+        case "warning": return .orange
+        default: return OMColors.secondaryText
+        }
+    }
+
+    private var icon: String {
+        switch entry.severity {
+        case "error": return "exclamationmark.circle.fill"
+        case "warning": return "exclamationmark.triangle.fill"
+        default: return entry.isError ? "exclamationmark.circle.fill" : "info.circle"
+        }
+    }
+
     var body: some View {
-        Label(entry.text, om: entry.isError ? "exclamationmark.circle.fill" : "info.circle")
-            .font(OMFonts.small)
-            .foregroundStyle(entry.isError ? Color.red : OMColors.secondaryText)
-            .textSelection(.enabled)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: 6) {
+            Label(entry.text, om: icon)
+                .font(OMFonts.small)
+                .foregroundStyle(tint)
+                .textSelection(.enabled)
+            if let detail = entry.detail {
+                MarkdownView(text: detail)
+                    .padding(.leading, 20)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// 计划模式批准后的计划文档(Markdown 卡片)。
+struct PlanDocView: View {
+    let entry: TimelineEntry
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("计划", om: "list.bullet.clipboard")
+                .font(OMFonts.small.weight(.semibold))
+                .foregroundStyle(OMColors.secondaryText)
+            MarkdownView(text: entry.text)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .omSolidCard()
     }
 }
 

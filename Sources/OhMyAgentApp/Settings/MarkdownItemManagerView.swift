@@ -118,6 +118,12 @@ struct MarkdownItemEditor: View {
                 Text(item.name).font(OMFonts.title)
                 Tag(item.source.displayName, color: .accentColor)
                 Spacer()
+                if item.kind == .agent || item.userInvocable {
+                    Button {
+                        AppActions.shared.insertIntoComposer(item.kind == .agent ? "@agent-\(item.name) " : "/\(item.name) ")
+                    } label: { Label("在对话中使用", om: "message-square-plus") }
+                        .help(item.kind == .agent ? "回到对话并 @ 提及这个子 Agent" : "回到对话并插入这个命令")
+                }
                 Button { NSWorkspace.shared.activateFileViewerSelecting([item.fileURL]) } label: { Image.om("folder") }
                     .help("在 Finder 中显示").accessibilityLabel("在 Finder 中显示")
                 if !item.source.isReadOnly {

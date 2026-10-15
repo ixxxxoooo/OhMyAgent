@@ -17,13 +17,15 @@ struct PermissionCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                Image.om(ToolIcons.symbol(for: prompt.kind)).foregroundStyle(OMColors.warning)
-                Text("需要你的许可").font(OMFonts.small.weight(.semibold))
+                Image.om(prompt.isPlanApproval ? "list-todo" : ToolIcons.symbol(for: prompt.kind)).foregroundStyle(OMColors.warning)
+                Text(prompt.isPlanApproval ? "计划待批准" : "需要你的许可").font(OMFonts.small.weight(.semibold))
             }
-            Text(prompt.title)
-                .font(OMFonts.monoSmall)
-                .lineLimit(4)
-                .textSelection(.enabled)
+            if !prompt.isPlanApproval {
+                Text(prompt.title)
+                    .font(OMFonts.monoSmall)
+                    .lineLimit(4)
+                    .textSelection(.enabled)
+            }
             if let command = prompt.tool.rawInput?["command"]?.stringValue, command != prompt.title {
                 Text(command)
                     .font(OMFonts.monoSmall)
@@ -52,7 +54,11 @@ struct PermissionCard: View {
     @ViewBuilder
     private var preview: some View {
         let contents = prompt.tool.content
-        if !contents.isEmpty {
+        if contents.isEmpty, prompt.isPlanApproval, let plan = prompt.planText {
+            AutoHeightScroll(maxHeight: 320) {
+                MarkdownView(text: plan).frame(maxWidth: .infinity, alignment: .leading)
+            }
+        } else if !contents.isEmpty {
             AutoHeightScroll(maxHeight: 260) {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(Array(contents.enumerated()), id: \.offset) { _, content in

@@ -3,6 +3,7 @@
 // 自动增高与占位文字。比 SwiftUI TextEditor 更可控,且不会在输入法组合期间误触发发送。
 
 import AppKit
+import ChatKit
 import SwiftUI
 
 /// 补全弹层的按键。
@@ -33,6 +34,12 @@ final class SubmitTextView: NSTextView {
     var onCompletionKey: ((CompletionKey) -> Void)?
     /// Shift+Tab
     var onBacktab: (() -> Void)?
+    /// ⌘Return:运行中排到本轮结束后发送
+    var onSubmitAfterTurn: (() -> Void)?
+    /// 粘贴/拖入图片;返回 true 表示已处理
+    var onImages: (([ImageAttachment]) -> Void)?
+    /// 是否接受图片(Agent 不支持图片时不接管粘贴)
+    var acceptsImages: () -> Bool = { false }
     var placeholder: String = "" { didSet { needsDisplay = true } }
 
     override func keyDown(with event: NSEvent) {
@@ -58,6 +65,10 @@ final class SubmitTextView: NSTextView {
                 onSubmit?()
                 return
             }
+            if modifiers == [.command] {
+                onSubmitAfterTurn?()
+                return
+            }
             if modifiers == [.shift] || modifiers == [.option] {
                 insertNewlineIgnoringFieldEditor(nil)
                 return
@@ -68,6 +79,34 @@ final class SubmitTextView: NSTextView {
             return
         }
         super.keyDown(with: event)
+    }
+
+    /// 粘贴:剪贴板含图片时作为附件,否则按纯文本粘贴。
+    override func paste(_ sender: Any?) {
+        if acceptsImages(), ImageIntake.hasImage(.general) {
+            let images = ImageIntake.attachments(from: .general)
+            if !images.isEmpty {
+                onImages?(images)
+                return
+            }
+        }
+        pasteAsPlainText(sender)
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        if acceptsImages(), ImageIntake.hasImage(sender.draggingPasteboard) { return .copy }
+        return super.draggingEntered(sender)
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        if acceptsImages(), ImageIntake.hasImage(sender.draggingPasteboard) {
+            let images = ImageIntake.attachments(from: sender.draggingPasteboard)
+            if !images.isEmpty {
+                onImages?(images)
+                return true
+            }
+        }
+        return super.performDragOperation(sender)
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -94,6 +133,9 @@ struct ComposerTextView: NSViewRepresentable {
     var isCompletionActive: () -> Bool = { false }
     var onCompletionKey: ((CompletionKey) -> Void)?
     var onBacktab: (() -> Void)?
+    var onSubmitAfterTurn: (() -> Void)?
+    var onImages: (([ImageAttachment]) -> Void)?
+    var acceptsImages: () -> Bool = { false }
     /// 文本或光标变化(未处于输入法组合态时)
     var onEdit: ((String, Int) -> Void)?
     /// 选中文字变化(无选中为 nil)
@@ -122,6 +164,10 @@ struct ComposerTextView: NSViewRepresentable {
         textView.isCompletionActive = { [coordinator = context.coordinator] in coordinator.parent.isCompletionActive() }
         textView.onCompletionKey = { [coordinator = context.coordinator] key in coordinator.parent.onCompletionKey?(key) }
         textView.onBacktab = { [coordinator = context.coordinator] in coordinator.parent.onBacktab?() }
+        textView.onSubmitAfterTurn = { [coordinator = context.coordinator] in coordinator.parent.onSubmitAfterTurn?() }
+        textView.onImages = { [coordinator = context.coordinator] images in coordinator.parent.onImages?(images) }
+        textView.acceptsImages = { [coordinator = context.coordinator] in coordinator.parent.acceptsImages() }
+        textView.registerForDraggedTypes([.fileURL, .png, .tiff])
         textView.setAccessibilityLabel("消息输入框")
         controller?.textView = textView
 

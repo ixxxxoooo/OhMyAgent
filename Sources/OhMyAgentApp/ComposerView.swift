@@ -21,6 +21,16 @@ struct ComposerView: View {
 
     var body: some View {
         VStack(spacing: 6) {
+            if !model.attachments.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(model.attachments) { item in
+                            AttachmentThumbnail(attachment: item, size: 56) { model.removeAttachment(item.id) }
+                        }
+                    }
+                    .padding(.top, 2)
+                }
+            }
             ComposerTextView(
                 text: $model.draft,
                 height: $textHeight,
@@ -31,6 +41,9 @@ struct ComposerView: View {
                 isCompletionActive: { completion != nil && !items.isEmpty },
                 onCompletionKey: handleCompletionKey,
                 onBacktab: { model.cycleMode() },
+                onSubmitAfterTurn: { model.sendDraft(afterTurn: true) },
+                onImages: { images in images.forEach { model.addAttachment($0) } },
+                acceptsImages: { model.canAttachImages },
                 onEdit: updateCompletion,
                 onSelectionText: { model.selectedText = $0 }
             )
@@ -39,6 +52,17 @@ struct ComposerView: View {
                 OptionMenu(model: model, category: "mode", icon: "slider.horizontal.3")
                 OptionMenu(model: model, category: "model", icon: "cpu")
                 OptionMenu(model: model, category: "thought_level", icon: "brain")
+                if model.canAttachImages {
+                    Button {
+                        ImageIntake.pickImages().forEach { model.addAttachment($0) }
+                    } label: {
+                        Image.om("image-plus", size: 12).foregroundStyle(OMColors.secondaryText)
+                    }
+                    .buttonStyle(.plain)
+                    .help("添加图片(也可粘贴或拖入)")
+                    .accessibilityLabel("添加图片")
+                }
+                MCPPanelButton(model: model)
                 Spacer(minLength: 8)
                 if let queued = model.queuedPrompt {
                     Text("连接后发送:\(queued)")
@@ -98,7 +122,7 @@ struct ComposerView: View {
     private func accept(_ item: CompletionItem) {
         guard let context = completion else { return }
         var text = item.insertText
-        if context.trigger == .slash, item.kind == .agentCommand { text += " " }
+        if context.trigger == .slash || item.kind == .subagent { text += item.insertText.hasSuffix(" ") ? "" : " " }
         completion = nil
         items = []
         controller.replace(range: context.range, with: text)
@@ -108,30 +132,43 @@ struct ComposerView: View {
         switch model.phase {
         case .connecting: return String(localized: "正在连接 Agent,可以先输入…")
         case .failed: return String(localized: "Agent 未连接,发送将尝试重新连接")
-        default: return String(localized: "向 \(model.agentName) 提问,Return 发送,Shift+Return 换行")
+        default:
+            if model.isRunning {
+                return model.canSteer
+                    ? String(localized: "运行中:Return 引导 \(model.agentName),⌘Return 排到本轮之后")
+                    : String(localized: "运行中:Return 或 ⌘Return 排到本轮之后发送")
+            }
+            return String(localized: "向 \(model.agentName) 提问,Return 发送,Shift+Return 换行,/ 命令,@ 提及")
         }
+    }
+
+    private var hasContent: Bool {
+        !model.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !model.attachments.isEmpty
     }
 
     @ViewBuilder
     private var sendButton: some View {
-        if model.isRunning {
-            Button { model.cancel() } label: {
-                Image.om("stop.fill", size: 11, weight: .bold).frame(width: 26, height: 26)
+        HStack(spacing: 6) {
+            if model.isRunning {
+                Button { model.cancel() } label: {
+                    Image.om("stop.fill", size: 11, weight: .bold).frame(width: 26, height: 26)
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .help("停止 (Esc)")
+                .accessibilityLabel("停止生成")
             }
-            .buttonStyle(.glassProminent)
-            .buttonBorderShape(.circle)
-            .help("停止 (Esc)")
-            .accessibilityLabel("停止生成")
-        } else {
-            Button { model.sendDraft() } label: {
-                Image.om("arrow.up", size: 12, weight: .bold).frame(width: 26, height: 26)
+            if !model.isRunning || hasContent {
+                Button { model.sendDraft() } label: {
+                    Image.om(model.isRunning ? "corner-down-right" : "arrow.up", size: 12, weight: .bold).frame(width: 26, height: 26)
+                }
+                .buttonStyle(.glassProminent)
+                .buttonBorderShape(.circle)
+                .disabled(!hasContent)
+                .keyboardShortcut(ShortcutStore.shared.shortcut(for: .send))
+                .help(model.isRunning ? "引导当前轮次 (Return);⌘Return 排到本轮之后" : "发送 (Return)")
+                .accessibilityLabel(model.isRunning ? "引导当前轮次" : "发送")
             }
-            .buttonStyle(.glassProminent)
-            .buttonBorderShape(.circle)
-            .disabled(model.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            .keyboardShortcut(ShortcutStore.shared.shortcut(for: .send))
-            .help("发送 (Return)")
-            .accessibilityLabel("发送")
         }
     }
 }
@@ -177,7 +214,7 @@ struct CompletionPopup: View {
     let onPick: (CompletionItem) -> Void
 
     /// 弹层固定高度(每行 36pt,最多 280pt)
-    var height: CGFloat { min(CGFloat(items.count) * 36 + 8, 280) }
+    var height: CGFloat { min(CGFloat(items.count) * 36 + 8, 320) }
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -209,6 +246,14 @@ struct CompletionPopup: View {
                 .frame(width: 18)
                 .foregroundStyle(OMColors.secondaryText)
             Text(item.title).font(OMFonts.body).lineLimit(1)
+            if let badge = item.badge {
+                Text(badge)
+                    .font(OMFonts.caption)
+                    .foregroundStyle(OMColors.secondaryText)
+                    .lineLimit(1)
+                    .padding(.horizontal, 5)
+                    .background(Capsule().fill(Color.primary.opacity(0.08)))
+            }
             if let subtitle = item.subtitle, !subtitle.isEmpty {
                 Text(subtitle)
                     .font(OMFonts.caption)
@@ -226,9 +271,13 @@ struct CompletionPopup: View {
 
     private func icon(_ kind: CompletionItem.Kind) -> String {
         switch kind {
-        case .agentCommand: return "slash.circle"
+        case .agentCommand: return "slash"
         case .localCommand: return "terminal"
         case .file: return "doc.text"
+        case .skill: return "sparkles"
+        case .customCommand: return "command"
+        case .mcpPrompt: return "plug"
+        case .subagent: return "bot"
         }
     }
 }
