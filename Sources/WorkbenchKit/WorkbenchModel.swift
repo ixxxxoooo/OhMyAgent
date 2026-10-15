@@ -170,6 +170,16 @@ public final class WorkbenchModel {
         return dock.open(.preview(id: id), title: title)
     }
 
+    /// 打开终端标签。
+    /// - Parameters:
+    ///   - id: 终端标识(同一标识复用同一标签)
+    ///   - title: 标签标题
+    @discardableResult
+    public func openTerminal(id: String, title: String) -> UUID {
+        mode = .workspace
+        return dock.open(.terminal(id: id), title: title)
+    }
+
     /// 关闭某项目全部子 Agent 标签(会话被替换后它们指向的工具调用已不存在)。
     func closeSubagentTabs(in projectID: String) {
         dock.closeTabs { tab in

@@ -38,6 +38,10 @@ struct WorkbenchView: View {
             DiagnosticsStore.shared.markFirstFrame()
             actions.capture(openWindow: openWindow)
         }
+        .onChange(of: workbench.dock.allTabs.compactMap(\.terminalID)) { _, ids in
+            // 终端标签被关闭 → 结束其 shell 进程
+            TerminalStore.shared.prune(keeping: Set(ids))
+        }
         .onChange(of: workbench.activeSession?.uid) { _, _ in updateFocus() }
         .onChange(of: workbench.activeSession?.phase) { _, _ in consumeSessionRequest() }
         .onChange(of: actions.sessionRequest) { _, _ in consumeSessionRequest() }
@@ -161,6 +165,14 @@ struct WorkbenchView: View {
             let id = MermaidPreviewStore.shared.register(source.replacingOccurrences(of: "\\n", with: "\n"))
             workbench.openPreview(id: id, title: "Mermaid 图")
         }
+        if env["OMA_OPEN_TERMINAL"] != nil {
+            // 调试:打开终端标签;OMA_TERM_INPUT 在 shell 就绪后输入(\n 会被替换为回车)
+            actions.openTerminal()
+            if let input = env["OMA_TERM_INPUT"], !input.isEmpty {
+                try? await Task.sleep(for: .milliseconds(2000))
+                TerminalStore.shared.controllers.values.first?.send(input.replacingOccurrences(of: "\\n", with: "\r"))
+            }
+        }
         if let file = env["OMA_OPEN_FILE"], !file.isEmpty {
             // 调试:打开文件标签;OMA_SPLIT=right|bottom 时把它拖到会话组的对应边缘分屏
             let id = workbench.openFile(file, line: env["OMA_OPEN_LINE"].flatMap(Int.init), preview: false)
@@ -172,6 +184,7 @@ struct WorkbenchView: View {
         }
         if env["OMA_SHOW_RIGHT"] != nil { workbench.layout.rightVisible = true }
         if env["OMA_SHOW_BOTTOM"] != nil { workbench.layout.bottomVisible = true }
+        if let pane = env["OMA_BOTTOM_PANE"].flatMap(BottomPane.init(rawValue:)) { workbench.layout.bottomPane = pane }
         if env["OMA_OPEN_SETTINGS"] != nil {
             workbench.openSettings()
         }

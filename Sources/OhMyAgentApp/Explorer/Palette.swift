@@ -118,6 +118,7 @@ enum PaletteCommands {
             },
             PaletteCommand(id: "save", title: String(localized: "保存文件"), icon: "save", shortcut: key(.saveFile)) { AppActions.shared.saveActiveFile() },
             PaletteCommand(id: "saveAll", title: String(localized: "保存全部文件"), icon: "save", shortcut: nil) { AppActions.shared.saveAllFiles() },
+            PaletteCommand(id: "terminal", title: String(localized: "新建终端标签"), icon: "square-terminal", shortcut: key(.newTerminal)) { AppActions.shared.openTerminal() },
             PaletteCommand(id: "explorer", title: String(localized: "显示文件资源管理器"), icon: "folder", shortcut: nil) { workbench.showRight(.files) },
             PaletteCommand(id: "changesPane", title: String(localized: "显示改动"), icon: "file-diff", shortcut: nil) { workbench.showRight(.changes) },
             PaletteCommand(id: "planPane", title: String(localized: "显示计划"), icon: "list-checks", shortcut: nil) { workbench.showRight(.plan) },

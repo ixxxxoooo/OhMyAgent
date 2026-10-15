@@ -34,7 +34,11 @@ struct BottomPanelView: View {
             Group {
                 switch workbench.layout.bottomPane {
                 case .output: LogViewerView()
-                case .terminal, .problems: EmptyView()
+                case .terminal:
+                    // 底部面板使用项目级常驻终端;面板隐藏/切换标签都不会结束其中的进程
+                    let root = workbench.selectedProjectID ?? NSHomeDirectory()
+                    TerminalTabView(id: "bottom:\(root)", fallbackDirectory: root)
+                case .problems: EmptyView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

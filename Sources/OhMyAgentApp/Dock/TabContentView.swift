@@ -24,12 +24,8 @@ struct TabContentView: View {
         case .changes(let projectID): ChangesTabView(workbench: workbench, projectID: projectID)
         case .subagent(let projectID, let toolCallID): SubagentTabView(workbench: workbench, projectID: projectID, toolCallID: toolCallID)
         case .preview(let id): PreviewTabView(id: id)
-        case .terminal:
-            ContentUnavailableView {
-                Label("此类型的标签尚未提供", om: "info", size: 28)
-            } description: {
-                Text(tab.title)
-            }
+        case .terminal(let id):
+            TerminalTabView(id: id, fallbackDirectory: workbench.selectedProjectID ?? NSHomeDirectory())
         }
     }
 }

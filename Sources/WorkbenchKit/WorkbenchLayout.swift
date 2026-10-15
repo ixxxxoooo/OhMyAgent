@@ -30,7 +30,7 @@ public enum RightPane: String, Codable, CaseIterable, Sendable {
 public enum BottomPane: String, Codable, CaseIterable, Sendable {
     case terminal, output, problems
 
-    public static var available: [BottomPane] { [.output] }
+    public static var available: [BottomPane] { [.terminal, .output] }
 }
 
 /// 工作台布局。

@@ -9,7 +9,7 @@ import SwiftUI
 enum ShortcutAction: String, CaseIterable, Identifiable {
     case newConversation, openWorkspace, extensions, send
     case toggleSidebar, toggleInspector, togglePanel
-    case saveFile, quickOpen, commandPalette, globalSearch
+    case saveFile, quickOpen, commandPalette, globalSearch, newTerminal
     var id: String { rawValue }
 
     var title: String {
@@ -25,6 +25,7 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
         case .quickOpen: return "快速打开文件"
         case .commandPalette: return "命令面板"
         case .globalSearch: return "在文件中搜索"
+        case .newTerminal: return "新建终端标签"
         }
     }
 
@@ -42,6 +43,7 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
         case .quickOpen: return ShortcutBinding(key: "p", modifiers: ["command"])
         case .commandPalette: return ShortcutBinding(key: "p", modifiers: ["command", "shift"])
         case .globalSearch: return ShortcutBinding(key: "f", modifiers: ["command", "shift"])
+        case .newTerminal: return ShortcutBinding(key: "`", modifiers: ["control", "shift"])
         }
     }
 }

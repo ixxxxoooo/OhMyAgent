@@ -252,3 +252,7 @@
 "统一" = "Unified";
 "显示模式" = "Display Mode";
 "Diff 显示模式" = "Diff display mode";
+"新建终端标签" = "New Terminal Tab";
+"重新启动" = "Restart";
+"进程已结束" = "Process ended";
+"进程已退出(退出码 %lld)" = "Process exited (code %lld)";

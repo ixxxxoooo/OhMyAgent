@@ -99,6 +99,17 @@ final class AppActions {
         }
     }
 
+    /// 在当前项目目录新建终端标签。
+    func openTerminal() {
+        let workbench = AppEnvironment.shared.workbench
+        let directory = workbench.selectedProjectID ?? NSHomeDirectory()
+        let id = UUID().uuidString
+        TerminalStore.shared.register(id: id, directory: directory)
+        let index = workbench.dock.allTabs.filter { if case .terminal = $0.kind { return true } else { return false } }.count + 1
+        workbench.openTerminal(id: id, title: String(localized: "终端") + (index > 1 ? " \(index)" : ""))
+        showMainWindow()
+    }
+
     /// 打开预览标签(如放大的 Mermaid 图)。
     func openPreview(id: String, title: String) {
         AppEnvironment.shared.workbench.openPreview(id: id, title: title)

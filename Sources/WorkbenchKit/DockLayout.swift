@@ -27,6 +27,12 @@ public enum TabKind: Codable, Hashable, Sendable {
 
 /// 工作台标签。
 public struct WorkbenchTab: Codable, Hashable, Identifiable, Sendable {
+    /// 终端标签的终端标识;其他类型为 nil。
+    public var terminalID: String? {
+        if case .terminal(let id) = kind { return id }
+        return nil
+    }
+
     public var id: UUID
     public var kind: TabKind
     public var title: String

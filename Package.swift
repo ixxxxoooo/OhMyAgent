@@ -11,6 +11,10 @@ let package = Package(
         .executable(name: "FakeAgent", targets: ["FakeAgent"]),
         .executable(name: "OhMyAgentBridge", targets: ["OhMyAgentBridge"]),
     ],
+    dependencies: [
+        // 终端模拟器(VT/xterm 解析与渲染视图)
+        .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", exact: "1.5.1"),
+    ],
     targets: [
         // 统一日志:os.Logger + 文件轮转 + 脱敏 + 协议流量日志
         .target(name: "OMLog"),
@@ -37,7 +41,8 @@ let package = Package(
         // 应用本体
         .executableTarget(
             name: "OhMyAgentApp",
-            dependencies: ["ACPKit", "AgentHost", "ChatKit", "ClaudeConfigKit", "DiffKit", "EditorKit", "DesignSystem", "IconKit", "MermaidKit", "OMLog", "WorkbenchKit"]
+            dependencies: ["ACPKit", "AgentHost", "ChatKit", "ClaudeConfigKit", "DiffKit", "EditorKit", "DesignSystem", "IconKit", "MermaidKit", "OMLog", "WorkbenchKit",
+                           .product(name: "SwiftTerm", package: "SwiftTerm")]
         ),
         // 脚本化 ACP Agent,用于测试与预览
         .executableTarget(name: "FakeAgent", dependencies: ["ACPKit"]),
