@@ -20,7 +20,7 @@ public final class CodeEditorView: NSView {
     private static let highlightPadding = 12_000
 
     public let scrollView = NSScrollView()
-    public let textView: NSTextView
+    public let textView: EditorTextView
     private let ruler: LineNumberRulerView
     private let engine = HighlightEngine()
     private var theme: EditorTheme
@@ -40,6 +40,17 @@ public final class CodeEditorView: NSView {
     /// 用户编辑后回调(传出完整文本)。程序化 `setText` 不触发。
     public var onTextChange: ((String) -> Void)?
 
+    /// 语言智能回调(LSP 等);变更后立即接入文本视图。
+    public var features = EditorLanguageFeatures() {
+        didSet { wireFeatures() }
+    }
+
+    /// 当前诊断(用于下划线、行号栏圆点与悬停提示)。
+    public private(set) var diagnostics: [EditorDiagnostic] = []
+    private var hoverPopover: NSPopover?
+    private var hoverGeneration = 0
+    private var autoCompleteTask: Task<Void, Never>?
+
     /// 行标记,变更后刷新标尺。
     public var lineMarkers: [Int: LineMarker] = [:] {
         didSet { ruler.lineMarkers = lineMarkers }
@@ -52,7 +63,7 @@ public final class CodeEditorView: NSView {
     public init(theme: EditorTheme = .default, isEditable: Bool = true) {
         self.theme = theme
         // 显式使用 TextKit 2
-        self.textView = NSTextView(usingTextLayoutManager: true)
+        self.textView = EditorTextView(usingTextLayoutManager: true)
         self.ruler = LineNumberRulerView(scrollView: scrollView, theme: theme)
         super.init(frame: .zero)
         configure(isEditable: isEditable)
@@ -138,7 +149,17 @@ public final class CodeEditorView: NSView {
         rebuildTask?.cancel()
         highlightTask?.cancel()
 
+        // 新文本使旧诊断失效(属性随文本一起被清掉)
+        diagnostics = []
+        ruler.diagnosticLines = [:]
+        closeHover()
         textView.string = text
+        // 替换文本时新字符会继承旧字符的属性,显式去掉旧诊断的下划线
+        if let storage = textView.textStorage, storage.length > 0 {
+            let all = NSRange(location: 0, length: storage.length)
+            storage.removeAttribute(.underlineStyle, range: all)
+            storage.removeAttribute(.underlineColor, range: all)
+        }
         textView.textColor = theme.foreground
         textView.font = theme.font
         // 先用文本长度粗判大文件(平均每行 40 字符),随后用精确行数修正
@@ -193,7 +214,9 @@ public final class CodeEditorView: NSView {
                 self.scheduleHighlight()
             }
         }
+        closeHover()
         onTextChange?(text)
+        scheduleAutoCompletion()
     }
 
     /// 滚动到指定行并选中该行。
@@ -203,6 +226,151 @@ public final class CodeEditorView: NSView {
         textView.setSelectedRange(NSRange(location: range.location, length: 0))
         textView.scrollRangeToVisible(range)
         scheduleHighlight()
+    }
+
+    // MARK: - 语言智能
+
+    /// 接入悬停/跳转/补全回调。
+    private func wireFeatures() {
+        textView.completionProvider = features.completion
+        if features.definition != nil {
+            textView.onJumpToDefinition = { [weak self] offset in self?.features.definition?(offset) }
+        } else {
+            textView.onJumpToDefinition = nil
+        }
+        textView.onHoverEnd = { [weak self] in self?.closeHover() }
+        if features.hover != nil || !diagnostics.isEmpty {
+            textView.onHoverDwell = { [weak self] offset, rect in self?.showHover(at: offset, rect: rect) }
+        } else {
+            textView.onHoverDwell = nil
+        }
+    }
+
+    /// 设置诊断:用彩色下划线标出范围,行号栏显示最严重级别的圆点。
+    /// - Parameter newValue: 诊断列表(越界范围会被夹取)
+    public func setDiagnostics(_ newValue: [EditorDiagnostic]) {
+        guard newValue != diagnostics else { return }
+        diagnostics = newValue
+        wireFeatures()
+        guard let storage = textView.textStorage else { return }
+        let total = storage.length
+        storage.beginEditing()
+        storage.removeAttribute(.underlineStyle, range: NSRange(location: 0, length: total))
+        storage.removeAttribute(.underlineColor, range: NSRange(location: 0, length: total))
+        var worstByLine: [Int: EditorDiagnostic.Severity] = [:]
+        for diagnostic in newValue {
+            let start = min(max(diagnostic.range.location, 0), total)
+            // 空范围(服务器只给出一个点)时向后扩展到整个标识符,至少标出一个字符
+            let length = diagnostic.range.length > 0 ? diagnostic.range.length : Self.wordLength(in: storage.string as NSString, from: start)
+            let range = NSIntersectionRange(NSRange(location: start, length: length), NSRange(location: 0, length: total))
+            if range.length > 0 {
+                storage.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: range)
+                storage.addAttribute(.underlineColor, value: Self.color(for: diagnostic.severity), range: range)
+            }
+            let line = lineIndex.line(containing: start)
+            if let existing = worstByLine[line], existing.rawValue <= diagnostic.severity.rawValue { continue }
+            worstByLine[line] = diagnostic.severity
+        }
+        storage.endEditing()
+        ruler.diagnosticLines = worstByLine
+    }
+
+    /// 从某偏移开始的标识符长度(字母数字下划线);不是标识符则为 1。
+    static func wordLength(in text: NSString, from start: Int) -> Int {
+        var end = start
+        while end < text.length, let scalar = Unicode.Scalar(text.character(at: end)),
+              CharacterSet.alphanumerics.contains(scalar) || scalar == "_" { end += 1 }
+        return max(end - start, 1)
+    }
+
+    static func color(for severity: EditorDiagnostic.Severity) -> NSColor {
+        switch severity {
+        case .error: return .systemRed
+        case .warning: return .systemOrange
+        case .information: return .systemBlue
+        case .hint: return .systemGray
+        }
+    }
+
+    /// 弹出悬停提示:先列出覆盖该位置的诊断,再追加语言服务器的 hover 文本。
+    private func showHover(at offset: Int, rect: NSRect) {
+        hoverGeneration += 1
+        let generation = hoverGeneration
+        let covering = diagnostics.filter { NSLocationInRange(offset, $0.range) || ($0.range.length == 0 && $0.range.location == offset) }
+        let hover = features.hover
+        Task { [weak self] in
+            var parts = covering.map { "\(Self.symbol(for: $0.severity)) \($0.message)" }
+            if let hover, let text = await hover(offset) { parts.append(Self.plainText(fromMarkdown: text)) }
+            guard let self, self.hoverGeneration == generation, !parts.isEmpty else { return }
+            self.presentHover(parts.joined(separator: "\n\n"), rect: rect)
+        }
+    }
+
+    private static func symbol(for severity: EditorDiagnostic.Severity) -> String {
+        switch severity {
+        case .error: return "⛔"
+        case .warning: return "⚠️"
+        case .information: return "ℹ️"
+        case .hint: return "💡"
+        }
+    }
+
+    /// 去掉 Markdown 围栏标记,保留代码与说明文字(悬浮窗用等宽纯文本展示)。
+    public static func plainText(fromMarkdown markdown: String) -> String {
+        markdown.split(separator: "\n", omittingEmptySubsequences: false)
+            .filter { !$0.hasPrefix("```") }
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func presentHover(_ text: String, rect: NSRect) {
+        closeHoverPopover()
+        let label = NSTextField(wrappingLabelWithString: String(text.prefix(2_000)))
+        label.font = NSFont.monospacedSystemFont(ofSize: 11.5, weight: .regular)
+        label.isSelectable = false
+        label.preferredMaxLayoutWidth = 480
+        label.setAccessibilityLabel(text)
+        let content = NSView()
+        label.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 10),
+            label.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -10),
+            label.topAnchor.constraint(equalTo: content.topAnchor, constant: 8),
+            label.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -8),
+        ])
+        let controller = NSViewController()
+        controller.view = content
+        let popover = NSPopover()
+        popover.contentViewController = controller
+        popover.behavior = .semitransient
+        popover.animates = false
+        hoverPopover = popover
+        popover.show(relativeTo: rect, of: textView, preferredEdge: .maxY)
+    }
+
+    private func closeHover() {
+        hoverGeneration += 1
+        closeHoverPopover()
+    }
+
+    private func closeHoverPopover() {
+        hoverPopover?.close()
+        hoverPopover = nil
+    }
+
+    /// 输入 `.` 后稍作停顿自动弹出补全。
+    private func scheduleAutoCompletion() {
+        autoCompleteTask?.cancel()
+        guard features.completion != nil else { return }
+        let ns = textView.string as NSString
+        let caret = textView.selectedRange().location
+        guard caret > 0, caret <= ns.length, ns.character(at: caret - 1) == 0x2E else { return }
+        autoCompleteTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(120))
+            guard !Task.isCancelled else { return }
+            self?.textView.complete(nil)
+        }
     }
 
     /// 应用新主题。
@@ -306,6 +474,17 @@ public final class CodeEditorView: NSView {
 // MARK: - 文本编辑回调
 
 extension CodeEditorView: NSTextViewDelegate {
+    /// 新输入的字符不继承诊断下划线。
+    public func textView(_ textView: NSTextView, shouldChangeTextIn affectedCharRange: NSRange, replacementString: String?) -> Bool {
+        var attributes = textView.typingAttributes
+        if attributes[.underlineStyle] != nil || attributes[.underlineColor] != nil {
+            attributes[.underlineStyle] = nil
+            attributes[.underlineColor] = nil
+            textView.typingAttributes = attributes
+        }
+        return true
+    }
+
     public func textDidChange(_ notification: Notification) {
         handleEdit()
     }
@@ -356,6 +535,8 @@ final class LineNumberRulerView: NSRulerView {
     var lineIndex = LineIndex(text: "") { didSet { needsDisplay = true } }
     var theme: EditorTheme { didSet { needsDisplay = true } }
     var lineMarkers: [Int: LineMarker] = [:] { didSet { needsDisplay = true } }
+    /// 每行最严重的诊断级别(绘制圆点)
+    var diagnosticLines: [Int: EditorDiagnostic.Severity] = [:] { didSet { needsDisplay = true } }
 
     init(scrollView: NSScrollView, theme: EditorTheme) {
         self.theme = theme
@@ -394,6 +575,10 @@ final class LineNumberRulerView: NSRulerView {
             let label = NSAttributedString(string: String(line + 1), attributes: attributes)
             let size = label.size()
             label.draw(at: NSPoint(x: self.ruleThickness - size.width - 8, y: pointInRuler.y + (frame.height - size.height) / 2))
+            if let severity = self.diagnosticLines[line] {
+                CodeEditorView.color(for: severity).setFill()
+                NSBezierPath(ovalIn: NSRect(x: 6, y: pointInRuler.y + (frame.height - 6) / 2, width: 6, height: 6)).fill()
+            }
             if let marker = self.lineMarkers[line] {
                 let color: NSColor
                 switch marker {

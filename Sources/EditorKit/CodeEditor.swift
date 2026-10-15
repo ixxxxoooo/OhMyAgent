@@ -12,6 +12,10 @@ public struct CodeEditor: NSViewRepresentable {
     public var markers: [Int: LineMarker]
     /// 用户编辑后回调(传出完整文本);仅可编辑时有意义。
     public var onChange: ((String) -> Void)?
+    /// 语言服务器诊断
+    public var diagnostics: [EditorDiagnostic]
+    /// 悬停/跳转定义/补全回调
+    public var features: EditorLanguageFeatures
 
     /// 创建编辑器。
     /// - Parameters:
@@ -20,8 +24,12 @@ public struct CodeEditor: NSViewRepresentable {
     ///   - isEditable: 是否可编辑
     ///   - revealLine: 需要跳转的行(1 起始)
     ///   - markers: 行标记
+    ///   - diagnostics: 诊断(下划线、行号栏圆点、悬停提示)
+    ///   - features: 语言智能回调
     ///   - onChange: 编辑回调
-    public init(text: String, language: SyntaxLanguage, isEditable: Bool = false, revealLine: Int? = nil, markers: [Int: LineMarker] = [:], onChange: ((String) -> Void)? = nil) {
+    public init(text: String, language: SyntaxLanguage, isEditable: Bool = false, revealLine: Int? = nil, markers: [Int: LineMarker] = [:], diagnostics: [EditorDiagnostic] = [], features: EditorLanguageFeatures = EditorLanguageFeatures(), onChange: ((String) -> Void)? = nil) {
+        self.diagnostics = diagnostics
+        self.features = features
         self.onChange = onChange
         self.text = text
         self.language = language
@@ -43,6 +51,8 @@ public struct CodeEditor: NSViewRepresentable {
         context.coordinator.loadedLanguage = language
         wire(view, context.coordinator)
         view.setText(text, language: language)
+        view.features = features
+        view.setDiagnostics(diagnostics)
         return view
     }
 
@@ -63,6 +73,8 @@ public struct CodeEditor: NSViewRepresentable {
             view.setText(text, language: language)
         }
         view.textView.isEditable = isEditable
+        view.features = features
+        view.setDiagnostics(diagnostics)
         view.lineMarkers = markers
         if let line = revealLine, context.coordinator.revealedLine != line {
             context.coordinator.revealedLine = line

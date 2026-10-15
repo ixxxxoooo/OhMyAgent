@@ -66,7 +66,7 @@ let package = Package(
         .testTarget(name: "IconKitTests", dependencies: ["IconKit"]),
         .testTarget(name: "LSPKitTests", dependencies: ["LSPKit", "ACPKit"]),
         .testTarget(name: "MermaidKitTests", dependencies: ["MermaidKit"]),
-        .testTarget(name: "OhMyAgentAppTests", dependencies: ["OhMyAgentApp", "ChatKit", "ACPKit", "DesignSystem"]),
+        .testTarget(name: "OhMyAgentAppTests", dependencies: ["OhMyAgentApp", "ChatKit", "ACPKit", "DesignSystem", "EditorKit", "LSPKit"]),
         .testTarget(name: "WorkbenchKitTests", dependencies: ["WorkbenchKit", "ChatKit", "ACPKit", "AgentHost", "FakeAgent"]),
     ]
 )
