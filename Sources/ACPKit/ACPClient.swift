@@ -20,6 +20,8 @@ public struct AgentCapabilities: Sendable, Hashable {
     public var canList = false
     public var additionalDirectories = false
     public var canLogout = false
+    /// 适配器是否支持 `_session/steering`(`_meta.steering.supported`)
+    public var canSteer = false
 
     public init() {}
 
@@ -274,7 +276,8 @@ public actor ACPClient {
             "clientCapabilities": .object(caps),
             "clientInfo": ["name": .string(clientName), "title": .string(clientName), "version": .string(clientVersion)],
         ])
-        let agentCaps = AgentCapabilities(json: result["agentCapabilities"] ?? .null)
+        var agentCaps = AgentCapabilities(json: result["agentCapabilities"] ?? .null)
+        agentCaps.canSteer = result["_meta"]?["steering"]?["supported"]?.boolValue ?? false
         capabilities = agentCaps
         let methods = (result["authMethods"]?.arrayValue ?? []).map {
             AuthMethod(id: $0["id"]?.stringValue ?? "", name: $0["name"]?.stringValue ?? "", description: $0["description"]?.stringValue)
@@ -389,6 +392,30 @@ public actor ACPClient {
             "prompt": .array(content.map(\.json)),
         ])
         return StopReason(rawValue: result["stopReason"]?.stringValue ?? "") ?? .other
+    }
+
+    /// 引导(steering):把追加消息注入正在运行的轮次(`_session/steering`)。
+    /// 没有运行中的轮次时返回 `promptRequired`,调用方应改走普通 `session/prompt`。
+    /// - Parameters:
+    ///   - sessionId: 会话 id
+    ///   - content: 内容块
+    /// - Returns: 适配器的结果:`injected` / `promptRequired` / `startedNewTurn`
+    public func steer(sessionId: String, content: [ContentBlock]) async throws -> String {
+        let result = try await connection.request("_session/steering", params: [
+            "sessionId": .string(sessionId),
+            "prompt": .array(content.map(\.json)),
+            "_meta": ["steering": ["idleBehavior": "promptRequired"]],
+        ])
+        return result["outcome"]?.stringValue ?? "injected"
+    }
+
+    /// 发送任意扩展请求(以 `_` 开头的自定义方法)。
+    /// - Parameters:
+    ///   - method: 方法名
+    ///   - params: 参数
+    /// - Returns: 响应结果
+    public func extensionRequest(_ method: String, params: JSONValue) async throws -> JSONValue {
+        try await connection.request(method, params: params)
     }
 
     /// 取消当前轮次。

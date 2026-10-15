@@ -12,6 +12,10 @@ public actor ScriptedAgent: ACPRequestHandler {
     private var models: [String: String] = [:]
     private var sessionCounter = 0
     private var editCounter = 0
+    /// 正在处理提示的会话
+    private var running: Set<String> = []
+    /// 各会话收到的引导消息
+    private var steered: [String: [String]] = [:]
     private var clientTerminal = false
     private var pump: Task<Void, Never>?
     /// 每个文本分片之间的停顿(毫秒),便于测试取消与流式合并。
@@ -71,6 +75,7 @@ public actor ScriptedAgent: ACPRequestHandler {
                 ],
                 "agentInfo": ["name": "scripted-agent", "title": "Scripted Agent", "version": "0.1.0"],
                 "authMethods": [["id": "fake-login", "name": "模拟登录", "description": "测试用"]],
+                "_meta": ["steering": ["supported": true]],
             ]
         case "session/new":
             sessionCounter += 1
@@ -123,6 +128,12 @@ public actor ScriptedAgent: ACPRequestHandler {
             return ["configOptions": configOptions(sessionId: id)]
         case "session/prompt":
             return try await runPrompt(p)
+        case "_session/steering":
+            // 有运行中的轮次:记录引导消息并回显;否则要求调用方改走 session/prompt
+            guard let id = p["sessionId"]?.stringValue, running.contains(id) else { return ["outcome": "promptRequired", "reason": "noRunningTurn"] }
+            let text = (p["prompt"]?.arrayValue ?? []).compactMap { $0["text"]?.stringValue }.joined(separator: "\n")
+            steered[id, default: []].append(text)
+            return ["outcome": "injected"]
         default:
             throw JSONRPCError(code: JSONRPCError.methodNotFound, message: "ScriptedAgent 未实现 \(method)")
         }
@@ -348,7 +359,12 @@ public actor ScriptedAgent: ACPRequestHandler {
             throw JSONRPCError(code: JSONRPCError.invalidParams, message: "缺少 sessionId")
         }
         cancelled.remove(sessionId)
+        running.insert(sessionId)
+        defer { running.remove(sessionId) }
         let text = (p["prompt"]?.arrayValue ?? []).compactMap { $0["text"]?.stringValue }.joined(separator: "\n")
+        if text.contains("#notice") {
+            await update(sessionId, ["sessionUpdate": "notice", "severity": "warning", "title": "上下文已压缩", "description": "旧消息已被摘要,可能丢失细节。"])
+        }
 
         // 思维
         for piece in ["让我先想想", ",这个请求需要", "分步骤处理。"] {
@@ -417,6 +433,9 @@ public actor ScriptedAgent: ACPRequestHandler {
             if cancelled.contains(sessionId) { return ["stopReason": "cancelled"] }
             await update(sessionId, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": .string(piece)]])
             try? await Task.sleep(for: .milliseconds(max(chunkDelayMillis, text.contains("slow") ? 40 : 0)))
+        }
+        for extra in steered.removeValue(forKey: sessionId) ?? [] {
+            await update(sessionId, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": .string("(已收到引导:\(extra))")]])
         }
         await update(sessionId, ["sessionUpdate": "usage_update", "used": 1200, "size": 200_000, "cost": ["amount": 0.0123, "currency": "USD"]])
         return ["stopReason": "end_turn"]

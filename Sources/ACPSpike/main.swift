@@ -35,7 +35,7 @@ let supervisor = AgentSupervisor(provider: ClaudeACPProvider(), cwd: cwd, delega
 do {
     let t1 = clock.now
     let result = try await supervisor.start(tools: tools)
-    print("[initialize] \(clock.now - t1) agent=\(result.agentTitle ?? result.agentName) v\(result.agentVersion ?? "?") caps(list=\(result.capabilities.canList), fork=\(result.capabilities.canFork), resume=\(result.capabilities.canResume))")
+    print("[initialize] \(clock.now - t1) agent=\(result.agentTitle ?? result.agentName) v\(result.agentVersion ?? "?") caps(list=\(result.capabilities.canList), fork=\(result.capabilities.canFork), resume=\(result.capabilities.canResume), steer=\(result.capabilities.canSteer), image=\(result.capabilities.imagePrompts))")
     guard let client = await supervisor.client else { exit(1) }
 
     let t2 = clock.now
@@ -55,7 +55,7 @@ do {
                     case .toolCallUpdate(let id, let raw): print("\n[tool_update] \(id) \(raw["status"]?.stringValue ?? "")")
                     case .usage(let usage): print("\n[usage] used=\(usage.used ?? 0) size=\(usage.size ?? 0) cost=\(usage.costAmount ?? 0)")
                     case .plan(let entries): print("\n[plan] \(entries.count) 项")
-                    case .availableCommands(let commands): print("[commands] \(commands.count) 个")
+                    case .availableCommands(let commands): print("[commands] \(commands.count) 个: " + commands.map(\.name).joined(separator: ", "))
                     default: break
                     }
                 case .closed: return (thoughts, chunks)

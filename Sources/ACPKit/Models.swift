@@ -312,6 +312,10 @@ public enum SessionUpdate: Sendable {
     case configOptions([SessionConfigOption])
     case sessionInfo(title: String?, updatedAt: String?)
     case usage(UsageUpdate)
+    /// 会话提示(需声明 `session.notices` 能力):严重程度 info/warning/error、标题、可选说明
+    case notice(severity: String, title: String, detail: String?)
+    /// 计划模式批准后的 Markdown 计划(`plan_update`)
+    case planMarkdown(String)
     /// 子 Agent(Task 工具)内部产生的更新,`parent` 为父工具调用 ID
     indirect case childUpdate(parent: String, update: SessionUpdate)
     case unknown(kind: String, raw: JSONValue)
@@ -364,6 +368,18 @@ public enum SessionUpdate: Sendable {
                 costAmount: json["cost"]?["amount"]?.doubleValue,
                 costCurrency: json["cost"]?["currency"]?.stringValue
             ))
+        case "notice":
+            self = .notice(
+                severity: json["severity"]?.stringValue ?? "info",
+                title: json["title"]?.stringValue ?? "",
+                detail: json["description"]?.stringValue
+            )
+        case "plan_update":
+            if json["plan"]?["type"]?.stringValue == "markdown", let content = json["plan"]?["content"]?.stringValue {
+                self = .planMarkdown(content)
+            } else {
+                self = .unknown(kind: kind, raw: json)
+            }
         default:
             self = .unknown(kind: kind, raw: json)
         }
