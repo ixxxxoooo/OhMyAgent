@@ -126,6 +126,21 @@ struct ToolRowView: View {
                 .help("打开文件")
                 .accessibilityLabel("打开 \((path as NSString).lastPathComponent)")
             }
+            if entry.childStore != nil, let tool = entry.tool {
+                Button {
+                    let workbench = AppEnvironment.shared.workbench
+                    if let project = workbench.projectID(of: model) {
+                        workbench.openSubagent(project: project, toolCallID: tool.toolCallId, title: tool.title)
+                    }
+                } label: {
+                    Image.om("square-arrow-out-up-right", size: 11)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(OMColors.secondaryText)
+                .opacity(hovering ? 1 : 0.55)
+                .help("在标签中打开子 Agent 会话")
+                .accessibilityLabel("在标签中打开子 Agent 会话")
+            }
             if let stats, stats.added + stats.removed > 0 {
                 HStack(spacing: 4) {
                     if stats.added > 0 { Text("+\(stats.added)").foregroundStyle(OMColors.diffAdded) }

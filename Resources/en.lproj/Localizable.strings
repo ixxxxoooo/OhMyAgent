@@ -175,3 +175,11 @@
 "此类型的标签尚未提供" = "This tab type is not available yet";
 "差异" = "Diff";
 "Agent 修改文件后,这里会列出每个文件的差异。" = "After the agent edits files, per-file diffs are listed here.";
+"在标签中打开子 Agent 会话" = "Open sub-agent session in tab";
+"这个子任务已不可用" = "This sub-task is no longer available";
+"会话被切换或重置后,原来的子任务内容不会保留。" = "Sub-task content is not kept after the session is switched or reset.";
+"子 Agent 还没有产生内容" = "The sub-agent has not produced anything yet";
+"只读" = "Read-only";
+"已完成" = "Completed";
+"运行中" = "Running";
+"失败" = "Failed";

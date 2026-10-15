@@ -49,6 +49,11 @@ public final class WorkbenchModel {
 
     public var selectedProject: ProjectEntry? { projects.first { $0.id == selectedProjectID } }
 
+    /// 会话模型所属的项目 ID。
+    public func projectID(of model: SessionModel) -> String? {
+        sessions.first { $0.value === model }?.key
+    }
+
     /// 当前项目的会话模型(尚未创建时为 nil)。
     public var activeSession: SessionModel? { selectedProjectID.flatMap { sessions[$0] } }
 
@@ -144,6 +149,25 @@ public final class WorkbenchModel {
         return dock.open(.diff(path: path), title: String(localized: "差异") + " · " + (path as NSString).lastPathComponent, preview: true)
     }
 
+    /// 打开子 Agent 的只读完整会话标签。
+    /// - Parameters:
+    ///   - projectID: 项目
+    ///   - toolCallID: 派生子 Agent 的工具调用 ID
+    ///   - title: 标签标题
+    @discardableResult
+    public func openSubagent(project projectID: String, toolCallID: String, title: String) -> UUID {
+        mode = .workspace
+        return dock.open(.subagent(projectID: projectID, toolCallID: toolCallID), title: title)
+    }
+
+    /// 关闭某项目全部子 Agent 标签(会话被替换后它们指向的工具调用已不存在)。
+    func closeSubagentTabs(in projectID: String) {
+        dock.closeTabs { tab in
+            if case .subagent(let p, _) = tab.kind { return p == projectID }
+            return false
+        }
+    }
+
     /// 打开本轮改动汇总标签。
     @discardableResult
     public func openChanges(project id: String) -> UUID {
@@ -225,12 +249,14 @@ public final class WorkbenchModel {
     /// 在项目下开始新对话(选中项目并重置其会话)。
     public func newConversation(in id: String) {
         select(project: id)
+        closeSubagentTabs(in: id)
         sessions[id]?.newConversation()
     }
 
     /// 在项目下打开历史会话。
     public func openHistory(project id: String, sessionId: String, title: String?) {
         select(project: id)
+        closeSubagentTabs(in: id)
         guard let model = sessions[id] else { return }
         let summary = model.history.first { $0.sessionId == sessionId } ?? SessionSummary(sessionId: sessionId, cwd: id, title: title)
         model.openSession(summary)

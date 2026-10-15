@@ -26,10 +26,14 @@ extension WorkbenchModel {
     /// 标签展示标题:会话标签优先使用会话标题,其余使用标签自带标题。
     @MainActor
     func displayTitle(_ tab: WorkbenchTab) -> String {
-        if case .chat(let id) = tab.kind {
+        switch tab.kind {
+        case .chat(let id):
             return sessions[id]?.sessionTitle ?? projects.first { $0.id == id }?.name ?? tab.title
+        case .subagent(let project, let toolCallID):
+            return sessions[project]?.timeline.toolEntry(id: toolCallID)?.tool?.title ?? tab.title
+        default:
+            return tab.title
         }
-        return tab.title
     }
 }
 

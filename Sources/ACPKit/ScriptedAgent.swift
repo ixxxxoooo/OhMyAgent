@@ -256,12 +256,19 @@ public actor ScriptedAgent: ACPRequestHandler {
         await update(sessionId, ["sessionUpdate": "tool_call_update", "toolCallId": "term_1", "status": "completed"])
     }
 
-    /// 子 Agent:父工具调用 + 带 `parentToolUseId` 的内部更新。
-    private func runSubagent(sessionId: String) async {
+    /// 子 Agent:父工具调用 + 带 `parentToolUseId` 的内部更新;`#sub2` 额外产生第二层子 Agent。
+    private func runSubagent(sessionId: String, nested: Bool = false) async {
         let meta: JSONValue = ["claudeCode": ["parentToolUseId": "sub_1"]]
         await update(sessionId, ["sessionUpdate": "tool_call", "toolCallId": "sub_1", "title": "子任务:调研代码", "kind": "other", "status": "in_progress"])
         await update(sessionId, ["sessionUpdate": "tool_call", "toolCallId": "sub_read", "title": "读取 README.md", "kind": "read", "status": "completed", "_meta": meta])
         await update(sessionId, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": "子 Agent 的中间结论。"], "_meta": meta])
+        if nested {
+            let inner: JSONValue = ["claudeCode": ["parentToolUseId": "sub_2"]]
+            await update(sessionId, ["sessionUpdate": "tool_call", "toolCallId": "sub_2", "title": "子任务:分析依赖", "kind": "other", "status": "in_progress", "_meta": meta])
+            await update(sessionId, ["sessionUpdate": "tool_call", "toolCallId": "sub2_grep", "title": "搜索 import", "kind": "search", "status": "completed", "_meta": inner])
+            await update(sessionId, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": "第二层子 Agent 的结论。"], "_meta": inner])
+            await update(sessionId, ["sessionUpdate": "tool_call_update", "toolCallId": "sub_2", "status": "completed", "_meta": meta])
+        }
         await update(sessionId, ["sessionUpdate": "tool_call_update", "toolCallId": "sub_1", "status": "completed"])
     }
 
@@ -371,7 +378,7 @@ public actor ScriptedAgent: ACPRequestHandler {
         if text.contains("#edit") { try await runEdit(sessionId: sessionId) }
         if text.contains("#ask") { try await runAsk(sessionId: sessionId) }
         if text.contains("#term") { try await runTerminal(sessionId: sessionId) }
-        if text.contains("#sub") { await runSubagent(sessionId: sessionId) }
+        if text.contains("#sub") { await runSubagent(sessionId: sessionId, nested: text.contains("#sub2")) }
         if text.contains("#showcase") { await runToolsShowcase(sessionId: sessionId) }
 
         if text.contains("plan") || text.contains("计划") {

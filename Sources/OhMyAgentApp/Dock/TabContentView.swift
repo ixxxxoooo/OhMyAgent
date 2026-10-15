@@ -1,6 +1,7 @@
 // @author ygw
 // 标签内容:会话、文件(EditorKit 只读)、单文件 Diff、本轮改动汇总;其余类型暂以占位说明。
 
+import ACPKit
 import ChatKit
 import DesignSystem
 import DiffKit
@@ -21,7 +22,8 @@ struct TabContentView: View {
         case .file(let path): FileTabView(path: path, line: tab.line)
         case .diff(let path): DiffTabView(workbench: workbench, path: path)
         case .changes(let projectID): ChangesTabView(workbench: workbench, projectID: projectID)
-        case .subagent, .terminal, .preview:
+        case .subagent(let projectID, let toolCallID): SubagentTabView(workbench: workbench, projectID: projectID, toolCallID: toolCallID)
+        case .terminal, .preview:
             ContentUnavailableView {
                 Label("此类型的标签尚未提供", om: "info", size: 28)
             } description: {
@@ -147,5 +149,61 @@ struct ChangesTabView: View {
                 Text("Agent 修改文件后,这里会列出每个文件的差异。")
             }
         }
+    }
+}
+
+/// 子 Agent 标签:只读展示子 Agent 的完整会话(含内部工具行、分组与实时状态)。
+struct SubagentTabView: View {
+    let workbench: WorkbenchModel
+    let projectID: String
+    let toolCallID: String
+
+    var body: some View {
+        if let model = workbench.sessions[projectID],
+           let entry = model.timeline.toolEntry(id: toolCallID), let tool = entry.tool {
+            VStack(spacing: 0) {
+                header(tool: tool, entry: entry)
+                Divider()
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 10) {
+                        if let child = entry.childStore, !child.entries.isEmpty {
+                            ForEach(TimelineGrouping.group(child.entries)) { item in
+                                TimelineItemView(item: item)
+                            }
+                        } else {
+                            Text("子 Agent 还没有产生内容").font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
+                        }
+                    }
+                    .frame(maxWidth: OMMetrics.timelineMaxWidth, alignment: .leading)
+                    .padding(16)
+                    .frame(maxWidth: .infinity)
+                }
+                .defaultScrollAnchor(.top)
+            }
+            .environment(model)
+            .background(OMColors.surface)
+        } else {
+            ContentUnavailableView {
+                Label("这个子任务已不可用", om: "bot", size: 28)
+            } description: {
+                Text("会话被切换或重置后,原来的子任务内容不会保留。")
+            }
+        }
+    }
+
+    private func header(tool: ToolCall, entry: TimelineEntry) -> some View {
+        HStack(spacing: 8) {
+            Image.om("bot", size: 14).foregroundStyle(OMColors.accent)
+            Text(tool.title).font(OMFonts.body.weight(.semibold)).lineLimit(1)
+            if tool.status.isTerminal {
+                OMTag(tool.status == .failed ? String(localized: "失败") : String(localized: "已完成"), tint: tool.status == .failed ? .red : .green)
+            } else {
+                OMTag(String(localized: "运行中"), tint: OMColors.accent)
+            }
+            Spacer()
+            Text("只读").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 38)
     }
 }

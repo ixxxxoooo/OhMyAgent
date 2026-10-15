@@ -259,6 +259,7 @@ private struct ProjectGroup: View {
                 let visible = showAll || !key.isEmpty ? all : Array(all.prefix(8))
                 ForEach(visible) { item in
                     SessionLine(workbench: workbench, item: item, mode: .tree)
+                    if item.isCurrent { SubagentRows(workbench: workbench, projectID: project.id) }
                 }
                 if all.count > 8 && key.isEmpty {
                     Button(showAll ? "收起" : "显示全部 \(all.count) 个会话") { showAll.toggle() }
@@ -307,6 +308,41 @@ private struct ProjectGroup: View {
             }
             Divider()
             Button("移除项目", role: .destructive) { workbench.removeProject(project.id) }
+        }
+    }
+}
+
+/// 当前会话下缩进显示的子任务(子 Agent):点击在标签中打开其只读会话;运行中带活动点。
+private struct SubagentRows: View {
+    let workbench: WorkbenchModel
+    let projectID: String
+
+    var body: some View {
+        if let model = workbench.sessions[projectID] {
+            let items = model.timeline.subagentEntries()
+            ForEach(Array(items.enumerated()), id: \.element.entry.id) { _, item in
+                if let tool = item.entry.tool {
+                    HStack(spacing: 6) {
+                        Image.om("bot", size: 11).foregroundStyle(OMColors.tertiaryText).frame(width: 16)
+                        Text(tool.title).font(OMFonts.caption).lineLimit(1).foregroundStyle(OMColors.secondaryText)
+                        Spacer(minLength: 4)
+                        if !tool.status.isTerminal {
+                            Circle().fill(OMColors.accent).frame(width: 6, height: 6)
+                                .accessibilityLabel("运行中")
+                        }
+                    }
+                    .padding(.leading, CGFloat(12 + item.depth * 12))
+                    .padding(.horizontal, 6)
+                    .frame(minHeight: 22)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        workbench.openSubagent(project: projectID, toolCallID: tool.toolCallId, title: tool.title)
+                    }
+                    .help(tool.title)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAddTraits(.isButton)
+                }
+            }
         }
     }
 }

@@ -201,7 +201,8 @@ public final class TimelineStore {
                 entries.append(entry)
             }
         case .childUpdate(let parent, let inner):
-            if let parentEntry = toolIndex[parent] {
+            // 多层子 Agent:父工具可能位于更深一层的子存储里
+            if let parentEntry = toolIndex[parent] ?? toolEntry(id: parent) {
                 let child = parentEntry.childStore ?? makeChildStore(for: parentEntry)
                 child.apply(inner)
             } else {
@@ -211,6 +212,28 @@ public final class TimelineStore {
             return
         }
         revision += 1
+    }
+
+    /// 在本存储及其全部子存储中按工具调用 ID 查找条目(支持多层子 Agent)。
+    /// - Parameter id: 工具调用 ID
+    /// - Returns: 对应的工具条目;不存在时为 nil
+    public func toolEntry(id: String) -> TimelineEntry? {
+        for entry in entries where entry.kind == .tool {
+            if entry.tool?.toolCallId == id { return entry }
+            if let found = entry.childStore?.toolEntry(id: id) { return found }
+        }
+        return nil
+    }
+
+    /// 全部子 Agent 条目(深度优先,附带嵌套深度),用于侧栏缩进展示与子 Agent 标签。
+    public func subagentEntries(depth: Int = 0) -> [(entry: TimelineEntry, depth: Int)] {
+        var result: [(TimelineEntry, Int)] = []
+        for entry in entries where entry.kind == .tool {
+            guard let child = entry.childStore else { continue }
+            result.append((entry, depth))
+            result.append(contentsOf: child.subagentEntries(depth: depth + 1))
+        }
+        return result
     }
 
     private func makeChildStore(for entry: TimelineEntry) -> TimelineStore {
