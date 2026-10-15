@@ -92,6 +92,16 @@ public indirect enum DockNode: Codable, Hashable, Sendable {
     case split(DockSplit)
 }
 
+extension DockNode: Identifiable {
+    /// 节点身份:组或分屏自身的 ID(视图遍历稳定)。
+    public var id: UUID {
+        switch self {
+        case .group(let g): return g.id
+        case .split(let s): return s.id
+        }
+    }
+}
+
 /// 拖拽落点:中心表示并入该组;四边表示在该方向新建分屏。
 public enum DockDropZone: String, Sendable, CaseIterable {
     case center, left, right, top, bottom

@@ -76,6 +76,14 @@ struct FileChangeRow: View {
                 .buttonStyle(.plain)
                 .help("在编辑器中打开")
                 .accessibilityLabel("在编辑器中打开 \(change.path)")
+                Button {
+                    AppEnvironment.shared.workbench.openDiff(change.path)
+                } label: {
+                    Image.om("file-diff")
+                }
+                .buttonStyle(.plain)
+                .help("在标签中查看差异")
+                .accessibilityLabel("在标签中查看差异 \(change.path)")
                 if change.status == .pending || change.status == .partiallyReverted {
                     Button("撤销") { model.revert(change) }
                         .buttonStyle(.plain)
@@ -103,42 +111,6 @@ struct FileChangeRow: View {
         case .partiallyReverted: OMTag("部分撤销", tint: OMColors.warning)
         case .conflict: OMTag("文件已被修改,未撤销", tint: .red)
         case .failed(let message): OMTag("失败:\(message)", tint: .red)
-        }
-    }
-}
-
-/// 文件查看面板:使用 EditorKit(TextKit 2)只读展示,带语法高亮并跳转到指定行。
-struct FileViewerSheet: View {
-    let request: FileViewRequest
-    @Environment(\.dismiss) private var dismiss
-    @State private var text: String?
-    @State private var failure: String?
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Image.om("doc.text")
-                Text(request.path.abbreviatedPath).font(OMFonts.small).lineLimit(1).truncationMode(.middle)
-                Spacer()
-                Button("关闭") { dismiss() }.keyboardShortcut(.cancelAction)
-            }
-            .padding(10)
-            Divider()
-            if let text {
-                CodeEditor(text: text, language: SyntaxLanguage.detect(path: request.path), isEditable: false, revealLine: request.line)
-            } else if let failure {
-                Text(failure).foregroundStyle(OMColors.secondaryText).frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-        }
-        .frame(minWidth: 760, minHeight: 520)
-        .task {
-            let path = request.path
-            let result = await Task.detached(priority: .userInitiated) { () -> String? in
-                try? String(contentsOfFile: path, encoding: .utf8)
-            }.value
-            if let result { text = result } else { failure = "无法读取文件(可能已被删除或不是文本文件)" }
         }
     }
 }

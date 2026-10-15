@@ -126,6 +126,15 @@ struct WorkbenchView: View {
         } else if env["OMA_AUTOSEND"] != nil {
             Log.app.warning("调试钩子:没有可用会话,未发送", ["active": "\(workbench.activeSession != nil)"])
         }
+        if let file = env["OMA_OPEN_FILE"], !file.isEmpty {
+            // 调试:打开文件标签;OMA_SPLIT=right|bottom 时把它拖到会话组的对应边缘分屏
+            let id = workbench.openFile(file, line: env["OMA_OPEN_LINE"].flatMap(Int.init), preview: false)
+            if let side = env["OMA_SPLIT"], let zone = DockDropZone(rawValue: side),
+               let chat = workbench.dock.allTabs.first(where: { if case .chat = $0.kind { return true } else { return false } }),
+               let group = workbench.dock.location(of: chat.id)?.group {
+                workbench.dock.drop(id, onGroup: group, zone: zone)
+            }
+        }
         if env["OMA_SHOW_RIGHT"] != nil { workbench.layout.rightVisible = true }
         if env["OMA_SHOW_BOTTOM"] != nil { workbench.layout.bottomVisible = true }
         if env["OMA_OPEN_SETTINGS"] != nil {
@@ -134,30 +143,29 @@ struct WorkbenchView: View {
     }
 }
 
-/// 中栏:会话 + 底部面板。
+/// 中栏:停靠区(标签组与分屏)+ 底部面板。
 struct CenterColumn: View {
     @Bindable var workbench: WorkbenchModel
-    private let appearance = AppearanceModel.shared
 
     var body: some View {
         VStack(spacing: 0) {
-            Group {
-                if let model = workbench.activeSession {
-                    ChatView(model: model)
-                        .id(appearance.fontRevision)
-                        .environment(model)
-                        .sheet(item: Bindable(model).viewerRequest) { request in
-                            FileViewerSheet(request: request)
-                        }
-                } else {
-                    WelcomeView(workbench: workbench)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            DockView(workbench: workbench)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             if workbench.layout.bottomVisible {
                 BottomPanelView(workbench: workbench)
             }
         }
+        .onChange(of: pendingViewerRequest) { _, request in
+            // 统一打开入口:工具行/Bridge/改动汇总发出的「查看文件」请求都变成文件标签
+            guard let request, let model = workbench.sessions.values.first(where: { $0.viewerRequest == request }) else { return }
+            model.viewerRequest = nil
+            workbench.openFile(request.path, line: request.line)
+        }
+    }
+
+    /// 任一会话中待处理的文件查看请求。
+    private var pendingViewerRequest: FileViewRequest? {
+        workbench.sessions.values.lazy.compactMap(\.viewerRequest).first
     }
 }
 
