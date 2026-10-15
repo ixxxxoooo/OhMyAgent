@@ -14,6 +14,8 @@ public final class TimelineEntry: Identifiable {
     /// 条目类别。
     public enum Kind: Sendable {
         case user, assistant, thought, tool, plan, notice, changes
+        /// 计划模式批准后的 Markdown 计划文档
+        case planDoc
     }
 
     public nonisolated let id = UUID()
@@ -28,6 +30,14 @@ public final class TimelineEntry: Identifiable {
     public var isStreaming: Bool
     /// 提示是否为错误(`kind == .notice`)
     public var isError = false
+    /// 提示的补充说明(`kind == .notice`,支持 Markdown)
+    public var detail: String?
+    /// 提示严重程度:info / warning / error(`kind == .notice`)
+    public var severity = "info"
+    /// 用户消息附带的图片(`kind == .user`)
+    public var attachments: [ImageAttachment] = []
+    /// 该用户消息是运行中引导进当前轮次的(`kind == .user`)
+    public var isSteered = false
     public let startedAt = Date()
     public var finishedAt: Date?
     /// 协议消息 ID,用于把分片归并到同一条消息
@@ -53,6 +63,31 @@ public final class TimelineEntry: Identifiable {
     /// 思考耗时(秒)。
     public var elapsedSeconds: Double {
         (finishedAt ?? Date()).timeIntervalSince(startedAt)
+    }
+}
+
+/// 随消息发送的图片附件。
+public struct ImageAttachment: Identifiable, Sendable, Hashable {
+    public let id: UUID
+    /// 图片原始数据(PNG/JPEG 等)
+    public var data: Data
+    public var mimeType: String
+    /// 显示名(如文件名或「粘贴的图片」)
+    public var name: String
+
+    public init(id: UUID = UUID(), data: Data, mimeType: String, name: String) {
+        self.id = id
+        self.data = data
+        self.mimeType = mimeType
+        self.name = name
+    }
+
+    /// 单张图片大小上限(Claude 接口限制单图 5 MB)
+    public static let maxBytes = 5 * 1024 * 1024
+
+    /// 转为 ACP 内容块。
+    public var contentBlock: ContentBlock {
+        .image(data: data.base64EncodedString(), mimeType: mimeType, uri: nil)
     }
 }
 
@@ -126,11 +161,25 @@ public final class TimelineStore {
     }
 
     /// 追加用户消息(本地发送)。
-    /// - Parameter text: 用户输入
-    public func appendUser(_ text: String) {
+    /// - Parameters:
+    ///   - text: 用户输入
+    ///   - attachments: 随消息发送的图片
+    ///   - steered: 是否为运行中引导进当前轮次的消息
+    public func appendUser(_ text: String, attachments: [ImageAttachment] = [], steered: Bool = false) {
         finishStreaming()
-        planEntry = nil
-        entries.append(TimelineEntry(kind: .user, text: text))
+        if !steered { planEntry = nil }
+        let entry = TimelineEntry(kind: .user, text: text)
+        entry.attachments = attachments
+        entry.isSteered = steered
+        entries.append(entry)
+        revision += 1
+    }
+
+    /// 追加计划文档(计划模式批准后)。
+    /// - Parameter markdown: 计划 Markdown
+    public func appendPlanDoc(_ markdown: String) {
+        finishStreaming()
+        entries.append(TimelineEntry(kind: .planDoc, text: markdown))
         revision += 1
     }
 
@@ -138,10 +187,14 @@ public final class TimelineStore {
     /// - Parameters:
     ///   - text: 文本
     ///   - isError: 是否错误
-    public func appendNotice(_ text: String, isError: Bool = false) {
+    ///   - detail: 补充说明(Markdown)
+    ///   - severity: 严重程度(info/warning/error);为空时由 `isError` 推导
+    public func appendNotice(_ text: String, isError: Bool = false, detail: String? = nil, severity: String? = nil) {
         finishStreaming()
         let entry = TimelineEntry(kind: .notice, text: text)
-        entry.isError = isError
+        entry.isError = isError || severity == "error"
+        entry.severity = severity ?? (isError ? "error" : "info")
+        entry.detail = detail
         entries.append(entry)
         revision += 1
     }
@@ -200,6 +253,11 @@ public final class TimelineStore {
                 planEntry = entry
                 entries.append(entry)
             }
+        case .notice(let severity, let title, let detail):
+            appendNotice(title, detail: detail?.isEmpty == false ? detail : nil, severity: severity)
+        case .planMarkdown(let markdown):
+            finishStreaming()
+            entries.append(TimelineEntry(kind: .planDoc, text: markdown))
         case .childUpdate(let parent, let inner):
             // 多层子 Agent:父工具可能位于更深一层的子存储里
             if let parentEntry = toolIndex[parent] ?? toolEntry(id: parent) {

@@ -32,6 +32,19 @@ public final class PermissionPrompt: Identifiable {
         self.continuation = continuation
     }
 
+    /// 是否为「退出计划模式」请求(`ExitPlanMode`)。
+    public var isPlanApproval: Bool { tool.name == "ExitPlanMode" }
+
+    /// 计划文本(Markdown):优先取请求输入中的 `plan`,其次取内容块里的文本。
+    public var planText: String? {
+        if let plan = tool.rawInput?["plan"]?.stringValue, !plan.isEmpty { return plan }
+        let texts = tool.content.compactMap { content -> String? in
+            if case .content(let block) = content { return block.plainText }
+            return nil
+        }
+        return texts.isEmpty ? nil : texts.joined(separator: "\n\n")
+    }
+
     /// 选择一个选项并回复 Agent。
     /// - Parameter optionId: 选项 ID
     public func choose(_ optionId: String) {
@@ -73,7 +86,10 @@ public struct ClientFeatures: Sendable, Equatable {
 
     /// 声明给 Agent 的额外能力。
     var extraCapabilities: [String: JSONValue] {
-        elicitation ? ["elicitation": ["form": .object([:]), "url": .object([:])]] : [:]
+        // 会话提示(notice):压缩、模型回退、Hook 拦截等以结构化提示行呈现,而非夹在回复里的粗体文字
+        var caps: [String: JSONValue] = ["session": ["notices": .object([:])]]
+        if elicitation { caps["elicitation"] = ["form": .object([:]), "url": .object([:])] }
+        return caps
     }
 }
 
@@ -245,8 +261,22 @@ public final class SessionModel {
     public private(set) var diagnostics: [String] = []
     /// 连接完成后自动发送的排队消息
     public private(set) var queuedPrompt: String?
+    /// 连接完成后随排队消息一起发送的图片
+    @ObservationIgnored private var queuedImages: [ImageAttachment] = []
     /// 输入框草稿
     public var draft = ""
+    /// 输入框中待发送的图片附件
+    public var attachments: [ImageAttachment] = []
+    /// 本轮结束后依次发送的排队消息
+    public private(set) var followUps: [QueuedMessage] = []
+    /// 当前 `/goal` 目标(客户端根据命令推断;适配器不向普通客户端推送结构化目标)
+    public private(set) var goal: GoalState?
+    /// 客户端接管命令的执行回调(由应用层打开设置页、面板等)
+    @ObservationIgnored public var onLocalCommand: (@MainActor (LocalCommand) -> Void)?
+    /// 本机 Skills/自定义命令目录(用于标注来源与连接前兜底)
+    @ObservationIgnored public var slashCatalog: (@MainActor () -> [SlashEntry])?
+    /// 本机可 @ 提及的子 Agent(名称、说明、来源徽标)
+    @ObservationIgnored public var agentCatalog: (@MainActor () -> [(name: String, summary: String, badge: String)])?
     /// 每次发布或回退改动汇总时自增;编辑器据此刷新「Agent 改动」行标记。
     public private(set) var changesRevision = 0
     /// Agent 完成一次文件编辑时回调(用于「跟随 Agent」)。
@@ -400,39 +430,269 @@ public final class SessionModel {
 
     // MARK: - 发送与取消
 
-    /// 发送消息。连接未就绪时排队,就绪后自动发送。
-    /// - Parameter text: 文本
-    public func send(_ text: String) {
+    /// 发送消息。连接未就绪时排队,就绪后自动发送;运行中则引导进当前轮次(Agent 不支持时排到本轮结束后)。
+    /// - Parameters:
+    ///   - text: 文本
+    ///   - images: 图片附件
+    ///   - afterTurn: 为 true 时即使正在运行也排到本轮结束后发送(⌘Return)
+    ///   - bypassLocal: 为 true 时不解析客户端命令,原样交给 Agent(如 `/mcp` 的会话内状态)
+    public func send(_ text: String, images: [ImageAttachment] = [], afterTurn: Bool = false, bypassLocal: Bool = false) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !isRunning else { return }
-        // 本地命令不发给 Agent
-        if trimmed == "/new" || trimmed == "/clear" {
-            newConversation()
+        guard !trimmed.isEmpty || !images.isEmpty else { return }
+        // 客户端接管的命令不发给 Agent
+        if images.isEmpty, !bypassLocal, let command = LocalCommands.parse(trimmed) {
+            perform(command)
+            return
+        }
+        if isRunning {
+            if !afterTurn, canSteer {
+                steer(trimmed, images: images)
+            } else {
+                enqueueFollowUp(trimmed, images: images)
+            }
             return
         }
         switch phase {
         case .ready:
-            start(prompt: trimmed)
+            start(prompt: trimmed, images: images)
         case .idle, .failed:
             queuedPrompt = trimmed
+            queuedImages = images
             connect()
         case .connecting:
             queuedPrompt = trimmed
+            queuedImages = images
         }
     }
 
-    /// 草稿发送便捷方法。
-    public func sendDraft() {
+    /// 把命令原样交给 Agent 执行(跳过客户端命令解析)。
+    /// - Parameter command: 如 `/mcp reconnect github`
+    public func sendToAgent(_ command: String) {
+        send(command, bypassLocal: true)
+    }
+
+    /// 草稿发送便捷方法(连同图片附件)。
+    /// - Parameter afterTurn: 运行中是否排到本轮结束后
+    public func sendDraft(afterTurn: Bool = false) {
         let text = draft
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let images = attachments
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !images.isEmpty else { return }
         draft = ""
-        send(text)
+        attachments = []
+        send(text, images: images, afterTurn: afterTurn)
     }
 
     private func flushQueuedPrompt() {
         guard let queued = queuedPrompt else { return }
+        let images = queuedImages
         queuedPrompt = nil
-        start(prompt: queued)
+        queuedImages = []
+        start(prompt: queued, images: images)
+    }
+
+    // MARK: - 图片附件
+
+    /// 是否可以发送图片(Agent 声明支持图片提示)。
+    public var canAttachImages: Bool { capabilities.imagePrompts }
+
+    /// 添加图片附件;超过大小上限或 Agent 不支持时给出提示。
+    /// - Parameter image: 图片
+    public func addAttachment(_ image: ImageAttachment) {
+        guard image.data.count <= ImageAttachment.maxBytes else {
+            timeline.appendNotice("图片太大(上限 \(ImageAttachment.maxBytes / 1024 / 1024) MB),已忽略:\(image.name)", isError: true)
+            return
+        }
+        guard attachments.count < 8 else {
+            timeline.appendNotice(ChatL10n.t("一条消息最多附带 8 张图片。"), isError: true)
+            return
+        }
+        attachments.append(image)
+    }
+
+    /// 移除图片附件。
+    /// - Parameter id: 附件 ID
+    public func removeAttachment(_ id: UUID) {
+        attachments.removeAll { $0.id == id }
+    }
+
+    // MARK: - 运行中引导与排队
+
+    /// 运行中是否可以把消息引导进当前轮次。
+    public var canSteer: Bool { capabilities.canSteer && phase == .ready && sessionId != nil && client != nil }
+
+    /// 把消息作为引导注入正在进行的轮次(`_session/steering`);注入失败则转为排队。
+    private func steer(_ text: String, images: [ImageAttachment]) {
+        guard let client, let sessionId else { return }
+        let blocks = promptBlocks(text, images: images)
+        log.info("运行中引导", ["turn": "\(turnNumber)", "chars": "\(text.count)"])
+        Task { [weak self] in
+            do {
+                let outcome = try await client.steer(sessionId: sessionId, content: blocks)
+                guard let self else { return }
+                if outcome == "injected" {
+                    self.timeline.appendUser(text, attachments: images, steered: true)
+                } else {
+                    // 轮次恰好已结束:作为普通消息排队/发送
+                    self.log.info("引导未注入,改为排队", ["outcome": outcome])
+                    self.enqueueFollowUp(text, images: images)
+                    if !self.isRunning { self.flushNextFollowUp() }
+                }
+            } catch {
+                self?.log.error("引导失败,改为排队", error: error)
+                self?.enqueueFollowUp(text, images: images)
+            }
+        }
+    }
+
+    /// 加入排队队列(本轮正常结束后依次发送)。
+    public func enqueueFollowUp(_ text: String, images: [ImageAttachment] = []) {
+        followUps.append(QueuedMessage(text: text, images: images))
+    }
+
+    /// 从队列移除。
+    /// - Parameter id: 排队消息 ID
+    public func removeFollowUp(_ id: UUID) {
+        followUps.removeAll { $0.id == id }
+    }
+
+    /// 立即发送某条排队消息:运行中引导注入,空闲时直接发送。
+    /// - Parameter id: 排队消息 ID
+    public func sendFollowUpNow(_ id: UUID) {
+        guard let item = followUps.first(where: { $0.id == id }) else { return }
+        followUps.removeAll { $0.id == id }
+        send(item.text, images: item.images)
+    }
+
+    /// 轮次结束后发送队列中的下一条。
+    private func flushNextFollowUp() {
+        guard !isRunning, phase == .ready, !followUps.isEmpty else { return }
+        let next = followUps.removeFirst()
+        send(next.text, images: next.images)
+    }
+
+    // MARK: - 客户端命令
+
+    /// 执行客户端接管的命令;需要界面的动作交给 `onLocalCommand`。
+    /// - Parameter command: 命令
+    public func perform(_ command: LocalCommand) {
+        switch command {
+        case .newConversation:
+            newConversation()
+        case .help:
+            timeline.appendNotice(ChatL10n.t("命令帮助"), detail: LocalCommands.helpMarkdown(agentCommandCount: availableCommands.count))
+        case .status:
+            timeline.appendNotice(ChatL10n.t("当前状态"), detail: statusMarkdown())
+        case .rename(let name):
+            if name.isEmpty {
+                timeline.appendNotice(ChatL10n.t("用法:`/rename 新名称`"), severity: "warning")
+            } else {
+                rename(to: name)
+            }
+        case .setModel(let name):
+            switchModel(named: name)
+        case .accountNotice:
+            timeline.appendNotice(ChatL10n.t("账号登录由本机 `claude` 管理"), detail: "OhMyAgent 不处理登录/登出。请在终端运行 `claude`,执行 `/login` 或 `/logout`。")
+        case .modelMenu:
+            timeline.appendNotice(ChatL10n.t("当前模型"), detail: modelListMarkdown())
+        case .exportTranscript, .settings, .extensions, .mcpPanel, .history:
+            if let onLocalCommand {
+                onLocalCommand(command)
+            } else {
+                timeline.appendNotice(ChatL10n.t("当前窗口不支持该命令。"), severity: "warning")
+            }
+        }
+    }
+
+    /// 重命名当前会话:标题写入客户端偏好并刷新历史列表。
+    /// - Parameter title: 新标题
+    public func rename(to title: String) {
+        let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty, let sessionId else { return }
+        ClientPrefs.setSessionTitle(clean, for: sessionId)
+        sessionTitle = clean
+        history = history.map { item in
+            var copy = item
+            if copy.sessionId == sessionId { copy.title = clean }
+            return copy
+        }
+        timeline.appendNotice("会话已重命名为「\(clean)」。")
+    }
+
+    /// 按名称(值或显示名,不区分大小写,支持前缀)切换模型。
+    private func switchModel(named name: String) {
+        guard let option = option(category: "model") else {
+            timeline.appendNotice(ChatL10n.t("当前 Agent 没有可切换的模型。"), severity: "warning")
+            return
+        }
+        let needle = name.lowercased()
+        let match = option.options.first { $0.value.lowercased() == needle || $0.name.lowercased() == needle }
+            ?? option.options.first { $0.value.lowercased().contains(needle) || $0.name.lowercased().contains(needle) }
+        guard let match else {
+            let names = option.options.map { "`\($0.value)`" }.joined(separator: "、")
+            timeline.appendNotice("没有名为「\(name)」的模型。", detail: "可选:\(names)", severity: "warning")
+            return
+        }
+        setConfigOption(option.id, value: match.value)
+        timeline.appendNotice("模型已切换为 \(match.name)。")
+    }
+
+    /// `/model` 无参数时的模型列表。
+    private func modelListMarkdown() -> String {
+        guard let option = option(category: "model") else { return "当前 Agent 没有可切换的模型。" }
+        let lines = option.options.map { item in
+            "- \(item.value == option.currentValue.stringValue ? "**" : "")`\(item.value)` \(item.name)\(item.value == option.currentValue.stringValue ? "**(当前)" : "")"
+        }
+        return (["用 `/model <名称>` 切换,或点输入框下方的模型菜单:", ""] + lines).joined(separator: "\n")
+    }
+
+    /// `/status` 文本。
+    private func statusMarkdown() -> String {
+        var lines: [String] = []
+        lines.append("- 工作区:`\(workspace.path)`")
+        if let sessionId { lines.append("- 会话:`\(sessionId)`") }
+        if let model = option(category: "model") {
+            lines.append("- 模型:\(model.options.first { $0.value == model.currentValue.stringValue }?.name ?? model.currentValue.stringValue ?? "-")")
+        }
+        if let mode = option(category: "mode") {
+            lines.append("- 权限模式:\(mode.options.first { $0.value == mode.currentValue.stringValue }?.name ?? mode.currentValue.stringValue ?? "-")")
+        }
+        if let providerName { lines.append("- 模型提供商:\(providerName)") }
+        lines.append("- 通告命令:\(availableCommands.count) 个")
+        lines.append("- 运行中引导:\(capabilities.canSteer ? "支持" : "不支持");图片输入:\(capabilities.imagePrompts ? "支持" : "不支持")")
+        if let goal { lines.append("- 目标:\(goal.objective)\(goal.isActive ? "(进行中)" : "(已结束)")") }
+        return lines.joined(separator: "\n")
+    }
+
+    // MARK: - 目标
+
+    /// 根据发出的提示推断 `/goal` 状态。
+    private func trackGoal(in prompt: String) {
+        guard prompt.hasPrefix("/goal") else { return }
+        let argument = prompt.dropFirst(5).trimmingCharacters(in: .whitespacesAndNewlines)
+        if argument.isEmpty { return }   // 单独的 /goal 只是查看状态
+        if ["clear", "stop", "off", "reset", "none", "cancel"].contains(argument.lowercased()) {
+            goal = nil
+        } else {
+            goal = GoalState(objective: argument, startedAt: Date(), isActive: true)
+        }
+    }
+
+    /// 清除目标(发送 `/goal clear`)。
+    public func clearGoal() {
+        if goal?.isActive == true {
+            send("/goal clear")
+        }
+        goal = nil
+    }
+
+    /// 构造提示内容块:文本 + 图片 + 文件引用。
+    private func promptBlocks(_ prompt: String, images: [ImageAttachment]) -> [ContentBlock] {
+        var blocks: [ContentBlock] = prompt.isEmpty ? [] : [.text(prompt)]
+        if capabilities.imagePrompts { blocks += images.map(\.contentBlock) }
+        for url in CompletionEngine.mentionedFiles(in: prompt, workspace: workspace) {
+            blocks.append(.resourceLink(uri: url.absoluteString, name: url.lastPathComponent, mimeType: nil, title: nil))
+        }
+        return blocks
     }
 
     /// 当前会话使用的模型提供商名称(未启用提供商时为 nil,即沿用 ~/.claude 配置)
@@ -489,11 +749,11 @@ public final class SessionModel {
         }
     }
 
-    private func start(prompt: String) {
+    private func start(prompt: String, images: [ImageAttachment] = []) {
         guard let client, let sessionId else { return }
         // 非 Claude 通道(测试/脚本化 Agent)无需探测网关,保持同步发送
         guard gatewayChecker != nil || activeDescriptor.kind == .claudeACP else {
-            beginTurn(prompt: prompt, client: client, sessionId: sessionId)
+            beginTurn(prompt: prompt, images: images, client: client, sessionId: sessionId)
             return
         }
         isRunning = true
@@ -503,24 +763,25 @@ public final class SessionModel {
             guard let self, self.isRunning else { return }
             if case .unreachable(let url, let reason) = status {
                 self.log.error("模型网关不可达,未发送", ["gateway": ModelGateway.origin(of: url), "reason": reason])
-                self.abortSend(prompt: prompt, message: ModelGateway.unreachableMessage(url: url, reason: reason))
+                self.abortSend(prompt: prompt, images: images, message: ModelGateway.unreachableMessage(url: url, reason: reason))
                 return
             }
-            self.beginTurn(prompt: prompt, client: client, sessionId: sessionId)
+            self.beginTurn(prompt: prompt, images: images, client: client, sessionId: sessionId)
         }
     }
 
     /// 真正开始一轮:写入用户消息、启动看门狗并发出 `session/prompt`。
-    private func beginTurn(prompt: String, client: ACPClient, sessionId: String) {
-        var blocks: [ContentBlock] = [.text(prompt)]
-        for url in CompletionEngine.mentionedFiles(in: prompt, workspace: workspace) {
-            blocks.append(.resourceLink(uri: url.absoluteString, name: url.lastPathComponent, mimeType: nil, title: nil))
+    private func beginTurn(prompt: String, images: [ImageAttachment], client: ACPClient, sessionId: String) {
+        let blocks = promptBlocks(prompt, images: images)
+        if !images.isEmpty && !capabilities.imagePrompts {
+            timeline.appendNotice(ChatL10n.t("当前 Agent 不支持图片输入,图片未发送。"), severity: "warning")
         }
-        timeline.appendUser(prompt)
+        trackGoal(in: prompt)
+        timeline.appendUser(prompt, attachments: images)
         turnNumber += 1
         turnStart = ContinuousClock.now
         lastActivity = .now
-        log.info("发送提示", ["turn": "\(turnNumber)", "chars": "\(prompt.count)", "mentions": "\(blocks.count - 1)"])
+        log.info("发送提示", ["turn": "\(turnNumber)", "chars": "\(prompt.count)", "blocks": "\(blocks.count)", "images": "\(images.count)"])
         turnChanges.removeAll()
         turnChangeOrder.removeAll()
         isRunning = true
@@ -536,8 +797,8 @@ public final class SessionModel {
     }
 
     /// 发送前失败:不产生用户消息,把文本放回输入框并给出提示。
-    private func abortSend(prompt: String, message: String) {
-        if draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { draft = prompt }
+    private func abortSend(prompt: String, images: [ImageAttachment], message: String) {
+        if draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { draft = prompt; attachments = images }
         timeline.appendNotice(message, isError: true)
         isRunning = false
         promptTask = nil
@@ -588,22 +849,25 @@ public final class SessionModel {
             } else if let error {
                 if !self.isShuttingDown {
                     if let rpc = error as? JSONRPCError, rpc.code == -32000 {
-                        self.timeline.appendNotice("Claude Code 尚未登录或登录已失效:请在终端运行 claude 完成登录后重试。", isError: true)
+                        self.timeline.appendNotice(ChatL10n.t("Claude Code 尚未登录或登录已失效:请在终端运行 claude 完成登录后重试。"), isError: true)
                     } else {
                         self.timeline.appendNotice("请求失败:\(error.localizedDescription)", isError: true)
                     }
                 }
             } else if reason == .refusal {
-                self.timeline.appendNotice("模型拒绝了该请求。")
+                self.timeline.appendNotice(ChatL10n.t("模型拒绝了该请求。"))
             } else if reason == .maxTokens {
-                self.timeline.appendNotice("已达到输出上限,回复被截断。")
+                self.timeline.appendNotice(ChatL10n.t("已达到输出上限,回复被截断。"))
             } else if reason == .maxTurnRequests {
-                self.timeline.appendNotice("已达到单轮请求上限。")
+                self.timeline.appendNotice(ChatL10n.t("已达到单轮请求上限。"))
             }
             self.publishTurnChanges()
             self.isRunning = false
             self.promptTask = nil
+            if self.goal?.isActive == true { self.goal?.isActive = false }
             self.refreshHistory()
+            // 本轮正常结束才自动发送排队消息;被取消/失败时保留队列,由用户决定
+            if error == nil, reason == .endTurn { self.flushNextFollowUp() }
         }
     }
 
@@ -622,6 +886,8 @@ public final class SessionModel {
         let cwd = workspace.path
         timeline.reset()
         sessionTitle = nil
+        goal = nil
+        followUps.removeAll()
         usage = nil
         turnChanges.removeAll()
         turnChangeOrder.removeAll()
@@ -648,7 +914,12 @@ public final class SessionModel {
         let cwd = workspace.path
         Task { [weak self] in
             guard let result = try? await client.listSessions(cwd: cwd) else { return }
-            let sorted = result.sessions.sorted { ($0.updatedAt ?? "") > ($1.updatedAt ?? "") }
+            let overrides = ClientPrefs.sessionTitleOverrides()
+            let sorted = result.sessions.sorted { ($0.updatedAt ?? "") > ($1.updatedAt ?? "") }.map { item -> SessionSummary in
+                var copy = item
+                if let title = overrides[item.sessionId] { copy.title = title }
+                return copy
+            }
             self?.history = sorted
         }
     }
@@ -659,10 +930,12 @@ public final class SessionModel {
         guard let client, phase == .ready, summary.sessionId != sessionId, capabilities.loadSession || capabilities.canResume else { return }
         cancel()
         timeline.reset()
+        goal = nil
+        followUps.removeAll()
         turnChanges.removeAll()
         turnChangeOrder.removeAll()
         Task { await checkpoints.reset() }
-        sessionTitle = summary.title
+        sessionTitle = ClientPrefs.sessionTitleOverrides()[summary.sessionId] ?? summary.title
         usage = nil
         sessionId = summary.sessionId
         isReplaying = true
@@ -695,7 +968,7 @@ public final class SessionModel {
             do {
                 let setup = try await client.forkSession(sessionId: sessionId, cwd: cwd, mcpServers: servers, meta: meta)
                 self?.sessionId = setup.sessionId
-                self?.timeline.appendNotice("已从此处分叉出新会话,后续对话不会影响原会话。")
+                self?.timeline.appendNotice(ChatL10n.t("已从此处分叉出新会话,后续对话不会影响原会话。"))
                 if !setup.configOptions.isEmpty { self?.configOptions = setup.configOptions }
                 self?.refreshHistory()
             } catch {
@@ -728,15 +1001,17 @@ public final class SessionModel {
     public func completionItems(for context: CompletionContext) async -> [CompletionItem] {
         switch context.trigger {
         case .slash:
-            return CompletionEngine.slashItems(query: context.query, agentCommands: availableCommands)
+            return CompletionEngine.slashItems(query: context.query, agentCommands: availableCommands, entries: slashCatalog?() ?? [])
         case .mention:
             await fileIndex.prepare(root: workspace)
             await fileIndex.waitUntilReady()
             let paths = await fileIndex.search(context.query)
-            return paths.map { path in
+            let files = paths.map { path in
                 CompletionItem(kind: .file, title: (path as NSString).lastPathComponent,
                                subtitle: (path as NSString).deletingLastPathComponent, insertText: "@\(path) ")
             }
+            let agents = CompletionEngine.agentMentionItems(query: context.query, agents: agentCatalog?() ?? [])
+            return agents + files
         }
     }
 
@@ -790,6 +1065,12 @@ public final class SessionModel {
     ///   - optionId: 选项
     public func resolve(_ prompt: PermissionPrompt, optionId: String) {
         log.info("权限已回复", ["tool": prompt.title, "option": optionId])
+        // 计划被批准后,把计划文档留在时间线里,方便回看
+        if prompt.isPlanApproval, let plan = prompt.planText,
+           let option = prompt.request.options.first(where: { $0.optionId == optionId }),
+           option.kind == .allowOnce || option.kind == .allowAlways {
+            timeline.appendPlanDoc(plan)
+        }
         prompt.choose(optionId)
         pendingPermissions.removeAll { $0.id == prompt.id }
     }
@@ -976,7 +1257,8 @@ public final class SessionModel {
             if let index = configOptions.firstIndex(where: { $0.category == "mode" }) {
                 configOptions[index].currentValue = .string(modeId)
             }
-        case .sessionInfo(let title, _): if let title { sessionTitle = title }
+        case .sessionInfo(let title, _):
+            if let title { sessionTitle = sessionId.flatMap { ClientPrefs.sessionTitleOverrides()[$0] } ?? title }
         case .usage(let value): usage = value
         default: timeline.apply(update)
         }
@@ -1057,4 +1339,24 @@ public struct AgentEdit: Sendable, Equatable {
         self.path = path
         self.firstChangedLine = firstChangedLine
     }
+}
+
+/// 排队等待发送的消息。
+public struct QueuedMessage: Identifiable, Sendable, Hashable {
+    public let id = UUID()
+    public var text: String
+    public var images: [ImageAttachment]
+
+    public init(text: String, images: [ImageAttachment] = []) {
+        self.text = text
+        self.images = images
+    }
+}
+
+/// `/goal` 目标状态。
+public struct GoalState: Sendable, Equatable {
+    public var objective: String
+    public var startedAt: Date
+    /// 目标仍在推进(所在轮次未结束)
+    public var isActive: Bool
 }

@@ -22,6 +22,8 @@ public struct ToolPresentation: Sendable, Equatable {
     public var detail: String?
     /// MCP 服务器名(仅 `.mcp`)。
     public var mcpServer: String?
+    /// 子 Agent 类型(仅 `.subagent`,来自 `subagent_type`,如 Explore、code-reviewer)。
+    public var agentType: String?
     /// 对象是否为文件路径(视图据此显示文件图标并支持点击打开)。
     public var subjectIsPath: Bool
 
@@ -35,6 +37,7 @@ public struct ToolPresentation: Sendable, Equatable {
         let path = input?["file_path"]?.stringValue ?? input?["path"]?.stringValue
             ?? input?["notebook_path"]?.stringValue ?? tool.locations.first?.path
         self.mcpServer = nil
+        self.agentType = nil
         self.detail = nil
         self.subjectIsPath = false
 
@@ -52,6 +55,8 @@ public struct ToolPresentation: Sendable, Equatable {
             category = .subagent
             verb = "子任务"
             subject = input?["description"]?.stringValue ?? tool.title
+            agentType = input?["subagent_type"]?.stringValue
+            if input?["run_in_background"]?.boolValue == true { detail = "后台" }
             return
         }
         if name == "TodoWrite" || name == "ExitPlanMode" {

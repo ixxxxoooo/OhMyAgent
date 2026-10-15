@@ -349,7 +349,7 @@ struct CompletionTests {
     func slashItems() {
         let commands = [AvailableCommand(name: "review", description: "代码审查", inputHint: nil), AvailableCommand(name: "compact", description: "压缩", inputHint: "说明")]
         let all = CompletionEngine.slashItems(query: "", agentCommands: commands)
-        #expect(all.count == 4)
+        #expect(all.count == LocalCommands.catalog.count + 2)
         #expect(CompletionEngine.slashItems(query: "rev", agentCommands: commands).first?.insertText == "/review")
         #expect(CompletionEngine.slashItems(query: "zzz", agentCommands: commands).isEmpty)
     }

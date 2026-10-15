@@ -83,6 +83,21 @@ public enum ClientPrefs {
         max(defaults.double(forKey: Key.budgetUSD), 0)
     }
 
+    /// 用户重命名过的会话标题(会话 ID → 标题);适配器不提供改名接口,故保存在客户端。
+    public static func sessionTitleOverrides(_ defaults: UserDefaults = .standard) -> [String: String] {
+        defaults.dictionary(forKey: "session.titleOverrides") as? [String: String] ?? [:]
+    }
+
+    /// 保存会话标题覆盖;`title` 为空时移除。
+    /// - Parameters:
+    ///   - title: 新标题
+    ///   - sessionId: 会话 ID
+    public static func setSessionTitle(_ title: String?, for sessionId: String, _ defaults: UserDefaults = .standard) {
+        var map = sessionTitleOverrides(defaults)
+        if let title, !title.isEmpty { map[sessionId] = title } else { map.removeValue(forKey: sessionId) }
+        defaults.set(map, forKey: "session.titleOverrides")
+    }
+
     /// 删除全部客户端偏好(不含 Claude 设置)。
     public static func resetAll(_ defaults: UserDefaults = .standard) {
         for key in defaults.dictionaryRepresentation().keys {
