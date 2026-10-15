@@ -1,5 +1,5 @@
 // @author ygw
-// 设置页:Agent 扩展(Agent 注册表、直连兜底、Agent-as-MCP、OhMyAgent Bridge)。均写回 agents.json。
+// 设置页:Agent 扩展(Agent 注册表、Agent-as-MCP、OhMyAgent Bridge)。均写回 agents.json。
 
 import AppKit
 import AgentHost
@@ -77,10 +77,6 @@ struct AgentExtensionsPage: View {
     var body: some View {
         SettingsForm {
             agentsSection
-            Section("直连兜底") {
-                Toggle("ACP 适配器不可用时自动改用直连通道", isOn: Binding(get: { registry.data.directFallback }, set: { value in registry.update { $0.directFallback = value } }))
-                Note("缺少 Node 或适配器时,改用 `claude -p` 的 stream-json 输出,界面保持一致;直连通道没有工具审批弹窗,通过模式(Accept edits / Bypass)与权限规则控制。也可以在上面的 Agent 列表中手动选择「Claude Code(直连)」。")
-            }
             mcpSection
             bridgeSection
             Section("配置文件") {

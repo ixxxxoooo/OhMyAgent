@@ -9,7 +9,6 @@ let package = Package(
     products: [
         .executable(name: "OhMyAgent", targets: ["OhMyAgentApp"]),
         .executable(name: "FakeAgent", targets: ["FakeAgent"]),
-        .executable(name: "DirectAgent", targets: ["DirectAgent"]),
         .executable(name: "OhMyAgentBridge", targets: ["OhMyAgentBridge"]),
     ],
     targets: [
@@ -17,7 +16,7 @@ let package = Package(
         .target(name: "OMLog"),
         // 协议层:JSON-RPC、ACP v1 模型、连接 actor
         .target(name: "ACPKit", dependencies: ["OMLog"]),
-        // 宿主层:子进程、Agent 注册表、路径探测、Bridge、直连兜底
+        // 宿主层:子进程、Agent 注册表、路径探测、Bridge
         .target(name: "AgentHost", dependencies: ["ACPKit", "OMLog"]),
         // 配置层:读写 ~/.claude 与 .mcp.json 等
         .target(name: "ClaudeConfigKit", dependencies: ["OMLog"]),
@@ -38,8 +37,6 @@ let package = Package(
         ),
         // 脚本化 ACP Agent,用于测试与预览
         .executableTarget(name: "FakeAgent", dependencies: ["ACPKit"]),
-        // 直连兜底 Agent(claude -p stream-json → ACP)
-        .executableTarget(name: "DirectAgent", dependencies: ["ACPKit", "AgentHost", "OMLog"]),
         // Bridge 的 stdio ↔ Unix socket 垫片
         .executableTarget(name: "OhMyAgentBridge", dependencies: ["OMLog"]),
         // M0 spike

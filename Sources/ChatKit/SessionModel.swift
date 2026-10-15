@@ -203,7 +203,7 @@ public enum SessionPhase: Sendable, Equatable {
 public final class SessionModel {
     public let workspace: URL
     public let descriptor: AgentDescriptor
-    /// 实际使用的描述符(ACP 适配器不可用且开启兜底时会自动变为直连)
+    /// 实际使用的描述符
     public private(set) var activeDescriptor: AgentDescriptor
     /// 用户在界面中选中的文字(Bridge 的 get_selection 读取)
     public var selectedText: String?
@@ -343,26 +343,8 @@ public final class SessionModel {
                 self.bridge?.stop()
                 self.bridge = nil
                 self.connectTask = nil
-                if self.shouldFallBackToDirect(error: error, descriptor: descriptor) {
-                    self.log.warning("ACP 适配器不可用,回退直连通道")
-                    self.activeDescriptor = .claudeDirect
-                    self.agentName = AgentDescriptor.claudeDirect.name
-                    self.phase = .idle
-                    self.timeline.appendNotice("ACP 适配器不可用(\(error.localizedDescription))\n已自动改用直连通道:无工具审批弹窗,请在模式中选择 Accept edits 或 Bypass permissions。")
-                    self.connect()
-                } else {
-                    self.phase = .failed(error.localizedDescription)
-                }
+                self.phase = .failed(error.localizedDescription)
             }
-        }
-    }
-
-    /// 启动前提缺失(Node / 适配器)且开启了兜底时,改用直连通道。
-    func shouldFallBackToDirect(error: Error, descriptor: AgentDescriptor, registry: AgentRegistryData = AgentRegistryStore().load()) -> Bool {
-        guard descriptor.kind == .claudeACP, let launch = error as? AgentLaunchError else { return false }
-        switch launch {
-        case .missingNode, .missingAdapter: return registry.directFallback
-        default: return false
         }
     }
 

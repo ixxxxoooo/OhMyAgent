@@ -249,7 +249,7 @@ public enum Log {
 
     /// 初始化全局日志(应在进程入口最先调用一次)。
     /// - Parameters:
-    ///   - process: 进程标签,如 app / DirectAgent / OhMyAgentBridge
+    ///   - process: 进程标签,如 app / OhMyAgentBridge
     ///   - directory: 日志目录
     public static func bootstrap(process: String = "app", directory: URL = LogSystem.defaultDirectory) {
         LogSystem.shared.attachFiles(directory: directory, process: process)

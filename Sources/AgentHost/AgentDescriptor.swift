@@ -10,8 +10,6 @@ public enum AgentKind: String, Codable, Sendable, Hashable {
     case claudeACP
     /// 任意 ACP 原生 Agent(Codex CLI、Gemini CLI、Goose、OpenCode 等)
     case genericACP
-    /// 直连 `claude -p --input-format stream-json` 的兜底通道
-    case claudeDirect
 }
 
 /// Agent 描述符,与 ACP Registry 条目字段对齐(id/name/command/args/env)。
@@ -84,7 +82,6 @@ public enum AgentProviders {
         switch descriptor.kind {
         case .claudeACP: return ClaudeACPProvider(descriptor: descriptor)
         case .genericACP: return GenericACPProvider(descriptor: descriptor)
-        case .claudeDirect: return ClaudeDirectProvider(descriptor: descriptor)
         }
     }
 }

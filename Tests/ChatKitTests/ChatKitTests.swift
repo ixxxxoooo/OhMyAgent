@@ -535,22 +535,9 @@ struct AgentIntegrationTests {
         #expect(AgentRegistryModel(store: store).data.resolvedDefault.id == "goose")
         model.setEnabled(false, agentId: "goose")
         #expect(model.data.defaultAgent == nil)
-        #expect(AgentRegistryModel(store: store).data.enabledAgents.map(\.id) == ["claude-code", "claude-direct"])
+        #expect(AgentRegistryModel(store: store).data.enabledAgents.map(\.id) == ["claude-code"])
         model.remove(agentId: "goose")
         #expect(AgentRegistryModel(store: store).data.agents.isEmpty)
-    }
-
-    @Test("仅在缺 Node / 适配器且开启兜底时回退直连")
-    func fallbackRules() {
-        let model = SessionModel(workspace: URL(fileURLWithPath: "/tmp"), descriptor: .claudeCode)
-        var registry = AgentRegistryData()
-        #expect(model.shouldFallBackToDirect(error: AgentLaunchError.missingNode, descriptor: .claudeCode, registry: registry))
-        #expect(model.shouldFallBackToDirect(error: AgentLaunchError.missingAdapter, descriptor: .claudeCode, registry: registry))
-        #expect(!model.shouldFallBackToDirect(error: AgentLaunchError.missingClaude, descriptor: .claudeCode, registry: registry))
-        #expect(!model.shouldFallBackToDirect(error: AgentLaunchError.missingNode, descriptor: .claudeDirect, registry: registry))
-        #expect(!model.shouldFallBackToDirect(error: AgentLaunchError.missingNode, descriptor: AgentDescriptor(id: "g", name: "G", kind: .genericACP, command: "g"), registry: registry))
-        registry.directFallback = false
-        #expect(!model.shouldFallBackToDirect(error: AgentLaunchError.missingNode, descriptor: .claudeCode, registry: registry))
     }
 
     @Test("MCP 注入包含已启用的 Agent-as-MCP,Bridge 关闭时不启动")

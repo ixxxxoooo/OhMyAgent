@@ -62,8 +62,6 @@ public actor Toolchain {
             let path = dir.appendingPathComponent("FakeAgent").path
             return AgentDescriptor(id: "fake", name: "Fake Agent", kind: .genericACP, command: path, summary: "脚本化测试 Agent")
         }
-        // 调试:OMA_AGENT=direct 强制使用直连兜底通道
-        if ProcessInfo.processInfo.environment["OMA_AGENT"] == "direct" { return .claudeDirect }
         return AgentRegistryStore().load().resolvedDefault
     }
 }

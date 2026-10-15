@@ -1,6 +1,6 @@
 // @author ygw
 // Agent 注册表:`~/Library/Application Support/OhMyAgent/agents.json`。
-// 保存用户自定义的 ACP Agent、作为 MCP 工具源登记的 Agent(Agent-as-MCP)、默认 Agent、直连兜底与 Bridge 开关。
+// 保存用户自定义的 ACP Agent、作为 MCP 工具源登记的 Agent(Agent-as-MCP)、默认 Agent 与 Bridge 开关。
 
 import ACPKit
 import Foundation
@@ -76,8 +76,6 @@ public struct BridgeSettings: Codable, Sendable, Equatable {
 public struct AgentRegistryData: Codable, Sendable, Equatable {
     public var version = 1
     public var defaultAgent: String?
-    /// ACP 适配器不可用时自动改用直连通道
-    public var directFallback = true
     public var agents: [AgentDescriptor] = []
     public var mcpAgents: [AgentMCPEntry] = []
     public var bridge = BridgeSettings()
@@ -88,13 +86,12 @@ public struct AgentRegistryData: Codable, Sendable, Equatable {
         let c = try decoder.container(keyedBy: Keys.self)
         version = try c.decodeIfPresent(Int.self, forKey: .version) ?? 1
         defaultAgent = try c.decodeIfPresent(String.self, forKey: .defaultAgent)
-        directFallback = try c.decodeIfPresent(Bool.self, forKey: .directFallback) ?? true
         agents = try c.decodeIfPresent([AgentDescriptor].self, forKey: .agents) ?? []
         mcpAgents = try c.decodeIfPresent([AgentMCPEntry].self, forKey: .mcpAgents) ?? []
         bridge = try c.decodeIfPresent(BridgeSettings.self, forKey: .bridge) ?? BridgeSettings()
     }
 
-    private enum Keys: String, CodingKey { case version, defaultAgent, directFallback, agents, mcpAgents, bridge }
+    private enum Keys: String, CodingKey { case version, defaultAgent, agents, mcpAgents, bridge }
 
     /// 内置 + 自定义的全部 Agent(内置在前;自定义同 id 会覆盖内置的启用状态之外的字段被忽略)。
     public var allAgents: [AgentDescriptor] {
@@ -148,14 +145,8 @@ public struct AgentRegistryStore: Sendable {
 }
 
 extension AgentDescriptor {
-    /// 内置 Agent:Claude Code(ACP 适配器)与直连兜底。
-    public static let builtIns: [AgentDescriptor] = [.claudeCode, .claudeDirect]
-
-    /// 直连兜底。
-    public static let claudeDirect = AgentDescriptor(
-        id: "claude-direct", name: "Claude Code(直连)", kind: .claudeDirect,
-        summary: "不依赖 Node 与适配器,直接调用 claude -p;无工具审批弹窗"
-    )
+    /// 内置 Agent:Claude Code(ACP 适配器)。
+    public static let builtIns: [AgentDescriptor] = [.claudeCode]
 
     /// 容错解码:手写的 agents.json 缺省字段时使用默认值。
     public init(from decoder: Decoder) throws {
@@ -164,7 +155,7 @@ extension AgentDescriptor {
         self.init(
             id: id,
             name: try c.decodeIfPresent(String.self, forKey: .name) ?? id,
-            kind: try c.decodeIfPresent(AgentKind.self, forKey: .kind) ?? .genericACP,
+            kind: (try? c.decodeIfPresent(AgentKind.self, forKey: .kind)) ?? .genericACP,
             command: try c.decodeIfPresent(String.self, forKey: .command),
             args: try c.decodeIfPresent([String].self, forKey: .args) ?? [],
             env: try c.decodeIfPresent([String: String].self, forKey: .env) ?? [:],
@@ -174,22 +165,6 @@ extension AgentDescriptor {
     }
 
     private enum Keys: String, CodingKey { case id, name, kind, command, args, env, enabled, summary }
-}
-
-/// 直连兜底的提供者:启动同目录下的 `DirectAgent` 可执行文件。
-public struct ClaudeDirectProvider: AgentProvider {
-    public var descriptor: AgentDescriptor
-
-    public init(descriptor: AgentDescriptor = .claudeDirect) { self.descriptor = descriptor }
-
-    public func makeLaunch(cwd: String, tools: LocatedTools) throws -> ProcessLaunch {
-        guard let claude = tools.claudePath else { throw AgentLaunchError.missingClaude }
-        guard let helper = HelperBinaries.locate("DirectAgent") else { throw AgentLaunchError.missingHelper("DirectAgent") }
-        var env = tools.environment
-        env["OMA_CLAUDE_PATH"] = claude
-        for (key, value) in descriptor.env { env[key] = value }
-        return ProcessLaunch(executable: helper, arguments: [], environment: env, workingDirectory: cwd)
-    }
 }
 
 /// 随应用分发的辅助可执行文件(与主程序同目录;开发期回退到 `.build`)。
