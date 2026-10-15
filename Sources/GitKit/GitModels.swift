@@ -115,6 +115,16 @@ public struct GitCommit: Sendable, Hashable, Identifiable {
     /// 指向该提交的引用(分支/标签),如 `HEAD -> main`、`origin/main`、`tag: v1`
     public var refs: [String]
 
+    public init(hash: String, parents: [String], author: String, email: String, date: Date, subject: String, refs: [String]) {
+        self.hash = hash
+        self.parents = parents
+        self.author = author
+        self.email = email
+        self.date = date
+        self.subject = subject
+        self.refs = refs
+    }
+
     public var shortHash: String { String(hash.prefix(7)) }
     public var isMerge: Bool { parents.count > 1 }
 }
