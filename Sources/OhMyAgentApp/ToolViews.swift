@@ -205,6 +205,7 @@ struct FlowLocations: View {
 /// 终端输出:去除 ANSI 控制序列后以等宽字体显示末尾若干行。
 struct TerminalOutputView: View {
     let session: TerminalSession
+    @AppStorage(ClientPrefs.Key.terminalFontSize) private var outputFontSize = 11.5
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -225,7 +226,7 @@ struct TerminalOutputView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     Text(Self.display(session.output))
-                        .font(OMFonts.monoSmall)
+                        .font(.system(size: outputFontSize, design: .monospaced))
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .id("tail")

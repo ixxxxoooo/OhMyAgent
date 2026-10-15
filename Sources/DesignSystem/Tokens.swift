@@ -36,12 +36,22 @@ public enum OMColors {
     public static let accent = Color.accentColor
 }
 
-/// 字体令牌。
+/// 字体缩放(由外观设置写入;只在主线程的界面刷新周期读取)。
+public enum OMScale {
+    nonisolated(unsafe) public static var ui: CGFloat = 1
+    nonisolated(unsafe) public static var timeline: CGFloat = 1
+}
+
+/// 字体令牌:随「界面字号」缩放;`reading*` 额外乘以「时间线字号」。
 public enum OMFonts {
-    public static let body = Font.system(size: 13.5)
-    public static let small = Font.system(size: 11.5)
-    public static let caption = Font.system(size: 11)
-    public static let title = Font.system(size: 15, weight: .semibold)
-    public static let mono = Font.system(size: 12.5, design: .monospaced)
-    public static let monoSmall = Font.system(size: 11.5, design: .monospaced)
+    public static var body: Font { .system(size: 13.5 * OMScale.ui) }
+    public static var small: Font { .system(size: 11.5 * OMScale.ui) }
+    public static var caption: Font { .system(size: 11 * OMScale.ui) }
+    public static var title: Font { .system(size: 15 * OMScale.ui, weight: .semibold) }
+    public static var mono: Font { .system(size: 12.5 * OMScale.ui, design: .monospaced) }
+    public static var monoSmall: Font { .system(size: 11.5 * OMScale.ui, design: .monospaced) }
+    /// 时间线正文
+    public static var reading: Font { .system(size: 13.5 * OMScale.ui * OMScale.timeline) }
+    /// 时间线代码
+    public static var readingMono: Font { .system(size: 12.5 * OMScale.ui * OMScale.timeline, design: .monospaced) }
 }

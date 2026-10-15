@@ -126,7 +126,7 @@ struct ComposerView: View {
             .buttonStyle(.glassProminent)
             .buttonBorderShape(.circle)
             .disabled(model.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            .keyboardShortcut(.return, modifiers: .command)
+            .keyboardShortcut(ShortcutStore.shared.shortcut(for: .send))
             .help("发送 (Return)")
             .accessibilityLabel("发送")
         }

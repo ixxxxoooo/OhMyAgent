@@ -29,7 +29,7 @@ struct UserMessageView: View {
 
     var body: some View {
         Text(entry.text)
-            .font(OMFonts.body)
+            .font(OMFonts.reading)
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 14)
@@ -111,7 +111,7 @@ struct PlanView: View {
                         .foregroundStyle(item.status == "completed" ? Color.green : OMColors.secondaryText)
                         .frame(width: 14)
                     Text(item.content)
-                        .font(OMFonts.body)
+                        .font(OMFonts.reading)
                         .strikethrough(item.status == "completed")
                         .foregroundStyle(item.status == "completed" ? OMColors.secondaryText : Color.primary)
                 }

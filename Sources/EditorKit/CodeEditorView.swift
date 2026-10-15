@@ -12,7 +12,10 @@ public enum LineMarker: Sendable {
 @MainActor
 public final class CodeEditorView: NSView {
     /// 超过该行数进入大文件模式:关闭自动换行,仅高亮视口附近。
-    public static let largeFileLineThreshold = 20_000
+    public static var largeFileLineThreshold: Int {
+        let value = UserDefaults.standard.object(forKey: "editor.largeFileLines") as? Int ?? 20_000
+        return min(max(value, 2_000), 200_000)
+    }
     /// 视口上下额外高亮的缓冲字符数。
     private static let highlightPadding = 12_000
 
@@ -188,7 +191,7 @@ public final class CodeEditorView: NSView {
     /// 是否自动换行。M0 实测:容器宽度超过可视宽度(横向滚动)时,TextKit 2 需要全量布局,
     /// 5 万行装载 ≈ 0.8s、输入 ≈ 115ms;自动换行装载 ≈ 25ms、输入 ≈ 1.2ms。
     /// 因此默认换行,且大文件模式强制换行。
-    public var wrapsLines = true {
+    public var wrapsLines = UserDefaults.standard.object(forKey: "editor.wrap") as? Bool ?? true {
         didSet { applyWrapping() }
     }
 

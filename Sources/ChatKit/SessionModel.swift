@@ -113,7 +113,7 @@ struct SessionDelegate: ACPClientDelegate {
     }
 
     func createTerminal(sessionId: String, command: String, args: [String], env: [String: String], cwd: String?, outputByteLimit: Int?) async throws -> String {
-        try await terminals.create(command: command, args: args, env: env, cwd: cwd, outputByteLimit: outputByteLimit)
+        try await terminals.create(command: command, args: args, env: env, cwd: cwd, outputByteLimit: outputByteLimit ?? ClientPrefs.terminalOutputLimit())
     }
 
     func terminalOutput(terminalId: String) async throws -> TerminalOutputSnapshot {
@@ -205,6 +205,8 @@ public final class SessionModel {
     /// 终端会话(按终端 ID)
     public private(set) var terminals: [String: TerminalSession] = [:]
     public private(set) var sessionId: String?
+    /// 最近一次连接(启动适配器 + 握手 + 新建会话)耗时,用于诊断
+    public private(set) var connectDuration: Duration?
     /// 当前工作区的历史会话(来自 `session/list`)
     public private(set) var history: [SessionSummary] = []
     /// Agent 能力与鉴权方式
@@ -257,12 +259,13 @@ public final class SessionModel {
     public func connect() {
         guard connectTask == nil, phase == .idle || isFailed else { return }
         phase = .connecting
+        let connectStart = ContinuousClock.now
         let descriptor = descriptor
         let cwd = workspace.path
         connectTask = Task { [weak self] in
             let tools = await Toolchain.shared.resolve()
             guard let self else { return }
-            let environment = tools.environment
+            let environment = ClientPrefs.filterTerminalEnvironment(tools.environment, inherit: ClientPrefs.terminalInheritsEnvironment())
             let manager = TerminalManager(workspace: cwd, environment: { environment }, onCreated: { [weak self] created in
                 Task { @MainActor in self?.registerTerminal(created) }
             })
@@ -291,6 +294,7 @@ public final class SessionModel {
                 self.sessionId = setup.sessionId
                 self.configOptions = setup.configOptions
                 self.phase = .ready
+                self.connectDuration = connectStart.duration(to: .now)
                 self.connectTask = nil
                 self.refreshHistory()
                 self.flushQueuedPrompt()

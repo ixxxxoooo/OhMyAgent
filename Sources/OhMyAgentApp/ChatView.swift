@@ -40,7 +40,7 @@ struct ChatView: View {
 
     private var timeline: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 14) {
+            LazyVStack(alignment: .leading, spacing: AppearanceModel.shared.isCompact ? 7 : 14) {
                 if model.timeline.entries.isEmpty {
                     EmptyStateView(model: model)
                         .padding(.top, 80)

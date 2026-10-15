@@ -42,18 +42,25 @@ enum WorkspaceStore {
 @MainActor
 final class SessionRegistry {
     static let shared = SessionRegistry()
-    private var models: [ObjectIdentifier: SessionModel] = [:]
+    private var storage: [ObjectIdentifier: SessionModel] = [:]
 
-    func register(_ model: SessionModel) { models[ObjectIdentifier(model)] = model }
-    func unregister(_ model: SessionModel) { models[ObjectIdentifier(model)] = nil }
-    func shutdownAll() { for model in models.values { model.shutdown() } }
+    /// 当前所有会话(设置页读取用量与鉴权信息)。
+    var models: [SessionModel] { Array(storage.values) }
+
+    func register(_ model: SessionModel) { storage[ObjectIdentifier(model)] = model }
+    func unregister(_ model: SessionModel) { storage[ObjectIdentifier(model)] = nil }
+    func shutdownAll() { for model in storage.values { model.shutdown() } }
 }
 
 /// 应用代理:激活策略与退出清理。
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate()
+        let showDock = UserDefaults.standard.object(forKey: ClientPrefs.Key.showDock) as? Bool ?? true
+        NSApp.setActivationPolicy(showDock ? .regular : .accessory)
+        AppearanceModel.shared.applyAll()
+        Task { await Toolchain.shared.setOverrides(ClientPrefs.pathOverrides()) }
+        // 由脚本启动(open -g)时不抢占前台焦点
+        if ProcessInfo.processInfo.environment["OMA_DRAFT"] == nil && ProcessInfo.processInfo.environment["OMA_OPEN_EXTENSIONS"] == nil && ProcessInfo.processInfo.environment["OMA_OPEN_SETTINGS"] == nil { NSApp.activate() }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
@@ -67,6 +74,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @main
 struct OhMyAgentApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
+    @AppStorage(ClientPrefs.Key.showMenuBar) private var showMenuBar = false
+    @AppStorage(ClientPrefs.Key.showDock) private var showDock = true
+
+    init() { DiagnosticsStore.shared.markLaunch() }
 
     var body: some Scene {
         WindowGroup("OhMyAgent", for: URL.self) { $workspace in
@@ -81,23 +92,49 @@ struct OhMyAgentApp: App {
             ExtensionsWindow(workspace: workspace ?? WorkspaceStore.defaultWorkspace)
         }
         .defaultSize(width: 1040, height: 700)
+
+        Settings { SettingsView() }
+
+        MenuBarExtra("OhMyAgent", systemImage: "sparkles", isInserted: .constant(showMenuBar || !showDock)) {
+            MenuBarContent()
+        }
     }
 }
 
 /// 菜单命令:打开工作区。
 struct WorkspaceCommands: Commands {
     @Environment(\.openWindow) private var openWindow
+    private let shortcuts = ShortcutStore.shared
 
     var body: some Commands {
         CommandGroup(after: .newItem) {
             Button("打开工作区…") {
                 if let url = WorkspaceStore.chooseDirectory() { openWindow(value: url) }
             }
-            .keyboardShortcut("o", modifiers: .command)
+            .keyboardShortcut(shortcuts.shortcut(for: .openWorkspace))
         }
         CommandGroup(after: .toolbar) {
             Button("扩展管理…") { openWindow(id: "extensions", value: WorkspaceStore.defaultWorkspace) }
-                .keyboardShortcut("e", modifiers: [.command, .shift])
+                .keyboardShortcut(shortcuts.shortcut(for: .extensions))
         }
+    }
+}
+
+/// 菜单栏图标菜单。
+struct MenuBarContent: View {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Button("打开工作区…") {
+            NSApp.activate()
+            if let url = WorkspaceStore.chooseDirectory() { openWindow(value: url) }
+        }
+        Button("扩展管理…") {
+            NSApp.activate()
+            openWindow(id: "extensions", value: WorkspaceStore.defaultWorkspace)
+        }
+        SettingsLink { Text("设置…") }
+        Divider()
+        Button("退出 OhMyAgent") { NSApp.terminate(nil) }
     }
 }

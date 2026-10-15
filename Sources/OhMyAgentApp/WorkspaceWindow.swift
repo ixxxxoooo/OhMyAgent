@@ -10,6 +10,8 @@ import SwiftUI
 struct WorkspaceWindow: View {
     let workspace: URL
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
+    private let appearance = AppearanceModel.shared
     @State private var model: SessionModel
 
     /// - Parameter workspace: 工作区目录
@@ -21,10 +23,14 @@ struct WorkspaceWindow: View {
     var body: some View {
         NavigationSplitView {
             SidebarView(model: model)
+                .id(appearance.fontRevision)
                 .navigationSplitViewColumnWidth(min: 200, ideal: OMMetrics.sidebarWidth, max: 340)
         } detail: {
+            // 字号变化时重建视图树以刷新字体令牌;会话状态在 model 中,不受影响
             ChatView(model: model)
+                .id(appearance.fontRevision)
         }
+        .tint(appearance.accent.color)
         .environment(model)
         .sheet(item: $model.viewerRequest) { request in
             FileViewerSheet(request: request)
@@ -33,6 +39,7 @@ struct WorkspaceWindow: View {
         .navigationSubtitle(model.workspace.abbreviatingHome)
         .toolbar { WindowToolbar(model: model) }
         .frame(minWidth: 760, minHeight: 520)
+        .onAppear { DiagnosticsStore.shared.markFirstFrame() }
         .task {
             WorkspaceStore.remember(workspace)
             SessionRegistry.shared.register(model)
@@ -41,6 +48,12 @@ struct WorkspaceWindow: View {
             // 调试钩子:预置输入框内容(用于不抢焦点的界面验证)
             if let draft = ProcessInfo.processInfo.environment["OMA_DRAFT"], !draft.isEmpty { model.draft = draft }
             if ProcessInfo.processInfo.environment["OMA_OPEN_EXTENSIONS"] != nil { openWindow(id: "extensions", value: workspace) }
+            if ProcessInfo.processInfo.environment["OMA_OPEN_SETTINGS"] != nil {
+                openSettings()
+                // 调试:不激活应用,仅把窗口置前,避免被遮挡时视图停止刷新
+                try? await Task.sleep(for: .milliseconds(600))
+                for window in NSApp.windows where window.title != "OhMyAgent" && !window.title.isEmpty { window.orderFrontRegardless() }
+            }
         }
         .onDisappear {
             model.shutdown()
@@ -83,7 +96,7 @@ struct WindowToolbar: ToolbarContent {
                 Label("新对话", systemImage: "square.and.pencil")
             }
             .help("新对话 (⌘N)")
-            .keyboardShortcut("n", modifiers: [.command, .shift])
+            .keyboardShortcut(ShortcutStore.shared.shortcut(for: .newConversation))
             .disabled(model.phase != .ready)
         }
     }
@@ -138,6 +151,12 @@ struct UsageButton: View {
     let usage: UsageUpdate
     @State private var shown = false
 
+    /// 费用是否超过设置页中的预算阈值(阈值为 0 表示关闭)。
+    private func overBudget(_ cost: Double) -> Bool {
+        let budget = ClientPrefs.budgetUSD()
+        return budget > 0 && cost >= budget
+    }
+
     private var fraction: Double {
         guard let used = usage.used, let size = usage.size, size > 0 else { return 0 }
         return Double(used) / Double(size)
@@ -161,6 +180,9 @@ struct UsageButton: View {
                 }
                 if let cost = usage.costAmount {
                     Text("累计费用 \(cost.formatted(.number.precision(.fractionLength(2...4)))) \(usage.costCurrency ?? "USD")").font(OMFonts.small)
+                    if overBudget(cost) {
+                        Label("已超过预算提醒阈值", systemImage: "exclamationmark.triangle.fill").font(OMFonts.small).foregroundStyle(OMColors.warning)
+                    }
                 }
                 Text("数据来自 Agent 上报,订阅账号可能不显示费用。")
                     .font(OMFonts.caption)

@@ -460,3 +460,68 @@ struct HistoryTests {
         model.shutdown()
     }
 }
+
+@Suite("客户端偏好")
+struct ClientPrefsTests {
+    private func defaults() -> UserDefaults {
+        let suite = "oma-test-\(UUID().uuidString)"
+        let value = UserDefaults(suiteName: suite)!
+        value.removePersistentDomain(forName: suite)
+        return value
+    }
+
+    @Test("终端输出上限默认 1MB 并被限制在 64KB–16MB")
+    func terminalLimit() {
+        let store = defaults()
+        #expect(ClientPrefs.terminalOutputLimit(store) == 1024 * 1024)
+        store.set(1, forKey: ClientPrefs.Key.terminalOutputKB)
+        #expect(ClientPrefs.terminalOutputLimit(store) == 64 * 1024)
+        store.set(1_000_000, forKey: ClientPrefs.Key.terminalOutputKB)
+        #expect(ClientPrefs.terminalOutputLimit(store) == 16_384 * 1024)
+    }
+
+    @Test("终端环境过滤只保留最小集合")
+    func environmentFilter() {
+        let env = ["PATH": "/bin", "SECRET_TOKEN": "x", "HOME": "/h"]
+        #expect(ClientPrefs.filterTerminalEnvironment(env, inherit: true) == env)
+        #expect(ClientPrefs.filterTerminalEnvironment(env, inherit: false) == ["PATH": "/bin", "HOME": "/h"])
+    }
+
+    @Test("路径覆盖忽略空白,预算不为负")
+    func overridesAndBudget() {
+        let store = defaults()
+        store.set("  ", forKey: ClientPrefs.Key.pathNode)
+        store.set("/opt/claude", forKey: ClientPrefs.Key.pathClaude)
+        #expect(ClientPrefs.pathOverrides(store) == ["claude": "/opt/claude"])
+        store.set(-3.0, forKey: ClientPrefs.Key.budgetUSD)
+        #expect(ClientPrefs.budgetUSD(store) == 0)
+        store.set(5.5, forKey: ClientPrefs.Key.budgetUSD)
+        #expect(ClientPrefs.budgetUSD(store) == 5.5)
+    }
+
+    @Test("恢复默认只清除客户端前缀的键")
+    func reset() {
+        let store = defaults()
+        store.set(true, forKey: ClientPrefs.Key.editorWrap)
+        store.set("keep", forKey: "other.key")
+        ClientPrefs.resetAll(store)
+        #expect(store.object(forKey: ClientPrefs.Key.editorWrap) == nil)
+        #expect(store.string(forKey: "other.key") == "keep")
+    }
+}
+
+@Suite("客户端能力")
+struct ClientFeaturesTests {
+    @Test("默认只开启提问表单,可被偏好覆盖")
+    func defaultsAndOverride() {
+        let suite = "oma-feat-\(UUID().uuidString)"
+        let store = UserDefaults(suiteName: suite)!
+        defer { store.removePersistentDomain(forName: suite) }
+        let base = ClientFeatures.load(store)
+        #expect(!base.fileSystem && !base.terminal && base.elicitation)
+        store.set(true, forKey: "feature.terminal")
+        store.set(false, forKey: "feature.elicitation")
+        let changed = ClientFeatures.load(store)
+        #expect(changed.terminal && !changed.elicitation)
+    }
+}

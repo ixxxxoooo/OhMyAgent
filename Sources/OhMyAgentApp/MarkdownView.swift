@@ -40,7 +40,7 @@ struct MarkdownBlockView: View {
                 .padding(.top, level <= 2 ? 6 : 2)
         case .paragraph(let text):
             Text(inlineMarkdown(text))
-                .font(OMFonts.body)
+                .font(OMFonts.reading)
                 .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
         case .code(let language, let code, _):
@@ -58,7 +58,7 @@ struct MarkdownBlockView: View {
                         }
                         Text(inlineMarkdown(item.text)).fixedSize(horizontal: false, vertical: true)
                     }
-                    .font(OMFonts.body)
+                    .font(OMFonts.reading)
                     .padding(.leading, CGFloat(item.level) * 16)
                 }
             }
@@ -66,7 +66,7 @@ struct MarkdownBlockView: View {
             HStack(spacing: 10) {
                 RoundedRectangle(cornerRadius: 1.5).fill(OMColors.hairline).frame(width: 3)
                 Text(inlineMarkdown(text))
-                    .font(OMFonts.body)
+                    .font(OMFonts.reading)
                     .foregroundStyle(OMColors.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -78,12 +78,14 @@ struct MarkdownBlockView: View {
     }
 
     private func headingSize(_ level: Int) -> CGFloat {
+        let base: CGFloat
         switch level {
-        case 1: return 20
-        case 2: return 17
-        case 3: return 15
-        default: return 14
+        case 1: base = 20
+        case 2: base = 17
+        case 3: base = 15
+        default: base = 14
         }
+        return base * OMScale.ui * OMScale.timeline
     }
 }
 
@@ -120,7 +122,7 @@ struct CodeBlockView: View {
             Divider()
             ScrollView(.horizontal, showsIndicators: false) {
                 Text(code)
-                    .font(OMFonts.mono)
+                    .font(OMFonts.readingMono)
                     .padding(12)
                     .fixedSize(horizontal: true, vertical: true)
             }
