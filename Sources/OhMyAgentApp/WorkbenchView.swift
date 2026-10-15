@@ -131,6 +131,11 @@ struct WorkbenchView: View {
             for _ in 0..<60 where model.timeline.toolEntry(id: toolID) == nil { try? await Task.sleep(for: .milliseconds(100)) }
             workbench.openSubagent(project: project, toolCallID: toolID, title: model.timeline.toolEntry(id: toolID)?.tool?.title ?? toolID)
         }
+        if let source = env["OMA_OPEN_MERMAID"], !source.isEmpty {
+            // 调试:直接以预览标签打开一段 Mermaid 源码(\n 表示换行)
+            let id = MermaidPreviewStore.shared.register(source.replacingOccurrences(of: "\\n", with: "\n"))
+            workbench.openPreview(id: id, title: "Mermaid 图")
+        }
         if let file = env["OMA_OPEN_FILE"], !file.isEmpty {
             // 调试:打开文件标签;OMA_SPLIT=right|bottom 时把它拖到会话组的对应边缘分屏
             let id = workbench.openFile(file, line: env["OMA_OPEN_LINE"].flatMap(Int.init), preview: false)

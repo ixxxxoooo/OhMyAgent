@@ -183,3 +183,15 @@
 "已完成" = "Completed";
 "运行中" = "Running";
 "失败" = "Failed";
+"查看图" = "Show diagram";
+"查看源码" = "Show source";
+"导出 PNG" = "Export PNG";
+"在标签中放大" = "Open in tab";
+"复制源码" = "Copy source";
+"无法渲染此图:%@" = "Cannot render this diagram: %@";
+"Mermaid 图" = "Mermaid diagram";
+"适应宽度" = "Fit width";
+"预览内容已失效" = "Preview content expired";
+"缩放" = "Zoom";
+"适应窗口" = "Fit to window";
+"实际大小" = "Actual size";

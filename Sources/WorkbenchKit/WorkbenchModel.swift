@@ -160,6 +160,16 @@ public final class WorkbenchModel {
         return dock.open(.subagent(projectID: projectID, toolCallID: toolCallID), title: title)
     }
 
+    /// 打开预览标签(如放大查看的 Mermaid 图)。
+    /// - Parameters:
+    ///   - id: 预览内容标识(同一标识复用同一标签)
+    ///   - title: 标签标题
+    @discardableResult
+    public func openPreview(id: String, title: String) -> UUID {
+        mode = .workspace
+        return dock.open(.preview(id: id), title: title)
+    }
+
     /// 关闭某项目全部子 Agent 标签(会话被替换后它们指向的工具调用已不存在)。
     func closeSubagentTabs(in projectID: String) {
         dock.closeTabs { tab in

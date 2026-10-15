@@ -256,6 +256,22 @@ public actor ScriptedAgent: ACPRequestHandler {
         await update(sessionId, ["sessionUpdate": "tool_call_update", "toolCallId": "term_1", "status": "completed"])
     }
 
+    /// Mermaid 场景:依次输出流程图、时序图、状态图、类图、饼图、甘特图与一个不支持的类型(验证回退)。
+    private func runMermaid(sessionId: String) async {
+        let blocks = [
+            "```mermaid\nflowchart TD\n  A[用户请求] --> B{已登录?}\n  B -->|是| C[读取数据]\n  B -->|否| D[跳转登录]\n  D --> A\n  C --> E([完成])\n  subgraph 后端\n    C --> F[(数据库)]\n  end\n```\n\n",
+            "```mermaid\nsequenceDiagram\n  autonumber\n  participant U as 用户\n  participant S as 服务\n  U->>+S: 发起请求\n  S-->>-U: 返回结果\n  Note over U,S: 完成\n  loop 每分钟\n    U->>U: 自检\n  end\n```\n\n",
+            "```mermaid\nstateDiagram-v2\n  [*] --> Idle\n  Idle --> Running : start\n  Running --> Idle : stop\n  Running --> [*]\n```\n\n",
+            "```mermaid\nclassDiagram\n  class Animal {\n    +String name\n    +eat() void\n  }\n  Animal <|-- Dog\n  Animal <|-- Cat\n```\n\n",
+            "```mermaid\npie showData title 占比\n  \"甲\" : 30\n  \"乙\" : 50\n  \"丙\" : 20\n```\n\n",
+            "```mermaid\ngantt\n  title 计划\n  dateFormat YYYY-MM-DD\n  section 设计\n  调研 :done, a1, 2026-01-01, 5d\n  方案 :a2, after a1, 3d\n  section 开发\n  实现 :crit, 2026-01-10, 2026-01-20\n```\n\n",
+            "```mermaid\nerDiagram\n  A ||--o{ B : has\n```\n\n",
+        ]
+        for block in blocks {
+            await update(sessionId, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": .string(block)]])
+        }
+    }
+
     /// 子 Agent:父工具调用 + 带 `parentToolUseId` 的内部更新;`#sub2` 额外产生第二层子 Agent。
     private func runSubagent(sessionId: String, nested: Bool = false) async {
         let meta: JSONValue = ["claudeCode": ["parentToolUseId": "sub_1"]]
@@ -380,6 +396,7 @@ public actor ScriptedAgent: ACPRequestHandler {
         if text.contains("#term") { try await runTerminal(sessionId: sessionId) }
         if text.contains("#sub") { await runSubagent(sessionId: sessionId, nested: text.contains("#sub2")) }
         if text.contains("#showcase") { await runToolsShowcase(sessionId: sessionId) }
+        if text.contains("#mermaid") { await runMermaid(sessionId: sessionId) }
 
         if text.contains("plan") || text.contains("计划") {
             await update(sessionId, [

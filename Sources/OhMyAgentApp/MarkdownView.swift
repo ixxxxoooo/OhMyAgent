@@ -44,8 +44,13 @@ struct MarkdownBlockView: View {
                 .font(OMFonts.reading)
                 .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
-        case .code(let language, let code, _):
-            CodeBlockView(language: language, code: code)
+        case .code(let language, let code, let isClosed):
+            // 围栏闭合后才渲染 Mermaid,避免流式输出中途反复解析失败
+            if isClosed, language?.lowercased() == "mermaid" {
+                MermaidBlockView(source: code)
+            } else {
+                CodeBlockView(language: language, code: code)
+            }
         case .list(let items):
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(Array(items.enumerated()), id: \.offset) { _, item in

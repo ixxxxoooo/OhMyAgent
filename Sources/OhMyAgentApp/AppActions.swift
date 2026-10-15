@@ -45,6 +45,12 @@ final class AppActions {
         showMainWindow()
     }
 
+    /// 打开预览标签(如放大的 Mermaid 图)。
+    func openPreview(id: String, title: String) {
+        AppEnvironment.shared.workbench.openPreview(id: id, title: title)
+        showMainWindow()
+    }
+
     /// 打开某个会话(点击通知或托盘菜单):选中项目并请求切换到会话。
     func openSession(workspacePath: String, sessionId: String?, title: String?, uid: String? = nil) {
         Log.app.info("请求打开会话", ["workspace": workspacePath, "session": sessionId ?? "-"])
