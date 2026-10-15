@@ -43,7 +43,7 @@ struct ScopeHeader: View {
                 .pickerStyle(.segmented).labelsHidden().frame(width: 220)
                 Spacer()
             }
-            Text(hint).font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
+            Text(LocalizedStringKey(hint)).font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
             if !model.canWriteCurrentScope {
                 Label("当前没有工作区,无法写入此层;请先打开一个工作区。", om: "exclamationmark.triangle").font(OMFonts.caption).foregroundStyle(OMColors.warning)
             }
