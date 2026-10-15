@@ -14,13 +14,37 @@ import WorkbenchKit
 /// 工作台根视图。
 struct WorkbenchView: View {
     @Bindable var workbench: WorkbenchModel
-    @Environment(\.openSettings) private var openSettings
     @Environment(\.openWindow) private var openWindow
     private let appearance = AppearanceModel.shared
     private let actions = AppActions.shared
     @State private var windowIsKey = false
 
     var body: some View {
+        Group {
+            if workbench.mode == .settings {
+                SettingsView(workbench: workbench)
+            } else {
+                workspaceBody
+            }
+        }
+        .tint(appearance.accent.color)
+        .frame(minWidth: 860, minHeight: 560)
+        .background(WindowFocusReader(onWindow: { actions.mainWindow = $0 }, onChange: { key in
+            windowIsKey = key
+            updateFocus()
+        }))
+        .onAppear {
+            DiagnosticsStore.shared.markFirstFrame()
+            actions.capture(openWindow: openWindow)
+        }
+        .onChange(of: workbench.activeSession?.uid) { _, _ in updateFocus() }
+        .onChange(of: workbench.activeSession?.phase) { _, _ in consumeSessionRequest() }
+        .onChange(of: actions.sessionRequest) { _, _ in consumeSessionRequest() }
+        .task { await runDebugHooks() }
+    }
+
+    /// 工作台主体:左栏 + 中栏 + 右栏 + 状态栏。
+    private var workspaceBody: some View {
         VStack(spacing: 0) {
             NavigationSplitView(columnVisibility: columnVisibility) {
                 ProjectTreeView(workbench: workbench)
@@ -41,20 +65,6 @@ struct WorkbenchView: View {
             }
             StatusBarView(workbench: workbench)
         }
-        .tint(appearance.accent.color)
-        .frame(minWidth: 860, minHeight: 560)
-        .background(WindowFocusReader(onWindow: { actions.mainWindow = $0 }, onChange: { key in
-            windowIsKey = key
-            updateFocus()
-        }))
-        .onAppear {
-            DiagnosticsStore.shared.markFirstFrame()
-            actions.capture(openWindow: openWindow, openSettings: openSettings)
-        }
-        .onChange(of: workbench.activeSession?.uid) { _, _ in updateFocus() }
-        .onChange(of: workbench.activeSession?.phase) { _, _ in consumeSessionRequest() }
-        .onChange(of: actions.sessionRequest) { _, _ in consumeSessionRequest() }
-        .task { await runDebugHooks() }
     }
 
     // MARK: 标题与布局
@@ -116,10 +126,7 @@ struct WorkbenchView: View {
         if env["OMA_SHOW_RIGHT"] != nil { workbench.layout.rightVisible = true }
         if env["OMA_SHOW_BOTTOM"] != nil { workbench.layout.bottomVisible = true }
         if env["OMA_OPEN_SETTINGS"] != nil {
-            openSettings()
-            // 调试:不激活应用,仅把窗口置前,避免被遮挡时视图停止刷新
-            try? await Task.sleep(for: .milliseconds(600))
-            for window in NSApp.windows where window !== actions.mainWindow && !window.title.isEmpty { window.orderFrontRegardless() }
+            workbench.openSettings()
         }
     }
 }
@@ -155,7 +162,6 @@ struct CenterColumn: View {
 struct WorkbenchToolbar: ToolbarContent {
     let workbench: WorkbenchModel
     let switchAgent: (AgentDescriptor) -> Void
-    @Environment(\.openSettings) private var openSettings
 
     var body: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
@@ -168,8 +174,7 @@ struct WorkbenchToolbar: ToolbarContent {
         }
         ToolbarItem(placement: .primaryAction) {
             Button {
-                SettingsRouter.shared.go(.tools)
-                openSettings()
+                AppActions.shared.openSettings(page: .tools)
             } label: {
                 Label("工具与扩展", om: "puzzlepiece.extension")
             }

@@ -6,6 +6,7 @@ import ChatKit
 import ClaudeConfigKit
 import DesignSystem
 import SwiftUI
+import WorkbenchKit
 
 /// 设置页。
 enum SettingsPage: String, CaseIterable, Identifiable {
@@ -88,26 +89,23 @@ enum SettingsContext {
     }
 }
 
-/// 设置窗口根视图。
+/// 设置整页(并入主窗口):左侧分组导航 + 搜索,右侧内容居中;「返回」回到工作台。
 struct SettingsView: View {
+    let workbench: WorkbenchModel
     @Bindable private var router = SettingsRouter.shared
     @State private var model = ClaudeSettingsModel(paths: ClaudePaths(workspace: SettingsContext.workspace))
     @State private var center = ConfigCenter(paths: ClaudePaths(workspace: SettingsContext.workspace))
+    @State private var query = ""
     private let appearance = AppearanceModel.shared
 
+    /// 需要全宽布局的页面(主从列表/大表格),其余页面内容限宽居中。
+    private var usesFullWidth: Bool { [.tools, .agentExtensions, .diagnostics, .usage].contains(router.page) }
+
     var body: some View {
-        NavigationSplitView {
-            List(selection: $router.page) {
-                ForEach(SettingsPage.groups, id: \.title) { group in
-                    Section(group.title) {
-                        ForEach(group.pages) { page in
-                            Label(page.title, om: page.icon).tag(page)
-                        }
-                    }
-                }
-            }
-            .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 260)
-        } detail: {
+        HStack(spacing: 0) {
+            sidebar
+                .frame(width: 232)
+            Divider()
             VStack(spacing: 0) {
                 if let error = model.lastError {
                     Label(error, om: "xmark.octagon.fill")
@@ -115,12 +113,15 @@ struct SettingsView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(10).background(Color.red.opacity(0.1))
                 }
-                page.id(appearance.fontRevision)
+                page
+                    .id(appearance.fontRevision)
+                    .frame(maxWidth: usesFullWidth ? .infinity : 720)
+                    .frame(maxWidth: .infinity)
             }
-            .navigationTitle(router.page.title)
         }
-        .frame(minWidth: 980, idealWidth: 1060, minHeight: 600, idealHeight: 720)
+        .navigationTitle(router.page.title)
         .tint(appearance.accent.color)
+        .onExitCommand { workbench.closeSettings() }
         .task {
             model.start()
             center.start()
@@ -128,6 +129,57 @@ struct SettingsView: View {
             if let claude = tools.claudePath { center.setRunner(CLIRunner(executable: claude, environment: tools.environment)) }
         }
         .onDisappear { model.stop(); center.stop() }
+    }
+
+    /// 左侧导航:返回、搜索、分组页面列表。
+    private var sidebar: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Button { workbench.closeSettings() } label: {
+                    Label("返回", om: "arrow.left")
+                        .font(OMFonts.body)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(OMColors.secondaryText)
+                .help("返回工作台 (Esc)")
+                Spacer()
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 10)
+            HStack(spacing: 6) {
+                Image.om("magnifyingglass", size: 12).foregroundStyle(OMColors.tertiaryText)
+                TextField("搜索设置", text: $query)
+                    .textFieldStyle(.plain)
+                    .font(OMFonts.body)
+            }
+            .padding(.horizontal, 8)
+            .frame(height: 26)
+            .background(RoundedRectangle(cornerRadius: 7).fill(Color.primary.opacity(0.06)))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            List(selection: $router.page) {
+                ForEach(filteredGroups, id: \.title) { group in
+                    Section(group.title) {
+                        ForEach(group.pages) { page in
+                            Label(page.title, om: page.icon).tag(page)
+                        }
+                    }
+                }
+            }
+            .listStyle(.sidebar)
+            .scrollContentBackground(.hidden)
+        }
+        .background(.regularMaterial)
+    }
+
+    /// 按搜索词过滤后的分组(标题或分组名包含关键字)。
+    private var filteredGroups: [(title: String, pages: [SettingsPage])] {
+        let key = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else { return SettingsPage.groups }
+        return SettingsPage.groups.compactMap { group in
+            let pages = group.pages.filter { $0.title.localizedCaseInsensitiveContains(key) || group.title.localizedCaseInsensitiveContains(key) }
+            return pages.isEmpty ? nil : (group.title, pages)
+        }
     }
 
     @ViewBuilder

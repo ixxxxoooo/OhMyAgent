@@ -25,12 +25,10 @@ final class AppActions {
     /// 主窗口(由工作台视图登记;窗口关闭后系统会释放它)
     @ObservationIgnored weak var mainWindow: NSWindow?
     @ObservationIgnored private var openWindowAction: OpenWindowAction?
-    @ObservationIgnored private var openSettingsAction: OpenSettingsAction?
 
     /// 由窗口视图捕获环境动作。
-    func capture(openWindow: OpenWindowAction, openSettings: OpenSettingsAction) {
+    func capture(openWindow: OpenWindowAction) {
         openWindowAction = openWindow
-        openSettingsAction = openSettings
     }
 
     /// 把目录加入工作台(已存在则选中)并前置主窗口。
@@ -40,11 +38,11 @@ final class AppActions {
         showMainWindow()
     }
 
-    /// 打开设置(可深链到某页)。
+    /// 打开设置整页(并入主窗口,可深链到某页)。
     func openSettings(page: SettingsPage? = nil, section: ExtensionSection? = nil) {
         if let page { SettingsRouter.shared.go(page, section: section) }
-        NSApp.activate()
-        openSettingsAction?()
+        AppEnvironment.shared.workbench.openSettings()
+        showMainWindow()
     }
 
     /// 打开某个会话(点击通知或托盘菜单):选中项目并请求切换到会话。

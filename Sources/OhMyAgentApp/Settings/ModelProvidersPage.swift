@@ -23,7 +23,7 @@ struct ModelProvidersPage: View {
                     Text("系统默认(~/.claude 的配置)").tag("")
                     ForEach(model.snapshot.providers) { provider in Text(provider.name).tag(provider.id) }
                 }
-                Note("选中的提供商对**新建会话与重新连接**生效。每个会话启动时由 OhMyAgent 把地址、模型与密钥交给 Claude Code,不会改动 ~/.claude/settings.json,也不影响终端里的 claude。")
+                Note("选中的提供商对「新建会话与重新连接」生效。每个会话启动时由 OhMyAgent 把地址、模型与密钥交给 Claude Code,不会改动 ~/.claude/settings.json,也不影响终端里的 claude。")
             }
             Section("提供商") {
                 ForEach(model.snapshot.providers) { provider in

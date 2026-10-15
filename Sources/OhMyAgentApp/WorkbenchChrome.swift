@@ -13,7 +13,6 @@ struct AgentMenu: View {
     let model: SessionModel
     let switchAgent: (AgentDescriptor) -> Void
     private let registry = AgentRegistryModel.shared
-    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         Menu {
@@ -26,8 +25,7 @@ struct AgentMenu: View {
             }
             Divider()
             Button("管理 Agent…") {
-                SettingsRouter.shared.go(.agentExtensions)
-                openSettings()
+                AppActions.shared.openSettings(page: .agentExtensions)
             }
         } label: {
             Label(model.descriptor.name, om: "person.crop.rectangle.stack")

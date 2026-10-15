@@ -84,14 +84,11 @@ struct OhMyAgentApp: App {
         }
         .defaultSize(width: 1280, height: 820)
         .commands { WorkbenchCommands() }
-
-        Settings { SettingsView() }
     }
 }
 
 /// 菜单命令:文件(打开项目、新对话)、视图(三栏与面板开关)、工具与扩展。
 struct WorkbenchCommands: Commands {
-    @Environment(\.openSettings) private var openSettings
     private let shortcuts = ShortcutStore.shared
     private let workbench = AppEnvironment.shared.workbench
 
@@ -107,6 +104,10 @@ struct WorkbenchCommands: Commands {
             }
             .keyboardShortcut(shortcuts.shortcut(for: .openWorkspace))
         }
+        CommandGroup(replacing: .appSettings) {
+            Button("设置…") { AppActions.shared.openSettings() }
+                .keyboardShortcut(",", modifiers: .command)
+        }
         CommandGroup(after: .appInfo) {
             Button("检查更新…") { UpdateModel.shared.checkInteractively() }
         }
@@ -119,8 +120,7 @@ struct WorkbenchCommands: Commands {
                 .keyboardShortcut(shortcuts.shortcut(for: .togglePanel))
             Divider()
             Button("工具与扩展…") {
-                SettingsRouter.shared.go(.tools)
-                openSettings()
+                AppActions.shared.openSettings(page: .tools)
             }
             .keyboardShortcut(shortcuts.shortcut(for: .extensions))
         }
