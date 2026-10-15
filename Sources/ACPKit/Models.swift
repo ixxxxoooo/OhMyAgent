@@ -195,6 +195,12 @@ public struct PlanEntry: Sendable, Hashable {
     public var content: String
     public var priority: String
     public var status: String
+
+    public init(content: String, priority: String = "medium", status: String = "pending") {
+        self.content = content
+        self.priority = priority
+        self.status = status
+    }
 }
 
 /// 可用斜杠命令。
@@ -204,6 +210,12 @@ public struct AvailableCommand: Sendable, Hashable, Identifiable {
     public var description: String
     /// 输入提示(无输入为 nil)
     public var inputHint: String?
+
+    public init(name: String, description: String, inputHint: String? = nil) {
+        self.name = name
+        self.description = description
+        self.inputHint = inputHint
+    }
 }
 
 /// 用量更新。
@@ -212,6 +224,13 @@ public struct UsageUpdate: Sendable, Hashable {
     public var size: Int?
     public var costAmount: Double?
     public var costCurrency: String?
+
+    public init(used: Int? = nil, size: Int? = nil, costAmount: Double? = nil, costCurrency: String? = nil) {
+        self.used = used
+        self.size = size
+        self.costAmount = costAmount
+        self.costCurrency = costCurrency
+    }
 }
 
 // MARK: - 会话配置
@@ -221,6 +240,12 @@ public struct ConfigOptionValue: Sendable, Hashable {
     public var value: String
     public var name: String
     public var description: String?
+
+    public init(value: String, name: String, description: String? = nil) {
+        self.value = value
+        self.name = name
+        self.description = description
+    }
 }
 
 /// 会话配置选项(模型、模式、思考强度等)。

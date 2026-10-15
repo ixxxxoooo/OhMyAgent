@@ -18,6 +18,8 @@ public actor AgentSupervisor {
     public let provider: any AgentProvider
     public let cwd: String
     private let delegate: any ACPClientDelegate
+    private let advertiseFileSystem: Bool
+    private let advertiseTerminal: Bool
     private var transport: StdioTransport?
     public private(set) var client: ACPClient?
     public private(set) var state: AgentState = .idle
@@ -32,7 +34,11 @@ public actor AgentSupervisor {
     ///   - provider: Agent 提供者
     ///   - cwd: 工作目录
     ///   - delegate: 反向请求委托
-    public init(provider: any AgentProvider, cwd: String, delegate: any ACPClientDelegate) {
+    ///   - fileSystem: 是否向 Agent 声明 `fs` 能力(需委托实现读写)
+    ///   - terminal: 是否向 Agent 声明 `terminal` 能力(需委托实现终端)
+    public init(provider: any AgentProvider, cwd: String, delegate: any ACPClientDelegate, fileSystem: Bool = false, terminal: Bool = false) {
+        self.advertiseFileSystem = fileSystem
+        self.advertiseTerminal = terminal
         self.provider = provider
         self.cwd = cwd
         self.delegate = delegate
@@ -63,7 +69,7 @@ public actor AgentSupervisor {
             try await client.start()
             self.transport = transport
             self.client = client
-            let result = try await client.initialize()
+            let result = try await client.initialize(fileSystem: advertiseFileSystem, terminal: advertiseTerminal)
             initializeResult = result
             set(.ready(result))
             return result

@@ -1,2 +1,0 @@
-// @author ygw
-print("OhMyAgent")

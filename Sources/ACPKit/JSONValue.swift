@@ -109,6 +109,14 @@ public extension JSONValue {
         return false
     }
 
+    /// 紧凑、键有序的 JSON 文本,用于界面展示与日志。
+    var compactDescription: String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        guard let data = try? encoder.encode(self) else { return "" }
+        return String(decoding: data, as: UTF8.self)
+    }
+
     /// 将 Encodable 值转换为 JSONValue。
     /// - Parameter value: 任意可编码值
     /// - Returns: 转换后的 JSON 值
