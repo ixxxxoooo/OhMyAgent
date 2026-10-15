@@ -448,8 +448,44 @@ public final class SessionModel {
         start(prompt: queued)
     }
 
+    /// 模型网关探测器(默认探测 `ANTHROPIC_BASE_URL`;测试可注入)。
+    @ObservationIgnored public var gatewayChecker: (@Sendable () async -> GatewayStatus)?
+    /// 最近一次收到 Agent 事件的时间(卡死看门狗使用)
+    @ObservationIgnored private var lastActivity = ContinuousClock.now
+    @ObservationIgnored private var watchdogTask: Task<Void, Never>?
+    /// 无事件超过该时长则怀疑卡死并重新探测网关
+    static let stallThreshold: Duration = .seconds(20)
+
+    /// 发送前探测网关;仅对真实 Claude 通道生效。
+    private func probeGateway() async -> GatewayStatus {
+        if let gatewayChecker { return await gatewayChecker() }
+        guard activeDescriptor.kind == .claudeACP else { return .notConfigured }
+        return await ModelGateway.check()
+    }
+
     private func start(prompt: String) {
         guard let client, let sessionId else { return }
+        // 非 Claude 通道(测试/脚本化 Agent)无需探测网关,保持同步发送
+        guard gatewayChecker != nil || activeDescriptor.kind == .claudeACP else {
+            beginTurn(prompt: prompt, client: client, sessionId: sessionId)
+            return
+        }
+        isRunning = true
+        promptTask = Task { [weak self] in
+            // 先探测网关:代理没启动时,SDK 会静默重试 10 余次,界面看起来像卡死
+            let status = await self?.probeGateway() ?? .notConfigured
+            guard let self, self.isRunning else { return }
+            if case .unreachable(let url, let reason) = status {
+                self.log.error("模型网关不可达,未发送", ["gateway": ModelGateway.origin(of: url), "reason": reason])
+                self.abortSend(prompt: prompt, message: ModelGateway.unreachableMessage(url: url, reason: reason))
+                return
+            }
+            self.beginTurn(prompt: prompt, client: client, sessionId: sessionId)
+        }
+    }
+
+    /// 真正开始一轮:写入用户消息、启动看门狗并发出 `session/prompt`。
+    private func beginTurn(prompt: String, client: ACPClient, sessionId: String) {
         var blocks: [ContentBlock] = [.text(prompt)]
         for url in CompletionEngine.mentionedFiles(in: prompt, workspace: workspace) {
             blocks.append(.resourceLink(uri: url.absoluteString, name: url.lastPathComponent, mimeType: nil, title: nil))
@@ -457,10 +493,12 @@ public final class SessionModel {
         timeline.appendUser(prompt)
         turnNumber += 1
         turnStart = ContinuousClock.now
+        lastActivity = .now
         log.info("发送提示", ["turn": "\(turnNumber)", "chars": "\(prompt.count)", "mentions": "\(blocks.count - 1)"])
         turnChanges.removeAll()
         turnChangeOrder.removeAll()
         isRunning = true
+        startWatchdog()
         promptTask = Task { [weak self] in
             do {
                 let reason = try await client.prompt(sessionId: sessionId, content: blocks)
@@ -471,8 +509,41 @@ public final class SessionModel {
         }
     }
 
+    /// 发送前失败:不产生用户消息,把文本放回输入框并给出提示。
+    private func abortSend(prompt: String, message: String) {
+        if draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { draft = prompt }
+        timeline.appendNotice(message, isError: true)
+        isRunning = false
+        promptTask = nil
+    }
+
+    /// 卡死看门狗:轮次中长时间没有任何事件时重新探测网关,不可达则取消并提示。
+    private func startWatchdog() {
+        watchdogTask?.cancel()
+        watchdogTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(5))
+                guard let self, self.isRunning, !Task.isCancelled else { return }
+                guard self.pendingPermissions.isEmpty, self.pendingElicitations.isEmpty else { continue }
+                guard self.lastActivity.duration(to: .now) > Self.stallThreshold else { continue }
+                if case .unreachable(let url, let reason) = await self.probeGateway() {
+                    self.log.error("轮次卡死:网关不可达,取消", ["gateway": ModelGateway.origin(of: url), "reason": reason])
+                    self.stallMessage = ModelGateway.unreachableMessage(url: url, reason: reason)
+                    self.cancel()
+                    return
+                }
+                self.lastActivity = .now   // 网关正常:上游仍在思考,继续等待
+            }
+        }
+    }
+
+    /// 看门狗判定卡死时待展示的提示(轮次结束时输出)。
+    @ObservationIgnored private var stallMessage: String?
+
     private func finishTurn(reason: StopReason?, error: Error?) {
         // 先把已合并但尚未应用的事件落入时间线,再结束轮次
+        watchdogTask?.cancel()
+        watchdogTask = nil
         coalescer?.flush()
         let turnMs = turnStart.map { OMLogger.milliseconds(since: $0) } ?? 0
         if let error {
@@ -485,7 +556,10 @@ public final class SessionModel {
             await Task.yield()
             guard let self else { return }
             self.timeline.finishStreaming()
-            if let error {
+            if let stall = self.stallMessage {
+                self.stallMessage = nil
+                self.timeline.appendNotice(stall, isError: true)
+            } else if let error {
                 if !self.isShuttingDown {
                     if let rpc = error as? JSONRPCError, rpc.code == -32000 {
                         self.timeline.appendNotice("Claude Code 尚未登录或登录已失效:请在终端运行 claude 完成登录后重试。", isError: true)
@@ -825,10 +899,12 @@ public final class SessionModel {
             switch event {
             case .sessionUpdate(let id, let update):
                 guard sessionId == nil || sessionId == id else { continue }
+                lastActivity = .now
                 handle(update)
             case .authStatus:
                 break   // 不展示账号状态:登录完全由本机 claude 管理
             case .stderr(let text):
+                lastActivity = .now
                 log.debug("Agent stderr", ["text": LogRedactor.truncate(text, limit: 1000)])
                 diagnostics.append(text)
                 if diagnostics.count > 200 { diagnostics.removeFirst(diagnostics.count - 200) }
@@ -875,6 +951,8 @@ public final class SessionModel {
         connectTask?.cancel()
         connectTask = nil
         promptTask?.cancel()
+        watchdogTask?.cancel()
+        watchdogTask = nil
         bridge?.stop()
         bridge = nil
         let supervisor = supervisor
