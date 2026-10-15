@@ -71,27 +71,41 @@ private struct SideBySideHunkView: View {
                 }
             }
         }
-        .background(Color.primary.opacity(0.03), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
+        .background(OMDiffPalette.background(.context))
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
     }
 
-    /// 单侧:行号 + 正文;空侧只显示灰底占位。
+    /// 单侧:行号槽(独立底色 + 强调色条)+ 正文;空侧只显示灰底占位。
     private func half(_ line: DiffLine?, mark: Range<Int>?, number: Int?) -> some View {
-        HStack(alignment: .top, spacing: 0) {
+        let kind = paletteKind(line)
+        return HStack(alignment: .top, spacing: 0) {
             Text(number.map(String.init) ?? "")
                 .frame(width: 34, alignment: .trailing)
                 .foregroundStyle(OMColors.tertiaryText)
-                .padding(.trailing, 6)
+                .padding(.horizontal, 4)
+                .frame(maxHeight: .infinity, alignment: .top)
+                .diffFill(OMDiffPalette.gutter(kind))
+                .overlay(alignment: .leading) { Rectangle().fill(OMDiffPalette.bar(kind)).frame(width: 3).padding(.vertical, -0.5) }
             Text(content(line, mark: mark))
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.trailing, 6)
+                .padding(.horizontal, 6)
+                .frame(maxHeight: .infinity, alignment: .top)
+                .diffFill(OMDiffPalette.background(kind))
         }
         .font(OMFonts.monoSmall)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(background(line))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(line.map { "\(kindLabel($0.kind)) \($0.text)" } ?? "")
+    }
+
+    private func paletteKind(_ line: DiffLine?) -> OMDiffPalette.Kind {
+        guard let line else { return .empty }
+        switch line.kind {
+        case .added: return .added
+        case .removed: return .removed
+        case .context: return .context
+        }
     }
 
     private func content(_ line: DiffLine?, mark: Range<Int>?) -> AttributedString {
@@ -104,15 +118,6 @@ private struct SideBySideHunkView: View {
         let end = characters.index(characters.startIndex, offsetBy: mark.upperBound)
         text[start..<end].backgroundColor = (line.kind == .added ? OMColors.diffAdded : OMColors.diffRemoved).opacity(0.38)
         return text
-    }
-
-    private func background(_ line: DiffLine?) -> Color {
-        guard let line else { return Color.primary.opacity(0.04) }
-        switch line.kind {
-        case .added: return OMColors.diffAdded.opacity(0.16)
-        case .removed: return OMColors.diffRemoved.opacity(0.16)
-        case .context: return .clear
-        }
     }
 
     private func kindLabel(_ kind: DiffLineKind) -> String {

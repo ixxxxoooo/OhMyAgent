@@ -36,6 +36,58 @@ public enum OMColors {
     public static let accent = Color.accentColor
 }
 
+/// Diff 配色:全部为不透明预混合色(随深浅色切换),避免半透明叠加在行与行之间留下接缝、边缘发灰。
+public enum OMDiffPalette {
+    /// 行类别。
+    public enum Kind: Sendable { case added, removed, context, empty }
+
+    private static func dynamic(light: (CGFloat, CGFloat, CGFloat), dark: (CGFloat, CGFloat, CGFloat)) -> Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            let c = isDark ? dark : light
+            return NSColor(srgbRed: c.0, green: c.1, blue: c.2, alpha: 1)
+        })
+    }
+
+    /// 正文区背景。
+    public static func background(_ kind: Kind) -> Color {
+        switch kind {
+        case .added: return addedBackground
+        case .removed: return removedBackground
+        case .context: return contextBackground
+        case .empty: return emptyBackground
+        }
+    }
+
+    /// 行号槽背景(比正文深一档)。
+    public static func gutter(_ kind: Kind) -> Color {
+        switch kind {
+        case .added: return addedGutter
+        case .removed: return removedGutter
+        case .context: return contextGutter
+        case .empty: return emptyGutter
+        }
+    }
+
+    /// 左侧强调色条。
+    public static func bar(_ kind: Kind) -> Color {
+        switch kind {
+        case .added: return Color(nsColor: .systemGreen)
+        case .removed: return Color(nsColor: .systemRed)
+        case .context, .empty: return .clear
+        }
+    }
+
+    private static let addedBackground = dynamic(light: (0.878, 0.965, 0.894), dark: (0.110, 0.220, 0.145))
+    private static let addedGutter = dynamic(light: (0.780, 0.929, 0.812), dark: (0.133, 0.310, 0.188))
+    private static let removedBackground = dynamic(light: (0.992, 0.894, 0.894), dark: (0.290, 0.130, 0.140))
+    private static let removedGutter = dynamic(light: (0.980, 0.804, 0.808), dark: (0.400, 0.165, 0.175))
+    private static let contextBackground = dynamic(light: (1, 1, 1), dark: (0.118, 0.122, 0.133))
+    private static let contextGutter = dynamic(light: (0.957, 0.961, 0.969), dark: (0.153, 0.157, 0.173))
+    private static let emptyBackground = dynamic(light: (0.965, 0.969, 0.976), dark: (0.140, 0.144, 0.158))
+    private static let emptyGutter = dynamic(light: (0.945, 0.949, 0.957), dark: (0.153, 0.157, 0.173))
+}
+
 /// 字体缩放(由外观设置写入;只在主线程的界面刷新周期读取)。
 public enum OMScale {
     nonisolated(unsafe) public static var ui: CGFloat = 1

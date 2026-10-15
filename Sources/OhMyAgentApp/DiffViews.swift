@@ -70,13 +70,13 @@ struct HunkView: View {
                 }
             }
         }
-        .background(Color.primary.opacity(0.03), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
+        .background(OMDiffPalette.background(.context))
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
     }
 }
 
-/// 单行。
+/// 单行:左侧一个整块的行号槽(独立底色 + 强调色条),右侧正文;背景为不透明色并略向上下外扩,避免行间接缝。
 struct DiffLineRow: View {
     let line: DiffLine
     /// 行内变化区间(词级高亮),nil 表示整行同色
@@ -84,24 +84,41 @@ struct DiffLineRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
-            Text(line.oldNumber.map(String.init) ?? "")
-                .frame(width: 34, alignment: .trailing)
-                .foregroundStyle(OMColors.tertiaryText)
-            Text(line.newNumber.map(String.init) ?? "")
-                .frame(width: 34, alignment: .trailing)
-                .foregroundStyle(OMColors.tertiaryText)
+            HStack(alignment: .top, spacing: 0) {
+                Text(line.oldNumber.map(String.init) ?? "")
+                    .frame(width: 34, alignment: .trailing)
+                Text(line.newNumber.map(String.init) ?? "")
+                    .frame(width: 34, alignment: .trailing)
+            }
+            .foregroundStyle(OMColors.tertiaryText)
+            .padding(.horizontal, 4)
+            .frame(maxHeight: .infinity, alignment: .top)
+            .diffFill(OMDiffPalette.gutter(paletteKind))
+            .overlay(alignment: .leading) { Rectangle().fill(OMDiffPalette.bar(paletteKind)).frame(width: 3).padding(.vertical, -0.5) }
             Text(sign)
                 .frame(width: 18)
+                .frame(maxHeight: .infinity, alignment: .top)
+                .diffFill(OMDiffPalette.background(paletteKind))
             Text(content)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.trailing, 8)
+                .frame(maxHeight: .infinity, alignment: .top)
+                .diffFill(OMDiffPalette.background(paletteKind))
         }
         .font(OMFonts.monoSmall)
         .foregroundStyle(line.kind == .context ? OMColors.secondaryText : Color.primary)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(background)
+        .fixedSize(horizontal: false, vertical: true)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(accessibilityKind) \(line.text)")
+    }
+
+    private var paletteKind: OMDiffPalette.Kind {
+        switch line.kind {
+        case .added: return .added
+        case .removed: return .removed
+        case .context: return .context
+        }
     }
 
     /// 正文:有行内区间时,变化部分使用更深的底色。
@@ -131,13 +148,12 @@ struct DiffLineRow: View {
         case .context: return "上下文"
         }
     }
+}
 
-    private var background: Color {
-        switch line.kind {
-        case .added: return OMColors.diffAdded.opacity(0.16)
-        case .removed: return OMColors.diffRemoved.opacity(0.16)
-        case .context: return .clear
-        }
+extension View {
+    /// 以不透明色铺满并向上下各外扩 0.5pt(相邻行互相覆盖,消除小数行高产生的接缝)。
+    func diffFill(_ color: Color) -> some View {
+        background { Rectangle().fill(color).padding(.vertical, -0.5) }
     }
 }
 
