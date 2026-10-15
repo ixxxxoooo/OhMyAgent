@@ -173,3 +173,36 @@ public final class LoopbackTransport: ACPTransport, @unchecked Sendable {
         }
     }
 }
+
+/// 基于当前进程 stdin/stdout 的传输(Agent 侧):供自带的 ACP Agent 可执行文件使用。
+public final class StdioServerTransport: ACPTransport, @unchecked Sendable {
+    private let writeQueue = DispatchQueue(label: "OhMyAgent.StdioServerTransport.write")
+
+    public init() {}
+
+    public func start() throws -> AsyncStream<TransportEvent> {
+        let (stream, continuation) = AsyncStream<TransportEvent>.makeStream(bufferingPolicy: .unbounded)
+        let thread = Thread {
+            var framer = LineFramer()
+            let input = FileHandle.standardInput
+            while true {
+                let data = input.availableData
+                if data.isEmpty { break }
+                for line in framer.push(data) { continuation.yield(.line(line)) }
+            }
+            continuation.yield(.closed(exitCode: 0))
+            continuation.finish()
+        }
+        thread.start()
+        return stream
+    }
+
+    public func send(_ data: Data) {
+        var payload = data
+        payload.append(0x0A)
+        let framed = payload
+        writeQueue.async { FileHandle.standardOutput.write(framed) }
+    }
+
+    public func stop() {}
+}

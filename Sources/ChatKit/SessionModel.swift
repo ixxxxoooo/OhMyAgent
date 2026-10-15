@@ -190,6 +190,14 @@ public enum SessionPhase: Sendable, Equatable {
 public final class SessionModel {
     public let workspace: URL
     public let descriptor: AgentDescriptor
+    /// 实际使用的描述符(ACP 适配器不可用且开启兜底时会自动变为直连)
+    public private(set) var activeDescriptor: AgentDescriptor
+    /// 用户在界面中选中的文字(Bridge 的 get_selection 读取)
+    public var selectedText: String?
+    /// 系统通知发送器(由应用层注入,Bridge 的 notify 使用)
+    public var notifier: (@MainActor (String, String) -> Void)?
+    var bridge: BridgeServer?
+    var mcpServers: [MCPServerConfig] = []
     public let timeline = TimelineStore()
 
     public private(set) var phase: SessionPhase = .idle
@@ -249,6 +257,7 @@ public final class SessionModel {
     public init(workspace: URL, descriptor: AgentDescriptor = Toolchain.defaultDescriptor()) {
         self.workspace = workspace
         self.descriptor = descriptor
+        self.activeDescriptor = descriptor
         self.agentName = descriptor.name
         timeline.onToolChange = { [weak self] call in self?.observeTool(call) }
     }
@@ -260,7 +269,7 @@ public final class SessionModel {
         guard connectTask == nil, phase == .idle || isFailed else { return }
         phase = .connecting
         let connectStart = ContinuousClock.now
-        let descriptor = descriptor
+        let descriptor = activeDescriptor
         let cwd = workspace.path
         connectTask = Task { [weak self] in
             let tools = await Toolchain.shared.resolve()
@@ -290,7 +299,11 @@ public final class SessionModel {
                 let result = try await supervisor.start(tools: tools)
                 guard let client = await supervisor.client else { throw AgentLaunchError.missingAdapter }
                 self.attach(supervisor: supervisor, client: client, result: result)
-                let setup = try await client.newSession(cwd: cwd)
+                let registry = AgentRegistryStore().load()
+                let prepared = self.prepareMCPServers(registry: registry, environment: tools.environment)
+                self.mcpServers = prepared.servers
+                self.bridge = prepared.bridge
+                let setup = try await client.newSession(cwd: cwd, mcpServers: prepared.servers)
                 self.sessionId = setup.sessionId
                 self.configOptions = setup.configOptions
                 self.phase = .ready
@@ -300,10 +313,35 @@ public final class SessionModel {
                 self.flushQueuedPrompt()
             } catch {
                 await supervisor.stop()
-                self.phase = .failed(error.localizedDescription)
+                self.bridge?.stop()
+                self.bridge = nil
                 self.connectTask = nil
+                if self.shouldFallBackToDirect(error: error, descriptor: descriptor) {
+                    self.activeDescriptor = .claudeDirect
+                    self.agentName = AgentDescriptor.claudeDirect.name
+                    self.phase = .idle
+                    self.timeline.appendNotice("ACP 适配器不可用(\(error.localizedDescription))\n已自动改用直连通道:无工具审批弹窗,请在模式中选择 Accept edits 或 Bypass permissions。")
+                    self.connect()
+                } else {
+                    self.phase = .failed(error.localizedDescription)
+                }
             }
         }
+    }
+
+    /// 启动前提缺失(Node / 适配器)且开启了兜底时,改用直连通道。
+    func shouldFallBackToDirect(error: Error, descriptor: AgentDescriptor, registry: AgentRegistryData = AgentRegistryStore().load()) -> Bool {
+        guard descriptor.kind == .claudeACP, let launch = error as? AgentLaunchError else { return false }
+        switch launch {
+        case .missingNode, .missingAdapter: return registry.directFallback
+        default: return false
+        }
+    }
+
+    /// 本轮是否记录了该文件的改动。
+    func hasTurnChange(at path: String) -> Bool {
+        guard let item = turnChanges[path] else { return false }
+        return item.original != item.current
     }
 
     private var isFailed: Bool {
@@ -453,9 +491,10 @@ public final class SessionModel {
         turnChanges.removeAll()
         turnChangeOrder.removeAll()
         Task { await checkpoints.reset() }
+        let servers = mcpServers
         Task { [weak self] in
             do {
-                let setup = try await client.newSession(cwd: cwd)
+                let setup = try await client.newSession(cwd: cwd, mcpServers: servers)
                 self?.sessionId = setup.sessionId
                 self?.configOptions = setup.configOptions
             } catch {
@@ -492,11 +531,12 @@ public final class SessionModel {
         isReplaying = true
         let cwd = workspace.path
         let canLoad = capabilities.loadSession
+        let servers = mcpServers
         Task { [weak self] in
             do {
                 let setup = canLoad
-                    ? try await client.loadSession(sessionId: summary.sessionId, cwd: cwd)
-                    : try await client.resumeSession(sessionId: summary.sessionId, cwd: cwd)
+                    ? try await client.loadSession(sessionId: summary.sessionId, cwd: cwd, mcpServers: servers)
+                    : try await client.resumeSession(sessionId: summary.sessionId, cwd: cwd, mcpServers: servers)
                 self?.configOptions = setup.configOptions.isEmpty ? (self?.configOptions ?? []) : setup.configOptions
             } catch {
                 self?.timeline.appendNotice("打开会话失败:\(error.localizedDescription)", isError: true)
@@ -511,9 +551,10 @@ public final class SessionModel {
     public func forkCurrentSession() {
         guard let client, let sessionId, capabilities.canFork, !isRunning else { return }
         let cwd = workspace.path
+        let servers = mcpServers
         Task { [weak self] in
             do {
-                let setup = try await client.forkSession(sessionId: sessionId, cwd: cwd)
+                let setup = try await client.forkSession(sessionId: sessionId, cwd: cwd, mcpServers: servers)
                 self?.sessionId = setup.sessionId
                 self?.timeline.appendNotice("已从此处分叉出新会话,后续对话不会影响原会话。")
                 if !setup.configOptions.isEmpty { self?.configOptions = setup.configOptions }
@@ -813,6 +854,8 @@ public final class SessionModel {
         connectTask?.cancel()
         connectTask = nil
         promptTask?.cancel()
+        bridge?.stop()
+        bridge = nil
         let supervisor = supervisor
         self.supervisor = nil
         client = nil

@@ -7,6 +7,8 @@ cd "$(dirname "$0")/.."
 pkill -x OhMyAgent 2>/dev/null || true
 pkill -f "claude-agent-acp" 2>/dev/null || true
 pkill -x FakeAgent 2>/dev/null || true
+pkill -x DirectAgent 2>/dev/null || true
+pkill -x OhMyAgentBridge 2>/dev/null || true
 sleep 0.3
 Scripts/bundle.sh "${1:-debug}"
 open -n build/OhMyAgent.app --env OMA_AGENT="${OMA_AGENT:-}" --env OMA_PROJECT_ROOT="$PWD"

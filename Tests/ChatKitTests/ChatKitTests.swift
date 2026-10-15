@@ -525,3 +525,77 @@ struct ClientFeaturesTests {
         #expect(changed.terminal && !changed.elicitation)
     }
 }
+
+@MainActor
+@Suite("Agent 注册表模型与会话接入")
+struct AgentIntegrationTests {
+    private func tempStore() -> AgentRegistryStore {
+        AgentRegistryStore(url: URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("oma-reg-\(UUID().uuidString)/agents.json"))
+    }
+
+    @Test("新增/校验/默认/停用/删除都会写回文件")
+    func registryMutations() {
+        let store = tempStore()
+        defer { try? FileManager.default.removeItem(at: store.url.deletingLastPathComponent()) }
+        let model = AgentRegistryModel(store: store)
+        #expect(model.upsert(AgentDescriptor(id: "", name: "x", kind: .genericACP, command: "x")) != nil)
+        #expect(model.upsert(AgentDescriptor(id: "claude-code", name: "冒名", kind: .genericACP, command: "x")) != nil)
+        #expect(model.upsert(AgentDescriptor(id: "g", name: "G", kind: .genericACP, command: " ")) != nil)
+        #expect(model.upsert(AgentDescriptor(id: "goose", name: "Goose", kind: .genericACP, command: "goose", args: ["acp"])) == nil)
+        model.setDefault(agentId: "goose")
+        #expect(AgentRegistryModel(store: store).data.resolvedDefault.id == "goose")
+        model.setEnabled(false, agentId: "goose")
+        #expect(model.data.defaultAgent == nil)
+        #expect(AgentRegistryModel(store: store).data.enabledAgents.map(\.id) == ["claude-code", "claude-direct"])
+        model.remove(agentId: "goose")
+        #expect(AgentRegistryModel(store: store).data.agents.isEmpty)
+    }
+
+    @Test("仅在缺 Node / 适配器且开启兜底时回退直连")
+    func fallbackRules() {
+        let model = SessionModel(workspace: URL(fileURLWithPath: "/tmp"), descriptor: .claudeCode)
+        var registry = AgentRegistryData()
+        #expect(model.shouldFallBackToDirect(error: AgentLaunchError.missingNode, descriptor: .claudeCode, registry: registry))
+        #expect(model.shouldFallBackToDirect(error: AgentLaunchError.missingAdapter, descriptor: .claudeCode, registry: registry))
+        #expect(!model.shouldFallBackToDirect(error: AgentLaunchError.missingClaude, descriptor: .claudeCode, registry: registry))
+        #expect(!model.shouldFallBackToDirect(error: AgentLaunchError.missingNode, descriptor: .claudeDirect, registry: registry))
+        #expect(!model.shouldFallBackToDirect(error: AgentLaunchError.missingNode, descriptor: AgentDescriptor(id: "g", name: "G", kind: .genericACP, command: "g"), registry: registry))
+        registry.directFallback = false
+        #expect(!model.shouldFallBackToDirect(error: AgentLaunchError.missingNode, descriptor: .claudeCode, registry: registry))
+    }
+
+    @Test("MCP 注入包含已启用的 Agent-as-MCP,Bridge 关闭时不启动")
+    func prepareServers() {
+        let model = SessionModel(workspace: URL(fileURLWithPath: "/tmp"), descriptor: .claudeCode)
+        var registry = AgentRegistryData()
+        registry.mcpAgents = [AgentMCPEntry(id: "codex", name: "Codex", command: "codex", args: ["mcp-server"], enabled: true),
+                              AgentMCPEntry(id: "off", name: "Off", command: "off", enabled: false)]
+        registry.bridge.enabled = false
+        let prepared = model.prepareMCPServers(registry: registry, environment: ["PATH": ""])
+        #expect(prepared.bridge == nil)
+        #expect(prepared.servers.count == 1)
+        #expect(prepared.servers.first == .stdio(name: "agent_codex", command: "codex", args: ["mcp-server"], env: [:]))
+    }
+
+    @Test("Bridge 的打开文件与选区工具作用于会话模型")
+    func bridgeTools() throws {
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("oma-bridge-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try "hello".write(to: dir.appendingPathComponent("a.txt"), atomically: true, encoding: .utf8)
+        let model = SessionModel(workspace: dir, descriptor: .claudeCode)
+        let opened = model.bridgeOpenFile(path: "a.txt", line: 2)
+        #expect(!opened.isError)
+        #expect(model.viewerRequest?.path == dir.appendingPathComponent("a.txt").path)
+        #expect(model.viewerRequest?.line == 2)
+        #expect(model.bridgeOpenFile(path: "missing.txt", line: nil).isError)
+        #expect(model.bridgeSelection().text.contains("没有选中"))
+        model.selectedText = "选中内容"
+        #expect(model.bridgeSelection().text == "选中内容")
+        #expect(model.bridgeNotify(title: "t", message: "m").isError)
+        var received: (String, String)?
+        model.notifier = { received = ($0, $1) }
+        #expect(!model.bridgeNotify(title: "t", message: "m").isError)
+        #expect(received?.0 == "t")
+    }
+}

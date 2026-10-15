@@ -1,6 +1,7 @@
 // @author ygw
 // 应用入口:每个 Workspace 一个窗口,每个窗口独占一个 Agent 子进程。
 
+import AgentHost
 import AppKit
 import ChatKit
 import DesignSystem
@@ -57,6 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let showDock = UserDefaults.standard.object(forKey: ClientPrefs.Key.showDock) as? Bool ?? true
         NSApp.setActivationPolicy(showDock ? .regular : .accessory)
+        BridgeServer.cleanStaleSockets()
         AppearanceModel.shared.applyAll()
         Task { await Toolchain.shared.setOverrides(ClientPrefs.pathOverrides()) }
         // 由脚本启动(open -g)时不抢占前台焦点

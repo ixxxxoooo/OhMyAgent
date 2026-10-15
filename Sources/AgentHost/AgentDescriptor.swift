@@ -53,6 +53,7 @@ public enum AgentLaunchError: Error, LocalizedError, Sendable {
     case missingAdapter
     case missingClaude
     case missingCommand(String)
+    case missingHelper(String)
 
     public var errorDescription: String? {
         switch self {
@@ -60,6 +61,7 @@ public enum AgentLaunchError: Error, LocalizedError, Sendable {
         case .missingAdapter: return "未找到 claude-agent-acp 适配器。请在设置 → 高级中指定路径,或运行 Scripts/install-adapter.sh。"
         case .missingClaude: return "未找到 claude 命令行工具。请先安装 Claude Code。"
         case .missingCommand(let name): return "Agent「\(name)」未配置可执行文件。"
+        case .missingHelper(let name): return "缺少随应用分发的辅助程序 \(name),请重新安装或运行 Scripts/bundle.sh。"
         }
     }
 }
@@ -82,7 +84,7 @@ public enum AgentProviders {
         switch descriptor.kind {
         case .claudeACP: return ClaudeACPProvider(descriptor: descriptor)
         case .genericACP: return GenericACPProvider(descriptor: descriptor)
-        case .claudeDirect: return ClaudeACPProvider(descriptor: descriptor)
+        case .claudeDirect: return ClaudeDirectProvider(descriptor: descriptor)
         }
     }
 }
@@ -127,7 +129,7 @@ public struct GenericACPProvider: AgentProvider {
     }
 
     /// 在 PATH 中解析可执行文件。
-    static func resolve(_ command: String, path: String) -> String? {
+    public static func resolve(_ command: String, path: String) -> String? {
         if command.hasPrefix("/") { return command }
         for dir in path.split(separator: ":") {
             let candidate = "\(dir)/\(command)"

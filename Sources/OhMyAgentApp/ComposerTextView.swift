@@ -96,6 +96,8 @@ struct ComposerTextView: NSViewRepresentable {
     var onBacktab: (() -> Void)?
     /// 文本或光标变化(未处于输入法组合态时)
     var onEdit: ((String, Int) -> Void)?
+    /// 选中文字变化(无选中为 nil)
+    var onSelectionText: ((String?) -> Void)?
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -152,6 +154,8 @@ struct ComposerTextView: NSViewRepresentable {
 
         func textViewDidChangeSelection(_ notification: Notification) {
             guard let textView, !textView.hasMarkedText() else { return }
+            let range = textView.selectedRange()
+            parent.onSelectionText?(range.length > 0 ? (textView.string as NSString).substring(with: range) : nil)
             parent.onEdit?(textView.string, textView.selectedRange().location)
         }
 

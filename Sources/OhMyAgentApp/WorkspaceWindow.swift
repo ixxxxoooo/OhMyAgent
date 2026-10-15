@@ -2,6 +2,7 @@
 // 工作区窗口:玻璃侧栏 + 时间线 + 浮动输入区。
 
 import ACPKit
+import AgentHost
 import ChatKit
 import DesignSystem
 import SwiftUI
@@ -17,7 +18,25 @@ struct WorkspaceWindow: View {
     /// - Parameter workspace: 工作区目录
     init(workspace: URL) {
         self.workspace = workspace
-        _model = State(initialValue: SessionModel(workspace: workspace))
+        _model = State(initialValue: Self.makeModel(workspace: workspace, descriptor: Toolchain.defaultDescriptor()))
+    }
+
+    /// 创建会话模型并接入应用层能力(系统通知)。
+    static func makeModel(workspace: URL, descriptor: AgentDescriptor) -> SessionModel {
+        let model = SessionModel(workspace: workspace, descriptor: descriptor)
+        model.notifier = { title, message in AppNotifier.send(title: title, message: message) }
+        return model
+    }
+
+    /// 窗口内切换 Agent:结束旧会话进程,用新描述符开始新会话。
+    private func switchAgent(to descriptor: AgentDescriptor) {
+        guard descriptor.id != model.descriptor.id else { return }
+        model.shutdown()
+        SessionRegistry.shared.unregister(model)
+        let next = Self.makeModel(workspace: workspace, descriptor: descriptor)
+        model = next
+        SessionRegistry.shared.register(next)
+        next.connect()
     }
 
     var body: some View {
@@ -37,7 +56,7 @@ struct WorkspaceWindow: View {
         }
         .navigationTitle(model.sessionTitle ?? model.workspace.lastPathComponent)
         .navigationSubtitle(model.workspace.abbreviatingHome)
-        .toolbar { WindowToolbar(model: model) }
+        .toolbar { WindowToolbar(model: model, switchAgent: switchAgent) }
         .frame(minWidth: 760, minHeight: 520)
         .onAppear { DiagnosticsStore.shared.markFirstFrame() }
         .task {
@@ -72,9 +91,13 @@ extension URL {
 /// 窗口工具栏:连接状态、用量、新对话。
 struct WindowToolbar: ToolbarContent {
     let model: SessionModel
+    let switchAgent: (AgentDescriptor) -> Void
     @Environment(\.openWindow) private var openWindow
 
     var body: some ToolbarContent {
+        ToolbarItem(placement: .primaryAction) {
+            AgentMenu(model: model, switchAgent: switchAgent)
+        }
         ToolbarItem(placement: .primaryAction) {
             ConnectionBadge(model: model)
         }
@@ -99,6 +122,31 @@ struct WindowToolbar: ToolbarContent {
             .keyboardShortcut(ShortcutStore.shared.shortcut(for: .newConversation))
             .disabled(model.phase != .ready)
         }
+    }
+}
+
+/// Agent 切换菜单:列出已启用的 Agent,切换会在当前窗口开始新会话。
+struct AgentMenu: View {
+    let model: SessionModel
+    let switchAgent: (AgentDescriptor) -> Void
+    private let registry = AgentRegistryModel.shared
+
+    var body: some View {
+        Menu {
+            ForEach(registry.data.enabledAgents) { agent in
+                Button {
+                    switchAgent(agent)
+                } label: {
+                    if agent.id == model.descriptor.id { Label(agent.name, systemImage: "checkmark") } else { Text(agent.name) }
+                }
+            }
+            Divider()
+            SettingsLink { Text("管理 Agent…") }
+        } label: {
+            Label(model.descriptor.name, systemImage: "person.crop.rectangle.stack")
+        }
+        .menuIndicator(.visible)
+        .help("切换 Agent(会在此窗口开始新会话)")
     }
 }
 

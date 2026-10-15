@@ -29,7 +29,8 @@ struct ComposerView: View {
                 isCompletionActive: { completion != nil && !items.isEmpty },
                 onCompletionKey: handleCompletionKey,
                 onBacktab: { model.cycleMode() },
-                onEdit: updateCompletion
+                onEdit: updateCompletion,
+                onSelectionText: { model.selectedText = $0 }
             )
             .frame(height: textHeight)
             HStack(spacing: 6) {

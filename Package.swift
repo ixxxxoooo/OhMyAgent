@@ -9,6 +9,8 @@ let package = Package(
     products: [
         .executable(name: "OhMyAgent", targets: ["OhMyAgentApp"]),
         .executable(name: "FakeAgent", targets: ["FakeAgent"]),
+        .executable(name: "DirectAgent", targets: ["DirectAgent"]),
+        .executable(name: "OhMyAgentBridge", targets: ["OhMyAgentBridge"]),
     ],
     targets: [
         // 协议层:JSON-RPC、ACP v1 模型、连接 actor
@@ -32,6 +34,10 @@ let package = Package(
         ),
         // 脚本化 ACP Agent,用于测试与预览
         .executableTarget(name: "FakeAgent", dependencies: ["ACPKit"]),
+        // 直连兜底 Agent(claude -p stream-json → ACP)
+        .executableTarget(name: "DirectAgent", dependencies: ["ACPKit", "AgentHost"]),
+        // Bridge 的 stdio ↔ Unix socket 垫片
+        .executableTarget(name: "OhMyAgentBridge"),
         // M0 spike
         .executableTarget(name: "ACPSpike", dependencies: ["ACPKit", "AgentHost"]),
         .executableTarget(name: "EditorSpike", dependencies: ["EditorKit"]),
