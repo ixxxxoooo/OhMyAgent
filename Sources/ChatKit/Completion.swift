@@ -1,0 +1,227 @@
+// @author ygw
+// 补全引擎:`/` 斜杠命令与 `@` 文件提及。解析触发上下文、模糊匹配打分、后台文件索引。
+
+import ACPKit
+import Foundation
+
+/// 补全触发类型。
+public enum CompletionTrigger: Sendable, Equatable {
+    case slash
+    case mention
+}
+
+/// 触发上下文:要被替换的范围与查询词。
+public struct CompletionContext: Sendable, Equatable {
+    public var trigger: CompletionTrigger
+    /// 需要被替换的 UTF-16 范围(含触发字符)
+    public var range: NSRange
+    /// 触发字符之后的查询词
+    public var query: String
+}
+
+/// 补全候选项。
+public struct CompletionItem: Identifiable, Sendable, Hashable {
+    public enum Kind: Sendable, Hashable { case agentCommand, localCommand, file }
+    public var id: String { "\(kind)-\(insertText)" }
+    public var kind: Kind
+    public var title: String
+    public var subtitle: String?
+    /// 接受后替换到文本中的内容
+    public var insertText: String
+}
+
+/// 模糊匹配打分:子序列匹配,前缀、词边界、连续命中加分,间隔扣分。
+public enum FuzzyMatcher {
+    /// - Parameters:
+    ///   - query: 查询词(大小写不敏感)
+    ///   - candidate: 候选文本
+    /// - Returns: 分数(越高越好);不匹配返回 nil
+    public static func score(query: String, candidate: String) -> Int? {
+        if query.isEmpty { return 0 }
+        let q = Array(query.lowercased())
+        let c = Array(candidate.lowercased())
+        let original = Array(candidate)
+        var score = 0
+        var qi = 0
+        var lastMatch = -2
+        for (ci, char) in c.enumerated() where qi < q.count && char == q[qi] {
+            var gain = 1
+            if ci == 0 { gain += 8 }
+            if ci > 0, "/_-. ".contains(original[ci - 1]) { gain += 5 }
+            if ci > 0, original[ci - 1].isLowercase, original[ci].isUppercase { gain += 4 }
+            if ci == lastMatch + 1 { gain += 4 } else if lastMatch >= 0 { gain -= min(3, ci - lastMatch - 1) }
+            score += gain
+            lastMatch = ci
+            qi += 1
+        }
+        guard qi == q.count else { return nil }
+        // 越短越相关
+        return score * 4 - min(c.count, 200) / 8
+    }
+}
+
+/// 补全引擎(纯函数部分)。
+public enum CompletionEngine {
+    /// 本地命令(由客户端实现,不发给 Agent)。
+    public static let localCommands: [CompletionItem] = [
+        CompletionItem(kind: .localCommand, title: "/new", subtitle: "开始新对话", insertText: "/new"),
+        CompletionItem(kind: .localCommand, title: "/clear", subtitle: "清空并开始新对话", insertText: "/clear"),
+    ]
+
+    /// 解析光标处的补全上下文。
+    /// - Parameters:
+    ///   - text: 输入框全文
+    ///   - cursor: 光标位置(UTF-16 偏移)
+    /// - Returns: 上下文;不在补全场景时为 nil
+    public static func context(text: String, cursor: Int) -> CompletionContext? {
+        let ns = text as NSString
+        guard cursor >= 0, cursor <= ns.length else { return nil }
+        let before = ns.substring(to: cursor)
+
+        // 斜杠命令:只在整条消息开头,且命令词内没有空白
+        if before.hasPrefix("/"), !before.dropFirst().contains(where: { $0.isWhitespace }) {
+            return CompletionContext(trigger: .slash, range: NSRange(location: 0, length: cursor), query: String(before.dropFirst()))
+        }
+
+        // @ 提及:最近的 @ 位于开头或空白之后,且其后到光标没有空白
+        guard let atIndex = before.lastIndex(of: "@") else { return nil }
+        let prefix = before[..<atIndex]
+        if let last = prefix.last, !last.isWhitespace { return nil }
+        let query = before[before.index(after: atIndex)...]
+        if query.contains(where: { $0.isWhitespace }) { return nil }
+        let location = (String(prefix) as NSString).length
+        return CompletionContext(trigger: .mention, range: NSRange(location: location, length: cursor - location), query: String(query))
+    }
+
+    /// 斜杠命令候选(本地命令 + Agent 命令)。
+    /// - Parameters:
+    ///   - query: 查询词(不含 `/`)
+    ///   - agentCommands: Agent 通告的命令
+    ///   - limit: 最大数量
+    public static func slashItems(query: String, agentCommands: [AvailableCommand], limit: Int = 12) -> [CompletionItem] {
+        var items = localCommands
+        for command in agentCommands where !items.contains(where: { $0.title == "/\(command.name)" }) {
+            let hint = command.inputHint.map { " <\($0)>" } ?? ""
+            items.append(CompletionItem(kind: .agentCommand, title: "/\(command.name)\(hint)", subtitle: command.description, insertText: "/\(command.name)"))
+        }
+        let scored = items.compactMap { item -> (CompletionItem, Int)? in
+            let name = String(item.insertText.dropFirst())
+            guard let score = FuzzyMatcher.score(query: query, candidate: name) else { return nil }
+            return (item, score)
+        }
+        return scored.sorted { $0.1 > $1.1 }.prefix(limit).map(\.0)
+    }
+
+    /// 文本中的 `@路径` 提及,解析为工作区内真实存在的文件。
+    /// - Parameters:
+    ///   - text: 用户输入
+    ///   - workspace: 工作区目录
+    /// - Returns: 去重后的文件 URL 列表(按出现顺序)
+    public static func mentionedFiles(in text: String, workspace: URL) -> [URL] {
+        var result: [URL] = []
+        var seen = Set<String>()
+        let words = text.split(whereSeparator: { $0.isWhitespace })
+        for word in words where word.hasPrefix("@") {
+            var path = String(word.dropFirst())
+            while let last = path.last, ",.;:!?)）。，；：！？".contains(last), !FileManager.default.fileExists(atPath: workspace.appendingPathComponent(path).path) {
+                path.removeLast()
+            }
+            guard !path.isEmpty else { continue }
+            let url = path.hasPrefix("/") ? URL(fileURLWithPath: path) : workspace.appendingPathComponent(path)
+            var isDirectory: ObjCBool = false
+            if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory), !isDirectory.boolValue, seen.insert(url.path).inserted {
+                result.append(url)
+            }
+        }
+        return result
+    }
+}
+
+/// 工作区文件索引:后台枚举一次,之后查询只在内存中打分。
+public actor FileIndex {
+    private var paths: [String] = []
+    private var root: URL?
+    private var building: Task<Void, Never>?
+
+    /// 默认忽略的目录名。
+    static let ignoredDirectories: Set<String> = [
+        ".git", "node_modules", ".build", "build", "DerivedData", "Pods", ".venv", "venv", "__pycache__",
+        "dist", ".next", ".gradle", ".idea", ".swiftpm", "target", "Carthage",
+    ]
+    static let maxFiles = 60_000
+
+    public init() {}
+
+    /// 为工作区建立索引(幂等;根目录变化时重建)。
+    /// - Parameter root: 工作区目录
+    public func prepare(root: URL) {
+        if self.root == root, building != nil { return }
+        self.root = root
+        paths = []
+        building = Task.detached(priority: .utility) { [weak self] in
+            let found = Self.enumerate(root: root)
+            await self?.finish(found, for: root)
+        }
+    }
+
+    /// 强制重建。
+    public func invalidate() {
+        building?.cancel()
+        building = nil
+        if let root { prepare(root: root) }
+    }
+
+    private func finish(_ found: [String], for root: URL) {
+        guard self.root == root else { return }
+        paths = found
+    }
+
+    /// 等待索引完成(测试与首次查询使用)。
+    public func waitUntilReady() async {
+        await building?.value
+    }
+
+    /// 查询。
+    /// - Parameters:
+    ///   - query: 查询词(为空时返回浅层文件)
+    ///   - limit: 数量上限
+    /// - Returns: 相对路径,按相关度排序
+    public func search(_ query: String, limit: Int = 30) -> [String] {
+        if query.isEmpty {
+            return paths.sorted { ($0.filter { $0 == "/" }.count, $0) < ($1.filter { $0 == "/" }.count, $1) }.prefix(limit).map { $0 }
+        }
+        var scored: [(String, Int)] = []
+        for path in paths {
+            let name = (path as NSString).lastPathComponent
+            // 文件名命中权重更高
+            if let nameScore = FuzzyMatcher.score(query: query, candidate: name) {
+                scored.append((path, nameScore + 40))
+            } else if let pathScore = FuzzyMatcher.score(query: query, candidate: path) {
+                scored.append((path, pathScore))
+            }
+        }
+        return scored.sorted { $0.1 != $1.1 ? $0.1 > $1.1 : $0.0 < $1.0 }.prefix(limit).map(\.0)
+    }
+
+    /// 同步枚举(在后台线程调用)。
+    nonisolated static func enumerate(root: URL) -> [String] {
+        let keys: [URLResourceKey] = [.isDirectoryKey, .isRegularFileKey]
+        guard let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles, .skipsPackageDescendants]) else { return [] }
+        var result: [String] = []
+        let rootPath = root.standardizedFileURL.path
+        for case let url as URL in enumerator {
+            if Task.isCancelled { break }
+            let name = url.lastPathComponent
+            let values = try? url.resourceValues(forKeys: Set(keys))
+            if values?.isDirectory == true {
+                if ignoredDirectories.contains(name) { enumerator.skipDescendants() }
+                continue
+            }
+            guard values?.isRegularFile == true else { continue }
+            let full = url.standardizedFileURL.path
+            if full.hasPrefix(rootPath + "/") { result.append(String(full.dropFirst(rootPath.count + 1))) }
+            if result.count >= maxFiles { break }
+        }
+        return result
+    }
+}

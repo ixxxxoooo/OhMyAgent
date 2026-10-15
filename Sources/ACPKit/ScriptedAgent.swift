@@ -64,13 +64,13 @@ public actor ScriptedAgent: ACPRequestHandler {
             return [
                 "protocolVersion": 1,
                 "agentCapabilities": [
-                    "loadSession": false,
+                    "loadSession": true,
                     "promptCapabilities": ["image": true, "embeddedContext": true],
                     "mcpCapabilities": ["http": true, "sse": false],
-                    "sessionCapabilities": ["list": .object([:]), "close": .object([:]), "resume": .object([:])],
+                    "sessionCapabilities": ["list": .object([:]), "close": .object([:]), "resume": .object([:]), "fork": .object([:]), "delete": .object([:])],
                 ],
                 "agentInfo": ["name": "scripted-agent", "title": "Scripted Agent", "version": "0.1.0"],
-                "authMethods": [],
+                "authMethods": [["id": "fake-login", "name": "模拟登录", "description": "测试用"]],
             ]
         case "session/new":
             sessionCounter += 1
@@ -81,8 +81,34 @@ public actor ScriptedAgent: ACPRequestHandler {
             Task { await self.sendCommands(sessionId: id) }
             return ["sessionId": .string(id), "configOptions": configOptions(sessionId: id)]
         case "session/list":
-            let list = sessions.map { (id, cwd) -> JSONValue in ["sessionId": .string(id), "cwd": .string(cwd), "title": .string("脚本会话 \(id)")] }
+            let list = sessions.keys.sorted().map { id -> JSONValue in ["sessionId": .string(id), "cwd": .string(sessions[id] ?? "/"), "title": .string("脚本会话 \(id)"), "updatedAt": "2026-10-16T01:00:00Z"] }
             return ["sessions": .array(list)]
+        case "authenticate", "logout":
+            return .object([:])
+        case "session/load", "session/resume":
+            guard let id = p["sessionId"]?.stringValue else {
+                throw JSONRPCError(code: JSONRPCError.invalidParams, message: "缺少 sessionId")
+            }
+            sessions[id] = p["cwd"]?.stringValue ?? sessions[id] ?? "/"
+            modes[id] = modes[id] ?? "default"
+            models[id] = models[id] ?? "scripted-1"
+            if method == "session/load" {
+                // 回放历史
+                await update(id, ["sessionUpdate": "user_message_chunk", "content": ["type": "text", "text": .string("历史问题 \(id)")]])
+                await update(id, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": "历史"]])
+                await update(id, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": "回答"]])
+            }
+            return ["configOptions": configOptions(sessionId: id)]
+        case "session/fork":
+            sessionCounter += 1
+            let id = "scripted-\(sessionCounter)"
+            sessions[id] = p["cwd"]?.stringValue ?? "/"
+            modes[id] = "default"
+            models[id] = "scripted-1"
+            return ["sessionId": .string(id), "configOptions": configOptions(sessionId: id)]
+        case "session/delete":
+            if let id = p["sessionId"]?.stringValue { sessions[id] = nil }
+            return .object([:])
         case "session/close":
             if let id = p["sessionId"]?.stringValue { cancelled.insert(id); sessions[id] = nil }
             return .object([:])

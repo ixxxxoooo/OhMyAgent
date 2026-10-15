@@ -5,15 +5,54 @@
 import AppKit
 import SwiftUI
 
+/// 补全弹层的按键。
+enum CompletionKey { case up, down, accept, dismiss }
+
+/// 输入框控制器:让外部(补全弹层)替换文本。
+@MainActor
+final class ComposerController {
+    weak var textView: SubmitTextView?
+
+    /// 替换指定范围的文本,光标落在替换内容之后。
+    /// - Parameters:
+    ///   - range: UTF-16 范围
+    ///   - string: 新文本
+    func replace(range: NSRange, with string: String) {
+        guard let textView, NSMaxRange(range) <= (textView.string as NSString).length else { return }
+        textView.window?.makeFirstResponder(textView)
+        textView.insertText(string, replacementRange: range)
+    }
+}
+
 /// 提交型文本视图。
 final class SubmitTextView: NSTextView {
     var onSubmit: (() -> Void)?
     var onEscape: (() -> Void)?
+    /// 补全弹层是否可见(可见时拦截方向键/Return/Tab/Esc)
+    var isCompletionActive: () -> Bool = { false }
+    var onCompletionKey: ((CompletionKey) -> Void)?
+    /// Shift+Tab
+    var onBacktab: (() -> Void)?
     var placeholder: String = "" { didSet { needsDisplay = true } }
 
     override func keyDown(with event: NSEvent) {
         let isReturn = event.keyCode == 36 || event.keyCode == 76
         let modifiers = event.modifierFlags.intersection([.shift, .option, .control, .command])
+        if !hasMarkedText() {
+            if isCompletionActive(), modifiers.isEmpty {
+                switch event.keyCode {
+                case 126: onCompletionKey?(.up); return
+                case 125: onCompletionKey?(.down); return
+                case 36, 76, 48: onCompletionKey?(.accept); return
+                case 53: onCompletionKey?(.dismiss); return
+                default: break
+                }
+            }
+            if event.keyCode == 48, modifiers == [.shift], let onBacktab {
+                onBacktab()
+                return
+            }
+        }
         if isReturn, !hasMarkedText() {
             if modifiers.isEmpty {
                 onSubmit?()
@@ -51,6 +90,12 @@ struct ComposerTextView: NSViewRepresentable {
     var maxHeight: CGFloat = 220
     var onSubmit: () -> Void
     var onEscape: (() -> Void)?
+    var controller: ComposerController?
+    var isCompletionActive: () -> Bool = { false }
+    var onCompletionKey: ((CompletionKey) -> Void)?
+    var onBacktab: (() -> Void)?
+    /// 文本或光标变化(未处于输入法组合态时)
+    var onEdit: ((String, Int) -> Void)?
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -72,7 +117,11 @@ struct ComposerTextView: NSViewRepresentable {
         textView.placeholder = placeholder
         textView.onSubmit = { [coordinator = context.coordinator] in coordinator.parent.onSubmit() }
         textView.onEscape = { [coordinator = context.coordinator] in coordinator.parent.onEscape?() }
+        textView.isCompletionActive = { [coordinator = context.coordinator] in coordinator.parent.isCompletionActive() }
+        textView.onCompletionKey = { [coordinator = context.coordinator] key in coordinator.parent.onCompletionKey?(key) }
+        textView.onBacktab = { [coordinator = context.coordinator] in coordinator.parent.onBacktab?() }
         textView.setAccessibilityLabel("消息输入框")
+        controller?.textView = textView
 
         let scrollView = NSScrollView()
         scrollView.drawsBackground = false
@@ -100,6 +149,11 @@ struct ComposerTextView: NSViewRepresentable {
         weak var textView: SubmitTextView?
 
         init(_ parent: ComposerTextView) { self.parent = parent }
+
+        func textViewDidChangeSelection(_ notification: Notification) {
+            guard let textView, !textView.hasMarkedText() else { return }
+            parent.onEdit?(textView.string, textView.selectedRange().location)
+        }
 
         func textDidChange(_ notification: Notification) {
             guard let textView else { return }

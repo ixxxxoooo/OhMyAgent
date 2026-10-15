@@ -317,3 +317,146 @@ struct M3ScenarioTests {
         model.shutdown()
     }
 }
+
+@MainActor
+@Suite("M4:补全引擎")
+struct CompletionTests {
+    @Test("斜杠只在消息开头触发,@ 需位于开头或空白之后")
+    func contexts() {
+        #expect(CompletionEngine.context(text: "/re", cursor: 3)?.trigger == .slash)
+        #expect(CompletionEngine.context(text: "/re", cursor: 3)?.query == "re")
+        #expect(CompletionEngine.context(text: "你好 /re", cursor: 6) == nil)
+        #expect(CompletionEngine.context(text: "/review 文件", cursor: 11) == nil)
+        let mention = CompletionEngine.context(text: "看看 @src/ma", cursor: 10)
+        #expect(mention?.trigger == .mention)
+        #expect(mention?.query == "src/ma")
+        #expect(mention?.range == NSRange(location: 3, length: 7))
+        #expect(CompletionEngine.context(text: "a@b", cursor: 3) == nil)
+        #expect(CompletionEngine.context(text: "@a b", cursor: 4) == nil)
+    }
+
+    @Test("模糊匹配:子序列、前缀与词边界优先")
+    func fuzzy() {
+        #expect(FuzzyMatcher.score(query: "xyz", candidate: "abc") == nil)
+        let prefix = FuzzyMatcher.score(query: "ma", candidate: "main.swift")!
+        let scattered = FuzzyMatcher.score(query: "ma", candidate: "zzzmzzza.swift")!
+        #expect(prefix > scattered)
+        #expect(FuzzyMatcher.score(query: "tv", candidate: "TimelineView.swift") != nil)
+        #expect(FuzzyMatcher.score(query: "", candidate: "任意") == 0)
+    }
+
+    @Test("斜杠候选合并本地命令与 Agent 命令并按相关度排序")
+    func slashItems() {
+        let commands = [AvailableCommand(name: "review", description: "代码审查", inputHint: nil), AvailableCommand(name: "compact", description: "压缩", inputHint: "说明")]
+        let all = CompletionEngine.slashItems(query: "", agentCommands: commands)
+        #expect(all.count == 4)
+        #expect(CompletionEngine.slashItems(query: "rev", agentCommands: commands).first?.insertText == "/review")
+        #expect(CompletionEngine.slashItems(query: "zzz", agentCommands: commands).isEmpty)
+    }
+
+    @Test("文件索引忽略构建目录,按文件名优先检索")
+    func fileIndex() async throws {
+        let ws = try M3ScenarioTests.tempWorkspace()
+        defer { try? FileManager.default.removeItem(at: ws) }
+        let fm = FileManager.default
+        for dir in ["Sources/App", "node_modules/x", ".git"] { try fm.createDirectory(at: ws.appendingPathComponent(dir), withIntermediateDirectories: true) }
+        for file in ["Sources/App/main.swift", "Sources/App/Timeline.swift", "node_modules/x/main.js", ".git/config", "README.md"] {
+            try "x".write(to: ws.appendingPathComponent(file), atomically: true, encoding: .utf8)
+        }
+        let index = FileIndex()
+        await index.prepare(root: ws)
+        await index.waitUntilReady()
+        let all = await index.search("")
+        #expect(Set(all) == ["README.md", "Sources/App/main.swift", "Sources/App/Timeline.swift"])
+        #expect(await index.search("main").first == "Sources/App/main.swift")
+        #expect(await index.search("tl").first == "Sources/App/Timeline.swift")
+    }
+
+    @Test("解析消息里真实存在的 @ 文件,忽略不存在与目录,去掉尾部标点")
+    func mentions() throws {
+        let ws = try M3ScenarioTests.tempWorkspace()
+        defer { try? FileManager.default.removeItem(at: ws) }
+        try "x".write(to: ws.appendingPathComponent("a.txt"), atomically: true, encoding: .utf8)
+        try FileManager.default.createDirectory(at: ws.appendingPathComponent("dir"), withIntermediateDirectories: true)
+        let files = CompletionEngine.mentionedFiles(in: "看 @a.txt, 还有 @none.txt @dir @a.txt", workspace: ws)
+        #expect(files.map(\.lastPathComponent) == ["a.txt"])
+    }
+}
+
+@MainActor
+@Suite("M4:历史会话与鉴权")
+struct HistoryTests {
+    @Test("历史列表、打开(回放)、分叉、删除")
+    func historyFlow() async throws {
+        let ws = try M3ScenarioTests.tempWorkspace()
+        defer { try? FileManager.default.removeItem(at: ws) }
+        let model = try await M3ScenarioTests.readyModel(workspace: ws)
+        #expect(model.capabilities.loadSession)
+        let first = try #require(model.sessionId)
+        #expect(await SessionModelTests.wait { model.history.contains { $0.sessionId == first } })
+
+        model.send("第一条")
+        #expect(await SessionModelTests.wait { !model.isRunning && model.timeline.entries.contains { $0.kind == .assistant } })
+
+        // 分叉:切到新会话并出现在历史中
+        model.forkCurrentSession()
+        #expect(await SessionModelTests.wait { model.sessionId != first && model.sessionId != nil })
+        let forked = try #require(model.sessionId)
+        #expect(await SessionModelTests.wait { model.history.contains { $0.sessionId == forked } })
+
+        // 打开第一个会话:时间线被回放内容替换
+        let summary = try #require(model.history.first { $0.sessionId == first })
+        model.openSession(summary)
+        #expect(await SessionModelTests.wait { !model.isReplaying && model.sessionId == first })
+        #expect(model.timeline.entries.first?.kind == .user)
+        #expect(model.timeline.entries.contains { $0.kind == .assistant && $0.text.contains("历史回答") })
+        #expect(model.timeline.entries.allSatisfy { !$0.isStreaming })
+
+        // 删除分叉出的会话
+        let forkSummary = try #require(model.history.first { $0.sessionId == forked })
+        model.deleteSession(forkSummary)
+        #expect(await SessionModelTests.wait { !model.history.contains { $0.sessionId == forked } })
+        model.shutdown()
+    }
+
+    @Test("@ 提及作为 resource_link 发送,本地命令 /new 不发给 Agent")
+    func mentionAndLocalCommand() async throws {
+        let ws = try M3ScenarioTests.tempWorkspace()
+        defer { try? FileManager.default.removeItem(at: ws) }
+        try "x".write(to: ws.appendingPathComponent("a.txt"), atomically: true, encoding: .utf8)
+        let model = try await M3ScenarioTests.readyModel(workspace: ws)
+        model.send("看看 @a.txt")
+        #expect(await SessionModelTests.wait { !model.isRunning && model.timeline.entries.contains { $0.kind == .assistant } })
+        let before = try #require(model.sessionId)
+        model.send("/new")
+        #expect(await SessionModelTests.wait { model.sessionId != before && model.sessionId != nil })
+        #expect(model.timeline.entries.isEmpty)
+        model.shutdown()
+    }
+
+    @Test("补全候选:斜杠含 Agent 命令,@ 返回工作区文件")
+    func completionItems() async throws {
+        let ws = try M3ScenarioTests.tempWorkspace()
+        defer { try? FileManager.default.removeItem(at: ws) }
+        try "x".write(to: ws.appendingPathComponent("hello.txt"), atomically: true, encoding: .utf8)
+        let model = try await M3ScenarioTests.readyModel(workspace: ws)
+        let slash = await model.completionItems(for: CompletionContext(trigger: .slash, range: NSRange(location: 0, length: 1), query: ""))
+        #expect(slash.contains { $0.insertText == "/new" })
+        await model.fileIndex.prepare(root: ws)
+        await model.fileIndex.waitUntilReady()
+        let files = await model.completionItems(for: CompletionContext(trigger: .mention, range: NSRange(location: 0, length: 1), query: "hel"))
+        #expect(files.first?.insertText == "@hello.txt ")
+        model.shutdown()
+    }
+
+    @Test("鉴权方式来自 initialize,可发起登录")
+    func auth() async throws {
+        let ws = try M3ScenarioTests.tempWorkspace()
+        defer { try? FileManager.default.removeItem(at: ws) }
+        let model = try await M3ScenarioTests.readyModel(workspace: ws)
+        let method = try #require(model.authMethods.first)
+        model.authenticate(method)
+        #expect(await SessionModelTests.wait { model.timeline.entries.contains { $0.text.contains("已通过") } })
+        model.shutdown()
+    }
+}

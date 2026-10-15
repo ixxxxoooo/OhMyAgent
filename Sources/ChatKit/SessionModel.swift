@@ -205,6 +205,15 @@ public final class SessionModel {
     /// 终端会话(按终端 ID)
     public private(set) var terminals: [String: TerminalSession] = [:]
     public private(set) var sessionId: String?
+    /// 当前工作区的历史会话(来自 `session/list`)
+    public private(set) var history: [SessionSummary] = []
+    /// Agent 能力与鉴权方式
+    public private(set) var capabilities = AgentCapabilities()
+    public private(set) var authMethods: [AuthMethod] = []
+    /// 正在回放历史会话
+    public private(set) var isReplaying = false
+    /// 工作区文件索引(供 @ 补全)
+    public let fileIndex = FileIndex()
     /// 最近的 stderr 行(诊断用,最多 200 行)
     public private(set) var diagnostics: [String] = []
     /// 连接完成后自动发送的排队消息
@@ -283,6 +292,7 @@ public final class SessionModel {
                 self.configOptions = setup.configOptions
                 self.phase = .ready
                 self.connectTask = nil
+                self.refreshHistory()
                 self.flushQueuedPrompt()
             } catch {
                 await supervisor.stop()
@@ -308,6 +318,8 @@ public final class SessionModel {
         self.supervisor = supervisor
         self.client = client
         agentName = result.agentTitle ?? result.agentName
+        capabilities = result.capabilities
+        authMethods = result.authMethods
         let coalescer = EventCoalescer()
         self.coalescer = coalescer
         // 后台:读取事件并合并
@@ -338,6 +350,11 @@ public final class SessionModel {
     public func send(_ text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !isRunning else { return }
+        // 本地命令不发给 Agent
+        if trimmed == "/new" || trimmed == "/clear" {
+            newConversation()
+            return
+        }
         switch phase {
         case .ready:
             start(prompt: trimmed)
@@ -365,6 +382,10 @@ public final class SessionModel {
 
     private func start(prompt: String) {
         guard let client, let sessionId else { return }
+        var blocks: [ContentBlock] = [.text(prompt)]
+        for url in CompletionEngine.mentionedFiles(in: prompt, workspace: workspace) {
+            blocks.append(.resourceLink(uri: url.absoluteString, name: url.lastPathComponent, mimeType: nil, title: nil))
+        }
         timeline.appendUser(prompt)
         turnNumber += 1
         turnChanges.removeAll()
@@ -372,7 +393,7 @@ public final class SessionModel {
         isRunning = true
         promptTask = Task { [weak self] in
             do {
-                let reason = try await client.prompt(sessionId: sessionId, content: [.text(prompt)])
+                let reason = try await client.prompt(sessionId: sessionId, content: blocks)
                 self?.finishTurn(reason: reason, error: nil)
             } catch {
                 self?.finishTurn(reason: nil, error: error)
@@ -389,7 +410,13 @@ public final class SessionModel {
             guard let self else { return }
             self.timeline.finishStreaming()
             if let error {
-                if !self.isShuttingDown { self.timeline.appendNotice("请求失败:\(error.localizedDescription)", isError: true) }
+                if !self.isShuttingDown {
+                    if let rpc = error as? JSONRPCError, rpc.code == -32000 {
+                        self.timeline.appendNotice("需要登录后才能继续:请在侧栏「账号」中选择登录方式。", isError: true)
+                    } else {
+                        self.timeline.appendNotice("请求失败:\(error.localizedDescription)", isError: true)
+                    }
+                }
             } else if reason == .refusal {
                 self.timeline.appendNotice("模型拒绝了该请求。")
             } else if reason == .maxTokens {
@@ -400,6 +427,7 @@ public final class SessionModel {
             self.publishTurnChanges()
             self.isRunning = false
             self.promptTask = nil
+            self.refreshHistory()
         }
     }
 
@@ -430,6 +458,139 @@ public final class SessionModel {
                 self?.timeline.appendNotice("创建新对话失败:\(error.localizedDescription)", isError: true)
             }
         }
+    }
+
+    // MARK: - 历史会话
+
+    /// 刷新当前工作区的历史会话列表。
+    public func refreshHistory() {
+        guard let client, capabilities.canList else { return }
+        let cwd = workspace.path
+        Task { [weak self] in
+            guard let result = try? await client.listSessions(cwd: cwd) else { return }
+            let sorted = result.sessions.sorted { ($0.updatedAt ?? "") > ($1.updatedAt ?? "") }
+            self?.history = sorted
+        }
+    }
+
+    /// 打开历史会话:优先 `session/load`(回放历史),否则 `session/resume`。
+    /// - Parameter summary: 会话摘要
+    public func openSession(_ summary: SessionSummary) {
+        guard let client, phase == .ready, summary.sessionId != sessionId, capabilities.loadSession || capabilities.canResume else { return }
+        cancel()
+        timeline.reset()
+        turnChanges.removeAll()
+        turnChangeOrder.removeAll()
+        Task { await checkpoints.reset() }
+        sessionTitle = summary.title
+        usage = nil
+        sessionId = summary.sessionId
+        isReplaying = true
+        let cwd = workspace.path
+        let canLoad = capabilities.loadSession
+        Task { [weak self] in
+            do {
+                let setup = canLoad
+                    ? try await client.loadSession(sessionId: summary.sessionId, cwd: cwd)
+                    : try await client.resumeSession(sessionId: summary.sessionId, cwd: cwd)
+                self?.configOptions = setup.configOptions.isEmpty ? (self?.configOptions ?? []) : setup.configOptions
+            } catch {
+                self?.timeline.appendNotice("打开会话失败:\(error.localizedDescription)", isError: true)
+            }
+            await self?.settleEvents()
+            self?.timeline.finishStreaming()
+            self?.isReplaying = false
+        }
+    }
+
+    /// 分叉当前会话,并切换到分叉出的新会话。
+    public func forkCurrentSession() {
+        guard let client, let sessionId, capabilities.canFork, !isRunning else { return }
+        let cwd = workspace.path
+        Task { [weak self] in
+            do {
+                let setup = try await client.forkSession(sessionId: sessionId, cwd: cwd)
+                self?.sessionId = setup.sessionId
+                self?.timeline.appendNotice("已从此处分叉出新会话,后续对话不会影响原会话。")
+                if !setup.configOptions.isEmpty { self?.configOptions = setup.configOptions }
+                self?.refreshHistory()
+            } catch {
+                self?.timeline.appendNotice("分叉失败:\(error.localizedDescription)", isError: true)
+            }
+        }
+    }
+
+    /// 删除历史会话。
+    /// - Parameter summary: 会话摘要
+    public func deleteSession(_ summary: SessionSummary) {
+        guard let client, capabilities.canDelete, summary.sessionId != sessionId else { return }
+        Task { [weak self] in
+            try? await client.deleteSession(sessionId: summary.sessionId)
+            self?.refreshHistory()
+        }
+    }
+
+    /// 让已到达但尚在合并窗口中的事件先落入时间线。
+    private func settleEvents() async {
+        coalescer?.flush()
+        try? await Task.sleep(for: .milliseconds(40))
+    }
+
+    // MARK: - 鉴权
+
+    /// 使用指定方式登录。
+    /// - Parameter method: 鉴权方式
+    public func authenticate(_ method: AuthMethod) {
+        guard let client else { return }
+        Task { [weak self] in
+            do {
+                try await client.authenticate(methodId: method.id)
+                self?.timeline.appendNotice("已通过「\(method.name)」完成登录。")
+            } catch {
+                self?.timeline.appendNotice("登录失败:\(error.localizedDescription)", isError: true)
+            }
+        }
+    }
+
+    /// 退出登录(Agent 需支持)。
+    public func logout() {
+        guard let client else { return }
+        Task { [weak self] in
+            do {
+                try await client.logout()
+                self?.timeline.appendNotice("已退出登录。")
+            } catch {
+                self?.timeline.appendNotice("退出登录失败:\(error.localizedDescription)", isError: true)
+            }
+        }
+    }
+
+    // MARK: - 补全
+
+    /// 计算补全候选。
+    /// - Parameter context: 补全上下文
+    /// - Returns: 候选项
+    public func completionItems(for context: CompletionContext) async -> [CompletionItem] {
+        switch context.trigger {
+        case .slash:
+            return CompletionEngine.slashItems(query: context.query, agentCommands: availableCommands)
+        case .mention:
+            await fileIndex.prepare(root: workspace)
+            await fileIndex.waitUntilReady()
+            let paths = await fileIndex.search(context.query)
+            return paths.map { path in
+                CompletionItem(kind: .file, title: (path as NSString).lastPathComponent,
+                               subtitle: (path as NSString).deletingLastPathComponent, insertText: "@\(path) ")
+            }
+        }
+    }
+
+    /// 循环切换模式(Shift+Tab)。
+    public func cycleMode() {
+        guard let option = option(category: "mode"), option.options.count > 1 else { return }
+        let current = option.currentValue.stringValue
+        let index = option.options.firstIndex { $0.value == current } ?? -1
+        setConfigOption(option.id, value: option.options[(index + 1) % option.options.count].value)
     }
 
     // MARK: - 配置选项

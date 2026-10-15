@@ -1,6 +1,7 @@
 // @author ygw
 // 工作区窗口:玻璃侧栏 + 时间线 + 浮动输入区。
 
+import ACPKit
 import ChatKit
 import DesignSystem
 import SwiftUI
@@ -36,6 +37,8 @@ struct WorkspaceWindow: View {
             SessionRegistry.shared.register(model)
             // 首帧之后后台预热连接,首次发送时通常已就绪
             model.connect()
+            // 调试钩子:预置输入框内容(用于不抢焦点的界面验证)
+            if let draft = ProcessInfo.processInfo.environment["OMA_DRAFT"], !draft.isEmpty { model.draft = draft }
         }
         .onDisappear {
             model.shutdown()
@@ -60,9 +63,8 @@ struct WindowToolbar: ToolbarContent {
             ConnectionBadge(model: model)
         }
         ToolbarItem(placement: .primaryAction) {
-            if let usage = model.usage, let used = usage.used, let size = usage.size, size > 0 {
-                UsageRing(fraction: Double(used) / Double(size))
-                    .help("上下文已用 \(used) / \(size) tokens")
+            if let usage = model.usage, usage.used != nil || usage.costAmount != nil {
+                UsageButton(usage: usage)
             }
         }
         ToolbarItem(placement: .primaryAction) {
@@ -119,5 +121,44 @@ struct UsageRing: View {
         }
         .frame(width: 16, height: 16)
         .accessibilityLabel("上下文用量 \(Int(fraction * 100))%")
+    }
+}
+
+/// 用量按钮:点击弹出上下文占用与费用详情。
+struct UsageButton: View {
+    let usage: UsageUpdate
+    @State private var shown = false
+
+    private var fraction: Double {
+        guard let used = usage.used, let size = usage.size, size > 0 else { return 0 }
+        return Double(used) / Double(size)
+    }
+
+    var body: some View {
+        Button { shown.toggle() } label: {
+            if usage.size != nil { UsageRing(fraction: fraction) } else { Image(systemName: "gauge.with.needle") }
+        }
+        .help("用量详情")
+        .popover(isPresented: $shown, arrowEdge: .bottom) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("会话用量").font(OMFonts.title)
+                if let used = usage.used {
+                    if let size = usage.size, size > 0 {
+                        ProgressView(value: min(fraction, 1))
+                        Text("上下文 \(used.formatted()) / \(size.formatted()) tokens(\(Int(fraction * 100))%)").font(OMFonts.small)
+                    } else {
+                        Text("已用 \(used.formatted()) tokens").font(OMFonts.small)
+                    }
+                }
+                if let cost = usage.costAmount {
+                    Text("累计费用 \(cost.formatted(.number.precision(.fractionLength(2...4)))) \(usage.costCurrency ?? "USD")").font(OMFonts.small)
+                }
+                Text("数据来自 Agent 上报,订阅账号可能不显示费用。")
+                    .font(OMFonts.caption)
+                    .foregroundStyle(OMColors.secondaryText)
+            }
+            .padding(14)
+            .frame(width: 260, alignment: .leading)
+        }
     }
 }
