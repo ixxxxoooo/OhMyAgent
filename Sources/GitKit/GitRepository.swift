@@ -27,6 +27,41 @@ public struct GitRepository: Sendable {
         return top.isEmpty ? nil : GitRepository(root: URL(fileURLWithPath: top))
     }
 
+    /// 在目录里初始化新仓库(默认分支 main)。
+    /// - Parameter directory: 目标目录(必须存在)
+    public static func initialize(at directory: String) async throws -> GitRepository {
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: directory, isDirectory: &isDir), isDir.boolValue else {
+            throw GitError.invalidArgument("目录不存在:\(directory)")
+        }
+        let url = URL(fileURLWithPath: directory)
+        let output = try await GitProcess.run(["init", "-b", "main"], in: url, timeout: 15)
+        guard output.status == 0 else {
+            throw GitError.commandFailed(command: "init", status: output.status, message: output.stderr.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        guard let repo = await discover(from: directory) else { throw GitError.notARepository(directory) }
+        return repo
+    }
+
+    /// 解析符号链接后的真实路径(`/tmp` → `/private/tmp`)。路径不存在时解析其父目录再拼回文件名。
+    public static func realPath(_ path: String) -> String {
+        if let resolved = realpath(path, nil) {
+            defer { free(resolved) }
+            return String(cString: resolved)
+        }
+        let parent = (path as NSString).deletingLastPathComponent
+        guard !parent.isEmpty, parent != path else { return path }
+        return (realPath(parent) as NSString).appendingPathComponent((path as NSString).lastPathComponent)
+    }
+
+    /// 绝对路径相对于仓库根的路径;不在仓库内返回 nil(两侧都先解析符号链接)。
+    public func relativePath(of absolute: String) -> String? {
+        let rootPath = Self.realPath(root.path)
+        let real = Self.realPath(absolute)
+        guard real.hasPrefix(rootPath + "/") else { return nil }
+        return String(real.dropFirst(rootPath.count + 1))
+    }
+
     // MARK: 内部执行
 
     @discardableResult

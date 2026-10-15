@@ -259,3 +259,44 @@ struct GitRepositoryTests {
         #expect(try await f.repo.fileDiff(path: "bin.dat") == nil)
     }
 }
+
+@Suite("路径解析")
+struct GitPathTests {
+    @Test("符号链接路径与不存在的文件都能换算为仓库相对路径")
+    func relative() async throws {
+        let f = try await Fixture.make()
+        defer { f.cleanup() }
+        try f.write("sub/a.txt", "x")
+        #expect(f.repo.relativePath(of: f.root.path + "/sub/a.txt") == "sub/a.txt")
+        #expect(f.repo.relativePath(of: f.root.path + "/sub/gone.txt") == "sub/gone.txt")  // 已删除文件
+        #expect(f.repo.relativePath(of: "/etc/hosts") == nil)
+        // 用 /var 写法(符号链接)也应得到同一结果
+        let viaSymlink = f.root.path.replacingOccurrences(of: "/private", with: "", options: .anchored)
+        #expect(f.repo.relativePath(of: viaSymlink + "/sub/a.txt") == "sub/a.txt")
+    }
+}
+
+@Suite("git 子进程")
+struct GitProcessTests {
+    @Test("取消正在运行的命令:及时终止、抛出取消错误且不崩溃")
+    func cancellation() async throws {
+        let dir = FileManager.default.temporaryDirectory
+        let started = ContinuousClock.now
+        let task = Task { try await GitProcess.run(["-c", "alias.slp=!sleep 10", "slp"], in: dir, timeout: 30) }
+        try await Task.sleep(for: .milliseconds(300))
+        task.cancel()
+        await #expect(throws: CancellationError.self) { _ = try await task.value }
+        #expect(ContinuousClock.now - started < .seconds(5))
+    }
+
+    @Test("超时:终止进程并抛出 timedOut")
+    func timeout() async throws {
+        let dir = FileManager.default.temporaryDirectory
+        do {
+            _ = try await GitProcess.run(["-c", "alias.slp=!sleep 10", "slp"], in: dir, timeout: 0.5)
+            Issue.record("应当超时")
+        } catch let error as GitError {
+            if case .timedOut = error {} else { Issue.record("错误类型不对:\(error)") }
+        }
+    }
+}

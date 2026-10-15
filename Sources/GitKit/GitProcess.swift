@@ -4,6 +4,7 @@
 
 import Foundation
 import OMLog
+import Synchronization
 
 /// 一次 git 调用的结果。
 struct GitOutput: Sendable {
@@ -12,6 +13,37 @@ struct GitOutput: Sendable {
     var stderr: String
 
     var text: String { String(decoding: stdout, as: UTF8.self) }
+}
+
+/// 进程退出信号:可在任意任务里等待,且不会因任务取消而提前返回
+/// (提前返回时读取 `terminationReason` 会抛出 Objective-C 异常)。
+private final class ExitGate: Sendable {
+    private struct State {
+        var done = false
+        var waiters: [CheckedContinuation<Void, Never>] = []
+    }
+
+    private let state = Mutex(State())
+
+    func signal() {
+        let waiters = state.withLock { state -> [CheckedContinuation<Void, Never>] in
+            state.done = true
+            defer { state.waiters = [] }
+            return state.waiters
+        }
+        for waiter in waiters { waiter.resume() }
+    }
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            let finished = state.withLock { state -> Bool in
+                if state.done { return true }
+                state.waiters.append(continuation)
+                return false
+            }
+            if finished { continuation.resume() }
+        }
+    }
 }
 
 enum GitProcess {
@@ -59,11 +91,8 @@ enum GitProcess {
         process.standardInput = input == nil ? FileHandle.nullDevice : inPipe
 
         // 退出通知用 terminationHandler(不用 waitUntilExit:它在后台线程里依赖 RunLoop,可能永远不返回)
-        let (exited, exitSignal) = AsyncStream<Void>.makeStream()
-        process.terminationHandler = { _ in
-            exitSignal.yield()
-            exitSignal.finish()
-        }
+        let gate = ExitGate()
+        process.terminationHandler = { _ in gate.signal() }
         do { try process.run() } catch {
             Log.git.error("git 启动失败", ["args": arguments.first ?? "", "error": "\(error)"])
             throw GitError.launchFailed("\(error)")
@@ -84,7 +113,7 @@ enum GitProcess {
             async let stdout = readAll(outPipe)
             async let stderr = readAll(errPipe)
             let pair = await (stdout, stderr)
-            for await _ in exited { break }
+            await gate.wait()
             return pair
         } onCancel: {
             if process.isRunning { process.terminate() }
