@@ -45,6 +45,11 @@ public final class CodeEditorView: NSView {
         didSet { wireFeatures() }
     }
 
+    /// 右键菜单 / ⌘⇧L:把选区作为引用加入对话(传入 UTF-16 范围)。
+    public var onReferenceSelection: ((NSRange) -> Void)? {
+        didSet { textView.onReferenceSelection = onReferenceSelection }
+    }
+
     /// 当前诊断(用于下划线、行号栏圆点与悬停提示)。
     public private(set) var diagnostics: [EditorDiagnostic] = []
     private var hoverPopover: NSPopover?

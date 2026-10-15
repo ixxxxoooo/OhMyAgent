@@ -60,17 +60,30 @@ struct FileTabView: View {
     private let store = FileDocumentStore.shared
     @AppStorage(ClientPrefs.Key.editorLSP) private var lspEnabled = true
     @State private var lsp: EditorLSPController?
+    /// 最近一次 Agent 改动在新文件中新增的行(仅当文本仍等于 Agent 写入的内容时显示)
+    @State private var agentMarks: AgentMarks?
+
+    /// Agent 改动的行标记快照。
+    struct AgentMarks: Equatable {
+        var text: String
+        var lines: Set<Int>
+    }
 
     var body: some View {
         let doc = store.document(for: path)
+        let changesRevision = workbench.sessions.values.reduce(0) { $0 + $1.changesRevision }
+        let markers: [Int: LineMarker] = {
+            guard let marks = agentMarks, doc.text == marks.text else { return [:] }
+            return Dictionary(uniqueKeysWithValues: marks.lines.map { ($0 - 1, LineMarker.agent) })
+        }()
         VStack(spacing: 0) {
             banner(doc)
             Group {
                 if let text = doc.text {
-                    CodeEditor(text: text, language: SyntaxLanguage.detect(path: path), isEditable: !doc.isReadOnly, revealLine: tab.line,
-                               diagnostics: lsp?.diagnostics ?? [], features: lsp?.features ?? EditorLanguageFeatures()) { newText in
-                        doc.text = newText
-                    }
+                    CodeEditor(text: text, language: SyntaxLanguage.detect(path: path), isEditable: !doc.isReadOnly, revealLine: tab.line, markers: markers,
+                               diagnostics: lsp?.diagnostics ?? [], features: lsp?.features ?? EditorLanguageFeatures(),
+                               onReferenceSelection: { range in referenceSelection(range, text: doc.text ?? text) },
+                               onChange: { newText in doc.text = newText })
                 } else if let failure = doc.loadError {
                     Text(failure).foregroundStyle(OMColors.secondaryText).frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
@@ -84,6 +97,9 @@ struct FileTabView: View {
         .onChange(of: doc.isDirty, initial: true) { wasDirty, dirty in
             workbench.dock.setDirty(dirty, for: tab.id)
             if wasDirty, !dirty { lsp?.didSave() }
+        }
+        .onChange(of: changesRevision, initial: true) {
+            refreshAgentMarks()
         }
         .onChange(of: doc.text) { _, newText in
             if let newText { lsp?.textChanged(newText) }
@@ -102,6 +118,26 @@ struct FileTabView: View {
                 await store.checkExternalChange(path)
             }
         }
+    }
+
+    /// 根据时间线里该文件最近一次 Agent 改动刷新行标记(已回退的改动不标记)。
+    private func refreshAgentMarks() {
+        guard let found = latestChange(for: path, in: workbench), found.change.status == .pending || found.change.status == .partiallyReverted else {
+            agentMarks = nil
+            return
+        }
+        let lines = found.change.diff.hunks.flatMap(\.lines).filter { $0.kind == .added }.compactMap(\.newNumber)
+        agentMarks = lines.isEmpty ? nil : AgentMarks(text: found.change.current, lines: Set(lines))
+    }
+
+    /// 把选区引用(`@文件:行范围`)追加到所属项目的输入框并切到对话标签。
+    private func referenceSelection(_ range: NSRange, text: String) {
+        let root = projectRoot()
+        guard workbench.projects.contains(where: { $0.id == root }), let session = workbench.ensureSession(for: root) else { return }
+        let token = EditorReference.token(path: path, projectRoot: root, text: text, range: range)
+        session.draft = EditorReference.appending(token, to: session.draft)
+        workbench.select(project: root)
+        Log.ui.info("引用选区到对话", ["file": (path as NSString).lastPathComponent, "token": token])
     }
 
     /// 文本加载完成后接入语言服务器(开关关闭、文件过大或类型不支持时不启动)。

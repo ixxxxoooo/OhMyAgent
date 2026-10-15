@@ -68,6 +68,8 @@ public final class EditorTextView: NSTextView {
     var onJumpToDefinition: ((Int) -> Void)?
     /// 异步取补全候选
     var completionProvider: ((Int) async -> [EditorCompletion])?
+    /// 「在对话中引用选区」:传入非空选区的 UTF-16 范围
+    var onReferenceSelection: ((NSRange) -> Void)?
 
     private var dwellTask: Task<Void, Never>?
     private var hoverOffset: Int?
@@ -166,6 +168,37 @@ public final class EditorTextView: NSTextView {
             return
         }
         super.keyDown(with: event)
+    }
+
+    // MARK: 引用选区
+
+    public override func menu(for event: NSEvent) -> NSMenu? {
+        let menu = super.menu(for: event)
+        if onReferenceSelection != nil, selectedRange().length > 0, let menu {
+            let item = NSMenuItem(title: String(localized: "在对话中引用选区"), action: #selector(referenceSelection(_:)), keyEquivalent: "L")
+            item.keyEquivalentModifierMask = [.command, .shift]
+            item.target = self
+            menu.insertItem(item, at: 0)
+            menu.insertItem(.separator(), at: 1)
+        }
+        return menu
+    }
+
+    @objc private func referenceSelection(_ sender: Any?) {
+        let range = selectedRange()
+        guard range.length > 0 else { return }
+        onReferenceSelection?(range)
+    }
+
+    /// ⌘⇧L:引用选区(无选区或未接入时交还系统处理)。
+    public override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if flags == [.command, .shift], event.charactersIgnoringModifiers?.lowercased() == "l",
+           onReferenceSelection != nil, selectedRange().length > 0, window?.firstResponder === self {
+            referenceSelection(nil)
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
     }
 
     // MARK: 补全

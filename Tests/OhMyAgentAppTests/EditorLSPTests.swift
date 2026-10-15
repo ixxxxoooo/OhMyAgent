@@ -246,3 +246,34 @@ struct EditorLSPControllerTests {
         #expect(!EditorLSPController.isSupported(path: "/a/readme.md"))
     }
 }
+
+@Suite("选区引用")
+struct EditorReferenceTests {
+    private let text = "line 1\nline 2\nline 3\nline 4\n"
+
+    @Test("单行与多行选区生成行范围;结尾换行不多算一行")
+    func tokenLines() {
+        let ns = text as NSString
+        let line2 = ns.range(of: "line 2")
+        #expect(EditorReference.token(path: "/p/Sources/A.swift", projectRoot: "/p", text: text, range: line2) == "@Sources/A.swift:2")
+        let twoLines = NSRange(location: ns.range(of: "line 2").location, length: ns.range(of: "line 3").upperBound - ns.range(of: "line 2").location)
+        #expect(EditorReference.token(path: "/p/Sources/A.swift", projectRoot: "/p", text: text, range: twoLines) == "@Sources/A.swift:2-3")
+        let withNewline = NSRange(location: ns.range(of: "line 2").location, length: 7)   // "line 2\n"
+        #expect(EditorReference.token(path: "/p/Sources/A.swift", projectRoot: "/p", text: text, range: withNewline) == "@Sources/A.swift:2")
+    }
+
+    @Test("项目外文件使用绝对路径")
+    func outsideProject() {
+        #expect(EditorReference.token(path: "/other/x.txt", projectRoot: "/p", text: text, range: NSRange(location: 0, length: 4)) == "@/other/x.txt:1")
+        // 前缀相同但不是子目录
+        #expect(EditorReference.token(path: "/project2/x.txt", projectRoot: "/project", text: text, range: NSRange(location: 0, length: 1)) == "@/project2/x.txt:1")
+    }
+
+    @Test("追加到草稿:按需补空格,以空格结尾")
+    func appendToDraft() {
+        #expect(EditorReference.appending("@a:1", to: "") == "@a:1 ")
+        #expect(EditorReference.appending("@a:1", to: "解释一下") == "解释一下 @a:1 ")
+        #expect(EditorReference.appending("@b:2", to: "看 @a:1 ") == "看 @a:1 @b:2 ")
+        #expect(EditorReference.appending("@b:2", to: "第一行\n") == "第一行\n@b:2 ")
+    }
+}
