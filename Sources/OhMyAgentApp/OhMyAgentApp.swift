@@ -5,6 +5,7 @@ import AgentHost
 import AppKit
 import ChatKit
 import DesignSystem
+import OMLog
 import SwiftUI
 
 /// 工作区记录(最近使用)。
@@ -48,8 +49,14 @@ final class SessionRegistry {
     /// 当前所有会话(设置页读取用量与鉴权信息)。
     var models: [SessionModel] { Array(storage.values) }
 
-    func register(_ model: SessionModel) { storage[ObjectIdentifier(model)] = model }
-    func unregister(_ model: SessionModel) { storage[ObjectIdentifier(model)] = nil }
+    func register(_ model: SessionModel) {
+        storage[ObjectIdentifier(model)] = model
+        Log.session.info("会话已注册", ["workspace": model.workspace.path, "total": "\(storage.count)"])
+    }
+    func unregister(_ model: SessionModel) {
+        storage[ObjectIdentifier(model)] = nil
+        Log.session.info("会话已注销", ["workspace": model.workspace.path, "total": "\(storage.count)"])
+    }
     func shutdownAll() { for model in storage.values { model.shutdown() } }
 }
 
@@ -57,6 +64,7 @@ final class SessionRegistry {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let showDock = UserDefaults.standard.object(forKey: ClientPrefs.Key.showDock) as? Bool ?? true
+        Log.app.info("应用启动完成", ["showDock": "\(showDock)", "agentOverride": ProcessInfo.processInfo.environment["OMA_AGENT"] ?? "-", "project": ProcessInfo.processInfo.environment["OMA_PROJECT_ROOT"] ?? "-"])
         NSApp.setActivationPolicy(showDock ? .regular : .accessory)
         BridgeServer.cleanStaleSockets()
         AppearanceModel.shared.applyAll()
@@ -74,7 +82,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @MainActor
     func applicationWillTerminate(_ notification: Notification) {
+        Log.app.info("应用即将退出", ["sessions": "\(SessionRegistry.shared.models.count)"])
         SessionRegistry.shared.shutdownAll()
+        LogSystem.shared.flush()
     }
 }
 
@@ -84,7 +94,10 @@ struct OhMyAgentApp: App {
     @AppStorage(ClientPrefs.Key.showMenuBar) private var showMenuBar = false
     @AppStorage(ClientPrefs.Key.showDock) private var showDock = true
 
-    init() { DiagnosticsStore.shared.markLaunch() }
+    init() {
+        Log.bootstrap(process: "app")
+        DiagnosticsStore.shared.markLaunch()
+    }
 
     var body: some Scene {
         WindowGroup("OhMyAgent", for: URL.self) { $workspace in

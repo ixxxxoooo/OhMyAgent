@@ -3,6 +3,7 @@
 
 import Foundation
 import Darwin
+import OMLog
 
 /// 启动计时(主线程使用)。
 @MainActor
@@ -19,6 +20,7 @@ final class DiagnosticsStore {
     func markFirstFrame() {
         guard firstFrameDate == nil else { return }
         firstFrameDate = Date()
+        if let ms = firstFrameMilliseconds { Log.perf.info("首帧", ["ms": "\(ms)"]) }
         if let path = ProcessInfo.processInfo.environment["OMA_PERF_OUT"], !path.isEmpty, let ms = firstFrameMilliseconds {
             try? "\(ms)\n".write(toFile: path, atomically: true, encoding: .utf8)
         }

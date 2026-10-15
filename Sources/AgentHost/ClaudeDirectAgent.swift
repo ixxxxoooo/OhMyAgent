@@ -4,6 +4,7 @@
 
 import ACPKit
 import Foundation
+import OMLog
 import Synchronization
 
 /// 单个直连会话的状态。
@@ -201,9 +202,12 @@ public actor ClaudeDirectAgent: ACPRequestHandler {
             if chunk.isEmpty { handle.readabilityHandler = nil; return }
             errorTail.withLock { $0.append(chunk); if $0.count > 4096 { $0 = $0.suffix(4096) } }
         }
+        let started = ContinuousClock.now
         do { try process.run() } catch {
+            Log.agent.error("直连:无法启动 claude", error: error, ["path": claudePath])
             return try await fail(id, "无法启动 claude:\(error.localizedDescription)")
         }
+        Log.agent.info("直连:启动 claude 回合", ["pid": "\(process.processIdentifier)", "args": Self.arguments(session: session).joined(separator: " "), "cwd": session.cwd, "promptChars": "\(text.count)"])
         session.process = process
         sessions[id] = session
         stdin.fileHandleForWriting.write(Data(text.utf8))
@@ -223,9 +227,11 @@ public actor ClaudeDirectAgent: ACPRequestHandler {
         }
         await Task.detached { process.waitUntilExit() }.value
         sessions[id]?.process = nil
+        Log.agent.info("直连:claude 回合结束", ["status": "\(process.terminationStatus)", "ms": "\(OMLogger.milliseconds(since: started))", "gotResult": "\(result != nil)", "cancelled": "\(sessions[id]?.cancelled == true)"])
         if sessions[id]?.cancelled == true { return ["stopReason": "cancelled"] }
         guard let result else {
             let tail = String(decoding: errorTail.withLock { $0 }, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+            Log.agent.error("直连:claude 异常退出且无结果", ["status": "\(process.terminationStatus)", "stderrTail": LogRedactor.truncate(tail, limit: 800)])
             return try await fail(id, tail.isEmpty ? "claude 异常退出(退出码 \(process.terminationStatus))" : tail)
         }
         return await finish(id, result)

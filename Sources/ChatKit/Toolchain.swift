@@ -4,6 +4,7 @@
 
 import AgentHost
 import Foundation
+import OMLog
 
 /// 工具链解析器(进程内单例)。
 public actor Toolchain {
@@ -35,6 +36,7 @@ public actor Toolchain {
         }
         inflight = task
         let result = await task.value
+        Log.agent.info("工具链定位", ["node": result.nodePath ?? "未找到", "claude": result.claudePath ?? "未找到", "adapter": result.adapterEntry ?? "未找到"])
         cached = result
         inflight = nil
         return result

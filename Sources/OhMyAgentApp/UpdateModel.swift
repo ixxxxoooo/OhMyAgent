@@ -4,6 +4,7 @@
 import AppKit
 import ChatKit
 import Foundation
+import OMLog
 import Observation
 
 /// 更新状态(设置页与菜单共享)。
@@ -37,6 +38,7 @@ final class UpdateModel {
         Task {
             let result = await UpdateChecker.check(feedURL: feed, channel: channel, currentVersion: version, currentBuild: build)
             defaults.set(Date(), forKey: ClientPrefs.Key.updateLastCheck)
+            Log.update.info("更新检查完成", ["feed": feed.isEmpty ? "-" : feed, "channel": channel, "result": "\(result)"])
             state = .result(result)
         }
     }

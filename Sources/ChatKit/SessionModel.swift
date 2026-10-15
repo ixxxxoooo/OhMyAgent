@@ -7,6 +7,7 @@ import AgentHost
 import DiffKit
 import Foundation
 import Observation
+import OMLog
 import Synchronization
 
 /// 待处理的权限请求。
@@ -92,7 +93,12 @@ struct SessionDelegate: ACPClientDelegate {
     }
 
     func readTextFile(sessionId: String, path: String, line: Int?, limit: Int?) async throws -> String {
-        let text = try String(contentsOfFile: path, encoding: .utf8)
+        let text: String
+        do { text = try String(contentsOfFile: path, encoding: .utf8) } catch {
+            Log.tool.error("fs/read_text_file 失败", error: error, ["path": path, "session": String(sessionId.prefix(8))])
+            throw error
+        }
+        Log.tool.debug("fs/read_text_file", ["path": path, "bytes": "\(text.utf8.count)", "line": line.map(String.init) ?? "-", "limit": limit.map(String.init) ?? "-"])
         guard line != nil || limit != nil else { return text }
         let lines = text.components(separatedBy: "\n")
         let start = max((line ?? 1) - 1, 0)
@@ -106,10 +112,17 @@ struct SessionDelegate: ACPClientDelegate {
         let root = URL(fileURLWithPath: workspace).standardizedFileURL.path
         let target = URL(fileURLWithPath: path).standardizedFileURL
         guard target.path == root || target.path.hasPrefix(root + "/") else {
+            Log.tool.warning("fs/write_text_file 被拒绝:不在工作区内", ["path": path, "workspace": root])
             throw JSONRPCError(code: JSONRPCError.invalidParams, message: "仅允许写入工作区内的文件: \(path)")
         }
-        try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try content.write(to: target, atomically: true, encoding: .utf8)
+        do {
+            try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try content.write(to: target, atomically: true, encoding: .utf8)
+        } catch {
+            Log.tool.error("fs/write_text_file 失败", error: error, ["path": path])
+            throw error
+        }
+        Log.tool.info("fs/write_text_file", ["path": path, "bytes": "\(content.utf8.count)"])
     }
 
     func createTerminal(sessionId: String, command: String, args: [String], env: [String: String], cwd: String?, outputByteLimit: Int?) async throws -> String {
@@ -243,6 +256,11 @@ public final class SessionModel {
     private var terminalManager: TerminalManager?
     private let checkpoints = CheckpointStore()
     private var turnNumber = 0
+    private var turnStart: ContinuousClock.Instant?
+    /// 带项目与会话标识的日志器。
+    private var log: OMLogger {
+        Log.session.with(["project": workspace.lastPathComponent, "session": sessionId.map { String($0.prefix(8)) } ?? "-"])
+    }
     private let snapshotter = FileSnapshotter()
     /// 本轮累计的文件改动:路径 → (最初内容, 最新内容)
     private var turnChanges: [String: (original: String?, current: String)] = [:]
@@ -271,9 +289,11 @@ public final class SessionModel {
         let connectStart = ContinuousClock.now
         let descriptor = activeDescriptor
         let cwd = workspace.path
+        log.info("开始连接 Agent", ["agent": descriptor.id, "cwd": cwd])
         connectTask = Task { [weak self] in
             let tools = await Toolchain.shared.resolve()
             guard let self else { return }
+            self.log.info("工具链解析完成", ["node": tools.nodePath ?? "-", "nodeVersion": tools.nodeVersion ?? "-", "claude": tools.claudePath ?? "-", "adapter": tools.adapterEntry ?? "-"])
             let environment = ClientPrefs.filterTerminalEnvironment(tools.environment, inherit: ClientPrefs.terminalInheritsEnvironment())
             let manager = TerminalManager(workspace: cwd, environment: { environment }, onCreated: { [weak self] created in
                 Task { @MainActor in self?.registerTerminal(created) }
@@ -308,15 +328,18 @@ public final class SessionModel {
                 self.configOptions = setup.configOptions
                 self.phase = .ready
                 self.connectDuration = connectStart.duration(to: .now)
+                self.log.info("Agent 已就绪", ["agent": result.agentName, "ms": "\(OMLogger.milliseconds(since: connectStart))", "mcpServers": "\(prepared.servers.count)", "bridge": prepared.bridge == nil ? "off" : "on"])
                 self.connectTask = nil
                 self.refreshHistory()
                 self.flushQueuedPrompt()
             } catch {
+                self.log.error("连接 Agent 失败", error: error, ["agent": descriptor.id, "ms": "\(OMLogger.milliseconds(since: connectStart))"])
                 await supervisor.stop()
                 self.bridge?.stop()
                 self.bridge = nil
                 self.connectTask = nil
                 if self.shouldFallBackToDirect(error: error, descriptor: descriptor) {
+                    self.log.warning("ACP 适配器不可用,回退直连通道")
                     self.activeDescriptor = .claudeDirect
                     self.agentName = AgentDescriptor.claudeDirect.name
                     self.phase = .idle
@@ -430,6 +453,8 @@ public final class SessionModel {
         }
         timeline.appendUser(prompt)
         turnNumber += 1
+        turnStart = ContinuousClock.now
+        log.info("发送提示", ["turn": "\(turnNumber)", "chars": "\(prompt.count)", "mentions": "\(blocks.count - 1)"])
         turnChanges.removeAll()
         turnChangeOrder.removeAll()
         isRunning = true
@@ -446,6 +471,12 @@ public final class SessionModel {
     private func finishTurn(reason: StopReason?, error: Error?) {
         // 先把已合并但尚未应用的事件落入时间线,再结束轮次
         coalescer?.flush()
+        let turnMs = turnStart.map { OMLogger.milliseconds(since: $0) } ?? 0
+        if let error {
+            log.error("轮次失败", error: error, ["turn": "\(turnNumber)", "ms": "\(turnMs)"])
+        } else {
+            log.info("轮次结束", ["turn": "\(turnNumber)", "reason": reason.map { "\($0)" } ?? "-", "ms": "\(turnMs)", "changedFiles": "\(turnChangeOrder.count)"])
+        }
         Task { [weak self] in
             // 让出一次,使 flush 产生的批次先被应用
             await Task.yield()
@@ -476,6 +507,7 @@ public final class SessionModel {
     /// 取消当前轮次,并拒绝所有待处理权限。
     public func cancel() {
         guard isRunning, let client, let sessionId else { return }
+        log.info("用户取消当前轮次", ["turn": "\(turnNumber)"])
         cancelPendingPrompts()
         Task { await client.cancel(sessionId: sessionId) }
     }
@@ -498,6 +530,7 @@ public final class SessionModel {
                 self?.sessionId = setup.sessionId
                 self?.configOptions = setup.configOptions
             } catch {
+                self?.log.error("创建新对话失败", error: error)
                 self?.timeline.appendNotice("创建新对话失败:\(error.localizedDescription)", isError: true)
             }
         }
@@ -666,6 +699,8 @@ public final class SessionModel {
 
     private func awaitPermission(_ request: PermissionRequest) async -> PermissionOutcome {
         snapshotter.capture(ToolCall(json: request.toolCallRaw))
+        let call = ToolCall(json: request.toolCallRaw)
+        log.info("请求权限", ["tool": call.title, "kind": "\(call.kind)", "toolCallId": call.toolCallId, "options": request.options.map(\.optionId).joined(separator: ",")])
         return await withCheckedContinuation { continuation in
             let prompt = PermissionPrompt(request: request, continuation: continuation)
             pendingPermissions.append(prompt)
@@ -677,6 +712,7 @@ public final class SessionModel {
     ///   - prompt: 请求
     ///   - optionId: 选项
     public func resolve(_ prompt: PermissionPrompt, optionId: String) {
+        log.info("权限已回复", ["tool": prompt.title, "option": optionId])
         prompt.choose(optionId)
         pendingPermissions.removeAll { $0.id == prompt.id }
     }
@@ -724,6 +760,7 @@ public final class SessionModel {
 
     /// 工具完成时:与开始前的快照比较并记录改动。
     private func observeTool(_ call: ToolCall) {
+        if call.status.isTerminal { log.debug("工具结束", ["toolCallId": call.toolCallId, "title": call.title, "kind": "\(call.kind)", "status": "\(call.status)"]) }
         let paths = FileSnapshotter.paths(of: call)
         guard !paths.isEmpty, call.status == .completed, let shot = snapshotter.take(call.toolCallId) else { return }
         for path in paths {
@@ -810,6 +847,7 @@ public final class SessionModel {
             case .authStatus(let kind, let label, let detail):
                 authStatus = [label, detail].compactMap { $0 }.first ?? kind
             case .stderr(let text):
+                log.debug("Agent stderr", ["text": LogRedactor.truncate(text, limit: 1000)])
                 diagnostics.append(text)
                 if diagnostics.count > 200 { diagnostics.removeFirst(diagnostics.count - 200) }
             case .closed(let code):
@@ -836,6 +874,7 @@ public final class SessionModel {
 
     private func handleClosed(code: Int32?) {
         guard !isShuttingDown else { return }
+        log.error("Agent 进程意外退出", ["code": code.map(String.init) ?? "-", "lastStderr": LogRedactor.truncate(diagnostics.suffix(3).joined(separator: " | "), limit: 600)])
         cancelPendingPrompts()
         timeline.finishStreaming()
         isRunning = false
@@ -865,6 +904,7 @@ public final class SessionModel {
 
     /// 关闭窗口时调用:终止 Agent 子进程。
     public func shutdown() {
+        log.info("关闭会话")
         isShuttingDown = true
         cancelPendingPrompts()
         for session in terminals.values { session.stop() }

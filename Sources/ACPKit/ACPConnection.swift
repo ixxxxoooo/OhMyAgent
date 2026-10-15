@@ -2,6 +2,7 @@
 // ACP 连接:基于任意传输实现 JSON-RPC 请求/响应关联、通知分发与反向请求处理。
 
 import Foundation
+import OMLog
 
 /// 连接向上层投递的入站事件(通知与生命周期)。
 public enum ACPInbound: Sendable {
@@ -30,6 +31,9 @@ public protocol ACPRequestHandler: Sendable {
 public actor ACPConnection {
     private let transport: any ACPTransport
     private var pending: [RequestID: CheckedContinuation<JSONValue, Error>] = [:]
+    /// 请求的方法名与发出时刻,用于记录往返耗时。
+    private var pendingInfo: [RequestID: (method: String, start: ContinuousClock.Instant)] = [:]
+    private let log: OMLogger
     private var nextRequestID = 1
     private var handler: (any ACPRequestHandler)?
     private var readTask: Task<Void, Never>?
@@ -41,7 +45,9 @@ public actor ACPConnection {
 
     /// 创建连接。
     /// - Parameter transport: 传输实现
-    public init(transport: any ACPTransport) {
+    /// - Parameter label: 日志中标识该连接的名称(如 agent id)
+    public init(transport: any ACPTransport, label: String = "") {
+        self.log = label.isEmpty ? Log.acp : Log.acp.with(["conn": label])
         self.transport = transport
         let (stream, continuation) = AsyncStream<ACPInbound>.makeStream(bufferingPolicy: .unbounded)
         self.inbound = stream
@@ -77,6 +83,7 @@ public actor ACPConnection {
         }
         let id = RequestID.int(nextRequestID)
         nextRequestID += 1
+        pendingInfo[id] = (method, ContinuousClock.now)
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
                 pending[id] = continuation
@@ -84,6 +91,8 @@ public actor ACPConnection {
                     try send(.request(id: id, method: method, params: params))
                 } catch {
                     pending[id] = nil
+                    pendingInfo[id] = nil
+                    log.error("请求发送失败", error: error, ["method": method])
                     continuation.resume(throwing: error)
                 }
             }
@@ -123,6 +132,7 @@ public actor ACPConnection {
     /// 请求被调用方取消时通知对端并让本地请求以取消错误结束。
     private func cancelRequest(_ id: RequestID) {
         guard let continuation = pending.removeValue(forKey: id) else { return }
+        if let info = pendingInfo.removeValue(forKey: id) { log.info("请求被取消", ["method": info.method, "id": "\(id)"]) }
         if let raw = try? JSONValue.from(id) {
             try? send(.notification(method: "$/cancel_request", params: ["requestId": raw]))
         }
@@ -130,15 +140,46 @@ public actor ACPConnection {
     }
 
     private func send(_ message: JSONRPCMessage) throws {
-        transport.send(try message.serialized())
+        let data = try message.serialized()
+        log.traffic("→", Self.summary(message), payload: String(decoding: data, as: UTF8.self))
+        transport.send(data)
+    }
+
+    /// 协议流量日志的摘要:类型、方法名与 id。
+    private static func summary(_ message: JSONRPCMessage) -> String {
+        switch message {
+        case .request(let id, let method, _): return "request \(method) #\(id)"
+        case .notification(let method, _): return "notify \(method)"
+        case .response(let id, _): return "response #\(id)"
+        case .errorResponse(let id, let error): return "error #\(id.map { "\($0)" } ?? "-") code=\(error.code)"
+        }
+    }
+
+    /// 记录一次请求的往返耗时;超过 2 秒升级为 warning(session/prompt 为长任务,不计入慢请求)。
+    private func finishInfo(_ id: RequestID, failure: JSONRPCError?) {
+        guard let info = pendingInfo.removeValue(forKey: id) else { return }
+        let d = ContinuousClock.now - info.start
+        let ms = Int(d.components.seconds * 1000 + d.components.attoseconds / 1_000_000_000_000_000)
+        var fields = ["method": info.method, "id": "\(id)", "ms": "\(ms)"]
+        if let failure {
+            fields["code"] = "\(failure.code)"
+            fields["message"] = failure.message
+            log.warning("请求失败", fields)
+        } else if ms > 2000, info.method != "session/prompt" {
+            log.warning("请求较慢", fields)
+        } else {
+            log.debug("请求完成", fields)
+        }
     }
 
     private func handle(_ event: TransportEvent) {
         switch event {
         case .line(let data):
+            log.traffic("←", "line \(data.count)B", payload: String(decoding: data, as: UTF8.self))
             do {
                 dispatch(try JSONRPCMessage.parse(data))
             } catch {
+                log.warning("收到无法解析的行", ["error": "\(error)", "bytes": "\(data.count)", "head": String(decoding: data.prefix(200), as: UTF8.self)])
                 inboundContinuation.yield(.malformed(String(decoding: data.prefix(512), as: UTF8.self)))
             }
         case .stderr(let text):
@@ -151,9 +192,11 @@ public actor ACPConnection {
     private func dispatch(_ message: JSONRPCMessage) {
         switch message {
         case .response(let id, let result):
+            finishInfo(id, failure: nil)
             pending.removeValue(forKey: id)?.resume(returning: result)
         case .errorResponse(let id, let error):
             if let id {
+                finishInfo(id, failure: error)
                 pending.removeValue(forKey: id)?.resume(throwing: error)
             }
         case .notification(let method, let params):
@@ -185,6 +228,8 @@ public actor ACPConnection {
     private func finish(exitCode: Int32?) {
         guard !isClosed else { return }
         isClosed = true
+        log.info("连接关闭", ["exit": exitCode.map { "\($0)" } ?? "-", "pending": "\(pending.count)"])
+        pendingInfo.removeAll()
         let error = JSONRPCError(code: JSONRPCError.internalError, message: "连接已关闭")
         for (_, continuation) in pending { continuation.resume(throwing: error) }
         pending.removeAll()

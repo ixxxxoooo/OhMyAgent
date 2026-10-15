@@ -2,6 +2,7 @@
 // ClaudeConfigKit 基础设施:路径解析、JSON 文件的"读-改-写"(保留未知字段)、错误类型。
 
 import Foundation
+import OMLog
 
 /// 配置读写错误。
 public enum ConfigError: Error, LocalizedError, Equatable {
@@ -111,6 +112,7 @@ public struct JSONFile: Sendable {
         }
         let data = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
         try data.write(to: url, options: .atomic)
+        Log.config.info("配置已写回", ["file": url.path, "bytes": "\(data.count)", "topKeys": "\(object.count)"])
     }
 
     /// 读-改-写。

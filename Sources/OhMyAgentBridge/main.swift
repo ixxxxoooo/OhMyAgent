@@ -4,8 +4,12 @@
 
 import Darwin
 import Foundation
+import OMLog
 
+Log.bootstrap(process: "OhMyAgentBridge")
 guard let path = ProcessInfo.processInfo.environment["OMA_BRIDGE_SOCKET"], !path.isEmpty else {
+    Log.bridge.error("缺少环境变量 OMA_BRIDGE_SOCKET")
+    LogSystem.shared.flush()
     FileHandle.standardError.write(Data("缺少环境变量 OMA_BRIDGE_SOCKET\n".utf8))
     exit(2)
 }
@@ -20,9 +24,13 @@ let connected = withUnsafePointer(to: &address) {
     $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) }
 }
 guard fd >= 0, connected == 0 else {
+    Log.bridge.error("无法连接 Bridge socket", ["path": path, "errno": String(cString: strerror(errno))])
+    LogSystem.shared.flush()
     FileHandle.standardError.write(Data("无法连接 Bridge socket \(path):\(String(cString: strerror(errno)))\n".utf8))
     exit(1)
 }
+
+Log.bridge.info("垫片已连接", ["socket": path])
 
 /// 把 source 读到的内容全部写入 target,直到 EOF。
 @Sendable func pump(from source: Int32, to target: Int32) {
@@ -43,4 +51,6 @@ guard fd >= 0, connected == 0 else {
 let upstream = Thread { pump(from: STDIN_FILENO, to: fd); shutdown(fd, SHUT_WR) }
 upstream.start()
 pump(from: fd, to: STDOUT_FILENO)
+Log.bridge.info("垫片退出")
+LogSystem.shared.flush()
 exit(0)

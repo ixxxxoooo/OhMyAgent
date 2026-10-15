@@ -3,6 +3,7 @@
 
 import ACPKit
 import Foundation
+import OMLog
 
 /// 监督者状态。
 public enum AgentState: Sendable {
@@ -74,9 +75,11 @@ public actor AgentSupervisor {
             self.client = client
             let result = try await client.initialize(fileSystem: advertiseFileSystem, terminal: advertiseTerminal, extraCapabilities: extraCapabilities)
             initializeResult = result
+            Log.agent.info("ACP 握手完成", ["agent": result.agentName, "version": result.agentVersion ?? "-", "authMethods": "\(result.authMethods.count)"])
             set(.ready(result))
             return result
         } catch {
+            Log.agent.error("Agent 启动失败", error: error, ["cwd": cwd])
             set(.failed(error.localizedDescription))
             throw error
         }
@@ -92,6 +95,7 @@ public actor AgentSupervisor {
 
     /// 停止子进程并回收。
     public func stop() async {
+        Log.agent.info("停止 Agent", ["cwd": cwd])
         if let client { await client.close() }
         client = nil
         transport = nil

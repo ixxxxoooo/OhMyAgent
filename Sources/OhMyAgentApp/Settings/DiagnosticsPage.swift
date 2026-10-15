@@ -6,6 +6,7 @@ import AppKit
 import ChatKit
 import ClaudeConfigKit
 import DesignSystem
+import OMLog
 import SwiftUI
 
 /// 子进程资源行。
@@ -24,6 +25,10 @@ struct DiagnosticsPage: View {
     @State private var doctorOutput: String?
     @State private var doctorRunning = false
     @State private var exportMessage: String?
+    @AppStorage(LogSystem.DefaultsKey.level) private var logLevel = "info"
+    @AppStorage(LogSystem.DefaultsKey.traffic) private var logTraffic = false
+    @AppStorage(LogSystem.DefaultsKey.hideHome) private var logHideHome = false
+    @State private var showLogViewer = false
 
     var body: some View {
         SettingsForm {
@@ -38,6 +43,28 @@ struct DiagnosticsPage: View {
                     LabeledContent("\(row.name) (\(row.id))") { Text(String(format: "%.0f MB · CPU %.1f%%", row.rssMB, row.cpu)).monospacedDigit() }
                 }
                 if rows.isEmpty { Text("正在读取…").foregroundStyle(OMColors.secondaryText) }
+            }
+            Section("日志") {
+                Picker("日志级别", selection: $logLevel) {
+                    Text("Debug(最详细)").tag("debug")
+                    Text("Info(默认)").tag("info")
+                    Text("Warning").tag("warning")
+                    Text("Error").tag("error")
+                }
+                .onChange(of: logLevel) { _, value in
+                    if let level = LogLevel(text: value) { LogSystem.shared.level = level; Log.log.info("日志级别已调整", ["level": value]) }
+                }
+                Toggle("记录 ACP 协议流量(acp-traffic 日志,载荷已脱敏并截断)", isOn: $logTraffic)
+                    .onChange(of: logTraffic) { _, value in LogSystem.shared.trafficEnabled = value; Log.log.info("协议流量日志", ["enabled": "\(value)"]) }
+                Toggle("日志中把家目录显示为 ~", isOn: $logHideHome)
+                    .onChange(of: logHideHome) { _, value in LogSystem.shared.hideHome = value }
+                HStack {
+                    Button("查看日志…") { showLogViewer = true }
+                    Button("打开日志目录") {
+                        if let dir = LogSystem.shared.directory { NSWorkspace.shared.open(dir) }
+                    }
+                }
+                Note("日志文件位于 ~/Library/Logs/OhMyAgent/(单文件 10MB 轮转,保留 7 天)。令牌、API Key 与授权头在写入前自动脱敏。排查问题时把 oma-日期.log 发给开发者即可。")
             }
             Section("claude doctor") {
                 HStack {
@@ -59,6 +86,14 @@ struct DiagnosticsPage: View {
             }
         }
         .task { await pollProcesses() }
+        .sheet(isPresented: $showLogViewer) {
+            VStack(spacing: 0) {
+                HStack { Text("日志").font(OMFonts.title); Spacer(); Button("关闭") { showLogViewer = false }.keyboardShortcut(.cancelAction) }.padding(10)
+                Divider()
+                LogViewerView()
+            }
+            .frame(minWidth: 860, minHeight: 520)
+        }
     }
 
     /// 周期读取本应用及子进程的资源占用,视图消失时任务被取消。
@@ -118,6 +153,7 @@ struct DiagnosticsPage: View {
         for model in SessionRegistry.shared.models {
             lines += ["", "## Agent 日志(\(model.agentName))"] + model.diagnostics
         }
+        lines += ["", "## 最近应用日志(最多 500 条)"] + LogSystem.shared.recent(limit: 500).map(\.line)
         let text = lines.joined(separator: "\n")
         return redact ? DiagnosticsRedactor.redact(text) : text
     }
@@ -137,10 +173,6 @@ struct DiagnosticsPage: View {
 enum DiagnosticsRedactor {
     /// 替换用户目录并抹去常见令牌形态。
     static func redact(_ text: String) -> String {
-        var result = text.replacingOccurrences(of: NSHomeDirectory(), with: "~")
-        for pattern in ["sk-[A-Za-z0-9_\\-]{8,}", "Bearer\\s+[A-Za-z0-9._\\-]{8,}"] {
-            result = result.replacingOccurrences(of: pattern, with: "[已脱敏]", options: .regularExpression)
-        }
-        return result
+        LogRedactor.redact(text, hideHome: true)
     }
 }

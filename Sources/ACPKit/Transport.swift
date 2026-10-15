@@ -2,6 +2,7 @@
 // 传输抽象与 Stdio 实现。
 
 import Foundation
+import OMLog
 import Synchronization
 
 /// 传输层收到的事件。
@@ -101,7 +102,9 @@ public final class StdioTransport: ACPTransport, @unchecked Sendable {
                 continuation.yield(.stderr(text))
             }
         }
+        let launchDescription = "\((launch.executable as NSString).lastPathComponent) \(launch.arguments.joined(separator: " "))"
         process.terminationHandler = { [stdoutPipe, stderrPipe, framer] proc in
+            Log.agent.info("子进程退出", ["cmd": launchDescription, "pid": "\(proc.processIdentifier)", "status": "\(proc.terminationStatus)", "reason": proc.terminationReason == .exit ? "exit" : "signal"])
             // 读尽残余数据后再通知关闭,避免丢失最后几行
             stdoutPipe.fileHandleForReading.readabilityHandler = nil
             stderrPipe.fileHandleForReading.readabilityHandler = nil
@@ -112,7 +115,11 @@ public final class StdioTransport: ACPTransport, @unchecked Sendable {
             continuation.yield(.closed(exitCode: proc.terminationStatus))
             continuation.finish()
         }
-        try process.run()
+        do { try process.run() } catch {
+            Log.agent.error("子进程启动失败", error: error, ["executable": launch.executable, "args": launch.arguments.joined(separator: " ")])
+            throw error
+        }
+        Log.agent.info("子进程已启动", ["executable": launch.executable, "args": launch.arguments.joined(separator: " "), "cwd": launch.workingDirectory ?? "-", "pid": "\(process.processIdentifier)"])
         return stream
     }
 

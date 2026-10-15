@@ -4,6 +4,7 @@
 
 import ACPKit
 import Foundation
+import OMLog
 import Synchronization
 
 /// 单个终端进程。
@@ -54,10 +55,15 @@ final class ManagedTerminal: Sendable {
                 self?.append(remaining)
             }
             pipe.fileHandleForReading.readabilityHandler = nil
+            Log.terminal.info("终端命令已退出", ["id": id, "status": "\(proc.terminationStatus)", "reason": proc.terminationReason == .exit ? "exit" : "signal"])
             self?.markExited(code: proc.terminationReason == .exit ? Int(proc.terminationStatus) : nil,
                              signal: proc.terminationReason == .uncaughtSignal ? "SIG\(proc.terminationStatus)" : nil)
         }
-        try process.run()
+        do { try process.run() } catch {
+            Log.terminal.error("终端命令启动失败", error: error, ["command": command, "cwd": cwd ?? "-"])
+            throw error
+        }
+        Log.terminal.info("终端命令已启动", ["id": id, "command": command, "args": args.joined(separator: " "), "cwd": cwd ?? "-", "pid": "\(process.processIdentifier)"])
     }
 
     private func append(_ data: Data) {

@@ -2,6 +2,7 @@
 // 解析用户登录 shell 的环境变量。GUI 应用不会继承终端 PATH,需要主动取得。
 
 import Foundation
+import OMLog
 
 /// 登录 shell 环境解析器。
 public enum ShellEnvironment {
@@ -20,6 +21,7 @@ public enum ShellEnvironment {
     /// 同步版本,仅供后台线程与脚本使用。
     static func resolveBlocking(timeout: TimeInterval) -> [String: String] {
         let fallback = ProcessInfo.processInfo.environment
+        let started = ContinuousClock.now
         let shell = fallback["SHELL"] ?? "/bin/zsh"
         let process = Process()
         process.executableURL = URL(fileURLWithPath: shell)
@@ -32,6 +34,7 @@ public enum ShellEnvironment {
         do {
             try process.run()
         } catch {
+            Log.agent.error("登录 shell 环境解析失败,使用当前进程环境", error: error, ["shell": shell])
             return fallback
         }
         let deadline = DispatchTime.now() + timeout
@@ -44,9 +47,12 @@ public enum ShellEnvironment {
         }
         if group.wait(timeout: deadline) == .timedOut {
             process.terminate()
+            Log.agent.warning("登录 shell 环境解析超时,使用当前进程环境", ["timeout": "\(timeout)", "shell": shell])
             return fallback
         }
-        return parse(collected) ?? fallback
+        let parsed = parse(collected)
+        Log.perf.info("登录 shell 环境解析", ["ms": "\(OMLogger.milliseconds(since: started))", "vars": "\(parsed?.count ?? 0)", "ok": "\(parsed != nil)"])
+        return parsed ?? fallback
     }
 
     /// 解析带标记的 `env -0` 输出。

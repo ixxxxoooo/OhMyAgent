@@ -5,6 +5,7 @@
 import ACPKit
 import Darwin
 import Foundation
+import OMLog
 import Synchronization
 
 /// 工具调用结果。
@@ -126,6 +127,7 @@ public final class BridgeServer: @unchecked Sendable {
             throw BridgeError.socket(code)
         }
         chmod(path, 0o600)
+        Log.bridge.info("Bridge 开始监听", ["socket": path])
         state.withLock { $0.listenFD = fd; $0.running = true }
         let thread = Thread { [weak self] in self?.acceptLoop(fd) }
         thread.name = "OhMyAgent.Bridge.accept"
@@ -141,6 +143,7 @@ public final class BridgeServer: @unchecked Sendable {
             state.connections = []
             return result
         }
+        Log.bridge.info("Bridge 停止", ["connections": "\(connections.count)"])
         if fd >= 0 { shutdown(fd, SHUT_RDWR); close(fd) }
         for connection in connections { shutdown(connection, SHUT_RDWR) }
         unlink(socketPath)
@@ -220,6 +223,7 @@ public final class BridgeServer: @unchecked Sendable {
         case "tools/call":
             guard let name = params?["name"]?.stringValue, let tool = BridgeTool(rawValue: name), enabled.contains(tool) else { return fail(-32602, "未知或已禁用的工具") }
             let result = await call(tool, arguments: params?["arguments"] ?? .object([:]), handler: handler)
+            Log.bridge.info("Bridge 工具调用", ["tool": name, "isError": "\(result.isError)"])
             return reply(["content": [["type": "text", "text": .string(result.text)]], "isError": .bool(result.isError)])
         default:
             return fail(-32601, "不支持的方法 \(method)")

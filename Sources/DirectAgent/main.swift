@@ -5,11 +5,15 @@
 import ACPKit
 import AgentHost
 import Foundation
+import OMLog
 
+Log.bootstrap(process: "DirectAgent")
 guard let claude = ProcessInfo.processInfo.environment["OMA_CLAUDE_PATH"], !claude.isEmpty else {
+    Log.agent.error("缺少环境变量 OMA_CLAUDE_PATH")
     FileHandle.standardError.write(Data("缺少环境变量 OMA_CLAUDE_PATH\n".utf8))
     exit(2)
 }
-let agent = ClaudeDirectAgent(transport: StdioServerTransport(), claudePath: claude, onClose: { exit(0) })
+Log.agent.info("DirectAgent 启动", ["claude": claude])
+let agent = ClaudeDirectAgent(transport: StdioServerTransport(), claudePath: claude, onClose: { Log.agent.info("DirectAgent 连接关闭,退出"); LogSystem.shared.flush(); exit(0) })
 try await agent.start()
 while true { try await Task.sleep(for: .seconds(3600)) }

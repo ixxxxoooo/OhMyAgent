@@ -2,6 +2,7 @@
 // 系统通知:供 OhMyAgent Bridge 的 notify 工具使用。首次发送时请求授权。
 
 import Foundation
+import OMLog
 @preconcurrency import UserNotifications
 
 /// 通知发送器。
@@ -12,8 +13,12 @@ enum AppNotifier {
     ///   - message: 正文
     static func send(title: String, message: String) {
         let center = UNUserNotificationCenter.current()
-        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
-            guard granted else { return }
+        center.requestAuthorization(options: [.alert, .sound]) { granted, error in
+            guard granted else {
+                Log.app.warning("通知未获授权,已忽略", ["title": title, "error": error.map { "\($0)" } ?? "-"])
+                return
+            }
+            Log.app.info("发送系统通知", ["title": title])
             let content = UNMutableNotificationContent()
             content.title = title
             content.body = message

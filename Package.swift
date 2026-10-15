@@ -16,11 +16,11 @@ let package = Package(
         // 统一日志:os.Logger + 文件轮转 + 脱敏 + 协议流量日志
         .target(name: "OMLog"),
         // 协议层:JSON-RPC、ACP v1 模型、连接 actor
-        .target(name: "ACPKit"),
+        .target(name: "ACPKit", dependencies: ["OMLog"]),
         // 宿主层:子进程、Agent 注册表、路径探测、Bridge、直连兜底
-        .target(name: "AgentHost", dependencies: ["ACPKit"]),
+        .target(name: "AgentHost", dependencies: ["ACPKit", "OMLog"]),
         // 配置层:读写 ~/.claude 与 .mcp.json 等
-        .target(name: "ClaudeConfigKit"),
+        .target(name: "ClaudeConfigKit", dependencies: ["OMLog"]),
         // Diff 与检查点
         .target(name: "DiffKit"),
         // AppKit TextKit 2 编辑器
@@ -28,18 +28,18 @@ let package = Package(
         // Liquid Glass 设计系统
         .target(name: "DesignSystem"),
         // 聊天核心:时间线模型、事件合并、Markdown 解析、会话模型(不含视图)
-        .target(name: "ChatKit", dependencies: ["ACPKit", "AgentHost", "DiffKit"]),
+        .target(name: "ChatKit", dependencies: ["ACPKit", "AgentHost", "DiffKit", "OMLog"]),
         // 应用本体
         .executableTarget(
             name: "OhMyAgentApp",
-            dependencies: ["ACPKit", "AgentHost", "ChatKit", "ClaudeConfigKit", "DiffKit", "EditorKit", "DesignSystem"]
+            dependencies: ["ACPKit", "AgentHost", "ChatKit", "ClaudeConfigKit", "DiffKit", "EditorKit", "DesignSystem", "OMLog"]
         ),
         // 脚本化 ACP Agent,用于测试与预览
         .executableTarget(name: "FakeAgent", dependencies: ["ACPKit"]),
         // 直连兜底 Agent(claude -p stream-json → ACP)
-        .executableTarget(name: "DirectAgent", dependencies: ["ACPKit", "AgentHost"]),
+        .executableTarget(name: "DirectAgent", dependencies: ["ACPKit", "AgentHost", "OMLog"]),
         // Bridge 的 stdio ↔ Unix socket 垫片
-        .executableTarget(name: "OhMyAgentBridge"),
+        .executableTarget(name: "OhMyAgentBridge", dependencies: ["OMLog"]),
         // M0 spike
         .executableTarget(name: "ACPSpike", dependencies: ["ACPKit", "AgentHost"]),
         .executableTarget(name: "EditorSpike", dependencies: ["EditorKit"]),
