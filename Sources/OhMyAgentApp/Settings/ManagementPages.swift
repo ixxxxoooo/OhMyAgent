@@ -12,6 +12,7 @@ struct EditorPage: View {
     @AppStorage(ClientPrefs.Key.editorWrap) private var wrap = true
     @AppStorage(ClientPrefs.Key.editorLargeFileLines) private var largeFileLines = 20_000
     @AppStorage(ClientPrefs.Key.editorLSP) private var lspEnabled = true
+    @AppStorage(ClientPrefs.Key.editorFollowAgent) private var followAgent = false
 
     var body: some View {
         SettingsForm {
@@ -24,6 +25,10 @@ struct EditorPage: View {
                     TextField("", value: $largeFileLines, format: .number).frame(width: 100).multilineTextAlignment(.trailing)
                 }
                 Note("超过该行数的文件会强制换行并关闭复杂高亮以保持流畅(范围 2,000–200,000)。新打开的文件立即生效。")
+            }
+            Section("Agent 联动") {
+                Toggle("跟随 Agent:编辑文件时自动打开并定位到改动处", isOn: $followAgent)
+                Note("开启后,Agent 每次修改文件都会在预览标签中打开该文件并跳到第一处改动(仅当前项目)。本轮改动过的行会在行号栏用强调色标出,文件被你编辑后标记消失。在编辑器里选中代码,右键「在对话中引用选区」或按 ⌘⇧L,会把 @文件:行范围 加入当前项目的输入框。")
             }
             Section("语言服务器(LSP)") {
                 Toggle("启用诊断、悬停提示、跳转定义与补全", isOn: $lspEnabled)

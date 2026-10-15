@@ -247,6 +247,10 @@ public final class SessionModel {
     public private(set) var queuedPrompt: String?
     /// 输入框草稿
     public var draft = ""
+    /// 每次发布或回退改动汇总时自增;编辑器据此刷新「Agent 改动」行标记。
+    public private(set) var changesRevision = 0
+    /// Agent 完成一次文件编辑时回调(用于「跟随 Agent」)。
+    @ObservationIgnored public var onAgentEdit: ((AgentEdit) -> Void)?
     /// 需要在编辑器面板中打开的文件
     public var viewerRequest: FileViewRequest?
 
@@ -857,7 +861,28 @@ public final class SessionModel {
             let turn = turnNumber
             let original = turnChanges[path]?.original
             Task { [checkpoints] in await checkpoints.record(turn: turn, path: path, oldText: original, newText: after) }
+            if let notify = onAgentEdit {
+                notify(AgentEdit(path: path, firstChangedLine: Self.firstChangedLine(old: before, new: after)))
+            }
         }
+    }
+
+    /// 一次编辑中第一处改动在新文件里的行号(1 起始)。
+    /// - Parameters:
+    ///   - old: 编辑前内容(nil 表示新建文件)
+    ///   - new: 编辑后内容
+    /// - Returns: 首个新增行号;只有删除时返回删除处所在行;内容相同返回 nil
+    nonisolated static func firstChangedLine(old: String?, new: String) -> Int? {
+        guard let hunk = LineDiff.diff(old: old, new: new).hunks.first else { return nil }
+        var lastNew = hunk.newStart - 1
+        for line in hunk.lines {
+            switch line.kind {
+            case .added: return line.newNumber
+            case .removed: return max(lastNew + 1, 1)
+            case .context: lastNew = line.newNumber ?? lastNew
+            }
+        }
+        return max(hunk.newStart, 1)
     }
 
     /// 在事件进入合并器之前拍快照(含子 Agent 内部的调用)。
@@ -884,6 +909,7 @@ public final class SessionModel {
         turnChanges.removeAll()
         turnChangeOrder.removeAll()
         timeline.appendChanges(turn: turnNumber, changes: changes)
+        changesRevision += 1
     }
 
     /// 回退文件改动(整文件或指定块)。
@@ -906,6 +932,7 @@ public final class SessionModel {
             case .notFound: change.status = .failed("没有可用的检查点")
             case .failed(let message): change.status = .failed(message)
             }
+            self?.changesRevision += 1
         }
     }
 
@@ -1016,5 +1043,18 @@ public final class SessionModel {
         for session in terminals.values { session.stop() }
         if let manager = terminalManager { Task { await manager.shutdown() } }
         shutdownProcess()
+    }
+}
+
+/// Agent 完成的一次文件编辑。
+public struct AgentEdit: Sendable, Equatable {
+    /// 文件绝对路径
+    public var path: String
+    /// 第一处改动所在行(1 起始),无法确定为 nil
+    public var firstChangedLine: Int?
+
+    public init(path: String, firstChangedLine: Int?) {
+        self.path = path
+        self.firstChangedLine = firstChangedLine
     }
 }

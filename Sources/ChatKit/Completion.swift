@@ -112,6 +112,22 @@ public enum CompletionEngine {
         return scored.sorted { $0.1 > $1.1 }.prefix(limit).map(\.0)
     }
 
+    /// 去掉编辑器引用产生的行号后缀:`a/b.swift:12` 或 `a/b.swift:12-20`;
+    /// 若带后缀的整体恰好是存在的文件名则保持原样。
+    /// - Parameters:
+    ///   - path: `@` 后面的路径(可能带行号后缀)
+    ///   - workspace: 工作区目录
+    /// - Returns: 不含行号后缀的路径
+    public static func stripLineSuffix(_ path: String, workspace: URL) -> String {
+        guard let colon = path.lastIndex(of: ":") else { return path }
+        let suffix = path[path.index(after: colon)...]
+        let numbers = suffix.split(separator: "-", omittingEmptySubsequences: false)
+        guard (1...2).contains(numbers.count), numbers.allSatisfy({ !$0.isEmpty && $0.allSatisfy(\.isASCII) && $0.allSatisfy(\.isNumber) }) else { return path }
+        let full = path.hasPrefix("/") ? URL(fileURLWithPath: path) : workspace.appendingPathComponent(path)
+        if FileManager.default.fileExists(atPath: full.path) { return path }
+        return String(path[..<colon])
+    }
+
     /// 文本中的 `@路径` 提及,解析为工作区内真实存在的文件。
     /// - Parameters:
     ///   - text: 用户输入
@@ -127,6 +143,7 @@ public enum CompletionEngine {
                 path.removeLast()
             }
             guard !path.isEmpty else { continue }
+            path = stripLineSuffix(path, workspace: workspace)
             let url = path.hasPrefix("/") ? URL(fileURLWithPath: path) : workspace.appendingPathComponent(path)
             var isDirectory: ObjCBool = false
             if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory), !isDirectory.boolValue, seen.insert(url.path).inserted {

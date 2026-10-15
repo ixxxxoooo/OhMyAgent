@@ -128,6 +128,11 @@ struct WorkbenchView: View {
             Log.app.debug("调试钩子:等待就绪后自动发送", ["project": model.workspace.lastPathComponent])
             for _ in 0..<100 where model.phase != .ready { try? await Task.sleep(for: .milliseconds(100)) }
             model.send(text)
+            if env["OMA_AUTOALLOW"] != nil {
+                // 调试:自动批准本轮第一个权限请求(用于无人值守验证 Agent 编辑联动)
+                for _ in 0..<100 where model.pendingPermissions.isEmpty { try? await Task.sleep(for: .milliseconds(100)) }
+                if let prompt = model.pendingPermissions.first { model.resolve(prompt, optionId: "allow") }
+            }
         } else if env["OMA_AUTOSEND"] != nil {
             Log.app.warning("调试钩子:没有可用会话,未发送", ["active": "\(workbench.activeSession != nil)"])
         }

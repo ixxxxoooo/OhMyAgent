@@ -20,6 +20,8 @@ public enum ClientPrefs {
         public static let editorLargeFileLines = "editor.largeFileLines"
         /// 编辑器是否启用语言服务器(诊断/悬停/跳转/补全)
         public static let editorLSP = "editor.lsp"
+        /// Agent 每次编辑文件后,自动在编辑器中打开并定位到首个改动行(默认关闭)
+        public static let editorFollowAgent = "editor.followAgent"
         public static let terminalFontSize = "terminal.fontSize"
         public static let terminalOutputKB = "terminal.outputLimitKB"
         public static let terminalInheritEnv = "terminal.inheritEnvironment"

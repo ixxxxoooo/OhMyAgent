@@ -307,15 +307,29 @@ public final class WorkbenchModel {
         guard let project = projects.first(where: { $0.id == id }) else { return nil }
         let model = makeSession(project.url)
         model.onHistoryChanged = { [weak self] history in self?.cacheHistory(history, for: id) }
+        model.onAgentEdit = { [weak self] edit in self?.followAgentEdit(edit, project: id) }
         sessions[id] = model
         if autoConnect { model.connect() }
         return model
+    }
+
+    /// 是否开启「跟随 Agent」;默认读偏好设置(测试可替换)。
+    @ObservationIgnored public var followAgentEnabled: @MainActor () -> Bool = {
+        UserDefaults.standard.bool(forKey: ClientPrefs.Key.editorFollowAgent)
+    }
+
+    /// Agent 编辑了文件:开启跟随时在预览标签中打开并定位到首个改动行。
+    /// 只跟随当前选中的项目,避免后台项目抢占界面。
+    func followAgentEdit(_ edit: AgentEdit, project id: String) {
+        guard followAgentEnabled(), selectedProjectID == id else { return }
+        openFile(edit.path, line: edit.firstChangedLine, preview: true)
     }
 
     /// 用新的 Agent 替换项目会话(窗口内切换 Agent)。
     public func replaceSession(for id: String, with model: SessionModel) {
         sessions[id]?.shutdown()
         model.onHistoryChanged = { [weak self] history in self?.cacheHistory(history, for: id) }
+        model.onAgentEdit = { [weak self] edit in self?.followAgentEdit(edit, project: id) }
         sessions[id] = model
         if autoConnect { model.connect() }
     }

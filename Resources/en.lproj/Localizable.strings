@@ -365,3 +365,7 @@
 "语言服务器(LSP)" = "Language Server (LSP)";
 "启用诊断、悬停提示、跳转定义与补全" = "Enable diagnostics, hover, go to definition and completion";
 "Swift 使用 Xcode 自带的 sourcekit-lsp;TypeScript/JavaScript 需要 typescript-language-server,Python 需要 pyright(npm i -g typescript-language-server typescript pyright)。悬停停留查看类型,⌘ 点击或 F12 跳转定义,⌃Space 补全,输入 . 自动补全。" = "Swift uses the sourcekit-lsp bundled with Xcode; TypeScript/JavaScript needs typescript-language-server and Python needs pyright (npm i -g typescript-language-server typescript pyright). Hover to see types, ⌘-click or F12 to jump to a definition, ⌃Space to complete; typing . triggers completion automatically.";
+"Agent 联动" = "Agent Integration";
+"跟随 Agent:编辑文件时自动打开并定位到改动处" = "Follow Agent: open and jump to changes when files are edited";
+"开启后,Agent 每次修改文件都会在预览标签中打开该文件并跳到第一处改动(仅当前项目)。本轮改动过的行会在行号栏用强调色标出,文件被你编辑后标记消失。在编辑器里选中代码,右键「在对话中引用选区」或按 ⌘⇧L,会把 @文件:行范围 加入当前项目的输入框。" = "When on, every file the Agent edits opens in a preview tab at its first change (current project only). Lines changed this turn are marked in the gutter with the accent color until you edit the file. Select code in the editor and choose \"Reference Selection in Chat\" or press ⌘⇧L to add @file:lines to the current project's input box.";
+"在对话中引用选区" = "Reference Selection in Chat";
