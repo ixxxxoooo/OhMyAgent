@@ -72,9 +72,11 @@ struct ListDetail<List: View, Detail: View>: View {
     @ViewBuilder var detail: Detail
 
     var body: some View {
-        HSplitView {
-            list.frame(minWidth: 280, idealWidth: 320, maxWidth: 420)
-            detail.frame(minWidth: 380, maxWidth: .infinity, maxHeight: .infinity)
+        // 固定宽度的列表列 + 自适应详情:不使用嵌套的 HSplitView(嵌在设置的 NavigationSplitView 内会破坏侧栏宽度)
+        HStack(spacing: 0) {
+            list.frame(width: 320)
+            Divider()
+            detail.frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 }

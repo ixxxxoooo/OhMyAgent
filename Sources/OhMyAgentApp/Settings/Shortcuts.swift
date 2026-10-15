@@ -14,7 +14,7 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
         switch self {
         case .newConversation: return "新对话"
         case .openWorkspace: return "打开工作区"
-        case .extensions: return "扩展管理"
+        case .extensions: return "工具与扩展"
         case .send: return "发送消息"
         }
     }

@@ -40,16 +40,11 @@ final class AppActions {
         openWindowAction?(value: url)
     }
 
-    /// 打开设置。
-    func openSettings() {
+    /// 打开设置(可深链到某页)。
+    func openSettings(page: SettingsPage? = nil, section: ExtensionSection? = nil) {
+        if let page { SettingsRouter.shared.go(page, section: section) }
         NSApp.activate()
         openSettingsAction?()
-    }
-
-    /// 打开扩展管理。
-    func openExtensions() {
-        NSApp.activate()
-        openWindowAction?(id: "extensions", value: WorkspaceStore.defaultWorkspace)
     }
 
     /// 打开某个会话(点击通知或托盘菜单):打开工作区窗口并请求切换到会话。

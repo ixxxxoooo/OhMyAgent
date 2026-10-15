@@ -8,24 +8,32 @@ import SwiftUI
 
 /// 设置页。
 enum SettingsPage: String, CaseIterable, Identifiable {
-    case general, appearance, agent, permissions, mcp, extensions, memory, editor
-    case terminal, shortcuts, usage, agentExtensions, privacy, advanced, diagnostics
+    case general, appearance, shortcuts
+    case agent, permissions, tools, agentExtensions
+    case editor, terminal
+    case usage, privacy, advanced, diagnostics
     var id: String { rawValue }
+
+    /// 侧栏分组(从上到下)。
+    static let groups: [(title: String, pages: [SettingsPage])] = [
+        ("客户端", [.general, .appearance, .shortcuts]),
+        ("Agent", [.agent, .permissions, .tools, .agentExtensions]),
+        ("工作台", [.editor, .terminal]),
+        ("其他", [.usage, .privacy, .advanced, .diagnostics]),
+    ]
 
     var title: String {
         switch self {
         case .general: return "通用"
         case .appearance: return "外观"
+        case .shortcuts: return "快捷键"
         case .agent: return "Agent 与模型"
         case .permissions: return "权限"
-        case .mcp: return "MCP"
-        case .extensions: return "扩展(Skills 等)"
-        case .memory: return "记忆与指令"
+        case .tools: return "工具与扩展"
+        case .agentExtensions: return "Agent 注册表"
         case .editor: return "编辑器"
         case .terminal: return "终端"
-        case .shortcuts: return "快捷键"
         case .usage: return "用量与成本"
-        case .agentExtensions: return "Agent 扩展"
         case .privacy: return "隐私与遥测"
         case .advanced: return "高级"
         case .diagnostics: return "诊断"
@@ -36,20 +44,34 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         switch self {
         case .general: return "gearshape"
         case .appearance: return "paintbrush"
+        case .shortcuts: return "keyboard"
         case .agent: return "cpu"
         case .permissions: return "lock.shield"
-        case .mcp: return "server.rack"
-        case .extensions: return "puzzlepiece.extension"
-        case .memory: return "brain"
+        case .tools: return "puzzlepiece.extension"
+        case .agentExtensions: return "square.stack.3d.up"
         case .editor: return "chevron.left.forwardslash.chevron.right"
         case .terminal: return "terminal"
-        case .shortcuts: return "keyboard"
         case .usage: return "chart.bar"
-        case .agentExtensions: return "square.stack.3d.up"
         case .privacy: return "hand.raised"
         case .advanced: return "wrench.and.screwdriver"
         case .diagnostics: return "stethoscope"
         }
+    }
+}
+
+/// 设置路由:统一的深链入口(⇧⌘E → 工具与扩展、命令面板、托盘等都通过它切页)。
+@MainActor
+@Observable
+final class SettingsRouter {
+    static let shared = SettingsRouter()
+
+    var page: SettingsPage = SettingsPage(rawValue: ProcessInfo.processInfo.environment["OMA_SETTINGS_PAGE"] ?? "") ?? .general
+    var section: ExtensionSection = ExtensionSection(rawValue: ProcessInfo.processInfo.environment["OMA_SECTION"] ?? "") ?? .mcp
+
+    /// 跳转到某页(可选带工具与扩展的分区)。
+    func go(_ page: SettingsPage, section: ExtensionSection? = nil) {
+        self.page = page
+        if let section { self.section = section }
     }
 }
 
@@ -63,15 +85,21 @@ enum SettingsContext {
 
 /// 设置窗口根视图。
 struct SettingsView: View {
-    @State private var selection: SettingsPage = SettingsPage(rawValue: ProcessInfo.processInfo.environment["OMA_SETTINGS_PAGE"] ?? "") ?? .general
+    @Bindable private var router = SettingsRouter.shared
     @State private var model = ClaudeSettingsModel(paths: ClaudePaths(workspace: SettingsContext.workspace))
     @State private var center = ConfigCenter(paths: ClaudePaths(workspace: SettingsContext.workspace))
     private let appearance = AppearanceModel.shared
 
     var body: some View {
         NavigationSplitView {
-            List(SettingsPage.allCases, selection: $selection) { page in
-                Label(page.title, systemImage: page.icon).tag(page)
+            List(selection: $router.page) {
+                ForEach(SettingsPage.groups, id: \.title) { group in
+                    Section(group.title) {
+                        ForEach(group.pages) { page in
+                            Label(page.title, systemImage: page.icon).tag(page)
+                        }
+                    }
+                }
             }
             .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 260)
         } detail: {
@@ -84,9 +112,9 @@ struct SettingsView: View {
                 }
                 page.id(appearance.fontRevision)
             }
-            .navigationTitle(selection.title)
+            .navigationTitle(router.page.title)
         }
-        .frame(minWidth: 860, idealWidth: 960, minHeight: 560, idealHeight: 660)
+        .frame(minWidth: 980, idealWidth: 1060, minHeight: 600, idealHeight: 720)
         .tint(appearance.accent.color)
         .task {
             model.start()
@@ -99,14 +127,12 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var page: some View {
-        switch selection {
+        switch router.page {
         case .general: GeneralPage()
         case .appearance: AppearancePage()
         case .agent: AgentModelPage(model: model)
         case .permissions: PermissionsPage(model: model)
-        case .mcp: MCPManagerView(center: center)
-        case .extensions: ExtensionsBundlePage(center: center)
-        case .memory: MemoryManagerView(center: center)
+        case .tools: ToolsExtensionsPage(center: center, router: router)
         case .editor: EditorPage()
         case .terminal: TerminalPage()
         case .shortcuts: ShortcutsPage()

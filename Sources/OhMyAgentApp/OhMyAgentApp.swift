@@ -83,7 +83,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             UpdateModel.shared.autoCheckIfNeeded()
         }
         // 由脚本启动(open -g)时不抢占前台焦点
-        if ProcessInfo.processInfo.environment["OMA_DRAFT"] == nil && ProcessInfo.processInfo.environment["OMA_OPEN_EXTENSIONS"] == nil && ProcessInfo.processInfo.environment["OMA_OPEN_SETTINGS"] == nil { NSApp.activate() }
+        if ProcessInfo.processInfo.environment["OMA_DRAFT"] == nil && ProcessInfo.processInfo.environment["OMA_OPEN_SETTINGS"] == nil { NSApp.activate() }
     }
 
     /// 托盘启用时,关闭最后一个窗口后应用继续在菜单栏运行(⌘Q 或托盘菜单退出)。
@@ -122,11 +122,6 @@ struct OhMyAgentApp: App {
         .defaultSize(width: 1120, height: 780)
         .commands { WorkspaceCommands() }
 
-        WindowGroup("扩展管理", id: "extensions", for: URL.self) { $workspace in
-            ExtensionsWindow(workspace: workspace ?? WorkspaceStore.defaultWorkspace)
-        }
-        .defaultSize(width: 1040, height: 700)
-
         Settings { SettingsView() }
 
     }
@@ -135,6 +130,7 @@ struct OhMyAgentApp: App {
 /// 菜单命令:打开工作区。
 struct WorkspaceCommands: Commands {
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
     private let shortcuts = ShortcutStore.shared
 
     var body: some Commands {
@@ -148,7 +144,10 @@ struct WorkspaceCommands: Commands {
             Button("检查更新…") { UpdateModel.shared.checkInteractively() }
         }
         CommandGroup(after: .toolbar) {
-            Button("扩展管理…") { openWindow(id: "extensions", value: WorkspaceStore.defaultWorkspace) }
+            Button("工具与扩展…") {
+                SettingsRouter.shared.go(.tools)
+                openSettings()
+            }
                 .keyboardShortcut(shortcuts.shortcut(for: .extensions))
         }
     }

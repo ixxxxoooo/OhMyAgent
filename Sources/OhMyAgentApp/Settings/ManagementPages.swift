@@ -1,31 +1,10 @@
 // @author ygw
-// 设置页:Skills/插件/子 Agent/Hooks 合集、编辑器、终端。
+// 设置页:编辑器、终端。
 
 import ChatKit
 import ClaudeConfigKit
 import DesignSystem
 import SwiftUI
-
-/// Skills / 插件 / 子 Agent / Hooks 合集页。
-struct ExtensionsBundlePage: View {
-    let center: ConfigCenter
-    @State private var tab: ExtensionSection = .skills
-    private let tabs: [ExtensionSection] = [.skills, .plugins, .agents, .hooks]
-
-    var body: some View {
-        VStack(spacing: 0) {
-            Picker("", selection: $tab) { ForEach(tabs) { Text($0.title).tag($0) } }
-                .pickerStyle(.segmented).labelsHidden().padding(10)
-            StatusBanner(center: center)
-            switch tab {
-            case .plugins: PluginsManagerView(center: center)
-            case .agents: MarkdownItemManagerView(center: center, kind: .agent)
-            case .hooks: HooksManagerView(center: center)
-            default: MarkdownItemManagerView(center: center, kind: .skill)
-            }
-        }
-    }
-}
 
 /// 编辑器。
 struct EditorPage: View {

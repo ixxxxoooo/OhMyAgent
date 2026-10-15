@@ -3,8 +3,8 @@
 /* 菜单与应用 */
 "打开工作区" = "Open Workspace";
 "打开工作区…" = "Open Workspace…";
-"扩展管理" = "Extensions";
-"扩展管理…" = "Extensions…";
+"工具与扩展" = "Tools & Extensions";
+"工具与扩展…" = "Tools & Extensions…";
 "设置…" = "Settings…";
 "退出 OhMyAgent" = "Quit OhMyAgent";
 "选择 Agent 要在其中工作的项目目录" = "Choose the project folder for the Agent to work in";
@@ -22,7 +22,6 @@
 "未命名对话" = "Untitled Conversation";
 "未连接" = "Not Connected";
 "正在启动 %@…" = "Starting %@…";
-"账号" = "Account";
 "退出登录" = "Sign Out";
 
 /* 工具栏与状态 */
@@ -86,7 +85,6 @@
 "终端" = "Terminal";
 "编辑器" = "Editor";
 "快捷键" = "Shortcuts";
-"账号与鉴权" = "Account & Auth";
 "用量与成本" = "Usage & Cost";
 "隐私与遥测" = "Privacy & Telemetry";
 "高级" = "Advanced";

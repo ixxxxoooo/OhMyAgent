@@ -91,7 +91,6 @@ struct WorkspaceWindow: View {
                 for _ in 0..<100 where model.phase != .ready { try? await Task.sleep(for: .milliseconds(100)) }
                 model.send(text)
             }
-            if ProcessInfo.processInfo.environment["OMA_OPEN_EXTENSIONS"] != nil { openWindow(id: "extensions", value: workspace) }
             if ProcessInfo.processInfo.environment["OMA_OPEN_SETTINGS"] != nil {
                 openSettings()
                 // 调试:不激活应用,仅把窗口置前,避免被遮挡时视图停止刷新
@@ -117,7 +116,7 @@ extension URL {
 struct WindowToolbar: ToolbarContent {
     let model: SessionModel
     let switchAgent: (AgentDescriptor) -> Void
-    @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
 
     var body: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
@@ -132,8 +131,11 @@ struct WindowToolbar: ToolbarContent {
             }
         }
         ToolbarItem(placement: .primaryAction) {
-            Button { openWindow(id: "extensions", value: model.workspace) } label: {
-                Label("扩展管理", systemImage: "puzzlepiece.extension")
+            Button {
+                SettingsRouter.shared.go(.tools)
+                openSettings()
+            } label: {
+                Label("工具与扩展", systemImage: "puzzlepiece.extension")
             }
             .help("MCP、Skills、子 Agent、Hooks、插件与记忆 (⇧⌘E)")
         }
