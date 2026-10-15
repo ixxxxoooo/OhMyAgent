@@ -144,6 +144,7 @@ private struct SCMContent: View {
         Menu {
             Button("获取(fetch)") { Task { await model.fetch() } }
             Button("刷新") { Task { await model.refresh() } }
+            Button("查看提交历史") { workbench.openHistory(project: model.projectPath) }
             Divider()
             Button("暂存当前更改到 stash…") {
                 if let message = GitDialogs.prompt(title: String(localized: "暂存到 stash"), message: String(localized: "包含未跟踪文件。可留空使用默认说明。"), placeholder: String(localized: "说明(可选)"), confirm: String(localized: "暂存")) {
@@ -359,6 +360,10 @@ private struct ChangeRow: View {
         .contextMenu {
             Button("查看差异") { openDiff() }
             Button("在编辑器中打开") { workbench.openFile(model.absolutePath(change.path), preview: false) }
+            if !change.isUntracked {
+                Button("Git 历史") { workbench.openHistory(project: model.projectPath, path: model.absolutePath(change.path)) }
+                Button("Git Blame") { workbench.openBlame(model.absolutePath(change.path)) }
+            }
             Button("在 Finder 中显示") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: model.absolutePath(change.path))]) }
             Button("拷贝路径") {
                 NSPasteboard.general.clearContents()

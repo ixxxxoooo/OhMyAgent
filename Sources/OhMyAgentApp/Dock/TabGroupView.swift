@@ -46,6 +46,8 @@ func tabIcon(_ kind: TabKind) -> String {
     case .diff, .changes: return "file-diff"
     case .terminal: return "square-terminal"
     case .preview: return "eye"
+    case .history: return "git-graph"
+    case .blame: return "user"
     }
 }
 

@@ -23,6 +23,10 @@ public enum TabKind: Codable, Hashable, Sendable {
     case terminal(id: String)
     /// 预览(Mermaid / Markdown 放大等)
     case preview(id: String)
+    /// Git 提交历史与图(`path` 非空时只看该文件的历史)
+    case history(projectID: String, path: String?)
+    /// 文件逐行追溯(blame)
+    case blame(path: String)
 }
 
 /// 工作台标签。
@@ -361,8 +365,8 @@ public struct DockLayout: Codable, Equatable, Sendable {
         copy.closeTabs { tab in
             switch tab.kind {
             case .subagent, .preview, .terminal: return true
-            case .chat(let id), .changes(let id): return !projectIDs.contains(id)
-            case .file(let path), .diff(let path):
+            case .chat(let id), .changes(let id), .history(let id, _): return !projectIDs.contains(id)
+            case .file(let path), .diff(let path), .blame(let path):
                 return !projectIDs.contains { path == $0 || path.hasPrefix($0 + "/") } || !FileManager.default.fileExists(atPath: path)
             }
         }

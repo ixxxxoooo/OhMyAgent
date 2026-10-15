@@ -118,6 +118,15 @@ enum PaletteCommands {
             },
             PaletteCommand(id: "save", title: String(localized: "保存文件"), icon: "save", shortcut: key(.saveFile)) { AppActions.shared.saveActiveFile() },
             PaletteCommand(id: "saveAll", title: String(localized: "保存全部文件"), icon: "save", shortcut: nil) { AppActions.shared.saveAllFiles() },
+            PaletteCommand(id: "gitHistory", title: String(localized: "显示 Git 历史"), icon: "git-graph", shortcut: nil) {
+                if let id = workbench.selectedProjectID { workbench.openHistory(project: id) }
+            },
+            PaletteCommand(id: "fileHistory", title: String(localized: "查看当前文件的 Git 历史"), icon: "clock", shortcut: nil) {
+                if let id = workbench.selectedProjectID, case .file(let path)? = workbench.dock.focusedGroup?.active?.kind { workbench.openHistory(project: id, path: path) }
+            },
+            PaletteCommand(id: "fileBlame", title: String(localized: "查看当前文件的 Git Blame"), icon: "user", shortcut: nil) {
+                if case .file(let path)? = workbench.dock.focusedGroup?.active?.kind { workbench.openBlame(path) }
+            },
             PaletteCommand(id: "terminal", title: String(localized: "新建终端标签"), icon: "square-terminal", shortcut: key(.newTerminal)) { AppActions.shared.openTerminal() },
             PaletteCommand(id: "explorer", title: String(localized: "显示文件资源管理器"), icon: "folder", shortcut: nil) { workbench.showRight(.files) },
             PaletteCommand(id: "changesPane", title: String(localized: "显示改动"), icon: "file-diff", shortcut: nil) { workbench.showRight(.changes) },

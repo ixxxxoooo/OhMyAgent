@@ -125,8 +125,8 @@ public final class WorkbenchModel {
     /// 标签内容是否归属某项目(会话/改动按项目 ID,文件/Diff 按路径前缀)。
     static func belongs(_ kind: TabKind, toProject id: String) -> Bool {
         switch kind {
-        case .chat(let p), .changes(let p), .subagent(let p, _): return p == id
-        case .file(let path), .diff(let path): return path == id || path.hasPrefix(id + "/")
+        case .chat(let p), .changes(let p), .subagent(let p, _), .history(let p, _): return p == id
+        case .file(let path), .diff(let path), .blame(let path): return path == id || path.hasPrefix(id + "/")
         case .terminal, .preview: return false
         }
     }
@@ -178,6 +178,24 @@ public final class WorkbenchModel {
     public func openTerminal(id: String, title: String) -> UUID {
         mode = .workspace
         return dock.open(.terminal(id: id), title: title)
+    }
+
+    /// 打开 Git 提交历史标签。
+    /// - Parameters:
+    ///   - projectID: 项目
+    ///   - path: 仅看该文件的历史;nil 表示整个仓库
+    @discardableResult
+    public func openHistory(project projectID: String, path: String? = nil) -> UUID {
+        mode = .workspace
+        let title = path.map { String(localized: "历史") + " · " + ($0 as NSString).lastPathComponent } ?? String(localized: "Git 历史")
+        return dock.open(.history(projectID: projectID, path: path), title: title)
+    }
+
+    /// 打开文件的逐行追溯(blame)标签。
+    @discardableResult
+    public func openBlame(_ path: String) -> UUID {
+        mode = .workspace
+        return dock.open(.blame(path: path), title: "Blame · " + (path as NSString).lastPathComponent)
     }
 
     /// 关闭某项目全部子 Agent 标签(会话被替换后它们指向的工具调用已不存在)。

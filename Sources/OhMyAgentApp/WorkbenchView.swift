@@ -166,6 +166,10 @@ struct WorkbenchView: View {
             workbench.openPreview(id: id, title: "Mermaid 图")
         }
         if let diffPath = env["OMA_OPEN_DIFF"], !diffPath.isEmpty { workbench.openDiff(diffPath) }  // 调试:打开 Diff 标签
+        if let history = env["OMA_OPEN_HISTORY"], let project = workbench.selectedProjectID {
+            workbench.openHistory(project: project, path: history.hasPrefix("/") ? history : nil)  // 调试:打开历史(可带文件路径)
+        }
+        if let blame = env["OMA_OPEN_BLAME"], !blame.isEmpty { workbench.openBlame(blame) }  // 调试:打开 blame
         if env["OMA_OPEN_TERMINAL"] != nil {
             // 调试:打开终端标签;OMA_TERM_INPUT 在 shell 就绪后输入(\n 会被替换为回车)
             actions.openTerminal()

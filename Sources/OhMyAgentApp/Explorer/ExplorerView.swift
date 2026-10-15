@@ -165,6 +165,11 @@ private struct ExplorerMenu: View {
         Button("重命名…") { ExplorerActions.rename(entry, workbench: workbench) }
         Button("移到废纸篓") { ExplorerActions.trash(entry, workbench: workbench) }
         Divider()
+        if !entry.isDirectory {
+            Button("Git 历史") { workbench.openHistory(project: root, path: entry.path) }
+            Button("Git Blame") { workbench.openBlame(entry.path) }
+            Divider()
+        }
         Button("在 Finder 中显示") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: entry.path)]) }
         Button("拷贝路径") { copy(entry.path) }
         Button("拷贝相对路径") { copy(relative) }
