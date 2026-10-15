@@ -2,6 +2,7 @@
 // 工作台根视图:左栏(项目 → 会话树)+ 中栏(会话)+ 右栏检查器(变更/计划)+ 底部面板 + 状态栏。
 // 左右栏均可收起,尺寸与显隐持久化到 WorkbenchModel.layout。
 
+import IconKit
 import ACPKit
 import AgentHost
 import ChatKit
@@ -170,7 +171,7 @@ struct WorkbenchToolbar: ToolbarContent {
                 SettingsRouter.shared.go(.tools)
                 openSettings()
             } label: {
-                Label("工具与扩展", systemImage: "puzzlepiece.extension")
+                Label("工具与扩展", om: "puzzlepiece.extension")
             }
             .help("MCP、Skills、子 Agent、Hooks、插件与记忆 (\(ShortcutStore.shared.binding(for: .extensions).display))")
         }
@@ -178,21 +179,21 @@ struct WorkbenchToolbar: ToolbarContent {
             Button {
                 if let id = workbench.selectedProjectID { workbench.newConversation(in: id) }
             } label: {
-                Label("新对话", systemImage: "square.and.pencil")
+                Label("新对话", om: "square.and.pencil")
             }
             .help("新对话 (\(ShortcutStore.shared.binding(for: .newConversation).display))")
             .disabled(workbench.activeSession?.phase != .ready)
         }
         ToolbarItem(placement: .primaryAction) {
             Button { workbench.toggleBottom() } label: {
-                Label("底部面板", systemImage: workbench.layout.bottomVisible ? "rectangle.bottomthird.inset.filled" : "rectangle.bottomthird.inset.filled")
+                Label("底部面板", om: workbench.layout.bottomVisible ? "rectangle.bottomthird.inset.filled" : "rectangle.bottomthird.inset.filled")
                     .symbolVariant(workbench.layout.bottomVisible ? .fill : .none)
             }
             .help("切换底部面板 (\(ShortcutStore.shared.binding(for: .togglePanel).display))")
         }
         ToolbarItem(placement: .primaryAction) {
             Button { workbench.toggleRight() } label: {
-                Label("右栏", systemImage: "sidebar.right")
+                Label("右栏", om: "sidebar.right")
             }
             .help("切换右栏 (\(ShortcutStore.shared.binding(for: .toggleInspector).display))")
         }

@@ -1,29 +1,29 @@
 // @author ygw
 // 基础组件:图标按钮、状态点、标签。
 
+import IconKit
 import SwiftUI
 
 /// 玻璃图标按钮,用于工具栏与浮动操作条。
 public struct OMIconButton: View {
-    private let systemName: String
+    private let symbol: String
     private let help: String
     private let action: () -> Void
 
     /// 创建按钮。
     /// - Parameters:
-    ///   - systemName: SF Symbol 名称
+    ///   - symbol: 图标语义名或 Lucide 名
     ///   - help: 悬停提示与辅助功能标签
     ///   - action: 点击回调
-    public init(_ systemName: String, help: String, action: @escaping () -> Void) {
-        self.systemName = systemName
+    public init(_ symbol: String, help: String, action: @escaping () -> Void) {
+        self.symbol = symbol
         self.help = help
         self.action = action
     }
 
     public var body: some View {
         Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 13, weight: .medium))
+            Image.om(symbol, size: 15)
                 .frame(width: 30, height: 30)
                 .contentShape(Circle())
         }

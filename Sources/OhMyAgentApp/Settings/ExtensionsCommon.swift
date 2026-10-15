@@ -1,6 +1,7 @@
 // @author ygw
 // 管理页公共组件:状态条、徽标、空状态、分栏容器。
 
+import IconKit
 import ClaudeConfigKit
 import DesignSystem
 import SwiftUI
@@ -22,17 +23,17 @@ struct StatusBanner: View {
             }
             if let error = center.lastError {
                 HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: "xmark.octagon.fill").foregroundStyle(.red)
+                    Image.om("xmark.octagon.fill").foregroundStyle(.red)
                     Text(error).font(OMFonts.small).textSelection(.enabled).lineLimit(4)
                     Spacer()
-                    Button { center.lastError = nil } label: { Image(systemName: "xmark") }.buttonStyle(.plain)
+                    Button { center.lastError = nil } label: { Image.om("xmark") }.buttonStyle(.plain)
                         .accessibilityLabel("关闭错误提示")
                 }
                 .padding(.horizontal, 16).padding(.vertical, 8)
                 .background(Color.red.opacity(0.1))
             } else if let notice = center.lastNotice {
                 HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                    Image.om("checkmark.circle.fill").foregroundStyle(.green)
                     Text(notice).font(OMFonts.small)
                     Spacer()
                 }
@@ -89,7 +90,7 @@ struct EmptyHint: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            Image(systemName: icon).font(.system(size: 28)).foregroundStyle(OMColors.tertiaryText)
+            Image.om(icon, size: 28).foregroundStyle(OMColors.tertiaryText)
             Text(title).font(OMFonts.title)
             if let message { Text(message).font(OMFonts.small).foregroundStyle(OMColors.secondaryText).multilineTextAlignment(.center) }
         }
@@ -127,7 +128,7 @@ struct SheetFooter: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             ForEach(problems, id: \.self) { problem in
-                Label(problem, systemImage: "exclamationmark.circle").font(OMFonts.small).foregroundStyle(OMColors.warning)
+                Label(problem, om: "exclamationmark.circle").font(OMFonts.small).foregroundStyle(OMColors.warning)
             }
             HStack {
                 Spacer()

@@ -1,6 +1,7 @@
 // @author ygw
 // 欢迎页:工作台还没有项目时显示,提供「打开项目」与最近项目。
 
+import IconKit
 import ChatKit
 import DesignSystem
 import SwiftUI
@@ -11,8 +12,7 @@ struct WelcomeView: View {
 
     var body: some View {
         VStack(spacing: 18) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 40, weight: .light))
+            Image.om("sparkles", size: 40, weight: .light)
                 .foregroundStyle(OMColors.accent)
             Text("打开一个项目开始")
                 .font(OMFonts.title)
@@ -22,7 +22,7 @@ struct WelcomeView: View {
             Button {
                 if let url = WorkspaceStore.chooseDirectory() { AppActions.shared.openWorkspace(url) }
             } label: {
-                Label("打开项目…", systemImage: "folder.badge.plus")
+                Label("打开项目…", om: "folder.badge.plus")
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
@@ -35,7 +35,7 @@ struct WelcomeView: View {
                             AppActions.shared.openWorkspace(URL(fileURLWithPath: path))
                         } label: {
                             HStack {
-                                Image(systemName: "folder")
+                                Image.om("folder")
                                 Text((path as NSString).lastPathComponent)
                                 Text((path as NSString).abbreviatingWithTildeInPath)
                                     .foregroundStyle(OMColors.secondaryText)

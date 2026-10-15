@@ -1,6 +1,7 @@
 // @author ygw
 // 插件管理:已安装列表(启停/更新/卸载)、市场管理与安装。变更全部委托官方 `claude plugin` CLI。
 
+import IconKit
 import ClaudeConfigKit
 import DesignSystem
 import SwiftUI
@@ -18,7 +19,7 @@ struct PluginsManagerView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 if !center.canRunCLI {
-                    Label("没有找到 claude 命令行工具,插件的安装/启停/卸载不可用(下方列表仍可只读查看)。", systemImage: "exclamationmark.triangle")
+                    Label("没有找到 claude 命令行工具,插件的安装/启停/卸载不可用(下方列表仍可只读查看)。", om: "exclamationmark.triangle")
                         .font(OMFonts.small).foregroundStyle(OMColors.warning)
                 }
                 installSection

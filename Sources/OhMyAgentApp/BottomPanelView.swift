@@ -1,6 +1,7 @@
 // @author ygw
 // 底部面板:顶部可拖拽调整高度的分隔条 + 标签(输出,后续加入终端与问题)+ 内容。
 
+import IconKit
 import ChatKit
 import DesignSystem
 import SwiftUI
@@ -23,7 +24,7 @@ struct BottomPanelView: View {
                         .background(workbench.layout.bottomPane == pane ? OMColors.accent.opacity(0.12) : .clear, in: Capsule())
                 }
                 Spacer()
-                Button { workbench.layout.bottomVisible = false } label: { Image(systemName: "xmark") }
+                Button { workbench.layout.bottomVisible = false } label: { Image.om("xmark") }
                     .buttonStyle(.borderless)
                     .help("关闭面板 (\(ShortcutStore.shared.binding(for: .togglePanel).display))")
                     .accessibilityLabel("关闭底部面板")

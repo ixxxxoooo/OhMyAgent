@@ -1,6 +1,7 @@
 // @author ygw
 // 工作台通用部件:窗口工具栏、Agent 菜单、连接徽标、用量环与用量按钮、窗口焦点读取。
 
+import IconKit
 import ACPKit
 import AgentHost
 import ChatKit
@@ -20,7 +21,7 @@ struct AgentMenu: View {
                 Button {
                     switchAgent(agent)
                 } label: {
-                    if agent.id == model.descriptor.id { Label(agent.name, systemImage: "checkmark") } else { Text(agent.name) }
+                    if agent.id == model.descriptor.id { Label(agent.name, om: "checkmark") } else { Text(agent.name) }
                 }
             }
             Divider()
@@ -29,7 +30,7 @@ struct AgentMenu: View {
                 openSettings()
             }
         } label: {
-            Label(model.descriptor.name, systemImage: "person.crop.rectangle.stack")
+            Label(model.descriptor.name, om: "person.crop.rectangle.stack")
         }
         .menuIndicator(.visible)
         .help("切换 Agent(会在当前项目开始新会话)")
@@ -98,7 +99,7 @@ struct UsageButton: View {
 
     var body: some View {
         Button { shown.toggle() } label: {
-            if usage.size != nil { UsageRing(fraction: fraction) } else { Image(systemName: "gauge.with.needle") }
+            if usage.size != nil { UsageRing(fraction: fraction) } else { Image.om("gauge.with.needle") }
         }
         .help("用量详情")
         .accessibilityLabel("用量详情")
@@ -117,7 +118,7 @@ struct UsageButton: View {
                 if let cost = usage.costAmount {
                     Text("累计费用 \(cost.formatted(.number.precision(.fractionLength(2...4)))) \(usage.costCurrency ?? "USD")").font(OMFonts.small)
                     if overBudget(cost) {
-                        Label("已超过预算提醒阈值", systemImage: "exclamationmark.triangle.fill").font(OMFonts.small).foregroundStyle(OMColors.warning)
+                        Label("已超过预算提醒阈值", om: "exclamationmark.triangle.fill").font(OMFonts.small).foregroundStyle(OMColors.warning)
                     }
                 }
                 Text("数据来自 Agent 上报,订阅账号可能不显示费用。")

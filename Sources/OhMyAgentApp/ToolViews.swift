@@ -1,6 +1,7 @@
 // @author ygw
 // 权限卡片与 Agent 提问表单。(工具行、终端输出等见 ToolRowViews.swift)
 
+import IconKit
 import ACPKit
 import ChatKit
 import DesignSystem
@@ -16,7 +17,7 @@ struct PermissionCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                Image(systemName: ToolIcons.symbol(for: prompt.kind)).foregroundStyle(OMColors.warning)
+                Image.om(ToolIcons.symbol(for: prompt.kind)).foregroundStyle(OMColors.warning)
                 Text("需要你的许可").font(OMFonts.small.weight(.semibold))
             }
             Text(prompt.title)
@@ -98,7 +99,7 @@ struct ElicitationCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("Agent 想向你确认", systemImage: "questionmark.bubble")
+            Label("Agent 想向你确认", om: "questionmark.bubble")
                 .font(OMFonts.small.weight(.semibold))
             if !prompt.message.isEmpty {
                 Text(prompt.message).font(OMFonts.body).textSelection(.enabled)
@@ -175,7 +176,7 @@ struct ElicitFieldView: View {
     private func optionRow(_ option: ElicitOption, selected: Bool, symbol: String, toggle: @escaping () -> Void) -> some View {
         Button(action: toggle) {
             HStack(alignment: .top, spacing: 8) {
-                Image(systemName: selected ? "\(symbol).inset.filled" : symbol)
+                Image.om(selected ? "\(symbol).inset.filled" : symbol)
                     .foregroundStyle(selected ? OMColors.accent : OMColors.secondaryText)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(option.title).font(OMFonts.body)

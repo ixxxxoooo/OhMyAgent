@@ -3,6 +3,7 @@
 // 图标右下角的状态点:运行中闪烁(蓝)、待处理闪烁(橙)、未读完成常亮(绿);已读后消失。
 // 不使用 SwiftUI MenuBarExtra(它在状态变化时的刷新循环曾造成 CPU 空转),菜单仅在打开时构建。
 
+import IconKit
 import AppKit
 import ChatKit
 import DesignSystem
@@ -178,7 +179,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         for path in projects.prefix(10) {
             let entry = item((path as NSString).lastPathComponent) { AppActions.shared.openWorkspace(URL(fileURLWithPath: path)) }
             entry.toolTip = (path as NSString).abbreviatingWithTildeInPath
-            entry.image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)
+            entry.image = OMIconRenderer.nsImage("folder", size: 14)
             projectMenu.addItem(entry)
         }
         if !projects.isEmpty {

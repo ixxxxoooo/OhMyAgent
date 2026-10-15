@@ -1,6 +1,7 @@
 // @author ygw
 // 设置页公共组件:settings.json 绑定、作用域选择器、说明文字。
 
+import IconKit
 import ClaudeConfigKit
 import DesignSystem
 import SwiftUI
@@ -44,7 +45,7 @@ struct ScopeHeader: View {
             }
             Text(hint).font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
             if !model.canWriteCurrentScope {
-                Label("当前没有工作区,无法写入此层;请先打开一个工作区。", systemImage: "exclamationmark.triangle").font(OMFonts.caption).foregroundStyle(OMColors.warning)
+                Label("当前没有工作区,无法写入此层;请先打开一个工作区。", om: "exclamationmark.triangle").font(OMFonts.caption).foregroundStyle(OMColors.warning)
             }
         }
     }

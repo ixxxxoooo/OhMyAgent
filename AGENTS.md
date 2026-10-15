@@ -16,6 +16,7 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 - `WorkbenchKit`:工作台模型(多项目、项目→会话树、布局与状态持久化,无视图)。
 - `ClaudeConfigKit`:读写 `~/.claude`、`.mcp.json` 等配置。
 - `DiffKit` / `EditorKit`:Diff 与编辑器。
+- `IconKit`:Lucide 图标(生成数据 + SVG path 解析 + `Image.om`);界面禁止再用 SF Symbol(`Scripts/gen-icons.py` 重新生成)。
 - `DesignSystem`:设计令牌与玻璃材质。
 - `OhMyAgentApp`:应用本体(SwiftUI/AppKit 视图)。
 - `FakeAgent` / `OhMyAgentBridge`:辅助可执行文件。

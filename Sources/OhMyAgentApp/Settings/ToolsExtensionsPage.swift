@@ -1,6 +1,7 @@
 // @author ygw
 // 设置页「工具与扩展」:MCP / Skills / 子 Agent / Hooks / 插件 / 记忆与指令的唯一入口(取代原独立的「扩展管理」窗口)。
 
+import IconKit
 import ClaudeConfigKit
 import DesignSystem
 import SwiftUI
@@ -62,7 +63,7 @@ struct ToolsExtensionsPage: View {
             .padding(10)
             StatusBanner(center: center)
             if let error = center.snapshot.errors[errorKey(router.section)] {
-                Label(error, systemImage: "exclamationmark.triangle.fill")
+                Label(error, om: "exclamationmark.triangle.fill")
                     .font(OMFonts.small)
                     .foregroundStyle(OMColors.warning)
                     .frame(maxWidth: .infinity, alignment: .leading)

@@ -1,6 +1,7 @@
 // @author ygw
 // 右栏检查器:本轮改动(当前会话最近一次的文件改动汇总)与计划(Agent 最近一次的任务清单)。
 
+import IconKit
 import ChatKit
 import DesignSystem
 import SwiftUI
@@ -23,7 +24,7 @@ struct RightPaneView: View {
             if let model = workbench.activeSession {
                 content(model: model)
             } else {
-                ContentUnavailableView("没有会话", systemImage: "bubble.left", description: Text("选择一个项目后,这里会显示改动与计划。"))
+                ContentUnavailableView { Label("没有会话", om: "bubble.left", size: 28) } description: { Text("选择一个项目后,这里会显示改动与计划。") }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -41,7 +42,7 @@ struct RightPaneView: View {
                         .padding(10)
                 }
             } else {
-                ContentUnavailableView("暂无改动", systemImage: "doc.on.doc", description: Text("Agent 修改文件后,这里会列出每个文件的差异。"))
+                ContentUnavailableView { Label("暂无改动", om: "doc.on.doc", size: 28) } description: { Text("Agent 修改文件后,这里会列出每个文件的差异。") }
             }
         case .plan:
             if let entry = model.timeline.entries.last(where: { $0.kind == .plan }) {
@@ -49,7 +50,7 @@ struct RightPaneView: View {
                     PlanView(entry: entry).padding(10)
                 }
             } else {
-                ContentUnavailableView("暂无计划", systemImage: "checklist", description: Text("Agent 制定任务计划后会显示在这里。"))
+                ContentUnavailableView { Label("暂无计划", om: "checklist", size: 28) } description: { Text("Agent 制定任务计划后会显示在这里。") }
             }
         case .outline, .problems:
             EmptyView()

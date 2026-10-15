@@ -1,6 +1,7 @@
 // @author ygw
 // “本轮改动”汇总与文件查看面板:逐文件审查、按块撤销、整体撤销;点击文件在 EditorKit 编辑器中打开。
 
+import IconKit
 import ChatKit
 import DesignSystem
 import DiffKit
@@ -18,7 +19,7 @@ struct ChangesSummaryView: View {
         let hasPending = entry.changes.contains { $0.status == .pending || $0.status == .partiallyReverted }
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                Image(systemName: "doc.on.doc").foregroundStyle(OMColors.secondaryText)
+                Image.om("doc.on.doc").foregroundStyle(OMColors.secondaryText)
                 Text("本轮修改了 \(entry.changes.count) 个文件").font(OMFonts.small.weight(.semibold))
                 Text("+\(added)").foregroundStyle(OMColors.diffAdded).font(OMFonts.small)
                 Text("−\(removed)").foregroundStyle(OMColors.diffRemoved).font(OMFonts.small)
@@ -53,8 +54,7 @@ struct FileChangeRow: View {
                     omWithAnimation(.snappy(duration: 0.2)) { expanded.toggle() }
                 } label: {
                     HStack(spacing: 8) {
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 9, weight: .bold))
+                        Image.om("chevron.right", size: 9, weight: .bold)
                             .rotationEffect(.degrees(expanded ? 90 : 0))
                             .foregroundStyle(OMColors.tertiaryText)
                         Text(change.fileName).font(OMFonts.small.weight(.medium))
@@ -71,7 +71,7 @@ struct FileChangeRow: View {
                 Button {
                     model.viewerRequest = FileViewRequest(path: change.path, line: change.diff.hunks.first?.newStart)
                 } label: {
-                    Image(systemName: "arrow.up.forward.square")
+                    Image.om("arrow.up.forward.square")
                 }
                 .buttonStyle(.plain)
                 .help("在编辑器中打开")
@@ -117,7 +117,7 @@ struct FileViewerSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Image(systemName: "doc.text")
+                Image.om("doc.text")
                 Text(request.path.abbreviatedPath).font(OMFonts.small).lineLimit(1).truncationMode(.middle)
                 Spacer()
                 Button("关闭") { dismiss() }.keyboardShortcut(.cancelAction)

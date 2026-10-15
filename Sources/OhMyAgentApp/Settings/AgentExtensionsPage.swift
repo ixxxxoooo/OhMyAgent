@@ -1,6 +1,7 @@
 // @author ygw
 // 设置页:Agent 扩展(Agent 注册表、Agent-as-MCP、OhMyAgent Bridge)。均写回 agents.json。
 
+import IconKit
 import AppKit
 import AgentHost
 import ChatKit
@@ -87,7 +88,7 @@ struct AgentExtensionsPage: View {
                         Button("重新读取") { registry.reload() }
                     }
                 }
-                if let error = registry.lastError { Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(OMColors.warning) }
+                if let error = registry.lastError { Label(error, om: "exclamationmark.triangle").foregroundStyle(OMColors.warning) }
             }
         }
         .sheet(item: $draft) { item in AgentEditSheet(draft: item) { draft = nil } }
@@ -110,7 +111,7 @@ struct AgentExtensionsPage: View {
                         }
                         if let summary = agent.summary { Note(summary) }
                         if !builtIn, let command = agent.command, GenericACPProvider.resolve(command, path: path) == nil {
-                            Label("在 PATH 中找不到 \(command)", systemImage: "exclamationmark.triangle").font(OMFonts.caption).foregroundStyle(OMColors.warning)
+                            Label("在 PATH 中找不到 \(command)", om: "exclamationmark.triangle").font(OMFonts.caption).foregroundStyle(OMColors.warning)
                         }
                     }
                     Spacer()
@@ -175,7 +176,7 @@ struct AgentExtensionsPage: View {
                 .padding(.leading, 16)
             }
             if HelperBinaries.locate("OhMyAgentBridge") == nil {
-                Label("缺少辅助程序 OhMyAgentBridge,请用 Scripts/bundle.sh 重新打包。", systemImage: "exclamationmark.triangle").font(OMFonts.caption).foregroundStyle(OMColors.warning)
+                Label("缺少辅助程序 OhMyAgentBridge,请用 Scripts/bundle.sh 重新打包。", om: "exclamationmark.triangle").font(OMFonts.caption).foregroundStyle(OMColors.warning)
             }
             Note("每个会话在本机创建一个仅当前用户可访问的 Unix socket,通过 `OhMyAgentBridge` 垫片以 MCP 服务器 `ohmyagent` 暴露:打开文件、显示改动、读取你在输入框中选中的文字、发送系统通知。会话结束即关闭。")
         }
@@ -208,7 +209,7 @@ struct AgentEditSheet: View {
                 }
             }
             .formStyle(.grouped)
-            if let error { Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(OMColors.warning) }
+            if let error { Label(error, om: "exclamationmark.triangle").foregroundStyle(OMColors.warning) }
             HStack {
                 Spacer()
                 Button("取消", action: close).keyboardShortcut(.cancelAction)
@@ -249,7 +250,7 @@ struct MCPAgentEditSheet: View {
                 TextField("参数", text: $args, prompt: Text("用空格分隔,如 mcp-server"))
             }
             .formStyle(.grouped)
-            if let error { Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(OMColors.warning) }
+            if let error { Label(error, om: "exclamationmark.triangle").foregroundStyle(OMColors.warning) }
             HStack {
                 Spacer()
                 Button("取消", action: close).keyboardShortcut(.cancelAction)

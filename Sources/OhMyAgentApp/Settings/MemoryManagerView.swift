@@ -1,6 +1,7 @@
 // @author ygw
 // 记忆与指令:多层级 CLAUDE.md / rules 编辑器,规则创建与删除。
 
+import IconKit
 import ClaudeConfigKit
 import DesignSystem
 import SwiftUI
@@ -18,7 +19,7 @@ struct MemoryManagerView: View {
         ListDetail {
             VStack(spacing: 0) {
                 HStack {
-                    Button { showCreateRule = true } label: { Label("新建规则", systemImage: "plus") }
+                    Button { showCreateRule = true } label: { Label("新建规则", om: "plus") }
                     Spacer()
                 }
                 .padding(10)
@@ -71,10 +72,10 @@ struct MemoryEditor: View {
             }
             Text(file.url.abbreviatingHome).font(OMFonts.caption).foregroundStyle(OMColors.secondaryText).lineLimit(1).truncationMode(.middle)
             if file.kind == .agentsMD {
-                Label("Claude Code 不会自动读取 AGENTS.md。可在 CLAUDE.md 中写 @AGENTS.md 导入它。", systemImage: "info.circle").font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
+                Label("Claude Code 不会自动读取 AGENTS.md。可在 CLAUDE.md 中写 @AGENTS.md 导入它。", om: "info.circle").font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
             }
             if file.kind == .local {
-                Label("CLAUDE.local.md 只对你个人生效,请加入 .gitignore。", systemImage: "info.circle").font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
+                Label("CLAUDE.local.md 只对你个人生效,请加入 .gitignore。", om: "info.circle").font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
             }
             TextEditor(text: $text)
                 .font(OMFonts.mono)

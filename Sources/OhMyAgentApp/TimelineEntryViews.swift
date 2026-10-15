@@ -1,6 +1,7 @@
 // @author ygw
 // 时间线条目视图:用户、助手(Markdown)、思维面板、工具卡片、计划、提示。
 
+import IconKit
 import ACPKit
 import ChatKit
 import DesignSystem
@@ -66,8 +67,7 @@ struct ThoughtView: View {
                 omWithAnimation(.snappy(duration: 0.2)) { expanded.toggle() }
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 9, weight: .bold))
+                    Image.om("chevron.right", size: 9, weight: .bold)
                         .rotationEffect(.degrees(expanded ? 90 : 0))
                     if entry.isStreaming {
                         TimelineView(.periodic(from: .now, by: 1)) { _ in
@@ -102,12 +102,12 @@ struct PlanView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Label("计划", systemImage: "list.bullet.clipboard")
+            Label("计划", om: "list.bullet.clipboard")
                 .font(OMFonts.small.weight(.semibold))
                 .foregroundStyle(OMColors.secondaryText)
             ForEach(Array(entry.plan.enumerated()), id: \.offset) { _, item in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Image(systemName: icon(item.status))
+                    Image.om(icon(item.status))
                         .foregroundStyle(item.status == "completed" ? Color.green : OMColors.secondaryText)
                         .frame(width: 14)
                     Text(item.content)
@@ -136,7 +136,7 @@ struct NoticeView: View {
     let entry: TimelineEntry
 
     var body: some View {
-        Label(entry.text, systemImage: entry.isError ? "exclamationmark.circle.fill" : "info.circle")
+        Label(entry.text, om: entry.isError ? "exclamationmark.circle.fill" : "info.circle")
             .font(OMFonts.small)
             .foregroundStyle(entry.isError ? Color.red : OMColors.secondaryText)
             .textSelection(.enabled)

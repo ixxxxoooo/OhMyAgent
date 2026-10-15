@@ -1,6 +1,7 @@
 // @author ygw
 // 设置页:用量与成本。登录与凭据完全由本机官方 claude 管理,客户端不提供账号 UI。
 
+import IconKit
 import ACPKit
 import AgentHost
 import AppKit
@@ -25,7 +26,7 @@ struct UsagePage: View {
                     }
                     if let cost = usage.costAmount {
                         LabeledContent("累计费用", value: "\(cost.formatted(.number.precision(.fractionLength(2...4)))) \(usage.costCurrency ?? "USD")")
-                        if budget > 0, cost >= budget { Label("已超过预算提醒阈值 \(budget.formatted()) USD", systemImage: "exclamationmark.triangle.fill").foregroundStyle(OMColors.warning) }
+                        if budget > 0, cost >= budget { Label("已超过预算提醒阈值 \(budget.formatted()) USD", om: "exclamationmark.triangle.fill").foregroundStyle(OMColors.warning) }
                     }
                 } else {
                     Text("当前没有用量数据").foregroundStyle(OMColors.secondaryText)

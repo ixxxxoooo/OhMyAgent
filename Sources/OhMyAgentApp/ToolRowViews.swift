@@ -2,6 +2,7 @@
 // Cursor 风格的紧凑工具行:一行摘要(动词 + 对象 + 附注 + 统计 + 状态),点击展开详情;
 // 连续的“浏览”类步骤折叠为一组;终端输出支持 ANSI 颜色、复制、耗时与中断。
 
+import IconKit
 import ACPKit
 import AppKit
 import ChatKit
@@ -97,8 +98,7 @@ struct ToolRowView: View {
 
     private func row(_ tool: ToolCall, _ p: ToolPresentation, canExpand: Bool, isExpanded: Bool) -> some View {
         HStack(spacing: 7) {
-            Image(systemName: ToolIcons.symbol(for: p.category))
-                .font(.system(size: 11.5))
+            Image.om(ToolIcons.symbol(for: p.category), size: 11.5)
                 .frame(width: 16)
                 .foregroundStyle(tool.status == .failed ? Color.red : OMColors.secondaryText)
             if let server = p.mcpServer { OMTag(server, tint: OMColors.accent) }
@@ -119,7 +119,7 @@ struct ToolRowView: View {
                 Button {
                     model.viewerRequest = FileViewRequest(path: path, line: tool.locations.first?.line)
                 } label: {
-                    Image(systemName: "arrow.up.right.square").font(.system(size: 11))
+                    Image.om("arrow.up.right.square", size: 11)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(OMColors.secondaryText)
@@ -136,8 +136,7 @@ struct ToolRowView: View {
             if p.category == .terminal { durationText(tool) }
             statusView(tool.status)
             if canExpand {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 9, weight: .bold))
+                Image.om("chevron.right", size: 9, weight: .bold)
                     .foregroundStyle(OMColors.tertiaryText)
                     .rotationEffect(.degrees(isExpanded ? 90 : 0))
             }
@@ -206,8 +205,8 @@ struct ToolRowView: View {
         switch status {
         case .pending: OMStatusDot(.idle)
         case .inProgress: ProgressView().controlSize(.mini)
-        case .completed: Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).foregroundStyle(.green.opacity(0.8))
-        case .failed: Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).foregroundStyle(.red)
+        case .completed: Image.om("checkmark", size: 9, weight: .bold).foregroundStyle(.green.opacity(0.8))
+        case .failed: Image.om("xmark", size: 9, weight: .bold).foregroundStyle(.red)
         }
     }
 
@@ -316,7 +315,7 @@ struct ToolDetailsView: View {
             if let session = model.terminals[id] {
                 TerminalOutputView(session: session) { model.interruptTerminal(id) }
             } else {
-                Label("终端 \(id)", systemImage: "terminal").font(OMFonts.monoSmall)
+                Label("终端 \(id)", om: "terminal").font(OMFonts.monoSmall)
             }
         case .content(let block):
             if let text = block.plainText, !text.isEmpty {
@@ -410,7 +409,7 @@ struct CopyButton: View {
                 copied = false
             }
         } label: {
-            Image(systemName: copied ? "checkmark" : "doc.on.doc").font(.system(size: 11))
+            Image.om(copied ? "checkmark" : "doc.on.doc", size: 11)
         }
         .buttonStyle(.plain)
         .foregroundStyle(OMColors.secondaryText)
@@ -492,7 +491,7 @@ struct SearchHitRow: View {
     var body: some View {
         Button(action: open) {
             HStack(spacing: 6) {
-                Image(systemName: "doc.text").font(.system(size: 10.5)).foregroundStyle(OMColors.secondaryText)
+                Image.om("doc.text", size: 10.5).foregroundStyle(OMColors.secondaryText)
                 Text((hit.path as NSString).lastPathComponent).font(OMFonts.small.weight(.medium))
                 if let line = hit.line { Text(":\(line)").font(OMFonts.monoSmall).foregroundStyle(OMColors.tertiaryText) }
                 if let text = hit.text, !text.isEmpty {
@@ -541,8 +540,7 @@ struct ExploreGroupView: View {
         let isExpanded = expanded ?? (DebugFlags.expandAll || group.isRunning || group.hasFailure)
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 7) {
-                Image(systemName: "text.magnifyingglass")
-                    .font(.system(size: 11.5))
+                Image.om("text.magnifyingglass", size: 11.5)
                     .frame(width: 16)
                     .foregroundStyle(OMColors.secondaryText)
                 Text(group.summary)
@@ -550,8 +548,7 @@ struct ExploreGroupView: View {
                     .foregroundStyle(OMColors.secondaryText)
                 if group.isRunning { ProgressView().controlSize(.mini) }
                 Spacer(minLength: 8)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 9, weight: .bold))
+                Image.om("chevron.right", size: 9, weight: .bold)
                     .foregroundStyle(OMColors.tertiaryText)
                     .rotationEffect(.degrees(isExpanded ? 90 : 0))
             }

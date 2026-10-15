@@ -1,6 +1,7 @@
 // @author ygw
 // Skills / 命令 / 子 Agent 管理:分组列表、源码编辑(含 frontmatter 快捷开关)、新建向导、删除。
 
+import IconKit
 import AppKit
 import ClaudeConfigKit
 import DesignSystem
@@ -27,9 +28,9 @@ struct MarkdownItemManagerView: View {
         ListDetail {
             VStack(spacing: 0) {
                 HStack(spacing: 8) {
-                    Button { showCreate = true } label: { Label("新建\(noun)", systemImage: "plus") }
+                    Button { showCreate = true } label: { Label("新建\(noun)", om: "plus") }
                     Spacer()
-                    Button { center.reload() } label: { Image(systemName: "arrow.clockwise") }.help("重新读取").accessibilityLabel("刷新")
+                    Button { center.reload() } label: { Image.om("arrow.clockwise") }.help("重新读取").accessibilityLabel("刷新")
                 }
                 .padding(10)
                 TextField("搜索名称或描述", text: $search).textFieldStyle(.roundedBorder).padding(.horizontal, 10).padding(.bottom, 8)
@@ -117,7 +118,7 @@ struct MarkdownItemEditor: View {
                 Text(item.name).font(OMFonts.title)
                 Tag(item.source.displayName, color: .accentColor)
                 Spacer()
-                Button { NSWorkspace.shared.activateFileViewerSelecting([item.fileURL]) } label: { Image(systemName: "folder") }
+                Button { NSWorkspace.shared.activateFileViewerSelecting([item.fileURL]) } label: { Image.om("folder") }
                     .help("在 Finder 中显示").accessibilityLabel("在 Finder 中显示")
                 if !item.source.isReadOnly {
                     Button("还原") { text = original }.disabled(!isDirty)
@@ -127,7 +128,7 @@ struct MarkdownItemEditor: View {
             }
             Text(item.fileURL.abbreviatingHome).font(OMFonts.caption).foregroundStyle(OMColors.secondaryText).lineLimit(1).truncationMode(.middle)
             if item.source.isReadOnly {
-                Label("来自插件,只读。如需修改请到「插件」页管理。", systemImage: "lock").font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
+                Label("来自插件,只读。如需修改请到「插件」页管理。", om: "lock").font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
             } else if item.kind != .agent {
                 HStack(spacing: 18) {
                     Toggle("允许模型自动调用", isOn: Binding(
@@ -140,7 +141,7 @@ struct MarkdownItemEditor: View {
                 .toggleStyle(.checkbox).font(OMFonts.small)
             }
             if !text.isEmpty, !parsed.hasFrontmatter, item.kind != .command {
-                Label("缺少 frontmatter(--- 包裹的头部),Claude 可能无法识别描述。", systemImage: "exclamationmark.triangle").font(OMFonts.small).foregroundStyle(OMColors.warning)
+                Label("缺少 frontmatter(--- 包裹的头部),Claude 可能无法识别描述。", om: "exclamationmark.triangle").font(OMFonts.small).foregroundStyle(OMColors.warning)
             }
             TextEditor(text: $text)
                 .font(OMFonts.mono)

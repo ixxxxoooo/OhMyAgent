@@ -1,6 +1,7 @@
 // @author ygw
 // Hooks 管理:事件 → matcher → 处理器 的分组视图;设置层的 Hook 可增删改,插件 Hook 只读。
 
+import IconKit
 import ClaudeConfigKit
 import DesignSystem
 import SwiftUI
@@ -19,7 +20,7 @@ struct HooksManagerView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Button { editor = HookEditorTarget(entry: nil) } label: { Label("添加 Hook", systemImage: "plus") }
+                Button { editor = HookEditorTarget(entry: nil) } label: { Label("添加 Hook", om: "plus") }
                 Spacer()
                 Text("来源:用户 / 项目 / 本地设置与已启用插件").font(OMFonts.caption).foregroundStyle(OMColors.secondaryText)
             }
@@ -56,10 +57,10 @@ struct HooksManagerView: View {
             }
             Spacer()
             if case .settings = entry.origin {
-                Button { editor = HookEditorTarget(entry: entry) } label: { Image(systemName: "pencil") }.buttonStyle(.borderless).help("编辑").accessibilityLabel("编辑")
-                Button { pendingDelete = entry } label: { Image(systemName: "trash") }.buttonStyle(.borderless).help("删除").accessibilityLabel("删除")
+                Button { editor = HookEditorTarget(entry: entry) } label: { Image.om("pencil") }.buttonStyle(.borderless).help("编辑").accessibilityLabel("编辑")
+                Button { pendingDelete = entry } label: { Image.om("trash") }.buttonStyle(.borderless).help("删除").accessibilityLabel("删除")
             } else {
-                Image(systemName: "lock").foregroundStyle(OMColors.tertiaryText).help("来自插件,只读")
+                Image.om("lock").foregroundStyle(OMColors.tertiaryText).help("来自插件,只读")
             }
         }
         .accessibilityElement(children: .contain)

@@ -1,6 +1,7 @@
 // @author ygw
 // 设置页:快捷键(录制、冲突提示、导入导出)。
 
+import IconKit
 import AppKit
 import DesignSystem
 import SwiftUI
@@ -22,12 +23,12 @@ struct ShortcutsPage: View {
                         Button(recording == action ? "按下新的组合键…(Esc 取消)" : store.binding(for: action).display) { toggleRecording(action) }
                             .buttonStyle(.bordered)
                             .font(OMFonts.mono)
-                        Button { store.reset(action) } label: { Image(systemName: "arrow.uturn.backward") }
+                        Button { store.reset(action) } label: { Image.om("arrow.uturn.backward") }
                             .buttonStyle(.borderless).help("恢复默认 \(action.defaultBinding.display)").accessibilityLabel("恢复 \(action.title) 的默认快捷键")
                             .disabled(store.binding(for: action) == action.defaultBinding)
                     }
                 }
-                if let message { Label(message, systemImage: "exclamationmark.triangle").font(OMFonts.small).foregroundStyle(OMColors.warning) }
+                if let message { Label(message, om: "exclamationmark.triangle").font(OMFonts.small).foregroundStyle(OMColors.warning) }
                 Note("组合键必须包含 ⌘、⌃ 或 ⌥ 之一。与系统保留键或其他动作冲突时会拒绝并提示。")
             }
             Section("固定快捷键") {

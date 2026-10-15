@@ -1,6 +1,7 @@
 // @author ygw
 // 左栏「会话」视图:项目 → 会话树。点击项目内「新对话」即在该目录下提问;支持置顶、移除、拖入目录添加项目。
 
+import IconKit
 import ACPKit
 import ChatKit
 import DesignSystem
@@ -21,7 +22,7 @@ struct ProjectTreeView: View {
         .overlay {
             if workbench.projects.isEmpty {
                 ContentUnavailableView {
-                    Label("没有项目", systemImage: "folder.badge.plus")
+                    Label("没有项目", om: "folder.badge.plus")
                 } description: {
                     Text("添加一个项目目录,或把文件夹拖到这里。")
                 }
@@ -32,7 +33,7 @@ struct ProjectTreeView: View {
                 Button {
                     if let url = WorkspaceStore.chooseDirectory() { AppActions.shared.openWorkspace(url) }
                 } label: {
-                    Label("添加项目…", systemImage: "folder.badge.plus")
+                    Label("添加项目…", om: "folder.badge.plus")
                         .font(OMFonts.small)
                 }
                 .buttonStyle(.plain)
@@ -117,18 +118,18 @@ private struct ProjectSection: View {
 
     private var header: some View {
         HStack(spacing: 6) {
-            Image(systemName: isSelected ? "folder.fill" : "folder")
+            Image.om(isSelected ? "folder.fill" : "folder")
                 .foregroundStyle(isSelected ? OMColors.accent : OMColors.secondaryText)
             Text(project.name)
                 .font(OMFonts.body.weight(.medium))
                 .lineLimit(1)
             if project.pinned {
-                Image(systemName: "pin.fill").font(.system(size: 9)).foregroundStyle(OMColors.tertiaryText)
+                Image.om("pin.fill", size: 9).foregroundStyle(OMColors.tertiaryText)
             }
             Spacer(minLength: 4)
             if hovering {
                 Button { workbench.newConversation(in: project.id) } label: {
-                    Image(systemName: "square.and.pencil")
+                    Image.om("square.and.pencil")
                 }
                 .buttonStyle(.borderless)
                 .help("在 \(project.name) 下新对话")
@@ -172,8 +173,7 @@ private struct SessionRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: isCurrent ? "bubble.left.fill" : "bubble.left")
-                .font(.system(size: 11))
+            Image.om(isCurrent ? "bubble.left.fill" : "bubble.left", size: 11)
                 .foregroundStyle(isCurrent && isSelected ? OMColors.accent : OMColors.tertiaryText)
             VStack(alignment: .leading, spacing: 1) {
                 Text(title).lineLimit(1).font(OMFonts.body)

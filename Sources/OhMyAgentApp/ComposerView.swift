@@ -1,6 +1,7 @@
 // @author ygw
 // 输入区:玻璃浮层,包含输入框、模式/模型菜单、发送与停止按钮。
 
+import IconKit
 import ACPKit
 import ChatKit
 import DesignSystem
@@ -114,7 +115,7 @@ struct ComposerView: View {
     private var sendButton: some View {
         if model.isRunning {
             Button { model.cancel() } label: {
-                Image(systemName: "stop.fill").font(.system(size: 11, weight: .bold)).frame(width: 26, height: 26)
+                Image.om("stop.fill", size: 11, weight: .bold).frame(width: 26, height: 26)
             }
             .buttonStyle(.glassProminent)
             .buttonBorderShape(.circle)
@@ -122,7 +123,7 @@ struct ComposerView: View {
             .accessibilityLabel("停止生成")
         } else {
             Button { model.sendDraft() } label: {
-                Image(systemName: "arrow.up").font(.system(size: 12, weight: .bold)).frame(width: 26, height: 26)
+                Image.om("arrow.up", size: 12, weight: .bold).frame(width: 26, height: 26)
             }
             .buttonStyle(.glassProminent)
             .buttonBorderShape(.circle)
@@ -148,14 +149,14 @@ struct OptionMenu: View {
                         model.setConfigOption(option.id, value: item.value)
                     } label: {
                         if option.currentValue.stringValue == item.value {
-                            Label(item.name, systemImage: "checkmark")
+                            Label(item.name, om: "checkmark")
                         } else {
                             Text(item.name)
                         }
                     }
                 }
             } label: {
-                Label(option.currentDisplayName, systemImage: icon)
+                Label(option.currentDisplayName, om: icon)
                     .font(OMFonts.small)
                     .lineLimit(1)
             }
@@ -201,7 +202,7 @@ struct CompletionPopup: View {
 
     private func row(_ item: CompletionItem, isSelected: Bool) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: icon(item.kind))
+            Image.om(icon(item.kind))
                 .frame(width: 18)
                 .foregroundStyle(OMColors.secondaryText)
             Text(item.title).font(OMFonts.body).lineLimit(1)

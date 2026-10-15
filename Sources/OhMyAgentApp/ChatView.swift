@@ -1,6 +1,7 @@
 // @author ygw
 // 对话区:时间线(锚定底部、流式时自动跟随)+ 浮动输入区。
 
+import IconKit
 import ChatKit
 import DesignSystem
 import SwiftUI
@@ -81,8 +82,7 @@ struct EmptyStateView: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 30, weight: .light))
+            Image.om("sparkles", size: 30, weight: .light)
                 .foregroundStyle(OMColors.accent)
             Text("有什么可以帮你?")
                 .font(OMFonts.title)
@@ -102,7 +102,7 @@ struct ConnectionFailureCard: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(OMColors.warning)
+            Image.om("exclamationmark.triangle.fill").foregroundStyle(OMColors.warning)
             Text(message)
                 .font(OMFonts.small)
                 .lineLimit(5)

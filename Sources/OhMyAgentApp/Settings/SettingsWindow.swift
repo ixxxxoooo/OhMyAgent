@@ -1,6 +1,7 @@
 // @author ygw
 // 设置窗口(⌘,):15 个页面。Claude Code 自身的设置写回 settings.json 并热更新,客户端设置存 UserDefaults。
 
+import IconKit
 import ChatKit
 import ClaudeConfigKit
 import DesignSystem
@@ -100,7 +101,7 @@ struct SettingsView: View {
                 ForEach(SettingsPage.groups, id: \.title) { group in
                     Section(group.title) {
                         ForEach(group.pages) { page in
-                            Label(page.title, systemImage: page.icon).tag(page)
+                            Label(page.title, om: page.icon).tag(page)
                         }
                     }
                 }
@@ -109,7 +110,7 @@ struct SettingsView: View {
         } detail: {
             VStack(spacing: 0) {
                 if let error = model.lastError {
-                    Label(error, systemImage: "xmark.octagon.fill")
+                    Label(error, om: "xmark.octagon.fill")
                         .font(OMFonts.small).foregroundStyle(.red)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(10).background(Color.red.opacity(0.1))

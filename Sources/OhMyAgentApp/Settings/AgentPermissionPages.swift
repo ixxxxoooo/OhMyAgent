@@ -1,6 +1,7 @@
 // @author ygw
 // 设置页:Agent 与模型、权限。均写回 settings.json。
 
+import IconKit
 import AppKit
 import ChatKit
 import ClaudeConfigKit
@@ -132,14 +133,14 @@ struct RuleListEditor: View {
             HStack {
                 Text(rule).font(OMFonts.mono).textSelection(.enabled)
                 Spacer()
-                Button { remove(rule) } label: { Image(systemName: "minus.circle") }.buttonStyle(.borderless).accessibilityLabel("删除规则 \(rule)")
+                Button { remove(rule) } label: { Image.om("minus.circle") }.buttonStyle(.borderless).accessibilityLabel("删除规则 \(rule)")
             }
         }
         HStack {
             TextField("例如 Bash(npm run test:*) 或 Read(./.env)", text: $draft).font(OMFonts.mono).onSubmit(add)
             Button("添加", action: add).disabled(draft.isEmpty || problem != nil)
         }
-        if let problem { Label(problem, systemImage: "exclamationmark.circle").font(OMFonts.caption).foregroundStyle(OMColors.warning) }
+        if let problem { Label(problem, om: "exclamationmark.circle").font(OMFonts.caption).foregroundStyle(OMColors.warning) }
     }
 
     private func add() {
@@ -168,7 +169,7 @@ struct DirectoryListEditor: View {
             HStack {
                 Text(path).font(OMFonts.mono).lineLimit(1).truncationMode(.middle)
                 Spacer()
-                Button { model.set(["permissions", "additionalDirectories"], directories.filter { $0 != path }.nilIfEmpty) } label: { Image(systemName: "minus.circle") }
+                Button { model.set(["permissions", "additionalDirectories"], directories.filter { $0 != path }.nilIfEmpty) } label: { Image.om("minus.circle") }
                     .buttonStyle(.borderless).accessibilityLabel("移除目录 \(path)")
             }
         }

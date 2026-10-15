@@ -1,6 +1,7 @@
 // @author ygw
 // MCP 服务器管理:列表(作用域/覆盖/启停/审批/健康)、表单与 JSON 添加、Claude Desktop 导入、删除。
 
+import IconKit
 import ClaudeConfigKit
 import DesignSystem
 import SwiftUI
@@ -62,16 +63,16 @@ struct MCPManagerView: View {
                 Divider()
                 Button("从 Claude Desktop 导入") { importFromDesktop() }
             } label: {
-                Label("添加", systemImage: "plus")
+                Label("添加", om: "plus")
             }
             .menuStyle(.button)
             Button { Task { await center.checkMCPHealth() } } label: {
-                Label("检测连接", systemImage: "waveform.path.ecg")
+                Label("检测连接", om: "waveform.path.ecg")
             }
             .disabled(!center.canRunCLI || center.isBusy)
             .help("运行 claude mcp list 检测各服务器连接状态")
             Spacer()
-            Button { center.reload() } label: { Image(systemName: "arrow.clockwise") }
+            Button { center.reload() } label: { Image.om("arrow.clockwise") }
                 .help("重新读取配置")
                 .accessibilityLabel("刷新")
         }
@@ -125,19 +126,19 @@ struct MCPManagerView: View {
                     detailActions(entry)
                 }
                 if config.transport == .sse {
-                    Label("SSE 传输已被 MCP 规范弃用,建议改用 HTTP。", systemImage: "exclamationmark.triangle").font(OMFonts.small).foregroundStyle(OMColors.warning)
+                    Label("SSE 传输已被 MCP 规范弃用,建议改用 HTTP。", om: "exclamationmark.triangle").font(OMFonts.small).foregroundStyle(OMColors.warning)
                 }
                 if entry.needsApproval {
-                    Label("这是项目 .mcp.json 中的服务器,尚未批准。批准后 Claude 才会启动它。", systemImage: "hand.raised").font(OMFonts.small).foregroundStyle(OMColors.warning)
+                    Label("这是项目 .mcp.json 中的服务器,尚未批准。批准后 Claude 才会启动它。", om: "hand.raised").font(OMFonts.small).foregroundStyle(OMColors.warning)
                 }
                 if let over = entry.overriddenBy {
-                    Label("同名服务器在\(over.displayName)作用域中优先生效,此条目被整体覆盖。", systemImage: "arrow.triangle.merge").font(OMFonts.small).foregroundStyle(OMColors.warning)
+                    Label("同名服务器在\(over.displayName)作用域中优先生效,此条目被整体覆盖。", om: "arrow.triangle.merge").font(OMFonts.small).foregroundStyle(OMColors.warning)
                 }
                 if let health = center.mcpHealth[config.name] {
-                    Label(health.detail, systemImage: "waveform.path.ecg").font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
+                    Label(health.detail, om: "waveform.path.ecg").font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
                 }
                 if !missing.isEmpty {
-                    Label("引用了未设置的环境变量:\(missing.joined(separator: "、"))。注意 ANTHROPIC_API_KEY 等凭据变量在远程 url/headers 中会读为空。", systemImage: "exclamationmark.circle")
+                    Label("引用了未设置的环境变量:\(missing.joined(separator: "、"))。注意 ANTHROPIC_API_KEY 等凭据变量在远程 url/headers 中会读为空。", om: "exclamationmark.circle")
                         .font(OMFonts.small).foregroundStyle(OMColors.warning)
                 }
                 Group {

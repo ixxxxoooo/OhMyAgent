@@ -1,6 +1,7 @@
 // @author ygw
 // Markdown 渲染:块级由 ChatKit.MarkdownParser 解析,行内交给系统 AttributedString。
 
+import IconKit
 import AppKit
 import ChatKit
 import DesignSystem
@@ -50,7 +51,7 @@ struct MarkdownBlockView: View {
                 ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         if let checked = item.checked {
-                            Image(systemName: checked ? "checkmark.square.fill" : "square")
+                            Image.om(checked ? "checkmark.square.fill" : "square")
                                 .foregroundStyle(checked ? OMColors.accent : OMColors.secondaryText)
                                 .font(.system(size: 12))
                         } else {
@@ -111,7 +112,7 @@ struct CodeBlockView: View {
                         copied = false
                     }
                 } label: {
-                    Label(copied ? "已复制" : "复制", systemImage: copied ? "checkmark" : "doc.on.doc")
+                    Label(copied ? "已复制" : "复制", om: copied ? "checkmark" : "doc.on.doc")
                         .font(OMFonts.caption)
                 }
                 .buttonStyle(.plain)

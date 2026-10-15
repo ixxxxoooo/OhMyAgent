@@ -1,6 +1,7 @@
 // @author ygw
 // Diff 视图:按块展示新增/删除行与行号;可选“撤销此块”。差异计算放到后台,避免大文件卡主线程。
 
+import IconKit
 import DesignSystem
 import DiffKit
 import SwiftUI
@@ -153,7 +154,7 @@ struct SnippetDiffView: View {
         VStack(alignment: .leading, spacing: 6) {
             if showHeader {
                 HStack(spacing: 6) {
-                    Image(systemName: "doc.text")
+                    Image.om("doc.text")
                     Text((path as NSString).lastPathComponent).font(OMFonts.small.weight(.medium))
                     if let diff {
                         Text("+\(diff.added)").foregroundStyle(OMColors.diffAdded)

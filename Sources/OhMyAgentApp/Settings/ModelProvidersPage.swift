@@ -1,6 +1,7 @@
 // @author ygw
 // 设置页:模型提供商(会话级 Anthropic 协议上游 + 模型 + 密钥)。不改动 ~/.claude/settings.json。
 
+import IconKit
 import ChatKit
 import DesignSystem
 import SwiftUI
@@ -48,7 +49,7 @@ struct ModelProvidersPage: View {
                 }
             }
             if selection != nil { editor }
-            if let error = model.lastError { Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(OMColors.warning) }
+            if let error = model.lastError { Label(error, om: "exclamationmark.triangle").foregroundStyle(OMColors.warning) }
         }
         .onAppear { model.reload() }
     }
@@ -82,7 +83,7 @@ struct ModelProvidersPage: View {
                 Button("保存") { save() }.keyboardShortcut(.defaultAction)
                 Button("测试连接") { Task { await test() } }.disabled(testing)
                 if testing { ProgressView().controlSize(.small) }
-                if saved { Label("已保存", systemImage: "checkmark.circle").foregroundStyle(OMColors.secondaryText).font(OMFonts.small) }
+                if saved { Label("已保存", om: "checkmark.circle").foregroundStyle(OMColors.secondaryText).font(OMFonts.small) }
                 Spacer()
                 Button("删除", role: .destructive) { remove() }
             }
@@ -94,9 +95,9 @@ struct ModelProvidersPage: View {
     private func resultView(_ result: ProviderTestResult) -> some View {
         switch result {
         case .ok(let ms, let reply):
-            Label("连接成功(\(ms) ms)\(reply.isEmpty ? "" : ":\(reply)")", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+            Label("连接成功(\(ms) ms)\(reply.isEmpty ? "" : ":\(reply)")", om: "checkmark.circle.fill").foregroundStyle(.green)
         case .failed(let message):
-            Label(message, systemImage: "xmark.octagon.fill").foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+            Label(message, om: "xmark.octagon.fill").foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
         }
     }
 
