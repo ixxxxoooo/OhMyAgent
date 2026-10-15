@@ -24,7 +24,7 @@ let package = Package(
         // Liquid Glass 设计系统
         .target(name: "DesignSystem"),
         // 聊天核心:时间线模型、事件合并、Markdown 解析、会话模型(不含视图)
-        .target(name: "ChatKit", dependencies: ["ACPKit", "AgentHost"]),
+        .target(name: "ChatKit", dependencies: ["ACPKit", "AgentHost", "DiffKit"]),
         // 应用本体
         .executableTarget(
             name: "OhMyAgentApp",

@@ -139,6 +139,8 @@ public struct ToolCall: Sendable, Hashable, Identifiable {
     public var locations: [ToolLocation]
     public var rawInput: JSONValue?
     public var rawOutput: JSONValue?
+    /// 父工具调用 ID(子 Agent 内部的工具调用,来自 `_meta.claudeCode.parentToolUseId`)
+    public var parentToolCallId: String?
 
     public init(toolCallId: String, name: String? = nil, title: String = "", kind: ToolKind = .other, status: ToolStatus = .pending, content: [ToolCallContent] = [], locations: [ToolLocation] = [], rawInput: JSONValue? = nil, rawOutput: JSONValue? = nil) {
         self.toolCallId = toolCallId
@@ -165,6 +167,8 @@ public struct ToolCall: Sendable, Hashable, Identifiable {
             rawInput: json["rawInput"].flatMap { $0.isNull ? nil : $0 },
             rawOutput: json["rawOutput"].flatMap { $0.isNull ? nil : $0 }
         )
+        parentToolCallId = json["_meta"]?["claudeCode"]?["parentToolUseId"]?.stringValue
+        if name == nil { name = json["_meta"]?["claudeCode"]?["toolName"]?.stringValue }
     }
 
     static func parseLocations(_ json: JSONValue?) -> [ToolLocation] {
@@ -185,6 +189,8 @@ public struct ToolCall: Sendable, Hashable, Identifiable {
         if json["locations"]?.arrayValue != nil { locations = Self.parseLocations(json["locations"]) }
         if let value = json["rawInput"], !value.isNull { rawInput = value }
         if let value = json["rawOutput"], !value.isNull { rawOutput = value }
+        if let value = json["_meta"]?["claudeCode"]?["parentToolUseId"]?.stringValue { parentToolCallId = value }
+        if name == nil, let value = json["_meta"]?["claudeCode"]?["toolName"]?.stringValue { name = value }
     }
 }
 
@@ -306,11 +312,22 @@ public enum SessionUpdate: Sendable {
     case configOptions([SessionConfigOption])
     case sessionInfo(title: String?, updatedAt: String?)
     case usage(UsageUpdate)
+    /// 子 Agent(Task 工具)内部产生的更新,`parent` 为父工具调用 ID
+    indirect case childUpdate(parent: String, update: SessionUpdate)
     case unknown(kind: String, raw: JSONValue)
 
-    /// 解析 `params.update`。
+    /// 解析 `params.update`。带有 `_meta.claudeCode.parentToolUseId` 的更新会被包装为 `.childUpdate`。
     /// - Parameter json: update 对象
     public init(json: JSONValue) {
+        if let parent = json["_meta"]?["claudeCode"]?["parentToolUseId"]?.stringValue, !parent.isEmpty {
+            self = .childUpdate(parent: parent, update: SessionUpdate(plain: json))
+        } else {
+            self.init(plain: json)
+        }
+    }
+
+    /// 解析为普通更新(不检查父子关系)。
+    init(plain json: JSONValue) {
         let kind = json["sessionUpdate"]?.stringValue ?? ""
         let messageId = json["messageId"]?.stringValue
         switch kind {

@@ -180,3 +180,140 @@ struct SessionModelTests {
         model.shutdown()
     }
 }
+
+@MainActor
+@Suite("M3 场景:改动汇总、提问、终端、子 Agent")
+struct M3ScenarioTests {
+    /// 创建连接好的会话。
+    static func readyModel(workspace: URL, terminal: Bool = false) async throws -> SessionModel {
+        let descriptor = AgentDescriptor(id: "fake", name: "Fake", kind: .genericACP, command: try SessionModelTests.fakeAgentPath())
+        let model = SessionModel(workspace: workspace, descriptor: descriptor)
+        model.features.terminal = terminal
+        model.connect()
+        #expect(await SessionModelTests.wait { model.phase == .ready })
+        return model
+    }
+
+    static func tempWorkspace() throws -> URL {
+        let url = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("oma-ws-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    @Test("编辑经批准后生成本轮改动,可整文件撤销并恢复原内容")
+    func editAndRevert() async throws {
+        let ws = try Self.tempWorkspace()
+        defer { try? FileManager.default.removeItem(at: ws) }
+        let file = ws.appendingPathComponent("oma-demo.txt")
+        let original = (1...10).map { "line \($0)" }.joined(separator: "\n") + "\n"
+        try original.write(to: file, atomically: true, encoding: .utf8)
+
+        let model = try await Self.readyModel(workspace: ws)
+        model.send("#edit")
+        #expect(await SessionModelTests.wait { !model.pendingPermissions.isEmpty })
+        let prompt = try #require(model.pendingPermissions.first)
+        // 权限请求携带 Diff 预览
+        #expect(prompt.tool.content.contains { if case .diff = $0 { return true } else { return false } })
+        model.resolve(prompt, optionId: "allow")
+        #expect(await SessionModelTests.wait { !model.isRunning && model.timeline.entries.contains { $0.kind == .changes } })
+
+        let summary = try #require(model.timeline.entries.first { $0.kind == .changes })
+        let change = try #require(summary.changes.first)
+        #expect(change.path.hasSuffix("oma-demo.txt"))
+        #expect(change.diff.added >= 1 && change.diff.removed >= 1)
+        #expect(try String(contentsOf: file, encoding: .utf8) != original)
+
+        model.revert(change)
+        #expect(await SessionModelTests.wait { change.status == .reverted })
+        #expect(try String(contentsOf: file, encoding: .utf8) == original)
+        model.shutdown()
+    }
+
+    @Test("撤销前文件被用户改动则报告冲突且保持原样")
+    func revertConflict() async throws {
+        let ws = try Self.tempWorkspace()
+        defer { try? FileManager.default.removeItem(at: ws) }
+        let model = try await Self.readyModel(workspace: ws)
+        model.send("#edit")
+        #expect(await SessionModelTests.wait { !model.pendingPermissions.isEmpty })
+        model.resolve(try #require(model.pendingPermissions.first), optionId: "allow")
+        #expect(await SessionModelTests.wait { !model.isRunning && model.timeline.entries.contains { $0.kind == .changes } })
+        let change = try #require(model.timeline.entries.first { $0.kind == .changes }?.changes.first)
+        #expect(change.original == nil)   // 文件原本不存在
+        let file = ws.appendingPathComponent("oma-demo.txt")
+        try "用户手工改过\n".write(to: file, atomically: true, encoding: .utf8)
+        model.revert(change)
+        #expect(await SessionModelTests.wait { change.status == .conflict })
+        #expect(try String(contentsOf: file, encoding: .utf8) == "用户手工改过\n")
+        model.shutdown()
+    }
+
+    @Test("拒绝权限后没有改动汇总")
+    func rejectedEdit() async throws {
+        let ws = try Self.tempWorkspace()
+        defer { try? FileManager.default.removeItem(at: ws) }
+        let model = try await Self.readyModel(workspace: ws)
+        model.send("#edit")
+        #expect(await SessionModelTests.wait { !model.pendingPermissions.isEmpty })
+        model.resolve(try #require(model.pendingPermissions.first), optionId: "reject")
+        #expect(await SessionModelTests.wait { !model.isRunning })
+        #expect(!model.timeline.entries.contains { $0.kind == .changes })
+        #expect(!FileManager.default.fileExists(atPath: ws.appendingPathComponent("oma-demo.txt").path))
+        model.shutdown()
+    }
+
+    @Test("提问表单:解析字段、校验并回传答案")
+    func elicitation() async throws {
+        let ws = try Self.tempWorkspace()
+        defer { try? FileManager.default.removeItem(at: ws) }
+        let model = try await Self.readyModel(workspace: ws)
+        model.send("#ask")
+        #expect(await SessionModelTests.wait { !model.pendingElicitations.isEmpty })
+        let prompt = try #require(model.pendingElicitations.first)
+        #expect(prompt.message == "请选择实现方案")
+        // 字段顺序:question_0, question_0_custom, question_1
+        #expect(prompt.fields.map(\.id) == ["question_0", "question_0_custom", "question_1"])
+        guard case .single(let options) = prompt.fields[0].kind else { Issue.record("应为单选"); return }
+        #expect(options.map(\.value) == ["A", "B"])
+        prompt.fields[0].selection = ["B"]
+        prompt.fields[2].selection = ["文档", "测试"]
+        prompt.accept()
+        model.dismiss(prompt)
+        #expect(await SessionModelTests.wait { !model.isRunning })
+        let reply = model.timeline.entries.first { $0.kind == .assistant }?.text ?? ""
+        #expect(reply.contains("\"question_0\":\"B\""))
+        // 多选按选项原始顺序输出
+        #expect(reply.contains("[\"测试\",\"文档\"]"))
+        model.shutdown()
+    }
+
+    @Test("声明 terminal 能力后命令输出进入终端会话")
+    func terminal() async throws {
+        let ws = try Self.tempWorkspace()
+        defer { try? FileManager.default.removeItem(at: ws) }
+        let model = try await Self.readyModel(workspace: ws, terminal: true)
+        model.send("#term")
+        #expect(await SessionModelTests.wait { !model.isRunning && model.timeline.entries.contains { $0.kind == .tool } })
+        let session = try #require(model.terminals.values.first)
+        #expect(await SessionModelTests.wait { !session.isRunning })
+        #expect(session.output.contains("hello-from-terminal"))
+        #expect(session.exitCode == 0)
+        model.shutdown()
+    }
+
+    @Test("子 Agent 的内部更新嵌套在父工具卡片内")
+    func subagent() async throws {
+        let ws = try Self.tempWorkspace()
+        defer { try? FileManager.default.removeItem(at: ws) }
+        let model = try await Self.readyModel(workspace: ws)
+        model.send("#sub")
+        #expect(await SessionModelTests.wait { !model.isRunning })
+        // 顶层只有父工具(及其后的助手文本),子步骤在 childStore 中
+        let parent = try #require(model.timeline.entries.first { $0.kind == .tool })
+        #expect(parent.tool?.toolCallId == "sub_1")
+        let child = try #require(parent.childStore)
+        #expect(child.entries.map(\.kind) == [.tool, .assistant])
+        #expect(!model.timeline.entries.contains { $0.tool?.toolCallId == "sub_read" })
+        model.shutdown()
+    }
+}

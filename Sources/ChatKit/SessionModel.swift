@@ -4,8 +4,10 @@
 
 import ACPKit
 import AgentHost
+import DiffKit
 import Foundation
 import Observation
+import Synchronization
 
 /// 待处理的权限请求。
 @MainActor
@@ -16,6 +18,8 @@ public final class PermissionPrompt: Identifiable {
     /// 工具标题(来自请求中的 toolCall)
     public let title: String
     public let kind: ToolKind
+    /// 请求中携带的工具调用快照(可能含 Diff 预览、计划文本)
+    public let tool: ToolCall
     public var isResolved = false
     private var continuation: CheckedContinuation<PermissionOutcome, Never>?
 
@@ -23,6 +27,7 @@ public final class PermissionPrompt: Identifiable {
         self.request = request
         self.title = request.toolCallRaw["title"]?.stringValue ?? "工具调用"
         self.kind = ToolKind(rawOrOther: request.toolCallRaw["kind"]?.stringValue)
+        self.tool = ToolCall(json: request.toolCallRaw)
         self.continuation = continuation
     }
 
@@ -45,12 +50,129 @@ public final class PermissionPrompt: Identifiable {
     }
 }
 
-/// 反向请求委托:权限请求转交给主 actor 的会话模型。
+/// 客户端能力开关(设置页可调整;默认只开启提问表单)。
+public struct ClientFeatures: Sendable, Equatable {
+    /// 由客户端代理文件读写(Agent 读写经过 OhMyAgent)
+    public var fileSystem = false
+    /// 由客户端提供终端(命令输出内嵌到工具卡片)
+    public var terminal = false
+    /// 支持 Agent 向用户提问(AskUserQuestion、MCP 表单)
+    public var elicitation = true
+
+    public init() {}
+
+    /// 从用户默认值读取。
+    public static func load(_ defaults: UserDefaults = .standard) -> ClientFeatures {
+        var features = ClientFeatures()
+        if defaults.object(forKey: "feature.fileSystem") != nil { features.fileSystem = defaults.bool(forKey: "feature.fileSystem") }
+        if defaults.object(forKey: "feature.terminal") != nil { features.terminal = defaults.bool(forKey: "feature.terminal") }
+        if defaults.object(forKey: "feature.elicitation") != nil { features.elicitation = defaults.bool(forKey: "feature.elicitation") }
+        return features
+    }
+
+    /// 声明给 Agent 的额外能力。
+    var extraCapabilities: [String: JSONValue] {
+        elicitation ? ["elicitation": ["form": .object([:]), "url": .object([:])]] : [:]
+    }
+}
+
+/// 反向请求委托:权限、提问转交主 actor 的会话模型;文件与终端在本地实现。
 struct SessionDelegate: ACPClientDelegate {
+    let workspace: String
+    let terminals: TerminalManager
     let ask: @Sendable (PermissionRequest) async -> PermissionOutcome
+    let ask2: @Sendable (String, JSONValue?) async -> JSONValue
 
     func requestPermission(_ request: PermissionRequest) async -> PermissionOutcome {
         await ask(request)
+    }
+
+    func elicit(method: String, params: JSONValue?) async throws -> JSONValue {
+        await ask2(method, params)
+    }
+
+    func readTextFile(sessionId: String, path: String, line: Int?, limit: Int?) async throws -> String {
+        let text = try String(contentsOfFile: path, encoding: .utf8)
+        guard line != nil || limit != nil else { return text }
+        let lines = text.components(separatedBy: "\n")
+        let start = max((line ?? 1) - 1, 0)
+        guard start < lines.count else { return "" }
+        let end = limit.map { min(start + $0, lines.count) } ?? lines.count
+        return lines[start..<end].joined(separator: "\n")
+    }
+
+    func writeTextFile(sessionId: String, path: String, content: String) async throws {
+        // 只允许写入工作区内,防止越权覆盖
+        let root = URL(fileURLWithPath: workspace).standardizedFileURL.path
+        let target = URL(fileURLWithPath: path).standardizedFileURL
+        guard target.path == root || target.path.hasPrefix(root + "/") else {
+            throw JSONRPCError(code: JSONRPCError.invalidParams, message: "仅允许写入工作区内的文件: \(path)")
+        }
+        try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try content.write(to: target, atomically: true, encoding: .utf8)
+    }
+
+    func createTerminal(sessionId: String, command: String, args: [String], env: [String: String], cwd: String?, outputByteLimit: Int?) async throws -> String {
+        try await terminals.create(command: command, args: args, env: env, cwd: cwd, outputByteLimit: outputByteLimit)
+    }
+
+    func terminalOutput(terminalId: String) async throws -> TerminalOutputSnapshot {
+        try await terminals.output(terminalId)
+    }
+
+    func waitForTerminalExit(terminalId: String) async throws -> TerminalOutputSnapshot {
+        try await terminals.waitForExit(terminalId)
+    }
+
+    func killTerminal(terminalId: String) async throws {
+        try await terminals.kill(terminalId)
+    }
+
+    func releaseTerminal(terminalId: String) async throws {
+        try await terminals.release(terminalId)
+    }
+}
+
+/// 文件快照器:在工具调用开始时(事件到达的后台线程上,先于合并与主线程处理)读取受影响文件的内容。
+/// 这样即使 Agent 在“自动接受编辑”模式下立刻写盘,也能拿到修改前的内容。
+final class FileSnapshotter: Sendable {
+    private let shots = Mutex<[String: [String: String?]]>([:])
+
+    /// 受影响的路径:locations 与 diff 内容中的路径。
+    static func paths(of call: ToolCall) -> [String] {
+        guard call.kind == .edit || call.kind == .delete || call.kind == .move else { return [] }
+        var paths = call.locations.map(\.path)
+        for case .diff(let path, _, _) in call.content where !paths.contains(path) { paths.append(path) }
+        return paths
+    }
+
+    /// 首次见到该工具调用时拍快照(幂等)。
+    func capture(_ call: ToolCall) {
+        guard !call.status.isTerminal else { return }
+        let paths = Self.paths(of: call)
+        guard !paths.isEmpty else { return }
+        let already = shots.withLock { $0[call.toolCallId] != nil }
+        guard !already else { return }
+        var shot: [String: String?] = [:]
+        for path in paths { shot.updateValue(SessionModel.readSmallFile(path), forKey: path) }
+        shots.withLock { if $0[call.toolCallId] == nil { $0[call.toolCallId] = shot } }
+    }
+
+    /// 取出并移除快照。
+    func take(_ id: String) -> [String: String?]? {
+        shots.withLock { $0.removeValue(forKey: id) }
+    }
+}
+
+/// 文件查看请求(在编辑器面板中打开)。
+public struct FileViewRequest: Identifiable, Sendable, Equatable {
+    public var id: String { "\(path):\(line ?? 0)" }
+    public var path: String
+    public var line: Int?
+
+    public init(path: String, line: Int? = nil) {
+        self.path = path
+        self.line = line
     }
 }
 
@@ -79,6 +201,9 @@ public final class SessionModel {
     public private(set) var sessionTitle: String?
     public private(set) var authStatus: String?
     public private(set) var pendingPermissions: [PermissionPrompt] = []
+    public private(set) var pendingElicitations: [ElicitationPrompt] = []
+    /// 终端会话(按终端 ID)
+    public private(set) var terminals: [String: TerminalSession] = [:]
     public private(set) var sessionId: String?
     /// 最近的 stderr 行(诊断用,最多 200 行)
     public private(set) var diagnostics: [String] = []
@@ -86,6 +211,8 @@ public final class SessionModel {
     public private(set) var queuedPrompt: String?
     /// 输入框草稿
     public var draft = ""
+    /// 需要在编辑器面板中打开的文件
+    public var viewerRequest: FileViewRequest?
 
     private var supervisor: AgentSupervisor?
     private var client: ACPClient?
@@ -94,6 +221,15 @@ public final class SessionModel {
     private var promptTask: Task<Void, Never>?
     private var connectTask: Task<Void, Never>?
     private var isShuttingDown = false
+    private var terminalManager: TerminalManager?
+    private let checkpoints = CheckpointStore()
+    private var turnNumber = 0
+    private let snapshotter = FileSnapshotter()
+    /// 本轮累计的文件改动:路径 → (最初内容, 最新内容)
+    private var turnChanges: [String: (original: String?, current: String)] = [:]
+    private var turnChangeOrder: [String] = []
+    /// 客户端能力
+    public var features = ClientFeatures.load()
 
     /// 创建会话模型。
     /// - Parameters:
@@ -103,6 +239,7 @@ public final class SessionModel {
         self.workspace = workspace
         self.descriptor = descriptor
         self.agentName = descriptor.name
+        timeline.onToolChange = { [weak self] call in self?.observeTool(call) }
     }
 
     // MARK: - 连接
@@ -116,11 +253,27 @@ public final class SessionModel {
         connectTask = Task { [weak self] in
             let tools = await Toolchain.shared.resolve()
             guard let self else { return }
-            let delegate = SessionDelegate { [weak self] request in
-                guard let self else { return .cancelled }
-                return await self.awaitPermission(request)
-            }
-            let supervisor = AgentSupervisor(provider: AgentProviders.make(descriptor), cwd: cwd, delegate: delegate)
+            let environment = tools.environment
+            let manager = TerminalManager(workspace: cwd, environment: { environment }, onCreated: { [weak self] created in
+                Task { @MainActor in self?.registerTerminal(created) }
+            })
+            self.terminalManager = manager
+            let delegate = SessionDelegate(
+                workspace: cwd,
+                terminals: manager,
+                ask: { [weak self] request in
+                    guard let self else { return .cancelled }
+                    return await self.awaitPermission(request)
+                },
+                ask2: { [weak self] method, params in
+                    guard let self else { return ["action": "cancel"] }
+                    return await self.awaitElicitation(method: method, params: params)
+                }
+            )
+            let features = self.features
+            let supervisor = AgentSupervisor(provider: AgentProviders.make(descriptor), cwd: cwd, delegate: delegate,
+                                             fileSystem: features.fileSystem, terminal: features.terminal,
+                                             extraCapabilities: features.extraCapabilities)
             do {
                 let result = try await supervisor.start(tools: tools)
                 guard let client = await supervisor.client else { throw AgentLaunchError.missingAdapter }
@@ -158,8 +311,14 @@ public final class SessionModel {
         let coalescer = EventCoalescer()
         self.coalescer = coalescer
         // 后台:读取事件并合并
+        let snapshotter = snapshotter
         let reader = Task.detached(priority: .userInitiated) {
-            for await event in client.events { coalescer.push(event) }
+            for await event in client.events {
+                if case .sessionUpdate(_, let update) = event {
+                    Self.captureSnapshots(update, snapshotter)
+                }
+                coalescer.push(event)
+            }
             coalescer.finish()
         }
         // 主 actor:按批应用
@@ -207,6 +366,9 @@ public final class SessionModel {
     private func start(prompt: String) {
         guard let client, let sessionId else { return }
         timeline.appendUser(prompt)
+        turnNumber += 1
+        turnChanges.removeAll()
+        turnChangeOrder.removeAll()
         isRunning = true
         promptTask = Task { [weak self] in
             do {
@@ -235,6 +397,7 @@ public final class SessionModel {
             } else if reason == .maxTurnRequests {
                 self.timeline.appendNotice("已达到单轮请求上限。")
             }
+            self.publishTurnChanges()
             self.isRunning = false
             self.promptTask = nil
         }
@@ -243,8 +406,7 @@ public final class SessionModel {
     /// 取消当前轮次,并拒绝所有待处理权限。
     public func cancel() {
         guard isRunning, let client, let sessionId else { return }
-        for prompt in pendingPermissions { prompt.cancel() }
-        pendingPermissions.removeAll()
+        cancelPendingPrompts()
         Task { await client.cancel(sessionId: sessionId) }
     }
 
@@ -256,6 +418,9 @@ public final class SessionModel {
         timeline.reset()
         sessionTitle = nil
         usage = nil
+        turnChanges.removeAll()
+        turnChangeOrder.removeAll()
+        Task { await checkpoints.reset() }
         Task { [weak self] in
             do {
                 let setup = try await client.newSession(cwd: cwd)
@@ -294,7 +459,8 @@ public final class SessionModel {
     // MARK: - 权限
 
     private func awaitPermission(_ request: PermissionRequest) async -> PermissionOutcome {
-        await withCheckedContinuation { continuation in
+        snapshotter.capture(ToolCall(json: request.toolCallRaw))
+        return await withCheckedContinuation { continuation in
             let prompt = PermissionPrompt(request: request, continuation: continuation)
             pendingPermissions.append(prompt)
         }
@@ -307,6 +473,124 @@ public final class SessionModel {
     public func resolve(_ prompt: PermissionPrompt, optionId: String) {
         prompt.choose(optionId)
         pendingPermissions.removeAll { $0.id == prompt.id }
+    }
+
+    private func cancelPendingPrompts() {
+        for prompt in pendingPermissions { prompt.cancel() }
+        pendingPermissions.removeAll()
+        for prompt in pendingElicitations { prompt.cancel() }
+        pendingElicitations.removeAll()
+    }
+
+    // MARK: - 提问(Elicitation)
+
+    private func awaitElicitation(method: String, params: JSONValue?) async -> JSONValue {
+        guard method == "elicitation/create", let params else { return ["action": "cancel"] }
+        let message = params["message"]?.stringValue ?? ""
+        return await withCheckedContinuation { continuation in
+            let prompt: ElicitationPrompt
+            if params["mode"]?.stringValue == "url", let text = params["url"]?.stringValue, let url = URL(string: text),
+               ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+                prompt = ElicitationPrompt(message: message, mode: .url(url), fields: [], continuation: continuation)
+            } else {
+                prompt = ElicitationPrompt(message: message, mode: .form, fields: ElicitationParser.fields(from: params), continuation: continuation)
+            }
+            pendingElicitations.append(prompt)
+        }
+    }
+
+    /// 回答提问后从队列移除。
+    /// - Parameter prompt: 已处理的提问
+    public func dismiss(_ prompt: ElicitationPrompt) {
+        pendingElicitations.removeAll { $0.id == prompt.id }
+    }
+
+    // MARK: - 终端
+
+    private func registerTerminal(_ created: TerminalCreated) {
+        guard let manager = terminalManager else { return }
+        let session = TerminalSession(id: created.id, command: created.command)
+        terminals[created.id] = session
+        session.startPolling(manager: manager)
+    }
+
+    // MARK: - 检查点与改动汇总
+
+    /// 工具完成时:与开始前的快照比较并记录改动。
+    private func observeTool(_ call: ToolCall) {
+        let paths = FileSnapshotter.paths(of: call)
+        guard !paths.isEmpty, call.status == .completed, let shot = snapshotter.take(call.toolCallId) else { return }
+        for path in paths {
+            let before: String? = shot[path] ?? nil
+            let after = Self.readSmallFile(path)
+            guard let after, after != before else { continue }
+            if let existing = turnChanges[path] {
+                turnChanges[path] = (existing.original, after)
+            } else {
+                turnChanges[path] = (before, after)
+                turnChangeOrder.append(path)
+            }
+            let turn = turnNumber
+            let original = turnChanges[path]?.original
+            Task { [checkpoints] in await checkpoints.record(turn: turn, path: path, oldText: original, newText: after) }
+        }
+    }
+
+    /// 在事件进入合并器之前拍快照(含子 Agent 内部的调用)。
+    nonisolated static func captureSnapshots(_ update: SessionUpdate, _ snapshotter: FileSnapshotter) {
+        switch update {
+        case .toolCall(let call): snapshotter.capture(call)
+        case .childUpdate(_, let inner): captureSnapshots(inner, snapshotter)
+        default: break
+        }
+    }
+
+    /// 读取不超过 1MB 的 UTF-8 文件;不存在或过大返回 nil。
+    nonisolated static func readSmallFile(_ path: String) -> String? {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: path),
+              let size = (attributes[.size] as? NSNumber)?.int64Value, size <= 1_048_576 else { return nil }
+        return try? String(contentsOfFile: path, encoding: .utf8)
+    }
+
+    private func publishTurnChanges() {
+        let changes = turnChangeOrder.compactMap { path -> FileChange? in
+            guard let item = turnChanges[path], item.original != item.current else { return nil }
+            return FileChange(path: path, original: item.original, current: item.current)
+        }
+        turnChanges.removeAll()
+        turnChangeOrder.removeAll()
+        timeline.appendChanges(turn: turnNumber, changes: changes)
+    }
+
+    /// 回退文件改动(整文件或指定块)。
+    /// - Parameters:
+    ///   - change: 改动记录
+    ///   - hunks: 需要回退的块;nil 表示整文件
+    public func revert(_ change: FileChange, hunks: Set<Int>? = nil) {
+        Task { [weak self, checkpoints] in
+            let outcome = await checkpoints.revert(path: change.path, hunks: hunks)
+            guard self != nil else { return }
+            switch outcome {
+            case .reverted:
+                if hunks == nil {
+                    change.status = .reverted
+                } else if let text = Self.readSmallFile(change.path) {
+                    change.updateCurrent(text)
+                    change.status = change.diff.isEmpty ? .reverted : .partiallyReverted
+                }
+            case .conflict: change.status = .conflict
+            case .notFound: change.status = .failed("没有可用的检查点")
+            case .failed(let message): change.status = .failed(message)
+            }
+        }
+    }
+
+    /// 回退一份汇总中尚未回退的全部文件。
+    /// - Parameter entry: `.changes` 条目
+    public func revertAll(in entry: TimelineEntry) {
+        for change in entry.changes where change.status == .pending || change.status == .partiallyReverted {
+            revert(change)
+        }
     }
 
     // MARK: - 事件处理
@@ -346,8 +630,7 @@ public final class SessionModel {
 
     private func handleClosed(code: Int32?) {
         guard !isShuttingDown else { return }
-        for prompt in pendingPermissions { prompt.cancel() }
-        pendingPermissions.removeAll()
+        cancelPendingPrompts()
         timeline.finishStreaming()
         isRunning = false
         let detail = diagnostics.suffix(3).joined(separator: "\n")
@@ -375,8 +658,9 @@ public final class SessionModel {
     /// 关闭窗口时调用:终止 Agent 子进程。
     public func shutdown() {
         isShuttingDown = true
-        for prompt in pendingPermissions { prompt.cancel() }
-        pendingPermissions.removeAll()
+        cancelPendingPrompts()
+        for session in terminals.values { session.stop() }
+        if let manager = terminalManager { Task { await manager.shutdown() } }
         shutdownProcess()
     }
 }

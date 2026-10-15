@@ -23,6 +23,9 @@ struct ChatView: View {
                         model.resolve(prompt, optionId: optionId)
                     }
                 }
+                ForEach(model.pendingElicitations) { prompt in
+                    ElicitationCard(prompt: prompt) { model.dismiss(prompt) }
+                }
                 if case .failed(let message) = model.phase {
                     ConnectionFailureCard(message: message) { model.reconnect() }
                 }

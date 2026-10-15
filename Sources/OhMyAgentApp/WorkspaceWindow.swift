@@ -23,8 +23,12 @@ struct WorkspaceWindow: View {
         } detail: {
             ChatView(model: model)
         }
-        .navigationTitle(model.sessionTitle ?? workspace.lastPathComponent)
-        .navigationSubtitle(workspace.abbreviatingHome)
+        .environment(model)
+        .sheet(item: $model.viewerRequest) { request in
+            FileViewerSheet(request: request)
+        }
+        .navigationTitle(model.sessionTitle ?? model.workspace.lastPathComponent)
+        .navigationSubtitle(model.workspace.abbreviatingHome)
         .toolbar { WindowToolbar(model: model) }
         .frame(minWidth: 760, minHeight: 520)
         .task {
