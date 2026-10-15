@@ -164,11 +164,8 @@ struct DiffTabView: View {
                 .padding(14)
             }
         } else {
-            ContentUnavailableView {
-                Label("没有这个文件的改动记录", om: "file-diff", size: 28)
-            } description: {
-                Text((path as NSString).abbreviatingWithTildeInPath)
-            }
+            // Agent 没有改过这个文件 → 退回到 Git 差异
+            GitFileDiffView(workbench: workbench, path: path)
         }
     }
 }

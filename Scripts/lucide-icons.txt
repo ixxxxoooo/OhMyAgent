@@ -123,3 +123,8 @@ workflow
 wrench
 x
 zap
+minus
+clock
+git-graph
+folder-git
+list-tree

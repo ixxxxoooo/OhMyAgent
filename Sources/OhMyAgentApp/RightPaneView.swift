@@ -22,6 +22,7 @@ struct RightPaneView: View {
             .padding(10)
             Divider()
             switch workbench.layout.rightPane {
+            case .changes: ChangesPane(workbench: workbench)
             case .files: ExplorerView(workbench: workbench)
             case .search: SearchPaneView(workbench: workbench)
             default: sessionContent
@@ -47,16 +48,6 @@ struct RightPaneView: View {
     @ViewBuilder
     private func content(model: SessionModel) -> some View {
         switch workbench.layout.rightPane {
-        case .changes:
-            if let entry = model.timeline.entries.last(where: { $0.kind == .changes && !$0.changes.isEmpty }) {
-                ScrollView {
-                    ChangesSummaryView(entry: entry)
-                        .environment(model)
-                        .padding(10)
-                }
-            } else {
-                ContentUnavailableView { Label("暂无改动", om: "doc.on.doc", size: 28) } description: { Text("Agent 修改文件后,这里会列出每个文件的差异。") }
-            }
         case .plan:
             if let entry = model.timeline.entries.last(where: { $0.kind == .plan }) {
                 ScrollView {
@@ -65,7 +56,7 @@ struct RightPaneView: View {
             } else {
                 ContentUnavailableView { Label("暂无计划", om: "checklist", size: 28) } description: { Text("Agent 制定任务计划后会显示在这里。") }
             }
-        case .outline, .problems, .files, .search:
+        case .outline, .problems, .files, .search, .changes:
             EmptyView()
         }
     }
@@ -127,5 +118,38 @@ struct RightRail: View {
         .foregroundStyle(OMColors.secondaryText)
         .help(title)
         .accessibilityLabel(title)
+    }
+}
+
+/// 「改动」页:未提交的 Git 改动 / 本轮 Agent 改动 二选一。
+struct ChangesPane: View {
+    let workbench: WorkbenchModel
+    @AppStorage("changes.source") private var source = "git"
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Picker("", selection: $source) {
+                Text("未提交").tag("git")
+                Text("本轮 Agent").tag("agent")
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .controlSize(.small)
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .accessibilityLabel("改动来源")
+            Divider()
+            if source == "git" {
+                SCMView(workbench: workbench)
+            } else if let model = workbench.activeSession,
+                      let entry = model.timeline.entries.last(where: { $0.kind == .changes && !$0.changes.isEmpty }) {
+                ScrollView {
+                    ChangesSummaryView(entry: entry)
+                        .environment(model)
+                        .padding(10)
+                }
+            } else {
+                ContentUnavailableView { Label("暂无改动", om: "doc.on.doc", size: 28) } description: { Text("Agent 修改文件后,这里会列出每个文件的差异。") }
+            }
+        }
     }
 }

@@ -165,6 +165,7 @@ struct WorkbenchView: View {
             let id = MermaidPreviewStore.shared.register(source.replacingOccurrences(of: "\\n", with: "\n"))
             workbench.openPreview(id: id, title: "Mermaid 图")
         }
+        if let diffPath = env["OMA_OPEN_DIFF"], !diffPath.isEmpty { workbench.openDiff(diffPath) }  // 调试:打开 Diff 标签
         if env["OMA_OPEN_TERMINAL"] != nil {
             // 调试:打开终端标签;OMA_TERM_INPUT 在 shell 就绪后输入(\n 会被替换为回车)
             actions.openTerminal()

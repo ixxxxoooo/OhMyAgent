@@ -17,7 +17,6 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 - `ClaudeConfigKit`:读写 `~/.claude`、`.mcp.json` 等配置。
 - `DiffKit` / `EditorKit`:Diff 与编辑器。
 - `GitKit`:`git` 命令的类型化封装与输出解析(状态、暂存、提交、分支、历史、blame、stash、冲突;无 UI)。
-- `IconKit` / `MermaidKit`:Lucide 原生图标;Mermaid 原生渲染。
 - `MermaidKit`:Mermaid 原生渲染(纯 Swift):解析 → 分层布局 → 场景(`MScene`)→ SwiftUI Canvas/PNG;支持 flowchart/graph、sequenceDiagram、stateDiagram-v2、classDiagram、pie、gantt。
 - `IconKit`:Lucide 图标(生成数据 + SVG path 解析 + `Image.om`);界面禁止再用 SF Symbol(`Scripts/gen-icons.py` 重新生成)。
 - `DesignSystem`:设计令牌与玻璃材质。
