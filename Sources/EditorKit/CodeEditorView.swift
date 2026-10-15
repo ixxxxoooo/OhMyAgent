@@ -97,6 +97,8 @@ public final class CodeEditorView: NSView {
         scrollView.documentView = textView
         scrollView.hasVerticalRuler = true
         scrollView.verticalRulerView = ruler
+        // 新系统不再自动把标尺的 clientView 指向文档视图,必须显式设置,否则行号永远不绘制
+        ruler.clientView = textView
         scrollView.rulersVisible = true
 
         addSubview(scrollView)
@@ -247,15 +249,19 @@ public final class CodeEditorView: NSView {
         let spans = await engine.spans(in: desired)
         guard generation == current, !Task.isCancelled else { return }
 
-        let docRange = NSRange(location: 0, length: total)
-        if let fullTextRange = contentStorage.textRange(docRange) {
-            layoutManager.removeRenderingAttribute(.foregroundColor, for: fullTextRange)
-        }
+        // 直接写入文本存储的前景色属性:TextKit 2 的渲染属性在新系统上不会被绘制。
+        // 属性变更不改变字符串,不会触发 textDidChange 与撤销登记。
+        guard let storage = textView.textStorage else { return }
+        let docRange = NSRange(location: 0, length: storage.length)
+        let resetRange = NSIntersectionRange(NSUnionRange(highlightedRange, desired), docRange)
+        storage.beginEditing()
+        if resetRange.length > 0 { storage.addAttribute(.foregroundColor, value: theme.foreground, range: resetRange) }
         for span in spans {
-            guard let color = theme.colors[span.kind],
-                  let textRange = contentStorage.textRange(NSRange(location: span.location, length: span.length)) else { continue }
-            layoutManager.addRenderingAttribute(.foregroundColor, value: color, for: textRange)
+            guard let color = theme.colors[span.kind] else { continue }
+            let range = NSIntersectionRange(NSRange(location: span.location, length: span.length), docRange)
+            if range.length > 0 { storage.addAttribute(.foregroundColor, value: color, range: range) }
         }
+        storage.endEditing()
         highlightedRange = desired
     }
 }
