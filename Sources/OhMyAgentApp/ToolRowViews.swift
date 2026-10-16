@@ -64,6 +64,7 @@ func resolveToolPath(_ path: String, workspace: String) -> String {
 struct ToolRowView: View {
     let entry: TimelineEntry
     @Environment(SessionModel.self) private var model
+    @Environment(\.stickyUser) private var scrollState
     @State private var expanded: Bool?
     @State private var hovering = false
     @State private var stats: DiffStats?
@@ -155,6 +156,7 @@ struct ToolRowView: View {
                 Image.om("chevron.right", size: 9, weight: .bold)
                     .foregroundStyle(OMColors.tertiaryText)
                     .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    .animation(.snappy(duration: 0.15), value: isExpanded)
             }
         }
         .padding(.horizontal, 8)
@@ -164,7 +166,9 @@ struct ToolRowView: View {
         .onHover { hovering = $0 }
         .onTapGesture {
             guard canExpand else { return }
-            omWithAnimation(.snappy(duration: 0.2)) { expanded = !isExpanded }
+            // 展开/折叠不做整体高度动画:惰性栈里动画重排会让点击明显卡顿;箭头自带小动画
+            scrollState?.followSuspended = true
+            expanded = !isExpanded
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(p.plainText),\(Self.statusText(tool.status))")
@@ -201,7 +205,7 @@ struct ToolRowView: View {
             .help(p.subject)
         } else if p.category == .terminal {
             // 命令按 shell 语法高亮;只取第一行作摘要
-            ShellCommandText(command: p.subject.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? p.subject, lineLimit: 1, failed: failed)
+            ShellCommandText(command: p.subject.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? p.subject, lineLimit: 1, failed: failed, selectable: false)
         } else if p.category == .search {
             Text(p.subject)
                 .font(OMFonts.monoSmall)
@@ -536,8 +540,22 @@ struct SearchHitRow: View {
 // MARK: - 浏览分组
 
 /// 对话流的展示单元分发:单个条目或浏览分组。
-struct TimelineItemView: View {
+struct TimelineItemView: View, Equatable {
     let item: TimelineItem
+    private let itemID: UUID
+    private let signature: Int
+
+    @MainActor
+    init(item: TimelineItem) {
+        self.item = item
+        itemID = item.id
+        signature = item.signature
+    }
+
+    /// 结构不变(身份与成员数量相同)就视为相等,避免父视图重新求值时重建所有行。
+    nonisolated static func == (lhs: TimelineItemView, rhs: TimelineItemView) -> Bool {
+        lhs.itemID == rhs.itemID && lhs.signature == rhs.signature
+    }
 
     var body: some View {
         switch item {
@@ -550,6 +568,7 @@ struct TimelineItemView: View {
 /// 连续浏览步骤的折叠分组:默认折叠(运行中、失败时都不自动展开),由用户自行展开。
 struct ExploreGroupView: View {
     let group: ExploreGroup
+    @Environment(\.stickyUser) private var scrollState
     @State private var expanded: Bool?
     @State private var hovering = false
 
@@ -574,7 +593,10 @@ struct ExploreGroupView: View {
             .background(hovering ? Color.primary.opacity(0.05) : Color.clear, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
             .contentShape(Rectangle())
             .onHover { hovering = $0 }
-            .onTapGesture { omWithAnimation(.snappy(duration: 0.2)) { expanded = !isExpanded } }
+            .onTapGesture {
+                scrollState?.followSuspended = true
+                expanded = !isExpanded
+            }
             .accessibilityElement(children: .combine)
             .accessibilityLabel(group.summary)
             .accessibilityAddTraits(.isButton)

@@ -255,6 +255,43 @@ public enum TimelineItem: Identifiable {
         case .explore(let group): return group.id
         }
     }
+
+    /// 结构签名:身份与成员数量。行内容由条目自身的可观察状态驱动,
+    /// 所以只要签名不变,行视图就无需因父视图重新求值而重建(配合 `Equatable` 视图使用)。
+    @MainActor
+    public var signature: Int {
+        switch self {
+        case .entry(let entry): return entry.id.hashValue
+        case .explore(let group):
+            var hasher = Hasher()
+            hasher.combine(group.id)
+            hasher.combine(group.entries.count)
+            return hasher.finalize()
+        }
+    }
+}
+
+/// 把条目序列分组的结果缓存:`revision` 与条目数都没变时直接复用,避免输入区等无关状态变化时重复分组。
+@MainActor
+public final class TimelineItemsCache {
+    private var owner: ObjectIdentifier?
+    private var revision = -1
+    private var count = -1
+    private var items: [TimelineItem] = []
+
+    public init() {}
+
+    /// 取分组结果。
+    /// - Parameter store: 时间线
+    /// - Returns: 展示单元序列
+    public func items(for store: TimelineStore) -> [TimelineItem] {
+        if owner == ObjectIdentifier(store), store.revision == revision, store.entries.count == count { return items }
+        items = TimelineGrouping.group(store.entries)
+        owner = ObjectIdentifier(store)
+        revision = store.revision
+        count = store.entries.count
+        return items
+    }
 }
 
 /// 浏览步骤分组。

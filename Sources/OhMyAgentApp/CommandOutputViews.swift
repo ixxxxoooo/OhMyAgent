@@ -17,14 +17,16 @@ struct ShellCommandText: View {
     /// 失败时整体染红(不再做语法着色)
     var failed = false
     var fontSize: CGFloat?
+    /// 是否允许选择文字。工具行摘要要关掉:可选文字会让点击先等手势判定,点击展开会有明显延迟。
+    var selectable = true
 
     var body: some View {
-        Text(failed ? AttributedString(command) : CodeHighlighter.attributed(command, language: .shell))
+        let text = Text(failed ? AttributedString(command) : CodeHighlighter.attributed(command, language: .shell))
             .font(fontSize.map { .system(size: $0, design: .monospaced) } ?? OMFonts.monoSmall)
             .foregroundStyle(failed ? Color.red : Color.primary)
             .lineLimit(lineLimit)
             .truncationMode(.middle)
-            .textSelection(.enabled)
+        if selectable { text.textSelection(.enabled) } else { text }
     }
 }
 
