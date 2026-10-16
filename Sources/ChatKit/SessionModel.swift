@@ -784,11 +784,19 @@ public final class SessionModel {
         let directory = providerDirectory
         let environment = providerEnvironment
         let override = providerOverride
-        let outcome = await Task.detached(priority: .userInitiated) { () -> Result<ResolvedProvider?, ProviderStorage.ResolveError> in
+        let initial = await Task.detached(priority: .userInitiated) { () -> Result<ResolvedProvider?, ProviderStorage.ResolveError> in
             do { return .success(try ProviderStorage.resolveActive(directory: directory, environment: environment, override: override)) }
             catch let error as ProviderStorage.ResolveError { return .failure(error) }
             catch { return .success(nil) }
         }.value
+        // OpenAI 协议的提供商先注册到本地协议代理(改写 `_meta`);失败时回退默认配置并提示
+        var outcome = initial
+        if case .success(let resolved?) = outcome {
+            do { outcome = .success(try await ProviderBridge.activate(resolved)) } catch {
+                log.error("协议代理不可用", error: error)
+                outcome = .failure(.invalid(resolved.provider.name, error.localizedDescription))
+            }
+        }
         switch outcome {
         case .success(let resolved?):
             providerName = resolved.provider.name

@@ -1490,3 +1490,11 @@
 "%@ 中另一方的修改会被丢弃。" = "Changes from the other side in %@ will be discarded.";
 "确认" = "Confirm";
 "该免费模型仅限 OpenCode 官方客户端使用(FreeTierError)。请改用 OpenCode Go 或自己的付费 API Key。" = "This free model is only available to the official OpenCode client (FreeTierError). Use OpenCode Go or your own paid API key instead.";
+"OpenAI 协议:经本机内置的协议代理转换后交给 Claude Code。" = "OpenAI protocol: converted by the built-in local protocol proxy before reaching Claude Code.";
+"聚合多家模型的 OpenAI 协议网关;模型名形如 厂商/模型。" = "An OpenAI-protocol gateway aggregating many vendors; model names look like vendor/model.";
+"Gemini 的 OpenAI 兼容端点,使用 Google AI Studio 的 API Key。" = "Gemini OpenAI-compatible endpoint; use a Google AI Studio API key.";
+"本机 Ollama 的 OpenAI 兼容端点,无需密钥;模型需要支持工具调用。" = "Local Ollama OpenAI-compatible endpoint, no key needed; the model must support tool calling.";
+"本机 LM Studio 的 OpenAI 兼容端点,无需密钥;请在 LM Studio 中先加载模型。" = "Local LM Studio OpenAI-compatible endpoint, no key needed; load a model in LM Studio first.";
+"OpenCode Go 订阅的 OpenAI 协议端点;模型名以其控制台为准,可用「获取模型列表」同步。" = "OpenAI-protocol endpoint of the OpenCode Go subscription; model names follow its console, use \"Fetch model list\" to sync.";
+"OpenCode Zen 免费模型" = "OpenCode Zen free models";
+"OpenCode 的免费模型(OpenAI 协议)。官方可能只允许 OpenCode 自家客户端调用;若被拒绝会给出明确提示,可改用 OpenCode Go 或付费 Key。" = "OpenCode free models (OpenAI protocol). They may only be allowed for the official OpenCode client; if rejected you will see a clear message, then switch to OpenCode Go or a paid key.";
