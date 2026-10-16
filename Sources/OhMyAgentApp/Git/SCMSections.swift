@@ -1,11 +1,12 @@
 // @author ixxxxoooo
 // Git 页(源代码管理)里的两个可折叠分区,对齐 VSCode/Cursor 的信息架构:
 // ① 「本轮 Agent 改动」:当前会话最近一次改动汇总(原右栏「改动」页并入此处);
-// ② 「提交图谱」:最近提交与泳道图(原先只能从「更多」菜单打开历史标签),点击进入完整历史标签。
+// ② 「提交图谱」:最近提交与泳道图,点击提交在原地展开文件列表与内联差异,完整历史标签由右上角按钮打开。
 
 import AppKit
 import ChatKit
 import DesignSystem
+import DiffKit
 import GitKit
 import IconKit
 import SwiftUI
@@ -64,13 +65,17 @@ struct AgentChangesSection: View {
     }
 }
 
-/// 「提交图谱」分区:最近 30 个提交(含所有分支)的泳道图;点击打开完整历史标签。
+/// 「提交图谱」分区:最近 30 个提交(含所有分支)的泳道图;
+/// 点击一行在原地展开该提交的文件列表,点文件再展开内联差异(对标 VS Code 的 Source Control Graph);
+/// 右上角按钮才打开完整历史标签。
 struct GitGraphSection: View {
     let workbench: WorkbenchModel
     let model: GitModel
     @State private var expanded = true
     @State private var rows: [GitGraphRow] = []
     @State private var failed = false
+    /// 当前展开的提交(同一时间只展开一个)
+    @State private var expandedHash: String?
     private static let limit = 30
 
     /// 状态变化(分支切换、提交/推送/拉取、工作区变干净)时重新取数。
@@ -102,10 +107,12 @@ struct GitGraphSection: View {
                     let laneWidth = CGFloat(max(1, rows.map(\.laneCount).max() ?? 1)) * 14 + 10
                     VStack(spacing: 0) {
                         ForEach(rows) { row in
-                            CommitRow(row: row, laneWidth: laneWidth, isSelected: false, compact: true)
-                                .onTapGesture { workbench.openHistory(project: model.projectPath) }
+                            let isOpen = expandedHash == row.commit.hash
+                            CommitRow(row: row, laneWidth: laneWidth, isSelected: isOpen, compact: true)
+                                .onTapGesture { omWithAnimation { expandedHash = isOpen ? nil : row.commit.hash } }
                                 .accessibilityElement(children: .combine)
                                 .accessibilityAddTraits(.isButton)
+                                .accessibilityHint(isOpen ? String(localized: "点按收起文件列表") : String(localized: "点按展开文件列表"))
                                 .contextMenu {
                                     Button("拷贝提交哈希") {
                                         NSPasteboard.general.clearContents()
@@ -113,6 +120,10 @@ struct GitGraphSection: View {
                                     }
                                     Button("打开完整历史") { workbench.openHistory(project: model.projectPath) }
                                 }
+                            if isOpen, let repo = model.repo {
+                                GraphCommitDetail(repo: repo, commit: row.commit, workbench: workbench)
+                                    .id(row.commit.hash)
+                            }
                         }
                     }
                 }
@@ -133,6 +144,114 @@ struct GitGraphSection: View {
             failed = false
         } catch {
             failed = true
+        }
+    }
+}
+
+/// 图谱里展开的提交详情:作者/时间/哈希 + 变更文件列表;点文件在原地展开内联差异。
+private struct GraphCommitDetail: View {
+    let repo: GitRepository
+    let commit: GitCommit
+    let workbench: WorkbenchModel
+    @State private var files: [GitFileChange] = []
+    @State private var loaded = false
+    @State private var openFile: String?
+    @State private var diff: FileDiff?
+    @State private var binary = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Text(commit.author)
+                Text(commit.date, format: .dateTime.month().day().hour().minute())
+                Text(commit.shortHash).font(OMFonts.monoSmall)
+                if commit.isMerge { OMTag(String(localized: "合并"), tint: .purple) }
+                Spacer(minLength: 0)
+            }
+            .font(OMFonts.caption)
+            .foregroundStyle(OMColors.secondaryText)
+            .lineLimit(1)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 5)
+            if !loaded {
+                ProgressView().controlSize(.small).frame(maxWidth: .infinity).padding(6)
+            } else if files.isEmpty {
+                Text("这个提交没有文件改动(例如空的合并提交)。").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
+                    .padding(.horizontal, 12).padding(.vertical, 4)
+            }
+            ForEach(files) { file in
+                fileRow(file)
+                if openFile == file.path { inlineDiff }
+            }
+        }
+        .padding(.bottom, 4)
+        .background(OMColors.accent.opacity(0.05))
+        .task { await loadFiles() }
+        .task(id: openFile) { await loadDiff() }
+    }
+
+    private func fileRow(_ file: GitFileChange) -> some View {
+        let name = (file.path as NSString).lastPathComponent
+        let dir = (file.path as NSString).deletingLastPathComponent
+        let kind = file.staged ?? file.unstaged
+        return HStack(spacing: 6) {
+            OMFileIcon(name: name, isDirectory: false, expanded: false, size: 14)
+            Text(name).font(OMFonts.small).lineLimit(1)
+            if !dir.isEmpty {
+                Text(dir).font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText).lineLimit(1).truncationMode(.head)
+            }
+            Spacer(minLength: 4)
+            Text(kind?.badge ?? "").font(OMFonts.caption.weight(.semibold)).foregroundStyle(color(kind))
+        }
+        .padding(.horizontal, 12).padding(.vertical, 3)
+        .background(openFile == file.path ? OMColors.accent.opacity(0.14) : .clear)
+        .contentShape(Rectangle())
+        .onTapGesture { omWithAnimation { openFile = openFile == file.path ? nil : file.path } }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .contextMenu {
+            Button("在编辑器中打开当前版本") { workbench.openFile(repo.root.path + "/" + file.path, preview: false) }
+            Button("文件历史") { workbench.openHistory(project: repo.root.path, path: repo.root.path + "/" + file.path) }
+        }
+    }
+
+    @ViewBuilder
+    private var inlineDiff: some View {
+        if let diff {
+            // 侧栏较窄,正文自动换行;DiffView 自带 300 行软上限,无需再套滚动容器
+            DiffView(diff: diff)
+                .padding(.horizontal, 8).padding(.vertical, 4)
+        } else if binary {
+            Text("二进制文件,不显示差异。").font(OMFonts.caption).foregroundStyle(OMColors.secondaryText).padding(.horizontal, 12).padding(.vertical, 4)
+        } else {
+            ProgressView().controlSize(.small).frame(maxWidth: .infinity).padding(6)
+        }
+    }
+
+    private func color(_ kind: GitChangeKind?) -> Color {
+        switch kind {
+        case .added: return OMColors.diffAdded
+        case .deleted: return OMColors.diffRemoved
+        case .renamed, .copied: return OMColors.accent
+        default: return OMColors.warning
+        }
+    }
+
+    private func loadFiles() async {
+        files = (try? await repo.files(in: commit.hash)) ?? []
+        loaded = true
+    }
+
+    private func loadDiff() async {
+        diff = nil
+        binary = false
+        guard let openFile else { return }
+        do {
+            let result = try await repo.fileDiff(path: openFile, commit: commit.hash)
+            diff = result
+            binary = result == nil
+        } catch {
+            binary = false
         }
     }
 }
