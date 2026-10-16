@@ -31,6 +31,8 @@ let package = Package(
         .target(name: "IconKit", dependencies: ["OMLog"]),
         // Mermaid 原生渲染:解析 → 分层布局 → 绘制场景(纯 Swift,无 WebView)
         .target(name: "MermaidKit"),
+        // 表格:xlsx(ZIP + OOXML)原生读取,流式解析为行列矩阵(无视图)
+        .target(name: "SpreadsheetKit"),
         // Git:git 命令的类型化封装与输出解析(后台子进程,无 UI)
         .target(name: "GitKit", dependencies: ["DiffKit", "OMLog"]),
         // LSP 客户端:Content-Length 分帧、客户端 actor、服务器定位与管理(复用 ACPKit 的 JSON-RPC 连接,无 UI)
@@ -48,7 +50,7 @@ let package = Package(
         // 应用本体
         .executableTarget(
             name: "OhMyAgentApp",
-            dependencies: ["ACPKit", "AgentHost", "ChatKit", "ClaudeConfigKit", "DiffKit", "EditorKit", "DesignSystem", "IconKit", "MermaidKit", "GitKit", "LSPKit", "DemoKit", "OMLog", "WorkbenchKit",
+            dependencies: ["ACPKit", "AgentHost", "ChatKit", "ClaudeConfigKit", "DiffKit", "EditorKit", "DesignSystem", "IconKit", "MermaidKit", "GitKit", "LSPKit", "DemoKit", "OMLog", "SpreadsheetKit", "WorkbenchKit",
                            .product(name: "SwiftTerm", package: "SwiftTerm")]
         ),
         // 脚本化 ACP Agent,用于测试与预览
@@ -68,6 +70,7 @@ let package = Package(
         .testTarget(name: "GitKitTests", dependencies: ["GitKit", "DiffKit"]),
         .testTarget(name: "IconKitTests", dependencies: ["IconKit"]),
         .testTarget(name: "LSPKitTests", dependencies: ["LSPKit", "ACPKit"]),
+        .testTarget(name: "SpreadsheetKitTests", dependencies: ["SpreadsheetKit"]),
         .testTarget(name: "MermaidKitTests", dependencies: ["MermaidKit"]),
         .testTarget(name: "OhMyAgentAppTests", dependencies: ["OhMyAgentApp", "ChatKit", "ACPKit", "DesignSystem", "EditorKit", "LSPKit"]),
         .testTarget(name: "WorkbenchKitTests", dependencies: ["WorkbenchKit", "ChatKit", "ACPKit", "AgentHost", "FakeAgent"]),

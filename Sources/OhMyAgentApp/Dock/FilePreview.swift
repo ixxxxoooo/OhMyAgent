@@ -11,7 +11,7 @@ import SwiftUI
 
 /// 可渲染预览的文件类型。
 enum FilePreviewKind: Equatable {
-    case markdown, mermaid, svg, image, pdf, csv(delimiter: Character)
+    case markdown, mermaid, svg, image, pdf, spreadsheet, csv(delimiter: Character)
 
     /// 按扩展名识别;不支持预览返回 nil。
     static func of(path: String) -> FilePreviewKind? {
@@ -21,6 +21,7 @@ enum FilePreviewKind: Equatable {
         case "svg": return .svg
         case "png", "jpg", "jpeg", "gif", "webp", "heic", "tif", "tiff", "bmp", "ico", "icns": return .image
         case "pdf": return .pdf
+        case "xlsx", "xlsm": return .spreadsheet
         case "csv": return .csv(delimiter: ",")
         case "tsv": return .csv(delimiter: "\t")
         default: return nil
@@ -28,7 +29,7 @@ enum FilePreviewKind: Equatable {
     }
 
     /// 是否为二进制文件(不能当文本编辑,只有预览)。
-    var isBinary: Bool { self == .image || self == .pdf }
+    var isBinary: Bool { self == .image || self == .pdf || self == .spreadsheet }
 }
 
 /// 文件标签的显示模式。
@@ -84,7 +85,7 @@ struct TextPreviewView: View {
         case .mermaid: MermaidFilePreview(text: text)
         case .svg: SVGPreviewView(text: text)
         case .csv(let delimiter): CSVTableView(text: text, delimiter: delimiter)
-        case .image, .pdf: EmptyView()
+        case .image, .pdf, .spreadsheet: EmptyView()
         }
     }
 }
@@ -208,6 +209,8 @@ struct BinaryPreviewTab: View {
             switch kind {
             case .pdf:
                 PDFPreviewView(url: URL(fileURLWithPath: path))
+            case .spreadsheet:
+                SpreadsheetTabView(path: path)
             default:
                 if let image {
                     ImageCanvas(image: image)

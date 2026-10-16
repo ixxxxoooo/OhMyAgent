@@ -1757,3 +1757,15 @@
 "更多" = "More";
 "搜索分支" = "Search branches";
 "搜索 Agent" = "Search agents";
+"编辑栏" = "Formula bar";
+"仅显示前 %@ 行 / %@ 列" = "Showing only the first %@ rows / %@ columns";
+"%@ 行 × %@ 列" = "%@ rows × %@ columns";
+"无法读取工作簿:%@" = "Cannot read workbook: %@";
+"工作表不存在" = "Sheet not found";
+"不是有效的 ZIP/xlsx 文件" = "Not a valid ZIP/xlsx file";
+"暂不支持:%@" = "Not supported: %@";
+"文件中缺少 %@" = "Missing %@ in file";
+"文件已损坏:%@" = "File is corrupted: %@";
+"加密的文件" = "Encrypted files";
+"条目过大" = "Entry too large";
+"无法打开表格" = "Cannot Open Spreadsheet";
