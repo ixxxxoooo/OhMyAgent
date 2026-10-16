@@ -8,15 +8,25 @@ import Observation
 import SwiftUI
 import WorkbenchKit
 
-/// 可拖动换位置的面板。
-enum DraggablePanel {
-    case terminal, output
+/// 可拖动换位置的面板(项目栏、工具栏、终端、输出共用同一套拖动与落点逻辑)。
+typealias DraggablePanel = PanelItem
 
+extension PanelItem {
     /// 面板标题。
     var title: String {
         switch self {
+        case .sidebar: return String(localized: "项目栏")
+        case .tools: return String(localized: "工具栏")
         case .terminal: return String(localized: "终端")
         case .output: return String(localized: "输出")
+        }
+    }
+
+    /// 拖动提示。
+    var dragHelp: String {
+        switch self {
+        case .sidebar, .tools: return String(localized: "拖动可把\(title)移到左侧或右侧")
+        case .terminal, .output: return String(localized: "拖动可把\(title)移到左侧、右侧、底部或编辑区")
         }
     }
 }
@@ -40,7 +50,7 @@ final class TerminalDragState {
     var target: TerminalPlacement? {
         guard isDragging else { return nil }
         let local = CGPoint(x: pointer.x - workspaceFrame.minX, y: pointer.y - workspaceFrame.minY)
-        return TerminalPlacement.dropTarget(at: local, in: workspaceFrame.size)
+        return panel.dropTarget(at: local, in: workspaceFrame.size)
     }
 
     /// 拖动中更新指针位置。
@@ -76,18 +86,14 @@ private struct TerminalDragHandle: ViewModifier {
                     DragGesture(minimumDistance: 6, coordinateSpace: .global)
                         .onChanged { TerminalDragState.shared.update($0.location, panel: panel) }
                         .onEnded { value in
-                            if let placement = TerminalDragState.shared.finish(at: value.location) {
-                                omWithAnimation {
-                                    switch panel {
-                                    case .terminal: workbench.setTerminalPlacement(placement)
-                                    case .output: workbench.setOutputPlacement(placement)
-                                    }
-                                }
+                            if let placement = TerminalDragState.shared.finish(at: value.location),
+                               let zone = PanelZone(rawValue: placement.rawValue) {
+                                omWithAnimation { workbench.place(panel, in: zone) }
                             }
                         }
                 )
         )
-        .help(panel == .terminal ? String(localized: "拖动可把终端移到左侧、右侧、底部或编辑区") : String(localized: "拖动可把输出移到左侧、右侧、底部或编辑区"))
+        .help(panel.dragHelp)
     }
 }
 

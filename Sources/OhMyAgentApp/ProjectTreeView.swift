@@ -102,6 +102,8 @@ struct ProjectTreeView: View {
                             if let url = WorkspaceStore.chooseDirectory() { AppActions.shared.openWorkspace(url) }
                         }
                     }
+                    // 「工作区」标题行同时是拖动手柄:拖到窗口左/右半边即可把项目栏换到那一侧
+                    .terminalDragHandle(workbench, panel: .sidebar)
                     ForEach(workbench.orderedProjects) { project in
                         ProjectGroup(workbench: workbench, project: project, showArchived: showArchived)
                     }

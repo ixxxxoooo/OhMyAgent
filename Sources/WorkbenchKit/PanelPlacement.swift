@@ -188,6 +188,22 @@ public enum PanelItem: String, CaseIterable, Identifiable, Sendable {
         return PanelItem(rawValue: String(payload.dropFirst(payloadPrefix.count)))
     }
 
+    /// 由指针位置判定拖动该面板时的落点;指针在工作区之外返回 nil(松手即取消)。
+    /// 项目栏与工具栏只能在左右两侧,所以按左右半幅判定(更好命中);终端与输出沿用五区命中测试。
+    /// - Parameters:
+    ///   - point: 工作区内坐标(左上为原点)
+    ///   - size: 工作区尺寸
+    ///   - edgeFraction: 边缘区占比(仅终端/输出使用)
+    /// - Returns: 落点摆放值;越界为 nil
+    public func dropTarget(at point: CGPoint, in size: CGSize, edgeFraction: Double = 0.25) -> TerminalPlacement? {
+        guard size.width > 0, size.height > 0,
+              point.x >= 0, point.y >= 0, point.x <= size.width, point.y <= size.height else { return nil }
+        switch self {
+        case .sidebar, .tools: return point.x < size.width / 2 ? .left : .right
+        case .terminal, .output: return TerminalPlacement.dropTarget(at: point, in: size, edgeFraction: edgeFraction)
+        }
+    }
+
     /// 该面板可以去的区域:项目栏与工具栏只能在左右两侧,终端与输出四处都行。
     public var allowedZones: [PanelZone] {
         switch self {

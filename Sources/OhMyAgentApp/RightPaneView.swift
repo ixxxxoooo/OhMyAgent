@@ -48,10 +48,13 @@ struct RightPaneView: View {
                 .accessibilityAddTraits(selected ? .isSelected : [])
             }
             Spacer(minLength: 4)
+            // 标题区同时是拖动手柄:按住拖到窗口左/右半边即可把工具栏换到那一侧
             Text(Self.title(workbench.layout.rightPane))
                 .font(OMFonts.small.weight(.semibold))
                 .foregroundStyle(OMColors.secondaryText)
                 .lineLimit(1)
+                .frame(minWidth: 60, maxHeight: .infinity, alignment: .trailing)
+                .terminalDragHandle(workbench, panel: .tools)
         }
         // 位于最外侧时,顶部角落留给面板开关浮层
         .padding(.leading, max(8, workbench.layout.titlebarInsets(for: .tools).leading))

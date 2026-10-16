@@ -1958,3 +1958,10 @@
 "当前平台暂无官方发行包" = "No official build for this platform";
 "一键安装" = "Install";
 "升级" = "Update";
+"工具栏" = "Tools";
+"拖动可把%@移到左侧或右侧" = "Drag to move %@ to the left or right";
+"拖动可把%@移到左侧、右侧、底部或编辑区" = "Drag to move %@ to the left, right, bottom or editor area";
+"移到底部面板" = "Move to Bottom Panel";
+"移到左侧栏" = "Move to Left Sidebar";
+"移到右侧栏" = "Move to Right Sidebar";
+"移到编辑区" = "Move to Editor Area";

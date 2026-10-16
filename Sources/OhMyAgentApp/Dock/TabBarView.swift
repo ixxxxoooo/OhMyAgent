@@ -234,6 +234,35 @@ struct TabItemView: View {
         }
     }
 
+    /// 终端/输出标签的「移到…」菜单:把它们从编辑区放回底部或左右侧栏(与标题条拖动等价)。
+    @ViewBuilder
+    private var panelMoveMenu: some View {
+        if let item = panelItem {
+            Divider()
+            ForEach(item.allowedZones.filter { $0 != .editor }) { zone in
+                Button(Self.moveTitle(item: item, zone: zone)) { omWithAnimation { _ = workbench.place(item, in: zone) } }
+            }
+        }
+    }
+
+    /// 标签对应的可摆放面板(仅终端标签与输出标签)。
+    private var panelItem: PanelItem? {
+        switch tab.kind {
+        case .terminal, .agentTerminal: return .terminal
+        case .preview(let id): return id == WorkbenchModel.outputTabID ? .output : nil
+        default: return nil
+        }
+    }
+
+    private static func moveTitle(item: PanelItem, zone: PanelZone) -> String {
+        switch zone {
+        case .bottom: return String(localized: "移到底部面板")
+        case .left: return String(localized: "移到左侧栏")
+        case .right: return String(localized: "移到右侧栏")
+        case .editor: return String(localized: "移到编辑区")
+        }
+    }
+
     @ViewBuilder
     private var menu: some View {
         Button("关闭") { AppActions.shared.requestCloseTab(tab.id) }
@@ -247,6 +276,7 @@ struct TabItemView: View {
         }
         .disabled(group.tabs.count < 2)
         Button(workbench.dock.maximizedGroupID == group.id ? String(localized: "还原布局") : String(localized: "最大化此组")) { workbench.dock.toggleMaximize(group: group.id) }
+        panelMoveMenu
         if case .file(let path) = tab.kind {
             Divider()
             Button("在 Finder 中显示") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }
@@ -408,4 +438,5 @@ private struct TabOverflowRow: View {
             Image.om(tabIcon(item.tab.kind), size: 12).foregroundStyle(OMColors.secondaryText)
         }
     }
+
 }
