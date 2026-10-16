@@ -74,7 +74,7 @@ final class PaletteModel {
     }
 
     private func commandItems(workbench: WorkbenchModel) -> [PaletteItem] {
-        let all = PaletteCommands.all(workbench: workbench)
+        let all = PaletteCommands.all(workbench: workbench) + DemoPaletteCommands.all(workbench: workbench)
         let trimmed = query.trimmingCharacters(in: .whitespaces)
         let ranked: [(PaletteCommand, [Int])]
         if trimmed.isEmpty { ranked = all.map { ($0, []) } }

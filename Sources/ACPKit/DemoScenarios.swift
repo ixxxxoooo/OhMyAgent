@@ -71,11 +71,19 @@ public enum DemoScenarios {
         }
         if prompt.contains("#showcase") { result.append(DemoScenarioMatch(scenario: legacyShowcase, isDemo: false)) }
         if prompt.contains("#mermaid") { result.append(DemoScenarioMatch(scenario: legacyMermaid, isDemo: false)) }
-        for token in prompt.split(whereSeparator: { $0.isWhitespace }) where token.hasPrefix("#demo-") {
+        // `#demo-<名>`(提示词关键字)与 `/demo-<名>`(斜杠命令)等价
+        for token in prompt.split(whereSeparator: { $0.isWhitespace }) where token.hasPrefix("#demo-") || token.hasPrefix("/demo-") {
             let name = String(token.dropFirst("#demo-".count)).trimmingCharacters(in: .punctuationCharacters.subtracting(CharacterSet(charactersIn: "-")))
             if let scenario = scenario(named: name) { result.append(DemoScenarioMatch(scenario: scenario, isDemo: true)) }
         }
         return result
+    }
+
+    /// 下发给客户端的斜杠命令描述(`available_commands_update`):每个场景一条 `/demo-<名>`。
+    public static var commandDescriptors: [JSONValue] {
+        catalog.map { scenario in
+            ["name": .string(scenario.commandName), "description": .string("演示 · \(scenario.group) · \(scenario.title):\(scenario.summary)"), "input": JSONValue.null]
+        }
     }
 
     // MARK: 旧关键字场景(行为与重构前保持一致)

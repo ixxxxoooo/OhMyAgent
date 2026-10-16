@@ -177,11 +177,11 @@ public actor ScriptedAgent: ACPRequestHandler {
     private func sendCommands(sessionId: String) async {
         await update(sessionId, [
             "sessionUpdate": "available_commands_update",
-            "availableCommands": [
+            "availableCommands": .array([
                 ["name": "compact", "description": "压缩上下文", "input": JSONValue.null],
                 ["name": "context", "description": "查看上下文用量", "input": JSONValue.null],
                 ["name": "review", "description": "审查改动", "input": ["hint": "可选范围"]],
-            ],
+            ] + (demoHistory ? DemoScenarios.commandDescriptors : [])),
         ])
     }
 

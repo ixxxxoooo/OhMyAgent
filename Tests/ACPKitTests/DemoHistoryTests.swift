@@ -89,4 +89,32 @@ struct DemoHistoryTests {
         if id != "demo-notes-cli-7" { #expect(!calls.isEmpty) }
         await client.close()
     }
+
+    @Test("斜杠命令 /demo-<名> 与 #demo-<名> 等价")
+    func slashCommandMatches() {
+        #expect(DemoScenarios.matching(prompt: "/demo-tools-files").first?.scenario.id == "tools-files")
+        #expect(DemoScenarios.matching(prompt: "/demo-tools-files").first?.isDemo == true)
+        #expect(DemoScenarios.matching(prompt: "/demo-nope").isEmpty)
+        #expect(DemoScenarios.commandDescriptors.count == DemoScenarios.all.count)
+    }
+
+    @Test("演示模式下新会话下发全部 /demo-* 命令,普通模式不下发")
+    func commandsAdvertised() async throws {
+        for (demo, expected) in [(true, true), (false, false)] {
+            let (a, b) = LoopbackTransport.makePair()
+            let agent = ScriptedAgent(transport: b, chunkDelayMillis: 1, demoHistory: demo)
+            try await agent.start()
+            let client = ACPClient(transport: a, delegate: AllowFirstDelegate())
+            try await client.start()
+            _ = try await client.initialize()
+            let events = try await collect(client, until: { event in
+                if case .sessionUpdate(_, .availableCommands) = event { return true } else { return false }
+            }) { _ = try await client.newSession(cwd: "/tmp/atlas-web") }
+            var names: [String] = []
+            for case .sessionUpdate(_, .availableCommands(let commands)) in events { names += commands.map(\.name) }
+            #expect(names.contains { $0.hasPrefix("demo-") } == expected)
+            if expected { #expect(Set(names).isSuperset(of: Set(DemoScenarios.all.map(\.commandName)))) }
+            await client.close()
+        }
+    }
 }

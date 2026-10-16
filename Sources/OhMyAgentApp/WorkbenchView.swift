@@ -125,7 +125,9 @@ struct WorkbenchView: View {
 
     /// 调试钩子(脚本化界面验证用,不影响正常使用)。
     private func runDebugHooks() async {
-        let env = ProcessInfo.processInfo.environment
+        var env = ProcessInfo.processInfo.environment
+        // 演示模式:OMA_DEMO_SCENARIO=<场景名> 等价于 OMA_AUTOSEND="/demo-<场景名>"
+        if let scenario = DemoLaunch.environment?.scenario, env["OMA_AUTOSEND"] == nil { env["OMA_AUTOSEND"] = "/demo-" + scenario }
         let wantsSession = env["OMA_AUTOSEND"] != nil || env["OMA_DRAFT"] != nil
         for _ in 0..<80 where workbench.activeSession == nil && (wantsSession || !workbench.projects.isEmpty) { try? await Task.sleep(for: .milliseconds(100)) }
         if let draft = env["OMA_DRAFT"], !draft.isEmpty { workbench.activeSession?.draft = draft }
