@@ -1,11 +1,11 @@
 // @author ixxxxoooo
-// OhMyAgent Bridge:本机 Unix socket 上的 MCP 服务器(换行分隔 JSON-RPC)。
-// Agent 通过 stdio 垫片进程 `OhMyAgentBridge` 连接,即可调用客户端能力:打开文件、显示 diff、读取选区、系统通知。
+// OhMyAgent Bridge:本机回环网关上的 MCP 服务器(Streamable HTTP)。
+// Agent 以 HTTP MCP 方式连接(无需垫片子进程),即可调用客户端能力:打开文件、显示 diff、读取选区、系统通知。
 
 import ACPKit
-import Darwin
 import Foundation
 import OMLog
+import ProviderProxyKit
 import Synchronization
 
 /// 工具调用结果。
@@ -60,141 +60,66 @@ public enum BridgeTool: String, CaseIterable, Sendable, Codable {
     public var displayName: String { "ohmyagent." + rawValue }
 }
 
-/// Bridge 服务器。
-public final class BridgeServer: @unchecked Sendable {
-    public let socketPath: String
+/// Bridge 服务器:通过本机网关暴露 MCP(Streamable HTTP,JSON 响应),每个会话一个不可猜测的令牌路径。
+public final class BridgeServer: Sendable {
     private let handler: any BridgeHandler
     private let enabled: Set<BridgeTool>
-    private let state = Mutex(State())
-
-    private struct State {
-        var listenFD: Int32 = -1
-        var running = false
-        var connections: Set<Int32> = []
-    }
+    private let gateway: LocalGateway
+    private let token = Mutex<String?>(nil)
 
     /// - Parameters:
-    ///   - socketPath: socket 文件路径(必须短于 104 字节)
     ///   - handler: 工具实现
     ///   - enabled: 启用的工具
-    public init(socketPath: String, handler: any BridgeHandler, enabled: Set<BridgeTool> = Set(BridgeTool.allCases)) {
-        self.socketPath = socketPath
+    ///   - gateway: 本机网关(默认应用共享实例;测试可注入)
+    public init(handler: any BridgeHandler, enabled: Set<BridgeTool> = Set(BridgeTool.allCases), gateway: LocalGateway = .shared) {
         self.handler = handler
         self.enabled = enabled
+        self.gateway = gateway
     }
 
-    /// 生成一个短路径的 socket 文件名。
-    public static func makeSocketPath() -> String {
-        (NSTemporaryDirectory() as NSString).appendingPathComponent("oma-\(UUID().uuidString.prefix(8).lowercased()).sock")
+    /// 注册到网关并返回 MCP 地址。
+    /// - Returns: 交给 Agent 的 HTTP MCP 地址
+    /// - Throws: 网关启动失败
+    public func start() async throws -> URL {
+        let handler = handler, enabled = enabled
+        let registered = try await gateway.register { request in
+            await Self.serve(request, handler: handler, enabled: enabled)
+        }
+        token.withLock { $0 = registered.token }
+        Log.bridge.info("Bridge 已注册到本机网关")
+        return registered.url
     }
 
-    /// 清理上次异常退出遗留的 socket 文件(只删除已无人监听的)。
-    public static func cleanStaleSockets() {
+    /// 注销路由(会话结束时调用)。
+    public func stop() {
+        let previous = token.withLock { (current: inout String?) -> String? in
+            let value = current
+            current = nil
+            return value
+        }
+        guard let value = previous else { return }
+        let gateway = gateway
+        Task { await gateway.unregister(token: value) }
+        Log.bridge.info("Bridge 已注销")
+    }
+
+    /// 清理旧版本(Unix socket 垫片时代)遗留在临时目录里的 `oma-*.sock` 文件。
+    public static func removeLegacySockets() {
         let directory = NSTemporaryDirectory()
         for name in (try? FileManager.default.contentsOfDirectory(atPath: directory)) ?? [] where name.hasPrefix("oma-") && name.hasSuffix(".sock") {
-            let path = (directory as NSString).appendingPathComponent(name)
-            guard path.utf8.count < 100 else { continue }
-            let fd = socket(AF_UNIX, SOCK_STREAM, 0)
-            guard fd >= 0 else { continue }
-            var address = sockaddr_un()
-            address.sun_family = sa_family_t(AF_UNIX)
-            withUnsafeMutableBytes(of: &address.sun_path) { buffer in for (index, byte) in path.utf8.enumerated() { buffer[index] = byte } }
-            let result = withUnsafePointer(to: &address) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) } }
-            close(fd)
-            if result != 0 { unlink(path) }
+            try? FileManager.default.removeItem(atPath: (directory as NSString).appendingPathComponent(name))
         }
     }
 
-    // MARK: - 生命周期
-
-    /// 开始监听。
-    public func start() throws {
-        let path = socketPath
-        guard path.utf8.count < 100 else { throw BridgeError.pathTooLong }
-        unlink(path)
-        let fd = socket(AF_UNIX, SOCK_STREAM, 0)
-        guard fd >= 0 else { throw BridgeError.socket(errno) }
-        var address = sockaddr_un()
-        address.sun_family = sa_family_t(AF_UNIX)
-        withUnsafeMutableBytes(of: &address.sun_path) { buffer in
-            for (index, byte) in path.utf8.enumerated() { buffer[index] = byte }
+    /// 处理一次 HTTP 请求:POST 一条 JSON-RPC;通知返回 202;其余方法返回 405。
+    static func serve(_ request: HTTPRequest, handler: any BridgeHandler, enabled: Set<BridgeTool>) async -> HTTPResult {
+        guard request.method.uppercased() == "POST" else {
+            return .full(status: 405, headers: ["Allow": "POST"], body: Data())
         }
-        let size = socklen_t(MemoryLayout<sockaddr_un>.size)
-        let bound = withUnsafePointer(to: &address) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(fd, $0, size) } }
-        guard bound == 0, listen(fd, 8) == 0 else {
-            let code = errno
-            close(fd)
-            throw BridgeError.socket(code)
+        guard let response = await respond(to: request.body, handler: handler, enabled: enabled) else {
+            return .full(status: 202, headers: [:], body: Data())
         }
-        chmod(path, 0o600)
-        Log.bridge.info("Bridge 开始监听", ["socket": path])
-        state.withLock { $0.listenFD = fd; $0.running = true }
-        let thread = Thread { [weak self] in self?.acceptLoop(fd) }
-        thread.name = "OhMyAgent.Bridge.accept"
-        thread.start()
-    }
-
-    /// 停止监听并关闭所有连接。
-    public func stop() {
-        let (fd, connections) = state.withLock { state -> (Int32, Set<Int32>) in
-            state.running = false
-            let result = (state.listenFD, state.connections)
-            state.listenFD = -1
-            state.connections = []
-            return result
-        }
-        Log.bridge.info("Bridge 停止", ["connections": "\(connections.count)"])
-        if fd >= 0 { shutdown(fd, SHUT_RDWR); close(fd) }
-        for connection in connections { shutdown(connection, SHUT_RDWR) }
-        unlink(socketPath)
-    }
-
-    private func acceptLoop(_ listenFD: Int32) {
-        while state.withLock({ $0.running }) {
-            let client = accept(listenFD, nil, nil)
-            if client < 0 { if errno == EINTR { continue } else { break } }
-            _ = state.withLock { $0.connections.insert(client) }
-            let thread = Thread { [weak self] in self?.serve(client) }
-            thread.name = "OhMyAgent.Bridge.client"
-            thread.start()
-        }
-    }
-
-    private func serve(_ fd: Int32) {
-        let writeLock = Mutex(())
-        // 对端关闭写端后,仍要等待在途请求写完响应再关闭连接
-        let inflight = DispatchGroup()
-        var framer = LineFramer()
-        var buffer = [UInt8](repeating: 0, count: 16384)
-        while true {
-            let count = read(fd, &buffer, buffer.count)
-            if count <= 0 { break }
-            for line in framer.push(Data(buffer[0..<count])) {
-                let handler = handler, enabled = enabled
-                inflight.enter()
-                Task.detached {
-                    defer { inflight.leave() }
-                    guard let response = await Self.respond(to: line, handler: handler, enabled: enabled) else { return }
-                    var data = response
-                    data.append(0x0A)
-                    writeLock.withLock { _ in Self.writeAll(fd, data) }
-                }
-            }
-        }
-        _ = inflight.wait(timeout: .now() + 30)
-        state.withLock { _ = $0.connections.remove(fd) }
-        close(fd)
-    }
-
-    private static func writeAll(_ fd: Int32, _ data: Data) {
-        data.withUnsafeBytes { raw in
-            var offset = 0
-            while offset < raw.count {
-                let written = write(fd, raw.baseAddress!.advanced(by: offset), raw.count - offset)
-                if written <= 0 { return }
-                offset += written
-            }
-        }
+        return .full(status: 200, headers: ["Content-Type": "application/json"], body: response)
     }
 
     // MARK: - MCP 处理(静态,便于直接测试)
@@ -243,19 +168,6 @@ public final class BridgeServer: @unchecked Sendable {
         case .notify:
             guard let message = arguments["message"]?.stringValue, !message.isEmpty else { return BridgeResult("缺少 message 参数", isError: true) }
             return await handler.notify(title: arguments["title"]?.stringValue ?? "OhMyAgent", message: message)
-        }
-    }
-}
-
-/// Bridge 错误。
-public enum BridgeError: Error, LocalizedError {
-    case pathTooLong
-    case socket(Int32)
-
-    public var errorDescription: String? {
-        switch self {
-        case .pathTooLong: return "Bridge socket 路径过长"
-        case .socket(let code): return "Bridge socket 失败:\(String(cString: strerror(code)))"
         }
     }
 }

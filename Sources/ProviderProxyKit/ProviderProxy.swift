@@ -26,21 +26,23 @@ public struct ProxyRoute: Sendable {
 }
 
 /// 协议转换代理(应用内共享一个实例,首次注册路由时才启动监听)。
+///
+/// 监听由 `LocalGateway` 提供(与 Bridge 的 HTTP MCP 共用一个回环端口)。
 public actor ProviderProxy {
     /// 应用共享实例。
     public static let shared = ProviderProxy()
 
-    private var server: LoopbackHTTPServer?
-    private var port: UInt16?
+    private let gateway: LocalGateway
     /// 路由键(如提供商 ID)→ 令牌
     private var tokens: [String: String] = [:]
-    /// 令牌 → 路由
-    private var routes: [String: (key: String, route: ProxyRoute)] = [:]
     private let session: URLSession
 
     /// 创建代理。
-    /// - Parameter session: 上游请求使用的会话(测试可注入)
-    public init(session: URLSession? = nil) {
+    /// - Parameters:
+    ///   - session: 上游请求使用的会话(测试可注入)
+    ///   - gateway: 本机网关(测试可注入独立实例)
+    public init(session: URLSession? = nil, gateway: LocalGateway = .shared) {
+        self.gateway = gateway
         self.session = session ?? URLSession(configuration: {
             let configuration = URLSessionConfiguration.ephemeral
             configuration.timeoutIntervalForRequest = 300
@@ -56,46 +58,28 @@ public actor ProviderProxy {
     /// - Returns: 交给 Claude Code 作为 `ANTHROPIC_BASE_URL` 的本地地址
     /// - Throws: 监听启动失败
     public func register(key: String, route: ProxyRoute) async throws -> URL {
-        let port = try await ensureStarted()
-        let token = tokens[key] ?? UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
-        tokens[key] = token
-        routes[token] = (key, route)
-        guard let url = URL(string: "http://127.0.0.1:\(port)/\(token)") else { throw LoopbackServerError.listenerFailed("bad url") }
-        return url
-    }
-
-    /// 停止监听并清空路由。
-    public func shutdown() {
-        server?.stop()
-        server = nil
-        port = nil
-        tokens.removeAll()
-        routes.removeAll()
-    }
-
-    private func ensureStarted() async throws -> UInt16 {
-        if let port { return port }
-        let server = LoopbackHTTPServer { [weak self] request in
+        let handler: LocalGateway.Handler = { [weak self] request in
             guard let self else { return Self.error(status: 503, message: "proxy stopped") }
-            return await self.handle(request)
+            return await self.handle(request, key: key, route: route)
         }
-        let port = try await server.start()
-        self.server = server
-        self.port = port
-        Log.agent.info("协议代理已启动", ["port": "\(port)"])
-        return port
+        let registered = try await gateway.register(token: tokens[key], handler: handler)
+        tokens[key] = registered.token
+        return registered.url
+    }
+
+    /// 注销全部路由(不停止共享监听)。
+    public func shutdown() async {
+        for token in tokens.values { await gateway.unregister(token: token) }
+        tokens.removeAll()
     }
 
     // MARK: - 请求处理
 
-    private func handle(_ request: HTTPRequest) async -> HTTPResult {
-        // 路径形如 /<令牌>/v1/messages
-        let parts = request.path.split(separator: "?", maxSplits: 1).first.map(String.init)?.split(separator: "/", omittingEmptySubsequences: true).map(String.init) ?? []
-        guard parts.count >= 2, let entry = routes[parts[0]] else { return Self.error(status: 404, message: "unknown route") }
-        let tail = "/" + parts.dropFirst().joined(separator: "/")
+    private func handle(_ request: HTTPRequest, key: String, route: ProxyRoute) async -> HTTPResult {
+        let tail = request.path.split(separator: "?", maxSplits: 1).first.map(String.init) ?? request.path
         switch (request.method.uppercased(), tail) {
         case ("POST", "/v1/messages"):
-            return await forward(request, key: entry.key, route: entry.route)
+            return await forward(request, key: key, route: route)
         case ("POST", "/v1/messages/count_tokens"):
             return Self.countTokens(request.body)
         case ("GET", "/v1/models"):

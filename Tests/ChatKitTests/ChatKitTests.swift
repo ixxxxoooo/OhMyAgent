@@ -575,13 +575,13 @@ struct AgentIntegrationTests {
     }
 
     @Test("MCP 注入包含已启用的 Agent-as-MCP,Bridge 关闭时不启动")
-    func prepareServers() {
+    func prepareServers() async {
         let model = SessionModel(workspace: URL(fileURLWithPath: "/tmp"), descriptor: .claudeCode)
         var registry = AgentRegistryData()
         registry.mcpAgents = [AgentMCPEntry(id: "codex", name: "Codex", command: "codex", args: ["mcp-server"], enabled: true),
                               AgentMCPEntry(id: "off", name: "Off", command: "off", enabled: false)]
         registry.bridge.enabled = false
-        let prepared = model.prepareMCPServers(registry: registry, environment: ["PATH": ""])
+        let prepared = await model.prepareMCPServers(registry: registry, environment: ["PATH": ""])
         #expect(prepared.bridge == nil)
         #expect(prepared.servers.count == 1)
         #expect(prepared.servers.first == .stdio(name: "agent_codex", command: "codex", args: ["mcp-server"], env: [:]))

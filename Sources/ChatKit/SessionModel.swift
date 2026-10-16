@@ -384,7 +384,7 @@ public final class SessionModel {
                 guard let client = await supervisor.client else { throw AgentLaunchError.missingAdapter }
                 self.attach(supervisor: supervisor, client: client, result: result)
                 let registry = AgentRegistryStore().load()
-                let prepared = self.prepareMCPServers(registry: registry, environment: tools.environment)
+                let prepared = await self.prepareMCPServers(registry: registry, environment: tools.environment)
                 self.mcpServers = prepared.servers
                 self.bridge = prepared.bridge
                 let setup = try await client.newSession(cwd: cwd, mcpServers: prepared.servers, meta: self.effectiveMeta())

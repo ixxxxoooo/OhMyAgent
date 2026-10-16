@@ -384,7 +384,6 @@
 "Agent 作为工具(Agent-as-MCP)" = "Agent as Tool (Agent-as-MCP)";
 "添加自定义…" = "Add Custom…";
 "向 Agent 提供 OhMyAgent 工具" = "Expose OhMyAgent tools to the Agent";
-"缺少辅助程序 OhMyAgentBridge,请用 Scripts/bundle.sh 重新打包。" = "The OhMyAgentBridge helper is missing. Rebuild with Scripts/bundle.sh.";
 "标识(唯一)" = "Identifier (unique)";
 "命令" = "Command";
 "绝对路径或 PATH 中的命令名" = "Absolute path or a command name in PATH";
@@ -651,7 +650,6 @@
 "预算提醒只在客户端侧判断:会话费用超过阈值时在用量弹层中高亮。订阅账号通常不上报费用。" = "Budget alerts are evaluated client-side: when a conversation's cost exceeds the threshold it is highlighted in the usage popover. Subscription accounts usually don't report cost.";
 "任何实现 ACP 的 Agent 都可以加入(命令 + 参数 + 环境变量)。切换 Agent 在窗口工具栏进行,会在当前窗口开始新会话。" = "Any ACP-compatible Agent can be added (command + arguments + environment variables). Switch Agents from the window toolbar; it starts a new conversation in the current window.";
 "启用后,这些 Agent 会以 stdio MCP 服务器的形式注入新会话,让当前 Agent 把子任务委托给另一个 Agent(例如 `codex mcp-server`)。对新会话生效。" = "When enabled, these Agents are injected into new sessions as stdio MCP servers so the current Agent can delegate subtasks to another Agent (e.g. `codex mcp-server`). Applies to new sessions.";
-"每个会话在本机创建一个仅当前用户可访问的 Unix socket,通过 `OhMyAgentBridge` 垫片以 MCP 服务器 `ohmyagent` 暴露:打开文件、显示改动、读取你在输入框中选中的文字、发送系统通知。会话结束即关闭。" = "Each session creates a Unix socket on this machine accessible only to the current user, exposed through the `OhMyAgentBridge` shim as the MCP server `ohmyagent`: open files, show changes, read the text you selected in the composer, and send system notifications. It closes when the session ends.";
 "选中的提供商对「新建会话与重新连接」生效。每个会话启动时由 OhMyAgent 把地址、模型与密钥交给 Claude Code,不会改动 ~/.claude/settings.json,也不影响终端里的 claude。" = "The selected provider applies to new sessions and reconnects. On each session start OhMyAgent passes the endpoint, model and key to Claude Code; it does not modify ~/.claude/settings.json or affect claude in your terminal.";
 "密钥保存在 ~/Library/Application Support/OhMyAgent/provider-keys.json(权限 0600),只在启动会话时放进 Claude Code 进程的环境变量,不写入日志。" = "Keys are stored in ~/Library/Application Support/OhMyAgent/provider-keys.json (mode 0600) and only placed in the Claude Code process environment when a session starts; they are never logged.";
 "日志文件位于 ~/Library/Logs/OhMyAgent/(单文件 10MB 轮转,保留 7 天)。令牌、API Key 与授权头在写入前自动脱敏。排查问题时把 oma-日期.log 发给开发者即可。" = "Logs live in ~/Library/Logs/OhMyAgent/ (rotated at 10MB per file, kept for 7 days). Tokens, API keys and authorization headers are redacted before writing. To report an issue, send the oma-<date>.log to the developer.";
@@ -1577,3 +1575,4 @@
 "显示项目栏" = "Show Project Sidebar";
 "隐藏工具栏" = "Hide Tools Sidebar";
 "显示工具栏" = "Show Tools Sidebar";
+"每个会话在应用内置的本机回环端点上注册一个不可猜测的 HTTP MCP 地址(服务器名 `ohmyagent`,无需额外进程),暴露:打开文件、显示改动、读取你在输入框中选中的文字、发送系统通知。会话结束即注销。" = "Each session registers an unguessable HTTP MCP address on the app's built-in loopback endpoint (server name `ohmyagent`, no extra process), exposing: open files, show changes, read the text you selected in the composer, and send system notifications. It is unregistered when the session ends.";

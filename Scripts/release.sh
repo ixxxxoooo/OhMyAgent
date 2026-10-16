@@ -34,7 +34,7 @@ BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Contents/Info
 # 4. 签名:先签内嵌可执行文件,最后签 app 本体(不使用 --deep)
 SIGN_ARGS=(--force --sign "$IDENTITY" --options runtime --entitlements "$ENTITLEMENTS")
 if [[ "$IDENTITY" != "-" ]]; then SIGN_ARGS+=(--timestamp); fi
-for helper in FakeAgent OhMyAgentBridge; do
+for helper in FakeAgent; do
   codesign "${SIGN_ARGS[@]}" "$APP/Contents/MacOS/$helper"
 done
 codesign "${SIGN_ARGS[@]}" "$APP"

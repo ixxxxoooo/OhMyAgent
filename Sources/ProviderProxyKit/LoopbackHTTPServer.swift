@@ -15,6 +15,14 @@ public struct HTTPRequest: Sendable {
     /// 请求头(名称小写)
     public var headers: [String: String]
     public var body: Data
+
+    /// 创建请求(测试与网关转发使用)。
+    public init(method: String, path: String, headers: [String: String] = [:], body: Data = Data()) {
+        self.method = method
+        self.path = path
+        self.headers = headers
+        self.body = body
+    }
 }
 
 /// 处理器的返回值。

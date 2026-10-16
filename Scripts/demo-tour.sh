@@ -134,7 +134,6 @@ PY
 stop_app() {
   pkill -x OhMyAgent 2>/dev/null || true
   pkill -x FakeAgent 2>/dev/null || true
-  pkill -x OhMyAgentBridge 2>/dev/null || true
   sleep 0.5
 }
 

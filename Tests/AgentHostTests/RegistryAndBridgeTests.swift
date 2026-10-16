@@ -6,6 +6,7 @@ import Darwin
 import Foundation
 import Testing
 @testable import AgentHost
+import ProviderProxyKit
 
 private func tempDir() throws -> URL {
     let url = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("oma-m7-\(UUID().uuidString)")
@@ -122,35 +123,55 @@ struct BridgeTests {
         #expect(unknown?["error"]?["code"]?.intValue == -32601)
     }
 
-    @Test("经真实 Unix socket 往返,停止后 socket 文件被清理")
-    func socketRoundTrip() async throws {
-        let path = BridgeServer.makeSocketPath()
-        let server = BridgeServer(socketPath: path, handler: RecordingHandler())
-        try server.start()
-        defer { server.stop() }
-        #expect(FileManager.default.fileExists(atPath: path))
+    @Test("经真实回环网关用 HTTP 往返:initialize / tools/call / 通知 / 非法方法,停止后路由消失")
+    func httpRoundTrip() async throws {
+        let gateway = LocalGateway()
+        defer { Task { await gateway.shutdown() } }
+        let server = BridgeServer(handler: RecordingHandler(), gateway: gateway)
+        let url = try await server.start()
+        #expect(await gateway.routeCount == 1)
 
-        let fd = socket(AF_UNIX, SOCK_STREAM, 0)
-        var address = sockaddr_un()
-        address.sun_family = sa_family_t(AF_UNIX)
-        withUnsafeMutableBytes(of: &address.sun_path) { buffer in for (i, byte) in path.utf8.enumerated() { buffer[i] = byte } }
-        let ok = withUnsafePointer(to: &address) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) } }
-        #expect(ok == 0)
-        defer { close(fd) }
-        let request = Data((#"{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"notify","arguments":{"title":"T","message":"M"}}}"# + "\n").utf8)
-        _ = request.withUnsafeBytes { write(fd, $0.baseAddress, $0.count) }
-        var buffer = [UInt8](repeating: 0, count: 4096)
-        let count = read(fd, &buffer, buffer.count)
-        #expect(count > 0)
-        let reply = try JSONDecoder().decode(JSONValue.self, from: Data(buffer[0..<max(count, 0)]))
+        func post(_ body: String) async throws -> (Data, Int) {
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.httpBody = Data(body.utf8)
+            request.setValue("application/json", forHTTPHeaderField: "content-type")
+            let (data, response) = try await URLSession(configuration: .ephemeral).data(for: request)
+            return (data, (response as? HTTPURLResponse)?.statusCode ?? 0)
+        }
+        let (initData, initStatus) = try await post(#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}"#)
+        #expect(initStatus == 200)
+        #expect(try JSONDecoder().decode(JSONValue.self, from: initData)["result"]?["serverInfo"]?["name"]?.stringValue == "ohmyagent")
+
+        let (callData, _) = try await post(#"{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"notify","arguments":{"title":"T","message":"M"}}}"#)
+        let reply = try JSONDecoder().decode(JSONValue.self, from: callData)
         #expect(reply["result"]?["content"]?.arrayValue?.first?["text"]?.stringValue == "notified T/M")
-        server.stop()
-        #expect(!FileManager.default.fileExists(atPath: path))
-    }
 
-    @Test("socket 路径过长被拒绝")
-    func longPath() {
-        let server = BridgeServer(socketPath: "/tmp/" + String(repeating: "a", count: 120), handler: RecordingHandler())
-        #expect(throws: BridgeError.self) { try server.start() }
+        let (_, noteStatus) = try await post(#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#)
+        #expect(noteStatus == 202, "通知无响应体,返回 202")
+
+        var get = URLRequest(url: url)
+        get.httpMethod = "GET"
+        let (_, getResponse) = try await URLSession(configuration: .ephemeral).data(for: get)
+        #expect((getResponse as? HTTPURLResponse)?.statusCode == 405)
+
+        // 并发请求互不串扰
+        try await withThrowingTaskGroup(of: String.self) { group in
+            for index in 0..<8 {
+                group.addTask {
+                    let (data, _) = try await post(#"{"jsonrpc":"2.0","id":\#(index),"method":"tools/call","params":{"name":"open_file","arguments":{"path":"f\#(index)"}}}"#)
+                    return try JSONDecoder().decode(JSONValue.self, from: data)["result"]?["content"]?.arrayValue?.first?["text"]?.stringValue ?? ""
+                }
+            }
+            var texts: Set<String> = []
+            for try await text in group { texts.insert(text) }
+            #expect(texts.count == 8)
+        }
+
+        server.stop()
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(await gateway.routeCount == 0)
+        let (_, goneStatus) = try await post(#"{"jsonrpc":"2.0","id":2,"method":"ping"}"#)
+        #expect(goneStatus == 404)
     }
 }

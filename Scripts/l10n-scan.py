@@ -145,7 +145,6 @@ ALLOWLIST = (
     ("Sources/OMLog/", None),                            # 日志文本不本地化
     ("Sources/EditorKit/CodeEditorView.swift", "不支持从 nib 创建"),  # fatalError 信息
     ("Sources/OhMyAgentApp/StatusItemController.swift", "init(coder:) 不可用"),
-    ("Sources/OhMyAgentBridge/", None),                  # 辅助可执行文件的 stderr
     ("Sources/ChatKit/ToolPresentation.swift", "读取 "),   # stripVerb:与 Agent 标题做前缀比较
     ("Sources/ChatKit/ToolPresentation.swift", "修改 "),
     ("Sources/ChatKit/ToolPresentation.swift", "编辑 "),

@@ -23,7 +23,6 @@ while [[ $# -gt 0 ]]; do
 done
 pkill -x OhMyAgent 2>/dev/null || true
 pkill -x FakeAgent 2>/dev/null || true
-pkill -x OhMyAgentBridge 2>/dev/null || true
 sleep 0.3
 Scripts/bundle.sh "$CONFIG"
 export OMA_DEMO=1

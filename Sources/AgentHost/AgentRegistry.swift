@@ -166,14 +166,3 @@ extension AgentDescriptor {
 
     private enum Keys: String, CodingKey { case id, name, kind, command, args, env, enabled, summary }
 }
-
-/// 随应用分发的辅助可执行文件(与主程序同目录;开发期回退到 `.build`)。
-public enum HelperBinaries {
-    /// - Parameter name: 可执行文件名
-    /// - Returns: 绝对路径;找不到返回 nil
-    public static func locate(_ name: String) -> String? {
-        let main = URL(fileURLWithPath: Bundle.main.executablePath ?? CommandLine.arguments[0]).deletingLastPathComponent()
-        let candidates = [main.appendingPathComponent(name).path]
-        return candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
-    }
-}

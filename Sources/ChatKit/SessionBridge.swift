@@ -5,6 +5,7 @@ import ACPKit
 import AgentHost
 import DiffKit
 import Foundation
+import OMLog
 
 /// Bridge 工具的会话实现(弱引用会话模型,窗口关闭后调用返回错误)。
 final class SessionBridge: BridgeHandler, @unchecked Sendable {
@@ -67,19 +68,22 @@ extension SessionModel {
         return BridgeResult("已发送通知")
     }
 
-    /// 汇总需要注入会话的 MCP 服务器:Agent-as-MCP 登记项 + OhMyAgent Bridge。
+    /// 汇总需要注入会话的 MCP 服务器:Agent-as-MCP 登记项 + OhMyAgent Bridge(进程内 HTTP MCP,无子进程)。
     /// - Parameters:
     ///   - registry: 注册表内容
     ///   - environment: 登录 shell 环境(用于解析命令)
-    /// - Returns: MCP 服务器配置与已启动的 Bridge
-    func prepareMCPServers(registry: AgentRegistryData, environment: [String: String]) -> (servers: [MCPServerConfig], bridge: BridgeServer?) {
+    /// - Returns: MCP 服务器配置与已注册的 Bridge
+    func prepareMCPServers(registry: AgentRegistryData, environment: [String: String]) async -> (servers: [MCPServerConfig], bridge: BridgeServer?) {
         var servers = registry.enabledMCPAgents.map { $0.serverConfig(path: environment["PATH"] ?? "") }
         var started: BridgeServer?
-        if registry.bridge.enabled, let helper = HelperBinaries.locate("OhMyAgentBridge") {
-            let server = BridgeServer(socketPath: BridgeServer.makeSocketPath(), handler: SessionBridge(model: self), enabled: registry.bridge.enabledTools)
-            if (try? server.start()) != nil {
+        if registry.bridge.enabled {
+            let server = BridgeServer(handler: SessionBridge(model: self), enabled: registry.bridge.enabledTools)
+            do {
+                let url = try await server.start()
                 started = server
-                servers.append(.stdio(name: "ohmyagent", command: helper, args: [], env: ["OMA_BRIDGE_SOCKET": server.socketPath]))
+                servers.append(.http(name: "ohmyagent", url: url.absoluteString, headers: [:]))
+            } catch {
+                Log.bridge.error("Bridge 启动失败", error: error)
             }
         }
         return (servers, started)

@@ -32,7 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let showDock = UserDefaults.standard.object(forKey: ClientPrefs.Key.showDock) as? Bool ?? true
         Log.app.info("应用启动完成", ["showDock": "\(showDock)", "agentOverride": ProcessInfo.processInfo.environment["OMA_AGENT"] ?? "-", "project": ProcessInfo.processInfo.environment["OMA_PROJECT_ROOT"] ?? "-"])
         NSApp.setActivationPolicy(showDock ? .regular : .accessory)
-        BridgeServer.cleanStaleSockets()
+        BridgeServer.removeLegacySockets()
         // 迁移:托盘改为默认开启,旧版本写入的「关闭」默认值不应继续生效(仅执行一次)
         if !UserDefaults.standard.bool(forKey: "migration.trayDefaultOn") {
             UserDefaults.standard.removeObject(forKey: ClientPrefs.Key.showMenuBar)

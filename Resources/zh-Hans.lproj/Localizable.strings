@@ -384,7 +384,6 @@
 "Agent 作为工具(Agent-as-MCP)" = "Agent 作为工具(Agent-as-MCP)";
 "添加自定义…" = "添加自定义…";
 "向 Agent 提供 OhMyAgent 工具" = "向 Agent 提供 OhMyAgent 工具";
-"缺少辅助程序 OhMyAgentBridge,请用 Scripts/bundle.sh 重新打包。" = "缺少辅助程序 OhMyAgentBridge,请用 Scripts/bundle.sh 重新打包。";
 "标识(唯一)" = "标识(唯一)";
 "命令" = "命令";
 "绝对路径或 PATH 中的命令名" = "绝对路径或 PATH 中的命令名";
@@ -651,7 +650,6 @@
 "预算提醒只在客户端侧判断:会话费用超过阈值时在用量弹层中高亮。订阅账号通常不上报费用。" = "预算提醒只在客户端侧判断:会话费用超过阈值时在用量弹层中高亮。订阅账号通常不上报费用。";
 "任何实现 ACP 的 Agent 都可以加入(命令 + 参数 + 环境变量)。切换 Agent 在窗口工具栏进行,会在当前窗口开始新会话。" = "任何实现 ACP 的 Agent 都可以加入(命令 + 参数 + 环境变量)。切换 Agent 在窗口工具栏进行,会在当前窗口开始新会话。";
 "启用后,这些 Agent 会以 stdio MCP 服务器的形式注入新会话,让当前 Agent 把子任务委托给另一个 Agent(例如 `codex mcp-server`)。对新会话生效。" = "启用后,这些 Agent 会以 stdio MCP 服务器的形式注入新会话,让当前 Agent 把子任务委托给另一个 Agent(例如 `codex mcp-server`)。对新会话生效。";
-"每个会话在本机创建一个仅当前用户可访问的 Unix socket,通过 `OhMyAgentBridge` 垫片以 MCP 服务器 `ohmyagent` 暴露:打开文件、显示改动、读取你在输入框中选中的文字、发送系统通知。会话结束即关闭。" = "每个会话在本机创建一个仅当前用户可访问的 Unix socket,通过 `OhMyAgentBridge` 垫片以 MCP 服务器 `ohmyagent` 暴露:打开文件、显示改动、读取你在输入框中选中的文字、发送系统通知。会话结束即关闭。";
 "选中的提供商对「新建会话与重新连接」生效。每个会话启动时由 OhMyAgent 把地址、模型与密钥交给 Claude Code,不会改动 ~/.claude/settings.json,也不影响终端里的 claude。" = "选中的提供商对「新建会话与重新连接」生效。每个会话启动时由 OhMyAgent 把地址、模型与密钥交给 Claude Code,不会改动 ~/.claude/settings.json,也不影响终端里的 claude。";
 "密钥保存在 ~/Library/Application Support/OhMyAgent/provider-keys.json(权限 0600),只在启动会话时放进 Claude Code 进程的环境变量,不写入日志。" = "密钥保存在 ~/Library/Application Support/OhMyAgent/provider-keys.json(权限 0600),只在启动会话时放进 Claude Code 进程的环境变量,不写入日志。";
 "日志文件位于 ~/Library/Logs/OhMyAgent/(单文件 10MB 轮转,保留 7 天)。令牌、API Key 与授权头在写入前自动脱敏。排查问题时把 oma-日期.log 发给开发者即可。" = "日志文件位于 ~/Library/Logs/OhMyAgent/(单文件 10MB 轮转,保留 7 天)。令牌、API Key 与授权头在写入前自动脱敏。排查问题时把 oma-日期.log 发给开发者即可。";
@@ -1577,3 +1575,4 @@
 "显示项目栏" = "显示项目栏";
 "隐藏工具栏" = "隐藏工具栏";
 "显示工具栏" = "显示工具栏";
+"每个会话在应用内置的本机回环端点上注册一个不可猜测的 HTTP MCP 地址(服务器名 `ohmyagent`,无需额外进程),暴露:打开文件、显示改动、读取你在输入框中选中的文字、发送系统通知。会话结束即注销。" = "每个会话在应用内置的本机回环端点上注册一个不可猜测的 HTTP MCP 地址(服务器名 `ohmyagent`,无需额外进程),暴露:打开文件、显示改动、读取你在输入框中选中的文字、发送系统通知。会话结束即注销。";
