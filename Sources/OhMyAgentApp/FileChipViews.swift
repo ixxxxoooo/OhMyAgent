@@ -13,6 +13,8 @@ struct FileMentionChip: View {
     var onRemove: (() -> Void)?
     /// 内联在文字里时使用更矮的高度
     var compact = false
+    /// 移除按钮仅在悬停时出现(输入框内联 chip 用;位置始终预留,避免悬停时 chip 宽度跳动)
+    var removeOnHover = false
     @State private var hovering = false
 
     private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: compact ? 7 : 8, style: .continuous) }
@@ -53,7 +55,7 @@ struct FileMentionChip: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .opacity(hovering ? 1 : 0.45)
+        .opacity(removeOnHover ? (hovering ? 1 : 0) : (hovering ? 1 : 0.45))
         .help("移除引用")
         .accessibilityLabel("移除引用")
     }

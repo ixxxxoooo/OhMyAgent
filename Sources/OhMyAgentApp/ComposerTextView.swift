@@ -74,9 +74,42 @@ final class SubmitTextView: NSTextView {
     var placeholder: String = "" { didSet { refreshPlaceholder() } }
     /// 工作区目录:非 nil 时,草稿里已存在的 `@路径` 会显示成内联 chip
     var mentionWorkspace: URL?
+    /// 视图宽度变化(折行改变)时回调,用于重算自适应高度
+    var onWidthChange: (() -> Void)?
+    private var lastLayoutWidth: CGFloat = 0
 
-    /// 只接受纯文字(附件由我们自己管理),避免粘贴/拖入富文本。
-    override var readablePasteboardTypes: [NSPasteboard.PasteboardType] { [.string] }
+    /// 可读取的剪贴板类型:文字之外还包括图片与文件。粘贴菜单项是否可用由它决定,
+    /// 只列 `.string` 时,剪贴板里只有图片/文件的情况下「粘贴」会被系统置灰,⌘V 也就无反应。
+    /// 真正的粘贴内容由 `paste(_:)` 自己解析(图片/文件作附件,文字按纯文本),不会插入富文本。
+    override var readablePasteboardTypes: [NSPasteboard.PasteboardType] {
+        [.string, .fileURL, .png, .tiff, NSPasteboard.PasteboardType("public.jpeg"), NSPasteboard.PasteboardType("public.heic")]
+    }
+
+    /// 粘贴类菜单项:剪贴板有可处理内容(文字/图片/文件)就可用,不依赖 NSTextView 对富文本类型的判断。
+    override func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
+        if item.action == #selector(paste(_:)) || item.action == #selector(pasteAsPlainText(_:)) {
+            return isEditable && Self.pasteboardHasContent(.general)
+        }
+        return super.validateUserInterfaceItem(item)
+    }
+
+    /// 剪贴板里是否有可粘贴的内容。
+    /// - Parameter board: 剪贴板
+    static func pasteboardHasContent(_ board: NSPasteboard) -> Bool {
+        if let text = board.string(forType: .string), !text.isEmpty { return true }
+        return ImageIntake.hasImage(board) || ImageIntake.hasFileURLs(board)
+    }
+
+    /// ⌘V 直接交给输入框处理:不经过菜单校验链,避免被 SwiftUI/菜单状态吞掉。
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        let modifiers = event.modifierFlags.intersection([.shift, .option, .control, .command])
+        if modifiers == [.command], event.charactersIgnoringModifiers?.lowercased() == "v",
+           window?.firstResponder === self, isEditable {
+            paste(nil)
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
 
     /// 复制:附件还原成 `@路径` 纯文本。
     override func copy(_ sender: Any?) { writePlainSelection() }
@@ -132,13 +165,23 @@ final class SubmitTextView: NSTextView {
     /// 粘贴:剪贴板含图片时作为附件,含文件/文件夹时转成 `@路径`,否则按纯文本粘贴。
     override func paste(_ sender: Any?) {
         if handlePasteboard(.general) { return }
-        super.pasteAsPlainText(sender)
+        insertPlainText(from: .general)
     }
 
     /// 「粘贴并匹配样式」(⌥⇧⌘V)同样要支持图片与文件,与 `paste(_:)` 共用一套逻辑。
     override func pasteAsPlainText(_ sender: Any?) {
         if handlePasteboard(.general) { return }
-        super.pasteAsPlainText(sender)
+        insertPlainText(from: .general)
+    }
+
+    /// 把剪贴板里的文字按纯文本插入当前选区(不依赖 NSTextView 内部的粘贴实现,避免富文本与递归)。
+    /// - Parameter board: 剪贴板
+    func insertPlainText(from board: NSPasteboard) {
+        guard let text = board.string(forType: .string), !text.isEmpty else {
+            Log.ui.debug("粘贴:剪贴板没有可用文字", ["types": board.types?.map(\.rawValue).joined(separator: ",") ?? ""])
+            return
+        }
+        insertText(text, replacementRange: selectedRange())
     }
 
     /// 处理粘贴板里的图片/文件。
@@ -230,6 +273,11 @@ final class SubmitTextView: NSTextView {
     override func layout() {
         super.layout()
         refreshPlaceholder()
+        // 宽度变化会改变折行,需要重新计算输入框高度
+        if abs(bounds.width - lastLayoutWidth) > 0.5 {
+            lastLayoutWidth = bounds.width
+            onWidthChange?()
+        }
     }
 
     override func didChangeText() {
@@ -314,6 +362,7 @@ struct ComposerTextView: NSViewRepresentable {
         textView.onImages = { [coordinator = context.coordinator] images in coordinator.parent.onImages?(images) }
         textView.acceptsImages = { [coordinator = context.coordinator] in coordinator.parent.acceptsImages() }
         textView.onFileURLs = { [coordinator = context.coordinator] urls in coordinator.parent.onFileURLs?(urls) }
+        textView.onWidthChange = { [coordinator = context.coordinator] in coordinator.updateHeight() }
         textView.registerForDraggedTypes([.fileURL] + ImageIntake.acceptedTypes.map { NSPasteboard.PasteboardType($0.identifier) })
         textView.setAccessibilityLabel(String(localized: "消息输入框"))
         controller?.textView = textView
@@ -384,11 +433,14 @@ struct ComposerTextView: NSViewRepresentable {
                   let contentManager = layoutManager.textContentManager else { return }
             layoutManager.ensureLayout(for: contentManager.documentRange)
             let used = layoutManager.usageBoundsForTextContainer.height
-            let target = min(max(used + textView.textContainerInset.height * 2, 34), parent.maxHeight)
+            // 最大高度随窗口:约窗口高度的 40%,限制在 [120, 320]
+            let windowHeight = textView.window?.contentView?.bounds.height ?? 0
+            let limit = windowHeight > 0 ? min(max(windowHeight * 0.4, 120), 320) : parent.maxHeight
+            let target = min(max(used + textView.textContainerInset.height * 2, 34), limit)
             if abs(parent.height - target) > 0.5 {
                 DispatchQueue.main.async { [weak self] in self?.parent.height = target }
             }
-            textView.enclosingScrollView?.hasVerticalScroller = used + textView.textContainerInset.height * 2 > parent.maxHeight
+            textView.enclosingScrollView?.hasVerticalScroller = used + textView.textContainerInset.height * 2 > limit
         }
     }
 }

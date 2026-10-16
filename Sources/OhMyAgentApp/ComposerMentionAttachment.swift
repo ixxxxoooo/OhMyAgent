@@ -43,10 +43,21 @@ final class MentionViewProvider: NSTextAttachmentViewProvider {
         nonisolated(unsafe) let provider = self
         MainActor.assumeIsolated {
             guard let attachment = provider.textAttachment as? MentionAttachment else { return }
-            let host = NSHostingView(rootView: FileMentionChip(mention: attachment.mention, onRemove: nil, compact: true))
+            let remove: () -> Void = { [weak provider] in provider?.removeFromText() }
+            let host = NSHostingView(rootView: FileMentionChip(mention: attachment.mention, onRemove: remove, compact: true, removeOnHover: true))
             host.setFrameSize(host.fittingSize)
             provider.view = host
         }
+    }
+
+    /// 悬停 × 时把这颗 chip 从输入框删除(并通知草稿同步)。
+    @MainActor
+    fileprivate func removeFromText() {
+        guard let manager = textLayoutManager,
+              let textView = manager.textContainer?.textView as? SubmitTextView,
+              let attachment = textAttachment as? MentionAttachment else { return }
+        let offset = manager.offset(from: manager.documentRange.location, to: location)
+        textView.removeMention(attachment, near: offset)
     }
 
     override func attachmentBounds(
@@ -126,6 +137,25 @@ extension SubmitTextView {
             if NSMaxRange(plain) > chipStart, NSMaxRange(plain) < chipStart + hit.tokenLength { end = hit.storageLocation + 1 }
         }
         return NSRange(location: start, length: max(end - start, 0))
+    }
+
+    /// 删除一颗内联 chip。优先按提供者给出的位置;位置不可信时按附件对象查找。
+    /// - Parameters:
+    ///   - attachment: 要删除的提及附件
+    ///   - near: 期望所在的文本存储位置
+    func removeMention(_ attachment: MentionAttachment, near offset: Int) {
+        let target: Int
+        if isMention(at: offset), (textStorage?.attribute(.attachment, at: offset, effectiveRange: nil) as? MentionAttachment) === attachment {
+            target = offset
+        } else if let found = mentionAttachments.first(where: { $0.attachment === attachment }) {
+            target = found.location
+        } else {
+            return
+        }
+        let range = NSRange(location: target, length: 1)
+        guard shouldChangeText(in: range, replacementString: "") else { return }
+        textStorage?.replaceCharacters(in: range, with: "")
+        didChangeText()
     }
 
     /// 指定存储位置是否是提及附件。
