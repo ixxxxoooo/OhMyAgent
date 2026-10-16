@@ -72,7 +72,20 @@ struct FileTabView: View {
     }
 
     var body: some View {
+        if let kind = FilePreviewKind.of(path: path), kind.isBinary {
+            // 图片 / PDF:只有预览,不当作文本载入
+            BinaryPreviewTab(path: path, kind: kind)
+        } else {
+            textBody
+        }
+    }
+
+    /// 文本文件:编辑器 +(可预览类型的)「源码 / 预览」切换。
+    @ViewBuilder
+    private var textBody: some View {
         let doc = store.document(for: path)
+        let previewKind = FilePreviewKind.of(path: path)
+        let mode = previewKind.map { FileViewModeStore.shared.mode(for: path, kind: $0) } ?? .source
         let changesRevision = workbench.sessions.values.reduce(0) { $0 + $1.changesRevision }
         let markers: [Int: LineMarker] = {
             guard let marks = agentMarks, doc.text == marks.text else { return [:] }
@@ -80,12 +93,22 @@ struct FileTabView: View {
         }()
         VStack(spacing: 0) {
             banner(doc)
+            if previewKind != nil { modeBar(mode: mode) }
             Group {
                 if let text = doc.text {
                     CodeEditor(text: text, language: SyntaxLanguage.detect(path: path), isEditable: !doc.isReadOnly, revealLine: tab.line, markers: markers,
                                diagnostics: lsp?.diagnostics ?? [], features: lsp?.features ?? EditorLanguageFeatures(),
                                onReferenceSelection: { range in referenceSelection(range, text: doc.text ?? text) },
                                onChange: { newText in doc.text = newText })
+                        .environment(\.tabIsActive, isActive && mode == .source)
+                        .opacity(mode == .source ? 1 : 0)
+                        .allowsHitTesting(mode == .source)
+                        .accessibilityHidden(mode != .source)
+                        .overlay {
+                            if mode == .preview, let previewKind {
+                                TextPreviewView(kind: previewKind, text: text)
+                            }
+                        }
                 } else if let failure = doc.loadError {
                     Text(failure).foregroundStyle(OMColors.secondaryText).frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
@@ -161,6 +184,23 @@ struct FileTabView: View {
             .filter { path == $0 || path.hasPrefix($0 + "/") }
             .max { $0.count < $1.count }
         return match ?? (path as NSString).deletingLastPathComponent
+    }
+
+    /// 「源码 / 预览」切换条(可渲染的文件类型才显示)。
+    private func modeBar(mode: FileViewMode) -> some View {
+        HStack(spacing: 8) {
+            Picker("显示模式", selection: Binding(get: { mode }, set: { FileViewModeStore.shared.set($0, for: path) })) {
+                ForEach(FileViewMode.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 120)
+            .accessibilityLabel("文件显示模式")
+            Spacer()
+        }
+        .padding(.horizontal, 12).padding(.vertical, 5)
+        .background(.bar)
+        .overlay(alignment: .bottom) { Divider() }
     }
 
     /// 只读与外部修改提示条。
