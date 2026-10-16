@@ -12,9 +12,9 @@ struct DockView: View {
 
     var body: some View {
         if let id = workbench.dock.maximizedGroupID, let group = workbench.dock.group(id) {
-            TabGroupView(workbench: workbench, group: group, topLeft: true)
+            TabGroupView(workbench: workbench, group: group)
         } else {
-            DockNodeView(workbench: workbench, node: workbench.dock.root, topLeft: true)
+            DockNodeView(workbench: workbench, node: workbench.dock.root)
         }
     }
 }
@@ -23,13 +23,13 @@ struct DockView: View {
 struct DockNodeView: View {
     let workbench: WorkbenchModel
     let node: DockNode
-    /// 该节点是否位于停靠区左上角(其标签栏需要在侧栏收起时为浮层按钮让位)
-    var topLeft = false
+    /// 该节点贴着窗口哪几条边(其标签栏需要在侧栏/右栏收起时为浮层按钮让位)
+    var edges = DockEdges()
 
     var body: some View {
         switch node {
-        case .group(let group): TabGroupView(workbench: workbench, group: group, topLeft: topLeft)
-        case .split(let split): DockSplitView(workbench: workbench, split: split, topLeft: topLeft)
+        case .group(let group): TabGroupView(workbench: workbench, group: group, edges: edges)
+        case .split(let split): DockSplitView(workbench: workbench, split: split, edges: edges)
         }
     }
 }
@@ -38,7 +38,7 @@ struct DockNodeView: View {
 struct DockSplitView: View {
     let workbench: WorkbenchModel
     let split: DockSplit
-    var topLeft = false
+    var edges = DockEdges()
     @State private var dragBase: [Double]?
 
     private var horizontal: Bool { split.axis == .horizontal }
@@ -50,7 +50,7 @@ struct DockSplitView: View {
             let layout = horizontal ? AnyLayout(HStackLayout(spacing: 0)) : AnyLayout(VStackLayout(spacing: 0))
             layout {
                 ForEach(Array(split.children.enumerated()), id: \.element.id) { index, child in
-                    DockNodeView(workbench: workbench, node: child, topLeft: topLeft && index == 0)
+                    DockNodeView(workbench: workbench, node: child, edges: edges.child(at: index, of: split.children.count, horizontal: horizontal))
                         .frame(
                             width: horizontal ? max(usable * ratio(index), 0) : nil,
                             height: horizontal ? nil : max(usable * ratio(index), 0)

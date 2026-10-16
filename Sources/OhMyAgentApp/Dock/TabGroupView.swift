@@ -51,12 +51,27 @@ func tabIcon(_ kind: TabKind) -> String {
     }
 }
 
+/// 停靠节点贴着窗口哪几条边(决定标签栏要不要给左上浮层按钮/右上右栏开关让位)。
+struct DockEdges: Equatable {
+    var left = true
+    var top = true
+    var right = true
+
+    /// 分屏中第 `index` 个子节点(共 `count` 个)继承的贴边关系。
+    func child(at index: Int, of count: Int, horizontal: Bool) -> DockEdges {
+        if horizontal {
+            return DockEdges(left: left && index == 0, top: top, right: right && index == count - 1)
+        }
+        return DockEdges(left: left, top: top && index == 0, right: right)
+    }
+}
+
 /// 标签组视图。
 struct TabGroupView: View {
     let workbench: WorkbenchModel
     let group: TabGroup
-    /// 是否位于停靠区左上角
-    var topLeft = false
+    /// 该组贴着停靠区的哪几条边
+    var edges = DockEdges()
     @State private var zone: DockDropZone?
     /// 保活的标签(最近使用的若干个视图保持挂载,切换时不重建)
     @State private var keepAlive = TabKeepAlive()
@@ -65,7 +80,11 @@ struct TabGroupView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            TabBarView(workbench: workbench, group: group, isFocused: isFocused, leadingInset: topLeft && !workbench.layout.leftVisible ? TitlebarMetrics.collapsedLeadingInset : 0)
+            TabBarView(
+                workbench: workbench, group: group, isFocused: isFocused,
+                leadingInset: edges.top && edges.left && !workbench.layout.leftVisible ? TitlebarMetrics.collapsedLeadingInset : 0,
+                trailingInset: edges.top && edges.right && !workbench.layout.rightVisible ? TitlebarMetrics.trailingInset : 0
+            )
             Divider()
             GeometryReader { proxy in
                 content
@@ -197,161 +216,5 @@ struct TabStripDropDelegate: DropDelegate {
             }
         }
         return true
-    }
-}
-
-/// 标签栏。
-struct TabBarView: View {
-    let workbench: WorkbenchModel
-    let group: TabGroup
-    let isFocused: Bool
-    /// 左侧让位宽度(侧栏收起时,为红绿灯与侧栏开关浮层留位)
-    var leadingInset: CGFloat = 0
-
-    var body: some View {
-        HStack(spacing: 0) {
-            if leadingInset > 0 { Color.clear.frame(width: leadingInset) }
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 0) {
-                    ForEach(Array(group.tabs.enumerated()), id: \.element.id) { index, tab in
-                        TabItemView(workbench: workbench, group: group, tab: tab, isActive: tab.id == group.activeID, isFocused: isFocused)
-                            .onDrop(of: [.plainText], delegate: TabStripDropDelegate(workbench: workbench, groupID: group.id, index: index))
-                    }
-                    Color.clear
-                        .frame(minWidth: 24, maxWidth: .infinity)
-                        .contentShape(Rectangle())
-                        .onDrop(of: [.plainText], delegate: TabStripDropDelegate(workbench: workbench, groupID: group.id, index: nil))
-                }
-            }
-            if group.tabs.count > 1 {
-                overflowMenu
-            }
-        }
-        .frame(height: TitlebarMetrics.height)
-        .background(WindowDragArea())
-        .background(.bar)
-    }
-
-    private var overflowMenu: some View {
-        Menu {
-            ForEach(group.tabs) { tab in
-                Button {
-                    workbench.activateTab(tab.id)
-                } label: {
-                    Label(workbench.displayTitle(tab), om: tab.id == group.activeID ? "check" : tabIcon(tab.kind))
-                }
-            }
-        } label: {
-            Image.om("chevrons-up-down", size: 12).frame(width: 26, height: 26)
-        }
-        .menuStyle(.button)
-        .buttonStyle(.plain)
-        .menuIndicator(.hidden)
-        .foregroundStyle(OMColors.secondaryText)
-        .help("所有标签")
-        .accessibilityLabel("所有标签")
-        .padding(.trailing, 4)
-    }
-}
-
-/// 单个标签。
-struct TabItemView: View {
-    let workbench: WorkbenchModel
-    let group: TabGroup
-    let tab: WorkbenchTab
-    let isActive: Bool
-    let isFocused: Bool
-    @State private var hovering = false
-
-    var body: some View {
-        HStack(spacing: 6) {
-            if case .file(let path) = tab.kind {
-                // 文件标签:彩色文件类型图标(非活动标签略降不透明度)
-                OMFileIcon(name: (path as NSString).lastPathComponent, size: 14)
-                    .opacity(isActive ? 1 : 0.7)
-            } else {
-                Image.om(tabIcon(tab.kind), size: 12)
-                    .foregroundStyle(isActive ? OMColors.accent : OMColors.tertiaryText)
-            }
-            Text(workbench.displayTitle(tab))
-                .font(OMFonts.small)
-                .italic(tab.isPreview)
-                .lineLimit(1)
-                .frame(maxWidth: 160)
-                .foregroundStyle(isActive ? Color.primary : OMColors.secondaryText)
-            trailing
-        }
-        .padding(.horizontal, 10)
-        .frame(height: TitlebarMetrics.height)
-        .background(isActive ? OMColors.surface : (hovering ? Color.primary.opacity(0.05) : Color.clear))
-        .overlay(alignment: .bottom) {
-            if isActive { Rectangle().fill(isFocused ? OMColors.accent : OMColors.tertiaryText).frame(height: 2) }
-        }
-        .overlay(alignment: .trailing) { Rectangle().fill(OMColors.hairline).frame(width: 0.5) }
-        .contentShape(Rectangle())
-        .onHover { hovering = $0 }
-        .onTapGesture(count: 2) {
-            if tab.isPreview { workbench.dock.keepOpen(tab.id) } else { workbench.dock.toggleMaximize(group: group.id) }
-        }
-        .onTapGesture { workbench.activateTab(tab.id) }
-        .onDrag {
-            DockDrag.shared.tabID = tab.id
-            return NSItemProvider(object: (DockDrag.prefix + tab.id.uuidString) as NSString)
-        }
-        .contextMenu { menu }
-        .help(helpText)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
-        .accessibilityAction(named: Text("关闭标签")) { AppActions.shared.requestCloseTab(tab.id) }
-    }
-
-    /// 尾部:固定图标 / 未保存点 / 关闭按钮(悬停或激活时可见)。
-    @ViewBuilder
-    private var trailing: some View {
-        ZStack {
-            if tab.isPinned && !hovering {
-                Image.om("pin", size: 10).foregroundStyle(OMColors.tertiaryText)
-            } else if tab.isDirty && !hovering {
-                Circle().fill(OMColors.secondaryText).frame(width: 7, height: 7)
-            } else if hovering || isActive {
-                Button { AppActions.shared.requestCloseTab(tab.id) } label: {
-                    Image.om("xmark", size: 10, weight: .bold)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(OMColors.secondaryText)
-                .accessibilityLabel("关闭标签")
-            }
-        }
-        .frame(width: 14, height: 14)
-    }
-
-    private var helpText: String {
-        switch tab.kind {
-        case .file(let path), .diff(let path): return (path as NSString).abbreviatingWithTildeInPath
-        default: return workbench.displayTitle(tab)
-        }
-    }
-
-    @ViewBuilder
-    private var menu: some View {
-        Button("关闭") { AppActions.shared.requestCloseTab(tab.id) }
-        Button("关闭其它") { workbench.dock.closeOthers(tab.id) }
-            .disabled(group.tabs.count < 2)
-        Divider()
-        Button(tab.isPinned ? String(localized: "取消固定") : String(localized: "固定")) { workbench.dock.togglePinned(tab.id) }
-        Button("向右拆分") {
-            workbench.dock.drop(tab.id, onGroup: group.id, zone: .right)
-            workbench.syncSelectionFromDock()
-        }
-        .disabled(group.tabs.count < 2)
-        Button(workbench.dock.maximizedGroupID == group.id ? String(localized: "还原布局") : String(localized: "最大化此组")) { workbench.dock.toggleMaximize(group: group.id) }
-        if case .file(let path) = tab.kind {
-            Divider()
-            Button("在 Finder 中显示") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }
-            Button("拷贝路径") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(path, forType: .string)
-            }
-        }
     }
 }
