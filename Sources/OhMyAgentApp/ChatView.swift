@@ -13,6 +13,8 @@ struct ChatView: View {
     @State private var position = ScrollPosition(edge: .bottom)
     @State private var isPinnedToBottom = true
     @State private var scrollPhase: ScrollPhase = .idle
+    /// 上下边缘是否还有被遮住的内容(没有时不做渐隐,避免末行文字被淡化、底部留出多余空白)
+    @State private var fadeEdges = TimelineEdgeFade.Edges(top: false, bottom: false)
     /// 吸顶用户消息的状态(位置上报、目标解析)
     @State private var sticky = StickyUserState()
     /// 分组结果缓存(输入区等无关状态变化时不重复分组)
@@ -51,9 +53,14 @@ struct ChatView: View {
         }
         .task(id: ObjectIdentifier(model)) { ChatBindings.bind(model) }
         .environment(\.stickyUser, sticky)
-        .sheet(item: $sticky.editing) { entry in
-            UserMessageEditor(model: model, entry: entry) { sticky.editing = nil }
+        .overlay {
+            // 图3 风格:就地展开的编辑卡片(不再用系统 sheet)
+            if let entry = sticky.editing {
+                UserMessageEditor(model: model, entry: entry, maxWidth: contentMaxWidth) { sticky.editing = nil }
+                    .id(entry.id)
+            }
         }
+        .animation(omShouldReduceMotion() ? nil : .easeOut(duration: 0.15), value: sticky.editing?.id)
         .onAppear { sticky.bind(model) }
     }
 
@@ -97,7 +104,7 @@ struct ChatView: View {
                     TimelineItemView(item: item).equatable()
                 }
                 WorkingIndicatorView(model: model)
-                Color.clear.frame(height: 36).id("bottom")
+                Color.clear.frame(height: 8).id("bottom")
             }
             .scrollTargetLayout()
             .frame(maxWidth: contentMaxWidth)
@@ -107,7 +114,7 @@ struct ChatView: View {
         }
         .coordinateSpace(.named(chatScrollSpace))
         .onScrollTargetVisibilityChange(idType: UUID.self, threshold: 0.01) { ids in sticky.updateVisible(ids) }
-        .mask(TimelineEdgeFade())
+        .mask(TimelineEdgeFade(edges: fadeEdges))
         .overlay(alignment: .top) { StickyUserOverlay(model: model, state: sticky, maxWidth: contentMaxWidth) }
         .clipped()
         .scrollPosition($position)
@@ -123,6 +130,14 @@ struct ChatView: View {
             } else if scrollPhase != .idle {
                 isPinnedToBottom = false
             }
+        }
+        .onScrollGeometryChange(for: TimelineEdgeFade.Edges.self) { geometry in
+            TimelineEdgeFade.Edges(
+                top: geometry.contentOffset.y > 2,
+                bottom: geometry.contentOffset.y + geometry.containerSize.height < geometry.contentSize.height - 4
+            )
+        } action: { _, edges in
+            omWithAnimation { fadeEdges = edges }
         }
         .onScrollGeometryChange(for: CGFloat.self) { $0.contentSize.height } action: { _, _ in
             if isPinnedToBottom, !sticky.followSuspended { position.scrollTo(edge: .bottom) }
@@ -179,11 +194,20 @@ struct TimelineEdgeFade: View {
     /// 底部渐隐高度(略高,与输入区衔接)
     static let bottomHeight: CGFloat = 32
 
+    /// 哪些边缘需要渐隐(该方向还有被遮住的内容时才需要)。
+    struct Edges: Equatable {
+        var top: Bool
+        var bottom: Bool
+    }
+
+    /// 当前需要渐隐的边缘
+    let edges: Edges
+
     var body: some View {
         VStack(spacing: 0) {
-            LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: Self.topHeight)
+            LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: edges.top ? Self.topHeight : 0)
             Rectangle().fill(.black)
-            LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: Self.bottomHeight)
+            LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: edges.bottom ? Self.bottomHeight : 0)
         }
         .allowsHitTesting(false)
     }

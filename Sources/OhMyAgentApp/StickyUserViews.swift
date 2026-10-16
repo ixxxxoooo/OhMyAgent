@@ -81,7 +81,7 @@ struct StickyUserOverlay: View {
                 .frame(maxWidth: maxWidth)
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
-                .padding(.bottom, 14)
+                .padding(.bottom, 16)
                 .frame(maxWidth: .infinity)
                 .background(alignment: .top) {
                     // 卡片下缘渐隐进内容,和会话流顶部淡出衔接
@@ -94,33 +94,46 @@ struct StickyUserOverlay: View {
     }
 }
 
-/// 吸顶卡:最多两行,悬停出现放大图标,双击放大编辑。
+/// 吸顶卡(图4 风格,沿用底部输入框的玻璃卡片):附件缩略图 + 最多三行正文,
+/// 悬停出现「编辑」图标,双击放大编辑。
 struct StickyUserCard: View {
     let entry: TimelineEntry
     @Environment(\.stickyUser) private var sticky
     @State private var hovering = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Text(verbatim: entry.text.isEmpty ? String(localized: "(仅图片)") : entry.text)
-                .font(OMFonts.reading)
-                .lineLimit(2)
-                .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: 6) {
             if !entry.attachments.isEmpty {
-                Label("\(entry.attachments.count)", om: "image").font(OMFonts.caption).foregroundStyle(OMColors.secondaryText)
+                HStack(spacing: 6) {
+                    ForEach(entry.attachments.prefix(4)) { AttachmentThumbnail(attachment: $0, size: 30) }
+                    if entry.attachments.count > 4 {
+                        Text(verbatim: "+\(entry.attachments.count - 4)").font(OMFonts.caption).foregroundStyle(OMColors.secondaryText)
+                    }
+                }
             }
+            if !entry.text.isEmpty {
+                Text(verbatim: entry.text)
+                    .font(OMFonts.reading)
+                    .lineLimit(3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .padding(.trailing, 18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .omGlass(in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(alignment: .bottomTrailing) {
             Button { sticky?.editing = entry } label: {
-                Image.om("maximize-2", size: 12).foregroundStyle(OMColors.secondaryText).frame(width: 20, height: 20).contentShape(Rectangle())
+                Image.om("square-pen", size: 12).foregroundStyle(OMColors.secondaryText).frame(width: 24, height: 24).contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .opacity(hovering ? 1 : 0)
+            .padding(8)
             .help("放大编辑(双击)")
             .accessibilityLabel("放大编辑")
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .omSolidCard()
-        .contentShape(Rectangle())
+        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .onHover { hovering = $0 }
         .onTapGesture(count: 2) { sticky?.editing = entry }
         .accessibilityElement(children: .contain)
@@ -129,17 +142,21 @@ struct StickyUserCard: View {
     }
 }
 
-/// 编辑并重新发送:放大的编辑窗,可切换模型。
+/// 编辑并重新发送(图3 风格):在会话流上方就地展开的大输入卡片,
+/// 版式与底部输入框一致——上方附件与文本,底部左侧模型选择,右侧取消与圆形发送按钮。
 struct UserMessageEditor: View {
     let model: SessionModel
     let entry: TimelineEntry
+    let maxWidth: CGFloat
     let onClose: () -> Void
     @State private var text: String
     @State private var modelPickerShown = false
+    @FocusState private var focused: Bool
 
-    init(model: SessionModel, entry: TimelineEntry, onClose: @escaping () -> Void) {
+    init(model: SessionModel, entry: TimelineEntry, maxWidth: CGFloat, onClose: @escaping () -> Void) {
         self.model = model
         self.entry = entry
+        self.maxWidth = maxWidth
         self.onClose = onClose
         _text = State(initialValue: entry.text)
     }
@@ -149,39 +166,66 @@ struct UserMessageEditor: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("编辑并重新发送").font(OMFonts.title)
+        ZStack(alignment: .top) {
+            // 点击空白处关闭;轻微压暗,突出编辑卡片
+            Color.black.opacity(0.08)
+                .contentShape(Rectangle())
+                .onTapGesture(perform: onClose)
+                .accessibilityHidden(true)
+            card
+                .frame(maxWidth: maxWidth)
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .frame(maxWidth: .infinity)
+        }
+        .transition(.opacity)
+        .onExitCommand(perform: onClose)
+        .onAppear { focused = true }
+    }
+
+    private var card: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if !entry.attachments.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) { ForEach(entry.attachments) { AttachmentThumbnail(attachment: $0, size: 56) } }
+                }
+            }
             TextEditor(text: $text)
                 .font(OMFonts.reading)
                 .scrollContentBackground(.hidden)
-                .padding(8)
-                .frame(minHeight: 180)
-                .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(OMColors.hairline))
-            if !entry.attachments.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) { ForEach(entry.attachments) { AttachmentThumbnail(attachment: $0, size: 56) } }
-                }
+                .focused($focused)
+                .frame(minHeight: 120, maxHeight: 320)
+            if model.isRunning {
+                Text("回合进行中,结束后才能重新发送。").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
             }
-            Text(model.isRunning ? "回合进行中,结束后才能重新发送。" : "将作为新消息发送,原消息与回复会保留。")
-                .font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
-            HStack {
+            HStack(spacing: 6) {
                 modelButton
-                Spacer()
-                Button("取消", action: onClose).keyboardShortcut(.cancelAction)
-                Button("重新发送") {
+                Spacer(minLength: 8)
+                Button("取消", action: onClose)
+                    .buttonStyle(.plain)
+                    .font(OMFonts.small)
+                    .foregroundStyle(OMColors.secondaryText)
+                    .keyboardShortcut(.cancelAction)
+                Button {
                     let images = entry.attachments
                     let prompt = text
                     onClose()
                     model.send(prompt, images: images)
+                } label: {
+                    Image.om("arrow.up", size: 12, weight: .bold).frame(width: 26, height: 26)
                 }
+                .buttonStyle(.glassProminent)
+                .buttonBorderShape(.circle)
                 .keyboardShortcut(.return, modifiers: .command)
-                .buttonStyle(.borderedProminent)
                 .disabled(!canResend)
+                .help("重新发送 (⌘Return)")
+                .accessibilityLabel("重新发送")
             }
         }
-        .padding(16)
-        .frame(width: 560)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .omGlass(in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .shadow(color: .black.opacity(0.12), radius: 18, y: 6)
     }
 
     /// 模型切换按钮(没有可切换的模型时不显示)。
