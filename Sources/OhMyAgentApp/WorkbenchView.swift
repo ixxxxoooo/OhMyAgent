@@ -1,5 +1,5 @@
 // @author ygw
-// 工作台根视图:左栏(项目 → 会话树)+ 中栏(会话)+ 右栏检查器(变更/计划)+ 底部面板 + 状态栏。
+// 工作台根视图:左栏(项目 → 会话树)+ 中栏(会话)+ 右栏检查器(文件/搜索/Git/改动/计划)+ 底部面板。
 // 左右栏均可收起,尺寸与显隐持久化到 WorkbenchModel.layout。
 
 import IconKit
@@ -49,7 +49,7 @@ struct WorkbenchView: View {
         .task { await runDebugHooks() }
     }
 
-    /// 工作台主体:左栏 + 中栏 + 右栏 + 状态栏。
+    /// 工作台主体:左栏 + 中栏 + 右栏(无状态栏,原状态栏功能收纳到输入区页脚与右栏快捷列)。
     private var workspaceBody: some View {
         VStack(spacing: 0) {
             HStack(spacing: 0) {
@@ -77,7 +77,6 @@ struct WorkbenchView: View {
                 }
                 if !workbench.layout.rightVisible { RightRail(workbench: workbench) }
             }
-            StatusBarView(workbench: workbench, switchAgent: switchAgent)
         }
         .background(PanelDividerReset(onReset: resetPanelWidth, visibility: { (left: workbench.layout.leftVisible, right: workbench.layout.rightVisible) }))
         .overlay(alignment: .top) { TitlebarOverlay(workbench: workbench) }
@@ -106,13 +105,6 @@ struct WorkbenchView: View {
     }
 
     // MARK: 行为
-
-    /// 当前项目内切换 Agent:结束旧会话进程,用新描述符开始新会话。
-    private func switchAgent(_ descriptor: AgentDescriptor) {
-        guard let id = workbench.selectedProjectID, let current = workbench.activeSession, descriptor.id != current.descriptor.id else { return }
-        Log.session.info("切换 Agent", ["project": id, "from": current.descriptor.id, "to": descriptor.id])
-        workbench.replaceSession(for: id, with: AppEnvironment.makeSession(workspace: current.workspace, descriptor: descriptor))
-    }
 
     /// 窗口为 key 时,当前会话视为「正在被查看」:其未读完成状态立即清除。
     private func updateFocus() {

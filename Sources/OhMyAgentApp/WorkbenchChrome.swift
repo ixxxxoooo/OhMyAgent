@@ -1,24 +1,25 @@
 // @author ygw
-// 工作台通用部件:窗口工具栏、Agent 菜单、连接徽标、用量环与用量按钮、窗口焦点读取。
+// 工作台通用部件:Agent 菜单、用量环与用量按钮、窗口焦点读取。
 
 import IconKit
 import ACPKit
 import AgentHost
 import ChatKit
 import DesignSystem
+import OMLog
 import SwiftUI
 
-/// Agent 切换菜单:列出已启用的 Agent,切换会在当前窗口开始新会话。
+/// Agent 切换菜单:列出已启用的 Agent,切换会在当前项目开始新会话。
+/// 显示当前 Agent 名称(输入区页脚右侧);切换逻辑内置,不依赖外部闭包。
 struct AgentMenu: View {
     let model: SessionModel
-    let switchAgent: (AgentDescriptor) -> Void
     private let registry = AgentRegistryModel.shared
 
     var body: some View {
         Menu {
             ForEach(registry.data.enabledAgents) { agent in
                 Button {
-                    switchAgent(agent)
+                    Self.switchAgent(to: agent)
                 } label: {
                     if agent.id == model.descriptor.id { Label(agent.name, om: "checkmark") } else { Text(agent.name) }
                 }
@@ -28,8 +29,12 @@ struct AgentMenu: View {
                 AppActions.shared.openSettings(page: .agentExtensions)
             }
         } label: {
-            Image.om("person.crop.rectangle.stack", size: 12)
-                .frame(width: 22, height: 18)
+            HStack(spacing: 4) {
+                Image.om("bot", size: 12)
+                Text(model.descriptor.name).lineLimit(1)
+            }
+            .frame(height: 18)
+            .contentShape(Rectangle())
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
@@ -38,32 +43,15 @@ struct AgentMenu: View {
         .help("切换 Agent(会在当前项目开始新会话),当前:\(model.descriptor.name)")
         .accessibilityLabel("切换 Agent")
     }
-}
 
-/// 连接状态徽标。
-struct ConnectionBadge: View {
-    let model: SessionModel
-
-    var body: some View {
-        HStack(spacing: 6) {
-            switch model.phase {
-            case .idle:
-                OMStatusDot(.idle)
-                Text("未连接")
-            case .connecting:
-                ProgressView().controlSize(.mini)
-                Text("正在连接…")
-            case .ready:
-                OMStatusDot(model.isRunning ? .running : .success)
-                Text(model.isRunning ? "工作中" : model.agentName)
-            case .failed:
-                OMStatusDot(.failure)
-                Text("连接失败")
-            }
-        }
-        .font(OMFonts.small)
-        .foregroundStyle(OMColors.secondaryText)
-        .accessibilityElement(children: .combine)
+    /// 当前项目内切换 Agent:结束旧会话进程,用新描述符开始新会话。
+    /// - Parameter descriptor: 目标 Agent
+    @MainActor
+    static func switchAgent(to descriptor: AgentDescriptor) {
+        let workbench = AppEnvironment.shared.workbench
+        guard let id = workbench.selectedProjectID, let current = workbench.activeSession, descriptor.id != current.descriptor.id else { return }
+        Log.session.info("切换 Agent", ["project": id, "from": current.descriptor.id, "to": descriptor.id])
+        workbench.replaceSession(for: id, with: AppEnvironment.makeSession(workspace: current.workspace, descriptor: descriptor))
     }
 }
 

@@ -361,7 +361,7 @@ struct CompletionPopup: View {
     }
 }
 
-/// 输入区下方的上下文条:当前 Git 分支与运行环境(目前仅「本机」)。
+/// 输入区下方的上下文条:左侧 Git 分支;右侧连接状态、用量与 Agent 切换(原状态栏功能)。
 struct ComposerFooter: View {
     let model: SessionModel
     @State private var head: GitHead?
@@ -372,16 +372,12 @@ struct ComposerFooter: View {
                 Label(head.displayName, om: "git-branch")
                     .help("当前分支")
             }
-            Menu {
-                Button { } label: { Label("本机", om: "checkmark") }
-            } label: {
-                Label("本机", om: "laptop")
-            }
-            .menuStyle(.button)
-            .buttonStyle(.plain)
-            .menuIndicator(.hidden)
-            .help("运行环境")
             Spacer()
+            footerStatus
+            if let usage = model.usage, usage.used != nil || usage.costAmount != nil {
+                UsageButton(usage: usage)
+            }
+            AgentMenu(model: model)
         }
         .font(OMFonts.caption)
         .foregroundStyle(OMColors.secondaryText)
@@ -389,6 +385,21 @@ struct ComposerFooter: View {
         .task(id: model.workspace.path) { await refresh() }
         .onChange(of: model.isRunning) { _, running in
             if !running { Task { await refresh() } }
+        }
+    }
+
+    /// 连接状态:仅在非正常态时提示(连接中/失败),正常时保持安静。
+    @ViewBuilder
+    private var footerStatus: some View {
+        switch model.phase {
+        case .connecting:
+            HStack(spacing: 4) { ProgressView().controlSize(.mini); Text("正在连接…") }
+        case .failed:
+            HStack(spacing: 4) { OMStatusDot(.failure); Text("连接失败").foregroundStyle(OMColors.warning) }
+        case .idle:
+            HStack(spacing: 4) { OMStatusDot(.idle); Text("未连接") }
+        case .ready:
+            EmptyView()
         }
     }
 
