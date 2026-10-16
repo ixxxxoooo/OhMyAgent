@@ -115,6 +115,9 @@ struct OhMyAgentApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
     init() {
+        // 关闭系统「自动填充」启发式:它会为每个应用拉起一个常驻的「自动填充」辅助进程(占内存、无用处,
+        // 本应用没有账号/密码输入场景);须早于任何文本控件创建
+        UserDefaults.standard.register(defaults: ["NSAutoFillHeuristicControllerEnabled": false])
         Log.bootstrap(process: "app")
         DemoLaunch.activateIfRequested()
         // Bundle ID 变更迁移:须早于外观、快捷键等偏好的首次读取(演示模式使用隔离沙盒,不迁移)
