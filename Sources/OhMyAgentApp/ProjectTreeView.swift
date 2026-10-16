@@ -467,6 +467,7 @@ private struct SessionLine: View {
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
                 .foregroundStyle(isArchived ? OMColors.tertiaryText : Color.primary)
+                .flowingText(item.isRunning)
                 // minWidth: 0 允许收缩到小于文字自然宽度(否则长标题会把整行撑出侧栏)
                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                 .clipped()
@@ -486,6 +487,8 @@ private struct SessionLine: View {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(isSelected ? OMColors.accent.opacity(0.14) : (hovering ? Color.primary.opacity(0.06) : Color.clear))
         )
+        // 悬停时背景上扫过一条高光(流动效果);平时不创建动画视图
+        .background { if hovering { FlowSweep() } }
         .transaction { $0.animation = nil }
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
