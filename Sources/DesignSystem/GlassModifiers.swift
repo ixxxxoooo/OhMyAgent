@@ -19,7 +19,15 @@ public extension View {
         omGlass(in: Capsule(), tint: tint, interactive: interactive)
     }
 
-    /// 纯色卡片:用于工具卡片、权限卡片等重要信息,不使用玻璃。
+    /// 悬浮在输入区周围的功能卡片(任务坞、提问、权限、目标、待办):使用与输入框一致的 Liquid Glass。
+    /// - Parameters:
+    ///   - cornerRadius: 圆角,默认 18(输入框为 22)
+    ///   - tint: 可选着色
+    func omGlassCard(cornerRadius: CGFloat = 18, tint: Color? = nil) -> some View {
+        omGlass(in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous), tint: tint)
+    }
+
+    /// 纯色卡片:用于时间线里的工具卡片、代码块等正文信息,不使用玻璃。
     /// - Parameter cornerRadius: 圆角
     func omSolidCard(cornerRadius: CGFloat = OMMetrics.cardRadius) -> some View {
         background(OMColors.card, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))

@@ -272,7 +272,7 @@ struct PlanDock: View {
                     PlanView(entry: entry).padding([.horizontal, .bottom], 4)
                 }
             }
-            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.primary.opacity(0.05)))
+            .omGlassCard(cornerRadius: 16)
         }
     }
 }

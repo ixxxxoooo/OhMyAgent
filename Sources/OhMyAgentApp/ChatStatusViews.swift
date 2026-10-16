@@ -36,7 +36,7 @@ struct GoalChip: View {
             }
             .padding(.horizontal, 12)
             .frame(height: 30)
-            .omSolidCard()
+            .omGlassCard(cornerRadius: 15)
             .help(goal.objective)
         }
     }

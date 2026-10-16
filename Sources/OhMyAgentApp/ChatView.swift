@@ -124,6 +124,6 @@ struct ConnectionFailureCard: View {
             Button("重试", action: retry)
         }
         .padding(12)
-        .omSolidCard()
+        .omGlassCard()
     }
 }

@@ -41,7 +41,7 @@ struct QuestionWizardCard: View {
                 footer
             }
         }
-        .omSolidCard()
+        .omGlassCard()
         .focusable()
         .focused($focus, equals: .card)
         .focusEffectDisabled()

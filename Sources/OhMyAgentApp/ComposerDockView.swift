@@ -49,6 +49,7 @@ struct ComposerDockView: View {
     // MARK: 胶囊标签
 
     private func chips(current: ComposerDockSection?, counts: [ComposerDockSection: Int]) -> some View {
+        OMGlassGroup(spacing: 6) {
         HStack(spacing: 6) {
             ForEach(ComposerDockSection.allCases, id: \.self) { section in
                 let count = counts[section, default: 0]
@@ -66,6 +67,7 @@ struct ComposerDockView: View {
                 }
             }
             Spacer(minLength: 0)
+        }
         }
     }
 
@@ -147,7 +149,7 @@ struct ComposerDockView: View {
             .scrollBounceBehavior(.basedOnSize)
             .frame(height: min(CGFloat(count) * 31 + 6, 196))
         }
-        .omSolidCard()
+        .omGlassCard()
         .accessibilityElement(children: .contain)
     }
 
@@ -167,7 +169,6 @@ private struct DockChip: View {
     let count: Int
     let selected: Bool
     let action: () -> Void
-    @State private var hovering = false
 
     var body: some View {
         Button(action: action) {
@@ -178,14 +179,13 @@ private struct DockChip: View {
             }
             .font(OMFonts.small)
             .foregroundStyle(selected ? Color.primary : OMColors.secondaryText)
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 11)
             .frame(height: 26)
-            .background(Capsule().fill(selected ? Color.primary.opacity(0.07) : (hovering ? Color.primary.opacity(0.05) : .clear)))
-            .overlay(Capsule().strokeBorder(selected ? OMColors.secondaryText.opacity(0.5) : OMColors.hairline, lineWidth: 0.8))
+            // Liquid Glass 胶囊:选中态带主题色着色,悬停由玻璃自带的交互反馈提供
+            .omGlass(in: Capsule(), tint: selected ? OMColors.accent.opacity(0.28) : nil, interactive: true)
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }

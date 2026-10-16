@@ -46,7 +46,7 @@ struct PermissionCard: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .omSolidCard()
+        .omGlassCard()
         .accessibilityElement(children: .contain)
         .accessibilityLabel("权限请求:\(prompt.title)")
     }
@@ -153,7 +153,7 @@ struct GenericElicitationCard: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .omSolidCard()
+        .omGlassCard()
         .accessibilityElement(children: .contain)
     }
 }
