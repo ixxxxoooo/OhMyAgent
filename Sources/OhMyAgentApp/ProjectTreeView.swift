@@ -93,7 +93,8 @@ struct ProjectTreeView: View {
             Color.clear.frame(height: TitlebarMetrics.height).background(WindowDragArea())
             navigation
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 2) {
+                // 行数有限(每项目最多预览 5 条),用普通 VStack:LazyVStack 在悬停/选中重排时按估算高度布局,会让整列抖动
+                VStack(alignment: .leading, spacing: 2) {
                     if !pinned.isEmpty {
                         SectionTitle(title: "置顶")
                         ForEach(pinned) { item in
@@ -381,6 +382,7 @@ private struct ProjectGroup: View {
         .padding(.horizontal, 8)
         .frame(height: 30)
         .background(hovering ? Color.primary.opacity(0.06) : Color.clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .transaction { $0.animation = nil }
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture { omWithAnimation(.snappy(duration: 0.18)) { workbench.toggleCollapsed(project.id) } }
@@ -426,7 +428,7 @@ private struct SubagentRows: View {
                     }
                     .padding(.leading, CGFloat(12 + item.depth * 12))
                     .padding(.horizontal, 6)
-                    .frame(minHeight: 22)
+                    .frame(height: 24)
                     .contentShape(Rectangle())
                     .onTapGesture {
                         workbench.openSubagent(project: projectID, toolCallID: tool.toolCallId, title: tool.title)
@@ -456,7 +458,7 @@ private struct SessionLine: View {
     var body: some View {
         HStack(spacing: 8) {
             SessionStatusDot(uid: item.isCurrent ? item.uid : nil, isRunning: item.isRunning)
-                .frame(width: 10)
+                .frame(width: 10, height: 10)
             // 标题溢出时右端渐隐(不用省略号硬截断);短标题不受影响
             Text(item.title)
                 .font(OMFonts.small)
@@ -476,11 +478,12 @@ private struct SessionLine: View {
         }
         .padding(.leading, mode == .tree ? 16 : 8)
         .padding(.trailing, 8)
-        .padding(.vertical, 5)
-        .background {
-            if isSelected { RoundedRectangle(cornerRadius: 7, style: .continuous).fill(OMColors.accent.opacity(0.14)) }
-            else if hovering { RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Color.primary.opacity(0.06)) }
-        }
+        .frame(height: 30)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isSelected ? OMColors.accent.opacity(0.14) : (hovering ? Color.primary.opacity(0.06) : Color.clear))
+        )
+        .transaction { $0.animation = nil }
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture(perform: open)
@@ -565,7 +568,7 @@ private struct SessionStatusDot: View {
         let state = uid.flatMap { center.items[$0]?.state } ?? (isRunning ? .running : .idle)
         switch state {
         case .running:
-            ProgressView().controlSize(.mini).scaleEffect(0.7).accessibilityLabel("运行中")
+            ProgressView().controlSize(.mini).scaleEffect(0.7).frame(width: 10, height: 10).accessibilityLabel("运行中")
         case .needsInput:
             dot(.orange, blink: true).accessibilityLabel("等待处理")
         case .unreadDone:
