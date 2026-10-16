@@ -66,6 +66,15 @@ struct SettingsForm<Content: View>: View {
     var body: some View {
         Form { content }
             .formStyle(.grouped)
+            .settingsSurface()
+    }
+}
+
+extension View {
+    /// 设置页右侧内容区统一背景:隐藏系统分组表单/列表自带的底色,铺 `OMColors.surface`,避免上下色差。
+    func settingsSurface() -> some View {
+        scrollContentBackground(.hidden)
+            .background(OMColors.surface)
     }
 }
 

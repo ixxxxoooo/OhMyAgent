@@ -70,7 +70,7 @@ struct MCPPanelView: View {
                         .multilineTextAlignment(.center)
                     Button("添加服务器…") {
                         dismiss()
-                        AppActions.shared.openSettings(page: .tools, section: .mcp)
+                        AppActions.shared.openSettings(page: .mcp)
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -191,7 +191,7 @@ struct MCPPanelView: View {
             Spacer()
             Button {
                 dismiss()
-                AppActions.shared.openSettings(page: .tools, section: .mcp)
+                AppActions.shared.openSettings(page: .mcp)
             } label: {
                 Label("管理…", om: "settings")
             }

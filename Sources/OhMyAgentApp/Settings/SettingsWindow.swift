@@ -11,15 +11,40 @@ import WorkbenchKit
 /// 设置页。
 enum SettingsPage: String, CaseIterable, Identifiable {
     case general, appearance, shortcuts
-    case agent, providers, modelMapping, prompts, network, permissions, trust, tools, agentExtensions
+    case agent, providers, modelMapping, prompts, network, permissions, trust, agentExtensions
+    case mcp, skills, subagents, hooks, plugins, memory
     case editor, terminal
     case usage, privacy, advanced, diagnostics
     var id: String { rawValue }
 
+    /// 设置搜索的附加关键词(页标题之外还能搜到的词)。
+    var keywords: [String] {
+        switch self {
+        case .mcp: return ["mcp", "model context protocol", "服务器", "工具", "server", "tools", "claude mcp"]
+        case .skills: return ["skill", "skills", "技能", "命令", "斜杠", "command", "slash", "SKILL.md"]
+        case .subagents: return ["agent", "subagent", "子代理", "子 agent", "代理", "agents"]
+        case .hooks: return ["hook", "hooks", "钩子", "生命周期", "PreToolUse", "PostToolUse"]
+        case .plugins: return ["plugin", "plugins", "插件", "市场", "marketplace", "扩展"]
+        case .memory: return ["memory", "记忆", "claude.md", "指令", "rules", "规则", "instructions"]
+        case .providers: return ["provider", "api", "密钥", "key", "openai", "anthropic"]
+        case .agentExtensions: return ["acp", "registry", "codex", "gemini", "pi", "opencode", "注册表"]
+        case .shortcuts: return ["快捷键", "shortcut", "keybinding"]
+        default: return []
+        }
+    }
+
+    /// 由环境变量/旧深链的名称解析设置页(兼容旧的 `tools` 页名)。
+    /// - Parameter name: 页面 rawValue 或旧名称
+    static func resolve(_ name: String) -> SettingsPage? {
+        if name == "tools" { return .mcp }
+        return SettingsPage(rawValue: name)
+    }
+
     /// 侧栏分组(从上到下)。
     static let groups: [(title: String, pages: [SettingsPage])] = [
         (String(localized: "客户端"), [.general, .appearance, .shortcuts]),
-        ("Agent", [.agent, .providers, .modelMapping, .prompts, .network, .permissions, .trust, .tools, .agentExtensions]),
+        ("Agent", [.agent, .providers, .modelMapping, .prompts, .network, .permissions, .trust, .agentExtensions]),
+        (String(localized: "扩展"), [.mcp, .skills, .subagents, .hooks, .plugins, .memory]),
         (String(localized: "工作台"), [.editor, .terminal]),
         (String(localized: "其他"), [.usage, .privacy, .advanced, .diagnostics]),
     ]
@@ -36,8 +61,13 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .network: return String(localized: "网络")
         case .permissions: return String(localized: "权限")
         case .trust: return String(localized: "项目信任")
-        case .tools: return String(localized: "工具与扩展")
         case .agentExtensions: return String(localized: "Agent 注册表")
+        case .mcp: return "MCP"
+        case .skills: return String(localized: "技能")
+        case .subagents: return String(localized: "子 Agent")
+        case .hooks: return "Hooks"
+        case .plugins: return String(localized: "插件")
+        case .memory: return String(localized: "记忆与指令")
         case .editor: return String(localized: "编辑器")
         case .terminal: return String(localized: "终端")
         case .usage: return String(localized: "用量与成本")
@@ -59,8 +89,13 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .network: return "network"
         case .permissions: return "lock.shield"
         case .trust: return "shield-check"
-        case .tools: return "puzzlepiece.extension"
         case .agentExtensions: return "square.stack.3d.up"
+        case .mcp: return "server.rack"
+        case .skills: return "sparkles"
+        case .subagents: return "person.2"
+        case .hooks: return "bolt.horizontal"
+        case .plugins: return "puzzlepiece.extension"
+        case .memory: return "brain"
         case .editor: return "chevron.left.forwardslash.chevron.right"
         case .terminal: return "terminal"
         case .usage: return "chart.bar"
@@ -77,14 +112,20 @@ enum SettingsPage: String, CaseIterable, Identifiable {
 final class SettingsRouter {
     static let shared = SettingsRouter()
 
-    var page: SettingsPage = SettingsPage(rawValue: ProcessInfo.processInfo.environment["OMA_SETTINGS_PAGE"] ?? "") ?? .general
-    var section: ExtensionSection = ExtensionSection(rawValue: ProcessInfo.processInfo.environment["OMA_SECTION"] ?? "") ?? .mcp
+    var page: SettingsPage = SettingsRouter.initialPage()
 
-    /// 跳转到某页(可选带工具与扩展的分区)。
-    func go(_ page: SettingsPage, section: ExtensionSection? = nil) {
-        self.page = page
-        if let section { self.section = section }
+    /// 启动页:`OMA_SETTINGS_PAGE`;旧的 `OMA_SECTION`(工具与扩展分区)映射到对应的独立页。
+    nonisolated static func initialPage() -> SettingsPage {
+        let env = ProcessInfo.processInfo.environment
+        if let section = env["OMA_SECTION"].flatMap(ExtensionSection.init(rawValue:)) { return section.page }
+        return env["OMA_SETTINGS_PAGE"].flatMap(SettingsPage.resolve) ?? .general
     }
+
+    /// 跳转到某页。
+    func go(_ page: SettingsPage) { self.page = page }
+
+    /// 跳转到某个扩展分区(MCP/技能/子 Agent/Hooks/插件/记忆)对应的独立页。
+    func go(extension section: ExtensionSection) { page = section.page }
 }
 
 /// 设置窗口所用的工作区:工作台当前选中的项目;主目录视为"无项目"(项目/本地层与用户层相同)。
@@ -107,7 +148,7 @@ struct SettingsView: View {
     private let appearance = AppearanceModel.shared
 
     /// 需要全宽布局的页面(主从列表/大表格),其余页面内容限宽居中。
-    private var usesFullWidth: Bool { [.tools, .agentExtensions, .diagnostics, .usage, .providers].contains(router.page) }
+    private var usesFullWidth: Bool { [.mcp, .skills, .subagents, .hooks, .plugins, .memory, .agentExtensions, .diagnostics, .usage, .providers].contains(router.page) }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -126,8 +167,10 @@ struct SettingsView: View {
                 page
                     .id(appearance.renderKey)
                     .frame(maxWidth: usesFullWidth ? .infinity : 720)
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(OMColors.surface)
             }
+            .background(OMColors.surface)
         }
         .background(OMColors.surface)
         // 无标题栏窗口:内容铺满到窗口顶部,由侧栏/内容区各自预留标题栏高度,避免系统安全区叠加出多余留白
@@ -196,7 +239,10 @@ struct SettingsView: View {
         let key = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !key.isEmpty else { return SettingsPage.groups }
         return SettingsPage.groups.compactMap { group in
-            let pages = group.pages.filter { $0.title.localizedCaseInsensitiveContains(key) || group.title.localizedCaseInsensitiveContains(key) }
+            let pages = group.pages.filter { page in
+                page.title.localizedCaseInsensitiveContains(key) || group.title.localizedCaseInsensitiveContains(key)
+                    || page.keywords.contains { $0.localizedCaseInsensitiveContains(key) }
+            }
             return pages.isEmpty ? nil : (group.title, pages)
         }
     }
@@ -213,7 +259,12 @@ struct SettingsView: View {
         case .network: NetworkPage()
         case .permissions: PermissionsPage(model: model)
         case .trust: ProjectTrustPage(workbench: workbench)
-        case .tools: ToolsExtensionsPage(center: center, router: router)
+        case .mcp: MCPSettingsPage(center: center)
+        case .skills: SkillsSettingsPage(center: center, kind: .skill)
+        case .subagents: SkillsSettingsPage(center: center, kind: .agent)
+        case .hooks: HooksSettingsPage(center: center)
+        case .plugins: PluginsSettingsPage(center: center)
+        case .memory: MemorySettingsPage(center: center)
         case .editor: EditorPage()
         case .terminal: TerminalPage()
         case .shortcuts: ShortcutsPage()

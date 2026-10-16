@@ -210,7 +210,7 @@ struct WorkbenchCommands: Commands {
             }
             Divider()
             Button("工具与扩展…") {
-                AppActions.shared.openSettings(page: .tools)
+                AppActions.shared.openSettings(page: .mcp)
             }
             .keyboardShortcut(shortcuts.shortcut(for: .extensions))
         }

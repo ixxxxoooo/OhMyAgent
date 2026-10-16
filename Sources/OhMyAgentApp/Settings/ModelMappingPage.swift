@@ -34,6 +34,7 @@ struct ModelMappingPage: View {
             }
         }
         .formStyle(.grouped)
+        .settingsSurface()
         .onAppear { model.reload() }
     }
 

@@ -48,6 +48,7 @@ struct ProviderDetailView: View {
             actionsSection
         }
         .formStyle(.grouped)
+        .settingsSurface()
         .sheet(isPresented: $showFetch) {
             ModelFetchSheet(provider: draft, key: keyText, existing: Set(draft.modelList.map(\.id))) { ids in
                 draft.mergeModels(ids)

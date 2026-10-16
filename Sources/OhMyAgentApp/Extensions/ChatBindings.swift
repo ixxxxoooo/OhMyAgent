@@ -52,9 +52,9 @@ enum ChatBindings {
     private static func handle(_ command: LocalCommand, in model: SessionModel) {
         switch command {
         case .settings(let page):
-            AppActions.shared.openSettings(page: SettingsPage(rawValue: page))
+            AppActions.shared.openSettings(page: SettingsPage.resolve(page))
         case .extensions(let section):
-            AppActions.shared.openSettings(page: .tools, section: ExtensionSection(rawValue: section))
+            AppActions.shared.openSettings(page: ExtensionSection(rawValue: section)?.page ?? .mcp)
         case .mcpPanel:
             ChatPanelRouter.shared.showMCP(for: model)
         case .history:

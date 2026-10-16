@@ -1,40 +1,61 @@
 // @author ixxxxoooo
-// MCP 服务器管理:列表(作用域/覆盖/启停/审批/健康)、表单与 JSON 添加、Claude Desktop 导入、删除。
+// MCP 设置页:卡片列表(启用开关、作用域/覆盖/待批准、连接状态)、表单与 JSON 添加、Claude Desktop 导入、删除。
+// 参考 Cursor 的「MCP」设置页版式;读写沿用 ClaudeConfigKit 的 `MCPStore`。
 
 import IconKit
 import ClaudeConfigKit
 import DesignSystem
 import SwiftUI
 
-/// MCP 管理页。
-struct MCPManagerView: View {
+/// MCP 设置页。
+struct MCPSettingsPage: View {
     let center: ConfigCenter
-    @State private var selectedID: String?
+    @State private var filter: ConfigScope?
+    @State private var expandedID: String?
     @State private var editor: MCPEditorTarget?
     @State private var showJSON = false
     @State private var pendingDelete: MCPServerEntry?
 
-    private var entries: [MCPServerEntry] { center.snapshot.mcp }
-    private var selected: MCPServerEntry? { entries.first { $0.id == selectedID } }
+    private var all: [MCPServerEntry] { center.snapshot.mcp }
+    private var entries: [MCPServerEntry] { filter.map { scope in all.filter { $0.scope == scope } } ?? all }
 
     var body: some View {
-        ListDetail {
-            VStack(spacing: 0) {
-                toolbar
-                if entries.isEmpty {
-                    EmptyHint(icon: "server.rack", title: String(localized: "还没有 MCP 服务器"), message: String(localized: "点击「添加」配置一个,或从 Claude Desktop 导入。"))
-                } else {
-                    List(entries, selection: $selectedID) { entry in
-                        row(entry).tag(entry.id)
-                    }
-                    .listStyle(.inset)
-                }
+        ExtensionPage(
+            center: center, icon: "server.rack", title: "MCP",
+            subtitle: String(localized: "通过 Model Context Protocol 给 Claude 接入外部工具与数据源。配置写入 ~/.claude.json 或项目的 .mcp.json。"),
+            errorKey: "MCP"
+        ) {
+            Button { Task { await center.checkMCPHealth() } } label: { Label("检测连接", om: "waveform.path.ecg") }
+                .disabled(!center.canRunCLI || center.isBusy)
+                .help("运行 claude mcp list 检测各服务器连接状态")
+            Button { center.reload() } label: { Image.om("arrow.clockwise") }
+                .help("重新读取配置")
+                .accessibilityLabel("刷新")
+            Menu {
+                Button("表单添加…") { editor = MCPEditorTarget(entry: nil) }
+                Button("粘贴 JSON 添加…") { showJSON = true }
+                Divider()
+                Button("从 Claude Desktop 导入") { importFromDesktop() }
+            } label: {
+                Label("添加服务器", om: "plus")
             }
-        } detail: {
-            if let entry = selected {
-                detail(entry)
+            .menuStyle(.button)
+            .buttonStyle(.borderedProminent)
+        } content: {
+            if !all.isEmpty { scopeFilter }
+            if entries.isEmpty {
+                ExtensionEmptyCard(
+                    icon: "server.rack",
+                    title: all.isEmpty ? String(localized: "还没有 MCP 服务器") : String(localized: "这个范围内没有服务器"),
+                    message: String(localized: "点击右上角「添加服务器」配置一个,或从 Claude Desktop 导入。")
+                )
             } else {
-                EmptyHint(icon: "server.rack", title: String(localized: "选择一个服务器查看详情"))
+                ExtensionCardList {
+                    ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                        if index > 0 { ExtensionRowDivider() }
+                        row(entry)
+                    }
+                }
             }
         }
         .sheet(item: $editor) { target in
@@ -46,137 +67,178 @@ struct MCPManagerView: View {
         .confirmationDialog("删除 MCP 服务器?", isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }), presenting: pendingDelete) { entry in
             Button("删除「\(entry.config.name)」", role: .destructive) {
                 center.perform(String(localized: "已删除 \(entry.config.name)")) { try MCPStore(paths: center.paths).remove(name: entry.config.name, scope: entry.scope) }
-                selectedID = nil
+                expandedID = nil
             }
         } message: { entry in
             Text("将从\(entry.scope.displayName)配置中移除,此操作不可撤销。")
         }
     }
 
-    // MARK: - 列表
+    // MARK: - 过滤
 
-    private var toolbar: some View {
-        HStack(spacing: 8) {
-            Menu {
-                Button("表单添加…") { editor = MCPEditorTarget(entry: nil) }
-                Button("粘贴 JSON 添加…") { showJSON = true }
-                Divider()
-                Button("从 Claude Desktop 导入") { importFromDesktop() }
-            } label: {
-                Label("添加", om: "plus")
+    private var scopeFilter: some View {
+        Picker("", selection: $filter) {
+            Text("全部 \(all.count)").tag(ConfigScope?.none)
+            ForEach(ConfigScope.allCases) { scope in
+                let count = all.filter { $0.scope == scope }.count
+                Text(count > 0 ? "\(scope.displayName) \(count)" : scope.displayName).tag(ConfigScope?.some(scope))
             }
-            .menuStyle(.button)
-            Button { Task { await center.checkMCPHealth() } } label: {
-                Label("检测连接", om: "waveform.path.ecg")
-            }
-            .disabled(!center.canRunCLI || center.isBusy)
-            .help("运行 claude mcp list 检测各服务器连接状态")
-            Spacer()
-            Button { center.reload() } label: { Image.om("arrow.clockwise") }
-                .help("重新读取配置")
-                .accessibilityLabel("刷新")
         }
-        .padding(10)
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .frame(maxWidth: 360)
     }
 
+    // MARK: - 行
+
     private func row(_ entry: MCPServerEntry) -> some View {
-        HStack(spacing: 8) {
-            healthDot(entry)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(entry.config.name).font(OMFonts.body).lineLimit(1)
-                HStack(spacing: 4) {
-                    Tag(entry.scope.displayName, color: OMColors.accent2)
-                    Tag(entry.config.transport.rawValue)
-                    if entry.isDisabled { Tag(String(localized: "已禁用"), color: .gray) }
-                    if entry.needsApproval { Tag(String(localized: "待批准"), color: OMColors.warning) }
-                    if let over = entry.overriddenBy { Tag(String(localized: "被\(over.displayName)覆盖"), color: OMColors.warning) }
-                }
+        let config = entry.config
+        let dimmed = entry.overriddenBy != nil || entry.isDisabled
+        return ExtensionRow(
+            icon: "server.rack", tint: tint(entry), title: config.name,
+            subtitle: summary(of: config), monoSubtitle: true, dimmed: dimmed,
+            expanded: expandedID == entry.id,
+            onTap: { omWithAnimation { expandedID = expandedID == entry.id ? nil : entry.id } },
+            badges: {
+                Tag(entry.scope.displayName, color: OMColors.accent2)
+                Tag(config.transport.rawValue)
+                if entry.needsApproval { Tag(String(localized: "待批准"), color: OMColors.warning) }
+                if let over = entry.overriddenBy { Tag(String(localized: "被\(over.displayName)覆盖"), color: OMColors.warning) }
+            },
+            trailing: { trailing(entry) },
+            detail: { detail(entry) }
+        )
+    }
+
+    /// 行右侧:连接状态 + 启用开关(待批准时换成「批准」按钮)+ 更多菜单。
+    private func trailing(_ entry: MCPServerEntry) -> some View {
+        HStack(spacing: 10) {
+            healthLabel(entry)
+            if entry.needsApproval {
+                Button("批准") { center.perform(String(localized: "已批准 \(entry.config.name)")) { try MCPStore(paths: center.paths).approveProjectServer(name: entry.config.name) } }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+            } else {
+                Toggle("", isOn: Binding(
+                    get: { !entry.isDisabled },
+                    set: { enabled in
+                        center.perform(enabled ? String(localized: "已启用") : String(localized: "已禁用")) {
+                            try MCPStore(paths: center.paths).setEnabled(enabled, name: entry.config.name, scope: entry.scope)
+                        }
+                    }
+                ))
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .labelsHidden()
+                .accessibilityLabel(String(localized: "启用 \(entry.config.name)"))
             }
-            Spacer(minLength: 0)
+            Menu {
+                Button("编辑…") { editor = MCPEditorTarget(entry: entry) }
+                Divider()
+                Button("删除…", role: .destructive) { pendingDelete = entry }
+            } label: {
+                Image.om("ellipsis", size: 14).frame(width: 24, height: 24).contentShape(Rectangle())
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .accessibilityLabel("更多操作")
         }
-        .opacity(entry.overriddenBy != nil || entry.isDisabled ? 0.55 : 1)
-        .accessibilityElement(children: .combine)
     }
 
     @ViewBuilder
-    private func healthDot(_ entry: MCPServerEntry) -> some View {
+    private func healthLabel(_ entry: MCPServerEntry) -> some View {
         if let health = center.mcpHealth[entry.config.name] {
-            switch health.state {
-            case .connected: OMStatusDot(.success)
-            case .needsAuth: OMStatusDot(.warning)
-            case .failed: OMStatusDot(.failure)
-            case .unknown: OMStatusDot(.idle)
+            HStack(spacing: 5) {
+                healthDot(health)
+                Text(verbatim: healthText(health)).font(OMFonts.caption).foregroundStyle(OMColors.secondaryText)
             }
-        } else {
-            OMStatusDot(.idle)
+            .help(health.detail)
         }
     }
 
-    // MARK: - 详情
+    @ViewBuilder
+    private func healthDot(_ health: MCPHealthStatus) -> some View {
+        switch health.state {
+        case .connected: OMStatusDot(.success)
+        case .needsAuth: OMStatusDot(.warning)
+        case .failed: OMStatusDot(.failure)
+        case .unknown: OMStatusDot(.idle)
+        }
+    }
+
+    private func healthText(_ health: MCPHealthStatus) -> String {
+        switch health.state {
+        case .connected: return String(localized: "已连接")
+        case .needsAuth: return String(localized: "需要认证")
+        case .failed: return String(localized: "连接失败")
+        case .unknown: return String(localized: "未知")
+        }
+    }
+
+    /// 图标瓦片的色调:按连接状态着色,未检测时用强调色。
+    private func tint(_ entry: MCPServerEntry) -> Color {
+        guard let health = center.mcpHealth[entry.config.name] else { return OMColors.accent }
+        switch health.state {
+        case .connected: return .green
+        case .needsAuth: return OMColors.warning
+        case .failed: return .red
+        case .unknown: return OMColors.accent
+        }
+    }
+
+    /// 单行摘要:命令或 URL。
+    private func summary(of config: MCPServerConfig) -> String {
+        config.transport == .stdio ? ([config.command] + config.args).joined(separator: " ") : config.url
+    }
+
+    // MARK: - 展开详情
 
     private func detail(_ entry: MCPServerEntry) -> some View {
         let config = entry.config
         let missing = MCPStore.unresolvedVariables(in: config, environment: ProcessInfo.processInfo.environment)
-        return ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    Text(config.name).font(OMFonts.title)
-                    Tag(entry.scope.displayName, color: OMColors.accent2)
-                    Spacer()
-                    detailActions(entry)
-                }
-                if config.transport == .sse {
-                    Label("SSE 传输已被 MCP 规范弃用,建议改用 HTTP。", om: "exclamationmark.triangle").font(OMFonts.small).foregroundStyle(OMColors.warning)
-                }
-                if entry.needsApproval {
-                    Label("这是项目 .mcp.json 中的服务器,尚未批准。批准后 Claude 才会启动它。", om: "hand.raised").font(OMFonts.small).foregroundStyle(OMColors.warning)
-                }
-                if let over = entry.overriddenBy {
-                    Label(String(localized: "同名服务器在\(over.displayName)作用域中优先生效,此条目被整体覆盖。"), om: "arrow.triangle.merge").font(OMFonts.small).foregroundStyle(OMColors.warning)
-                }
-                if let health = center.mcpHealth[config.name] {
-                    Label(health.detail, om: "waveform.path.ecg").font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
-                }
-                if !missing.isEmpty {
-                    Label(String(localized: "引用了未设置的环境变量:\(missing.joined(separator: String(localized: "、")))。注意 ANTHROPIC_API_KEY 等凭据变量在远程 url/headers 中会读为空。"), om: "exclamationmark.circle")
-                        .font(OMFonts.small).foregroundStyle(OMColors.warning)
-                }
-                Group {
-                    keyValue(String(localized: "传输"), config.transport.displayName)
-                    if config.transport == .stdio {
-                        keyValue(String(localized: "命令"), ([config.command] + config.args).joined(separator: " "))
-                        if !config.env.isEmpty { keyValue(String(localized: "环境变量"), config.env.keys.sorted().map { "\($0)=\(mask(config.env[$0] ?? "", key: $0))" }.joined(separator: "\n")) }
-                    } else {
-                        keyValue("URL", config.url)
-                        if !config.headers.isEmpty { keyValue(String(localized: "请求头"), config.headers.keys.sorted().map { "\($0): \(mask(config.headers[$0] ?? "", key: $0))" }.joined(separator: "\n")) }
-                    }
-                }
+        return VStack(alignment: .leading, spacing: 10) {
+            if config.transport == .sse {
+                warning("SSE 传输已被 MCP 规范弃用,建议改用 HTTP。", icon: "exclamationmark.triangle")
             }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            if entry.needsApproval {
+                warning("这是项目 .mcp.json 中的服务器,尚未批准。批准后 Claude 才会启动它。", icon: "hand.raised")
+            }
+            if let over = entry.overriddenBy {
+                warning(String(localized: "同名服务器在\(over.displayName)作用域中优先生效,此条目被整体覆盖。"), icon: "arrow.triangle.merge")
+            }
+            if let health = center.mcpHealth[config.name] {
+                Label(health.detail, om: "waveform.path.ecg").font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
+            }
+            if !missing.isEmpty {
+                warning(String(localized: "引用了未设置的环境变量:\(missing.joined(separator: String(localized: "、")))。注意 ANTHROPIC_API_KEY 等凭据变量在远程 url/headers 中会读为空。"), icon: "exclamationmark.circle")
+            }
+            keyValue(String(localized: "传输"), config.transport.displayName)
+            if config.transport == .stdio {
+                keyValue(String(localized: "命令"), ([config.command] + config.args).joined(separator: " "))
+                if !config.env.isEmpty { keyValue(String(localized: "环境变量"), config.env.keys.sorted().map { "\($0)=\(mask(config.env[$0] ?? "", key: $0))" }.joined(separator: "\n")) }
+            } else {
+                keyValue("URL", config.url)
+                if !config.headers.isEmpty { keyValue(String(localized: "请求头"), config.headers.keys.sorted().map { "\($0): \(mask(config.headers[$0] ?? "", key: $0))" }.joined(separator: "\n")) }
+            }
+            HStack(spacing: 8) {
+                Button("编辑…") { editor = MCPEditorTarget(entry: entry) }
+                Button("删除…", role: .destructive) { pendingDelete = entry }
+            }
+            .controlSize(.small)
+            .padding(.top, 2)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func detailActions(_ entry: MCPServerEntry) -> some View {
-        HStack(spacing: 8) {
-            if entry.needsApproval {
-                Button("批准") { center.perform(String(localized: "已批准 \(entry.config.name)")) { try MCPStore(paths: center.paths).approveProjectServer(name: entry.config.name) } }
-                    .buttonStyle(.borderedProminent)
-            }
-            Button(entry.isDisabled ? String(localized: "启用") : String(localized: "禁用")) {
-                center.perform(entry.isDisabled ? String(localized: "已启用") : String(localized: "已禁用")) {
-                    try MCPStore(paths: center.paths).setEnabled(entry.isDisabled, name: entry.config.name, scope: entry.scope)
-                }
-            }
-            Button("编辑…") { editor = MCPEditorTarget(entry: entry) }
-            Button("删除", role: .destructive) { pendingDelete = entry }
-        }
+    private func warning(_ text: String, icon: String) -> some View {
+        Label(text, om: icon).font(OMFonts.small).foregroundStyle(OMColors.warning)
     }
 
     private func keyValue(_ key: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(key).font(OMFonts.caption).foregroundStyle(OMColors.secondaryText)
-            Text(value).font(OMFonts.mono).textSelection(.enabled)
+            Text(value).font(OMFonts.monoSmall).textSelection(.enabled)
         }
     }
 

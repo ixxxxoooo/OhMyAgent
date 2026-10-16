@@ -1,5 +1,6 @@
 // @author ixxxxoooo
-// Skills / 命令 / 子 Agent 管理:分组列表、源码编辑(含 frontmatter 快捷开关)、新建向导、删除。
+// 技能(Skills 与命令)/ 子 Agent 设置页:按来源分组的卡片列表、搜索、新建向导、源码编辑(含 frontmatter 快捷开关)、删除。
+// 参考 Cursor 的「Rules, Skills, Subagents」版式;读写沿用 ClaudeConfigKit 的 `SkillStore` / `AgentStore`。
 
 import IconKit
 import AppKit
@@ -7,13 +8,13 @@ import ClaudeConfigKit
 import DesignSystem
 import SwiftUI
 
-/// Skills 或子 Agent 管理页(两者结构相同,用 kind 区分)。
-struct MarkdownItemManagerView: View {
+/// 技能或子 Agent 设置页(两者结构相同,用 kind 区分)。
+struct SkillsSettingsPage: View {
     let center: ConfigCenter
     let kind: MarkdownItem.Kind
-    @State private var selectedID: String?
     @State private var search = ""
     @State private var showCreate = false
+    @State private var editing: MarkdownItem?
     @State private var pendingDelete: MarkdownItem?
 
     private var items: [MarkdownItem] {
@@ -21,39 +22,44 @@ struct MarkdownItemManagerView: View {
         guard !search.isEmpty else { return all }
         return all.filter { $0.name.localizedCaseInsensitiveContains(search) || $0.description.localizedCaseInsensitiveContains(search) }
     }
-    private var selected: MarkdownItem? { items.first { $0.id == selectedID } }
-    private var noun: String { kind == .agent ? String(localized: "子 Agent") : "Skill" }
+    private var total: Int { kind == .agent ? center.snapshot.agents.count : center.snapshot.skills.count }
+    private var noun: String { kind == .agent ? String(localized: "子 Agent") : String(localized: "技能") }
+    private var pageIcon: String { kind == .agent ? "person.2" : "sparkles" }
 
     var body: some View {
-        ListDetail {
-            VStack(spacing: 0) {
-                HStack(spacing: 8) {
-                    Button { showCreate = true } label: { Label(String(localized: "新建\(noun)"), om: "plus") }
-                    Spacer()
-                    Button { center.reload() } label: { Image.om("arrow.clockwise") }.help("重新读取").accessibilityLabel("刷新")
-                }
-                .padding(10)
-                TextField("搜索名称或描述", text: $search).textFieldStyle(.roundedBorder).padding(.horizontal, 10).padding(.bottom, 8)
-                if items.isEmpty {
-                    EmptyHint(icon: kind == .agent ? "person.2" : "sparkles", title: String(localized: "没有\(noun)"), message: String(localized: "点击「新建\(noun)」创建,或安装带有\(noun)的插件。"))
-                } else {
-                    List(selection: $selectedID) {
-                        ForEach(grouped, id: \.0) { title, group in
-                            Section(title) {
-                                ForEach(group) { item in row(item).tag(item.id) }
-                            }
+        ExtensionPage(
+            center: center, icon: pageIcon, title: noun,
+            subtitle: kind == .agent
+                ? String(localized: "给 Claude 配置可委派任务的专用子 Agent,定义保存在 ~/.claude/agents 或项目的 .claude/agents。")
+                : String(localized: "用 SKILL.md 与自定义命令扩展 Claude 的能力,保存在 ~/.claude/skills、commands 或项目的 .claude 目录。")
+        ) {
+            Button { center.reload() } label: { Image.om("arrow.clockwise") }
+                .help("重新读取")
+                .accessibilityLabel("刷新")
+            Button { showCreate = true } label: { Label(String(localized: "新建\(noun)"), om: "plus") }
+                .buttonStyle(.borderedProminent)
+        } content: {
+            if total > 0 { ExtensionSearchField(placeholder: "搜索名称或描述", text: $search).frame(maxWidth: 360) }
+            if items.isEmpty {
+                ExtensionEmptyCard(
+                    icon: pageIcon,
+                    title: total == 0 ? String(localized: "还没有\(noun)") : String(localized: "没有匹配的\(noun)"),
+                    message: String(localized: "点击右上角「新建\(noun)」创建,或安装带有\(noun)的插件。")
+                )
+            } else {
+                ForEach(grouped, id: \.0) { title, group in
+                    ExtensionSectionLabel(title: title, count: group.count)
+                    ExtensionCardList {
+                        ForEach(Array(group.enumerated()), id: \.element.id) { index, item in
+                            if index > 0 { ExtensionRowDivider() }
+                            row(item)
                         }
                     }
-                    .listStyle(.inset)
                 }
             }
-        } detail: {
-            if let item = selected {
-                MarkdownItemEditor(center: center, item: item) { pendingDelete = item }
-                    .id(item.id)
-            } else {
-                EmptyHint(icon: "doc.text", title: String(localized: "选择一个\(noun)进行查看或编辑"))
-            }
+        }
+        .sheet(item: $editing) { item in
+            MarkdownItemEditorSheet(center: center, item: item, onDelete: { pendingDelete = item }) { editing = nil }
         }
         .sheet(isPresented: $showCreate) {
             if kind == .agent { AgentCreateSheet(center: center) { showCreate = false } }
@@ -64,13 +70,14 @@ struct MarkdownItemManagerView: View {
                 center.perform(String(localized: "已删除 \(item.name)")) {
                     if kind == .agent { try AgentStore(paths: center.paths).delete(item) } else { try SkillStore(paths: center.paths).delete(item) }
                 }
-                selectedID = nil
+                editing = nil
             }
         } message: { item in
             Text("「\(item.name)」会被移到废纸篓。")
         }
     }
 
+    /// 按来源分组(保持首次出现的顺序)。
     private var grouped: [(String, [MarkdownItem])] {
         var order: [String] = []
         var groups: [String: [MarkdownItem]] = [:]
@@ -82,21 +89,76 @@ struct MarkdownItemManagerView: View {
         return order.map { ($0, groups[$0] ?? []) }
     }
 
+    private func icon(for item: MarkdownItem) -> String {
+        switch item.kind {
+        case .agent: return "person.2"
+        case .command: return "terminal"
+        case .skill: return "sparkles"
+        }
+    }
+
     private func row(_ item: MarkdownItem) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 4) {
-                Text(item.kind == .command ? "/\(item.name)" : item.name).font(OMFonts.body).lineLimit(1)
+        ExtensionRow(
+            icon: icon(for: item), title: item.kind == .command ? "/\(item.name)" : item.name,
+            subtitle: item.description, dimmed: item.overriddenBy != nil,
+            onTap: { editing = item },
+            badges: {
                 if item.kind == .command { Tag(String(localized: "命令")) }
                 if item.disableModelInvocation { Tag(String(localized: "仅手动")) }
                 if let over = item.overriddenBy { Tag(String(localized: "被\(over.displayName)覆盖"), color: OMColors.warning) }
                 if item.isSymlink { Tag(String(localized: "链接")) }
+                if item.source.isReadOnly { Tag(String(localized: "只读"), color: .gray) }
+            },
+            trailing: {
+                HStack(spacing: 6) {
+                    if item.kind == .agent || item.userInvocable {
+                        Button {
+                            AppActions.shared.insertIntoComposer(item.kind == .agent ? "@agent-\(item.name) " : "/\(item.name) ")
+                        } label: { Image.om("message-square-plus", size: 14).frame(width: 24, height: 24).contentShape(Rectangle()) }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(OMColors.secondaryText)
+                            .help(item.kind == .agent ? String(localized: "回到对话并 @ 提及这个子 Agent") : String(localized: "回到对话并插入这个命令"))
+                            .accessibilityLabel("在对话中使用")
+                    }
+                    Menu {
+                        Button("编辑…") { editing = item }
+                        Button("在 Finder 中显示") { NSWorkspace.shared.activateFileViewerSelecting([item.fileURL]) }
+                        if !item.source.isReadOnly {
+                            Divider()
+                            Button("删除…", role: .destructive) { pendingDelete = item }
+                        }
+                    } label: {
+                        Image.om("ellipsis", size: 14).frame(width: 24, height: 24).contentShape(Rectangle())
+                    }
+                    .menuStyle(.borderlessButton)
+                    .menuIndicator(.hidden)
+                    .fixedSize()
+                    .accessibilityLabel("更多操作")
+                }
             }
-            if !item.description.isEmpty {
-                Text(item.description).font(OMFonts.caption).foregroundStyle(OMColors.secondaryText).lineLimit(2)
+        )
+    }
+}
+
+/// 编辑弹窗:条目编辑器 + 底部「完成」。
+struct MarkdownItemEditorSheet: View {
+    let center: ConfigCenter
+    let item: MarkdownItem
+    let onDelete: () -> Void
+    let onClose: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            MarkdownItemEditor(center: center, item: item, onDelete: onDelete)
+            Divider()
+            HStack {
+                Spacer()
+                Button("完成", action: onClose).keyboardShortcut(.cancelAction)
             }
+            .padding(12)
         }
-        .opacity(item.overriddenBy == nil ? 1 : 0.55)
-        .accessibilityElement(children: .combine)
+        .frame(width: 780, height: 600)
+        .background(OMColors.surface)
     }
 }
 

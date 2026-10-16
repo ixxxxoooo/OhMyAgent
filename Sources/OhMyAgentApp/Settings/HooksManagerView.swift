@@ -1,13 +1,13 @@
 // @author ixxxxoooo
-// Hooks 管理:事件 → matcher → 处理器 的分组视图;设置层的 Hook 可增删改,插件 Hook 只读。
+// Hooks 设置页:按事件分组的卡片列表(事件 → matcher → 处理器);设置层的 Hook 可增删改,插件 Hook 只读。
 
 import IconKit
 import ClaudeConfigKit
 import DesignSystem
 import SwiftUI
 
-/// Hooks 管理页。
-struct HooksManagerView: View {
+/// Hooks 设置页。
+struct HooksSettingsPage: View {
     let center: ConfigCenter
     @State private var editor: HookEditorTarget?
     @State private var pendingDelete: HookEntry?
@@ -18,22 +18,29 @@ struct HooksManagerView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Button { editor = HookEditorTarget(entry: nil) } label: { Label("添加 Hook", om: "plus") }
-                Spacer()
-                Text("来源:用户 / 项目 / 本地设置与已启用插件").font(OMFonts.caption).foregroundStyle(OMColors.secondaryText)
-            }
-            .padding(10)
+        ExtensionPage(
+            center: center, icon: "bolt.horizontal", title: "Hooks",
+            subtitle: String(localized: "在工具调用前后、会话开始或结束等事件上自动运行命令。来源:用户 / 项目 / 本地设置与已启用的插件。"),
+            errorKey: "Hooks"
+        ) {
+            Button { center.reload() } label: { Image.om("arrow.clockwise") }
+                .help("重新读取配置")
+                .accessibilityLabel("刷新")
+            Button { editor = HookEditorTarget(entry: nil) } label: { Label("添加 Hook", om: "plus") }
+                .buttonStyle(.borderedProminent)
+        } content: {
             if grouped.isEmpty {
-                EmptyHint(icon: "bolt.horizontal", title: String(localized: "没有配置 Hook"), message: String(localized: "Hook 可在工具调用前后、会话开始/结束等事件上运行命令。"))
+                ExtensionEmptyCard(icon: "bolt.horizontal", title: String(localized: "没有配置 Hook"), message: String(localized: "Hook 可在工具调用前后、会话开始/结束等事件上运行命令。"))
             } else {
-                List {
-                    ForEach(grouped, id: \.0) { event, entries in
-                        Section(event) { ForEach(entries) { row($0) } }
+                ForEach(grouped, id: \.0) { event, entries in
+                    ExtensionSectionLabel(title: event, count: entries.count)
+                    ExtensionCardList {
+                        ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                            if index > 0 { ExtensionRowDivider() }
+                            row(entry)
+                        }
                     }
                 }
-                .listStyle(.inset)
             }
         }
         .sheet(item: $editor) { target in HookEditorSheet(center: center, target: target) { editor = nil } }
@@ -45,25 +52,29 @@ struct HooksManagerView: View {
     }
 
     private func row(_ entry: HookEntry) -> some View {
-        HStack(spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 4) {
-                    Tag(entry.handler.type, color: OMColors.accent2)
-                    if !entry.matcher.isEmpty { Tag(String(localized: "匹配 \(entry.matcher)")) }
-                    Tag(entry.origin.displayName)
-                    if let timeout = entry.handler.timeout { Tag("\(timeout)s") }
+        let editable: Bool = { if case .settings = entry.origin { return true } else { return false } }()
+        return ExtensionRow(
+            icon: "bolt.horizontal", title: entry.handler.summary, subtitle: nil, monoSubtitle: true,
+            onTap: editable ? { editor = HookEditorTarget(entry: entry) } : nil,
+            badges: {
+                Tag(entry.handler.type, color: OMColors.accent2)
+                if !entry.matcher.isEmpty { Tag(String(localized: "匹配 \(entry.matcher)")) }
+                Tag(entry.origin.displayName)
+                if let timeout = entry.handler.timeout { Tag("\(timeout)s") }
+            },
+            trailing: {
+                if editable {
+                    HStack(spacing: 6) {
+                        Button { editor = HookEditorTarget(entry: entry) } label: { Image.om("pencil", size: 13).frame(width: 24, height: 24).contentShape(Rectangle()) }
+                            .buttonStyle(.plain).foregroundStyle(OMColors.secondaryText).help("编辑").accessibilityLabel("编辑")
+                        Button { pendingDelete = entry } label: { Image.om("trash", size: 13).frame(width: 24, height: 24).contentShape(Rectangle()) }
+                            .buttonStyle(.plain).foregroundStyle(OMColors.secondaryText).help("删除").accessibilityLabel("删除")
+                    }
+                } else {
+                    Image.om("lock", size: 13).foregroundStyle(OMColors.tertiaryText).help("来自插件,只读")
                 }
-                Text(entry.handler.summary).font(OMFonts.monoSmall).lineLimit(2).textSelection(.enabled)
             }
-            Spacer()
-            if case .settings = entry.origin {
-                Button { editor = HookEditorTarget(entry: entry) } label: { Image.om("pencil") }.buttonStyle(.borderless).help("编辑").accessibilityLabel("编辑")
-                Button { pendingDelete = entry } label: { Image.om("trash") }.buttonStyle(.borderless).help("删除").accessibilityLabel("删除")
-            } else {
-                Image.om("lock").foregroundStyle(OMColors.tertiaryText).help("来自插件,只读")
-            }
-        }
-        .accessibilityElement(children: .contain)
+        )
     }
 }
 

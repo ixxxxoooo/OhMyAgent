@@ -20,6 +20,7 @@ struct AgentPreset {
         AgentPreset(id: "gemini", name: "Gemini CLI", command: "gemini", args: ["--experimental-acp"], summary: String(localized: "Google Gemini CLI 的 ACP 模式")),
         AgentPreset(id: "goose", name: "Goose", command: "goose", args: ["acp"], summary: String(localized: "Block 的 Goose Agent")),
         AgentPreset(id: "opencode", name: "OpenCode", command: "opencode", args: ["acp"], summary: String(localized: "OpenCode 的 ACP 模式")),
+        AgentPreset(id: "pi", name: "Pi", command: "npx", args: ["-y", "pi-acp"], summary: String(localized: "Pi 编码 Agent(pi-acp 适配器,经 npx 运行,需已安装 Node.js)")),
         AgentPreset(id: "codex", name: String(localized: "Codex(codex-acp 适配器)"), command: "codex-acp", args: [], summary: String(localized: "需先安装 codex-acp 适配器")),
     ]
 }
@@ -206,6 +207,7 @@ struct AgentEditSheet: View {
                 }
             }
             .formStyle(.grouped)
+            .settingsSurface()
             if let error { Label(error, om: "exclamationmark.triangle").foregroundStyle(OMColors.warning) }
             HStack {
                 Spacer()
@@ -247,6 +249,7 @@ struct MCPAgentEditSheet: View {
                 TextField("参数", text: $args, prompt: Text("用空格分隔,如 mcp-server"))
             }
             .formStyle(.grouped)
+            .settingsSurface()
             if let error { Label(error, om: "exclamationmark.triangle").foregroundStyle(OMColors.warning) }
             HStack {
                 Spacer()

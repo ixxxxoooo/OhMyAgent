@@ -183,7 +183,7 @@ struct ToolRowView: View {
                         }
                     }
                 }
-                Button("查看子 Agent 定义…") { AppActions.shared.openSettings(page: .tools, section: .agents) }
+                Button("查看子 Agent 定义…") { AppActions.shared.openSettings(page: .subagents) }
             }
         }
     }

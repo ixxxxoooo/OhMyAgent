@@ -39,8 +39,8 @@ final class AppActions {
     }
 
     /// 打开设置整页(并入主窗口,可深链到某页)。
-    func openSettings(page: SettingsPage? = nil, section: ExtensionSection? = nil) {
-        if let page { SettingsRouter.shared.go(page, section: section) }
+    func openSettings(page: SettingsPage? = nil) {
+        if let page { SettingsRouter.shared.go(page) }
         AppEnvironment.shared.workbench.openSettings()
         showMainWindow()
     }

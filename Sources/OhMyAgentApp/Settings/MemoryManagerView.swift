@@ -36,6 +36,7 @@ struct MemoryManagerView: View {
                     .accessibilityElement(children: .combine)
                 }
                 .listStyle(.inset)
+                .settingsSurface()
             }
         } detail: {
             if let file = selected {

@@ -79,7 +79,7 @@ struct ModelProvidersPage: View {
             }
             .padding(10)
         }
-        .background(Color.primary.opacity(0.03))
+        .background(OMColors.sidebar)
     }
 
     private func row(_ provider: ModelProvider) -> some View {
