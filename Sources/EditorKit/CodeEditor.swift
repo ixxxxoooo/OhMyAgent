@@ -19,6 +19,8 @@ public struct CodeEditor: NSViewRepresentable {
     public var features: EditorLanguageFeatures
     /// 「在对话中引用选区」回调(UTF-16 范围)
     public var onReferenceSelection: ((NSRange) -> Void)?
+    /// Markdown 显示模式(仅 `.markdown` 语言有效)
+    public var markdownMode: MarkdownEditorMode
 
     /// 创建编辑器。
     /// - Parameters:
@@ -31,7 +33,8 @@ public struct CodeEditor: NSViewRepresentable {
     ///   - features: 语言智能回调
     ///   - onReferenceSelection: 引用选区回调
     ///   - onChange: 编辑回调
-    public init(text: String, language: SyntaxLanguage, isEditable: Bool = false, revealLine: Int? = nil, markers: [Int: LineMarker] = [:], diagnostics: [EditorDiagnostic] = [], features: EditorLanguageFeatures = EditorLanguageFeatures(), onReferenceSelection: ((NSRange) -> Void)? = nil, onChange: ((String) -> Void)? = nil) {
+    public init(text: String, language: SyntaxLanguage, isEditable: Bool = false, revealLine: Int? = nil, markers: [Int: LineMarker] = [:], diagnostics: [EditorDiagnostic] = [], features: EditorLanguageFeatures = EditorLanguageFeatures(), onReferenceSelection: ((NSRange) -> Void)? = nil, markdownMode: MarkdownEditorMode = .off, onChange: ((String) -> Void)? = nil) {
+        self.markdownMode = markdownMode
         self.onReferenceSelection = onReferenceSelection
         self.diagnostics = diagnostics
         self.features = features
@@ -55,6 +58,7 @@ public struct CodeEditor: NSViewRepresentable {
         context.coordinator.loadedText = text
         context.coordinator.loadedLanguage = language
         wire(view, context.coordinator)
+        view.markdownMode = markdownMode
         view.setText(text, language: language)
         view.features = features
         view.onReferenceSelection = onReferenceSelection
@@ -72,6 +76,7 @@ public struct CodeEditor: NSViewRepresentable {
 
     public func updateNSView(_ view: CodeEditorView, context: Context) {
         view.syncTabActive(context.environment.tabIsActive)
+        view.markdownMode = markdownMode
         context.coordinator.onChange = onChange
         wire(view, context.coordinator)
         if context.coordinator.loadedText != text || context.coordinator.loadedLanguage != language {

@@ -23,13 +23,19 @@ public final class CodeEditorView: NSView {
     public let textView: EditorTextView
     private let ruler: LineNumberRulerView
     private let engine = HighlightEngine()
-    private var theme: EditorTheme
-    private var language: SyntaxLanguage = .plain
+    var theme: EditorTheme
+    var language: SyntaxLanguage = .plain
     private var lineIndex = LineIndex(text: "")
-    private var highlightedRange = NSRange(location: 0, length: 0)
+    var highlightedRange = NSRange(location: 0, length: 0)
     private var rebuildTask: Task<Void, Never>?
     private var highlightTask: Task<Void, Never>?
-    private var generation = 0
+    var generation = 0
+    /// Markdown 渲染状态(见 `CodeEditorView+Markdown.swift`)
+    var markdown = MarkdownRenderState()
+    /// Markdown 渲染模式:关闭 / 源码着色 / 就地渲染(仅 `.markdown` 语言有效)
+    public var markdownMode: MarkdownEditorMode = .off {
+        didSet { if oldValue != markdownMode { markdownModeDidChange() } }
+    }
 
     /// 性能探针:文本装载与首次布局耗时(秒)。
     public private(set) var lastLoadDuration: Double = 0
@@ -91,6 +97,7 @@ public final class CodeEditorView: NSView {
         scrollView.contentView.postsBoundsChangedNotifications = true
 
         textView.delegate = self
+        textView.onFocusChange = { [weak self] focused in self?.markdownSelectionDidChange(focus: focused) }
         textView.isEditable = isEditable
         textView.isSelectable = true
         textView.isRichText = false
@@ -187,6 +194,8 @@ public final class CodeEditorView: NSView {
                 self.scheduleHighlight()
             }
         }
+        markdown.layout = nil
+        scheduleMarkdownRender(delay: .zero)
     }
 
     /// 用户编辑后:同步更新行索引(小文件)、防抖重做词法并回调。
@@ -220,6 +229,8 @@ public final class CodeEditorView: NSView {
             }
         }
         closeHover()
+        markdown.layout = nil
+        scheduleMarkdownRender(delay: .milliseconds(60))
         onTextChange?(text)
         scheduleAutoCompletion()
     }
@@ -390,6 +401,8 @@ public final class CodeEditorView: NSView {
         ruler.theme = theme
         highlightedRange = NSRange(location: 0, length: 0)
         scheduleHighlight()
+        markdown.layout = nil
+        scheduleMarkdownRender(delay: .zero)
     }
 
     // MARK: - 大文件模式
@@ -431,7 +444,7 @@ public final class CodeEditorView: NSView {
     }
 
     /// 防抖调度视口高亮。
-    private func scheduleHighlight() {
+    func scheduleHighlight() {
         highlightTask?.cancel()
         highlightTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(24))
@@ -442,6 +455,8 @@ public final class CodeEditorView: NSView {
 
     /// 取视口(含缓冲)内的片段并作为渲染属性应用,不修改文本存储。
     private func applyHighlightForViewport() async {
+        // Markdown 由块布局统一着色,不走词法高亮
+        if usesMarkdownStyling { return }
         guard let layoutManager = textView.textLayoutManager,
               let contentStorage = layoutManager.textContentManager as? NSTextContentStorage,
               let viewportRange = layoutManager.textViewportLayoutController.viewportRange else { return }
@@ -487,11 +502,16 @@ extension CodeEditorView: NSTextViewDelegate {
             attributes[.underlineColor] = nil
             textView.typingAttributes = attributes
         }
+        resetMarkdownTypingAttributes()
         return true
     }
 
     public func textDidChange(_ notification: Notification) {
         handleEdit()
+    }
+
+    public func textViewDidChangeSelection(_ notification: Notification) {
+        markdownSelectionDidChange()
     }
 }
 
@@ -576,6 +596,8 @@ final class LineNumberRulerView: NSRulerView {
             // 仅在逻辑行首绘制,折行片段不重复编号
             guard self.lineIndex.lineStarts[line] == nsRange.location else { return true }
             let frame = fragment.layoutFragmentFrame
+            // 折叠的行(Markdown 围栏标记行)不编号,避免与下一行重叠
+            if frame.height < 6 { return true }
             let pointInRuler = self.convert(NSPoint(x: 0, y: frame.minY + originY), from: textView)
             let label = NSAttributedString(string: String(line + 1), attributes: attributes)
             let size = label.size()

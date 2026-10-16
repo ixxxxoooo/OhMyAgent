@@ -33,15 +33,26 @@ enum FilePreviewKind: Equatable {
 
 /// 文件标签的显示模式。
 enum FileViewMode: String, CaseIterable, Identifiable {
+    /// Markdown 就地渲染(Typora 式)
+    case live
     case source, preview
     var id: String { rawValue }
 
     var title: String {
         switch self {
+        case .live: return String(localized: "渲染")
         case .source: return String(localized: "源码")
         case .preview: return String(localized: "预览")
         }
     }
+
+    /// 某类型可用的模式(就地渲染只对 Markdown 有意义)。
+    static func available(for kind: FilePreviewKind) -> [FileViewMode] {
+        kind == .markdown ? [.live, .source, .preview] : [.source, .preview]
+    }
+
+    /// 编辑器是否可见(预览模式下隐藏编辑器)。
+    var showsEditor: Bool { self != .preview }
 }
 
 /// 各文件的显示模式记忆(同一文件再次打开时沿用)。
@@ -51,13 +62,10 @@ final class FileViewModeStore {
     static let shared = FileViewModeStore()
     private var modes: [String: FileViewMode] = [:]
 
-    /// 取某文件的模式;未设置时 Markdown 等文档默认预览,其余默认源码。
+    /// 取某文件的模式;未设置时 Markdown 默认就地渲染,其余可渲染类型默认预览。
     func mode(for path: String, kind: FilePreviewKind) -> FileViewMode {
-        if let stored = modes[path] { return stored }
-        switch kind {
-        case .markdown, .mermaid, .csv: return .preview
-        case .svg, .image, .pdf: return .preview
-        }
+        if let stored = modes[path], FileViewMode.available(for: kind).contains(stored) { return stored }
+        return kind == .markdown ? .live : .preview
     }
 
     func set(_ mode: FileViewMode, for path: String) { modes[path] = mode }

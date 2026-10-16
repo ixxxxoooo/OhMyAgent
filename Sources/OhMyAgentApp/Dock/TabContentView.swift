@@ -86,6 +86,7 @@ struct FileTabView: View {
         let doc = store.document(for: path)
         let previewKind = FilePreviewKind.of(path: path)
         let mode = previewKind.map { FileViewModeStore.shared.mode(for: path, kind: $0) } ?? .source
+        let markdownMode: MarkdownEditorMode = previewKind == .markdown ? (mode == .live ? .live : .source) : .off
         let changesRevision = workbench.sessions.values.reduce(0) { $0 + $1.changesRevision }
         let markers: [Int: LineMarker] = {
             guard let marks = agentMarks, doc.text == marks.text else { return [:] }
@@ -93,17 +94,18 @@ struct FileTabView: View {
         }()
         VStack(spacing: 0) {
             banner(doc)
-            if previewKind != nil { modeBar(mode: mode) }
+            if let previewKind { modeBar(mode: mode, modes: FileViewMode.available(for: previewKind)) }
             Group {
                 if let text = doc.text {
                     CodeEditor(text: text, language: SyntaxLanguage.detect(path: path), isEditable: !doc.isReadOnly, revealLine: tab.line, markers: markers,
                                diagnostics: lsp?.diagnostics ?? [], features: lsp?.features ?? EditorLanguageFeatures(),
                                onReferenceSelection: { range in referenceSelection(range, text: doc.text ?? text) },
+                               markdownMode: markdownMode,
                                onChange: { newText in doc.text = newText })
-                        .environment(\.tabIsActive, isActive && mode == .source)
-                        .opacity(mode == .source ? 1 : 0)
-                        .allowsHitTesting(mode == .source)
-                        .accessibilityHidden(mode != .source)
+                        .environment(\.tabIsActive, isActive && mode.showsEditor)
+                        .opacity(mode.showsEditor ? 1 : 0)
+                        .allowsHitTesting(mode.showsEditor)
+                        .accessibilityHidden(!mode.showsEditor)
                         .overlay {
                             if mode == .preview, let previewKind {
                                 TextPreviewView(kind: previewKind, text: text)
@@ -187,14 +189,14 @@ struct FileTabView: View {
     }
 
     /// 「源码 / 预览」切换条(可渲染的文件类型才显示)。
-    private func modeBar(mode: FileViewMode) -> some View {
+    private func modeBar(mode: FileViewMode, modes: [FileViewMode]) -> some View {
         HStack(spacing: 8) {
             Picker("显示模式", selection: Binding(get: { mode }, set: { FileViewModeStore.shared.set($0, for: path) })) {
-                ForEach(FileViewMode.allCases) { Text($0.title).tag($0) }
+                ForEach(modes) { Text($0.title).tag($0) }
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .frame(width: 120)
+            .frame(width: CGFloat(modes.count) * 58)
             .accessibilityLabel("文件显示模式")
             Spacer()
         }

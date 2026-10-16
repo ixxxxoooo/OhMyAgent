@@ -71,6 +71,21 @@ public final class EditorTextView: NSTextView {
     /// 「在对话中引用选区」:传入非空选区的 UTF-16 范围
     var onReferenceSelection: ((NSRange) -> Void)?
 
+    /// 获得/失去键盘焦点(Markdown 就地渲染据此决定是否展开光标所在块)
+    var onFocusChange: ((Bool) -> Void)?
+
+    public override func becomeFirstResponder() -> Bool {
+        let accepted = super.becomeFirstResponder()
+        if accepted { onFocusChange?(true) }
+        return accepted
+    }
+
+    public override func resignFirstResponder() -> Bool {
+        let resigned = super.resignFirstResponder()
+        if resigned { onFocusChange?(false) }
+        return resigned
+    }
+
     private var dwellTask: Task<Void, Never>?
     private var hoverOffset: Int?
     private var pendingCompletions: [EditorCompletion] = []
