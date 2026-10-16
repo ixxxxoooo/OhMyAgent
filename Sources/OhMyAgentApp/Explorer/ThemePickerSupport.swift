@@ -70,10 +70,10 @@ public enum ThemePersonality {
         guard let p = package.palette else {
             // 跟随系统:展示经典多色圆点
             return [
-                Color(nsColor: .windowBackgroundColor),
-                Color(nsColor: .labelColor),
+                Color(nsColor: .windowBackgroundColor), // ui-lint:allow 「跟随系统」预览需展示真实的 macOS 系统色
+                Color(nsColor: .labelColor), // ui-lint:allow 同上
                 Color(nsColor: .controlAccentColor),
-                Color.purple
+                OMColors.accent2
             ]
         }
         return [
@@ -88,11 +88,11 @@ public enum ThemePersonality {
     public static func toneBadge(for package: ThemePackage) -> (text: String, bg: Color, fg: Color) {
         switch package.tone {
         case .system:
-            return (package.tone.displayName, Color.blue.opacity(0.12), Color.blue)
+            return (package.tone.displayName, OMColors.accent.opacity(0.12), OMColors.accent)
         case .dark:
-            return (package.tone.displayName, Color.purple.opacity(0.15), Color.purple)
+            return (package.tone.displayName, OMColors.accent2.opacity(0.15), OMColors.accent2)
         case .light:
-            return (package.tone.displayName, Color.orange.opacity(0.15), Color.orange)
+            return (package.tone.displayName, OMColors.warning.opacity(0.15), OMColors.warning)
         }
     }
 }

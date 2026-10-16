@@ -143,6 +143,7 @@ ALLOWLIST = (
     ("Sources/IconKit/BrandIcons.swift", None),           # 厂商匹配关键字(用户自建提供商名称),不是界面文案
     ("Sources/ChatKit/SessionModel.swift", "仅允许写入工作区内的文件: \u0000"),
     ("Sources/LSPKit/LSPClient.swift", "未实现: \u0000"),
+    ("Sources/ChatKit/CommitMessageGenerator.swift", None),  # 提交说明生成:提示词与中英文启发式文案,不是界面文案
     ("Sources/ChatKit/TitleGenerator.swift", None),       # 标题生成:发给小模型的提示词与前缀清洗,不是界面文案
     ("Sources/OhMyAgentApp/Settings/SettingsWindow.swift", "服务器"),  # 设置搜索的中文别名关键词
     ("Sources/OhMyAgentApp/Settings/SettingsWindow.swift", "斜杠"),  # 设置搜索的中文别名关键词
