@@ -63,6 +63,11 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
   - Bundle ID 为 `com.ixxxxoooo.OhMyAgent`;旧域 `com.ygw.OhMyAgent` 的偏好由 `LegacyDefaultsMigration` 首次启动时一次性迁移。
 - 无障碍:仅图标的控件必须有 `accessibilityLabel`;动画经 `omWithAnimation` 以遵循「减弱动态效果」。
 
+## 4.1 界面配色与布局约定(系统主题,浅色)
+- 左侧栏、右侧栏、设置页左栏背景统一为 `#EFEFEF`(`OMColors.sidebar` / `SidebarBackground`);中间内容区(会话流、编辑区、设置页右侧)背景统一为 `#F6F6F7`(`OMColors.surface` / `OMColors.contentBackground`)。深色与主题包由令牌派生,禁止在视图里写死色值或另起背景材质。
+- 设置页左栏宽度必须与工作台左栏一致(取 `WorkbenchModel.layout.leftWidth`),切换设置页时侧栏不跳动。
+- 悬浮在输入区附近的新卡片/弹窗(吸附消息、消息编辑窗等)沿用底部输入框的样式(`omGlassCard`、圆角、内边距),不要另起一套。
+
 ## 5. 日志规范(P1 起强制)
 - 只使用 `OMLog`(`Log.<category>.info/debug/warning/error`),禁止 `print`/`NSLog`。
 - 日志文件:`~/Library/Logs/OhMyAgent/`;排查问题先看这里。

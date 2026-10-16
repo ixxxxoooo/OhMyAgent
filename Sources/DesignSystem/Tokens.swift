@@ -17,8 +17,26 @@ public enum OMMetrics {
 /// 颜色令牌。系统主题下全部使用系统语义色;选择主题包后按调色板取色。
 public enum OMColors {
     /// 时间线与编辑区背景(纯色)
+    /// 系统主题:浅色 #F6F6F7(见 AGENTS.md「界面配色」)。
     public static var surface: Color {
-        ThemeRuntime.palette.map { $0.surface.color } ?? Color(nsColor: .textBackgroundColor)
+        ThemeRuntime.palette.map { $0.surface.color } ?? contentBackground
+    }
+    /// 系统主题的内容区背景:浅色 #F6F6F7、深色 #1E1F22。
+    public static let contentBackground = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            ? NSColor(srgbRed: 0.118, green: 0.122, blue: 0.133, alpha: 1)
+            : NSColor(srgbRed: 0xF6 / 255, green: 0xF6 / 255, blue: 0xF7 / 255, alpha: 1)
+    })
+    /// 左右侧栏(含设置页左栏)背景:系统主题浅色 #EFEFEF、深色 #18191C;主题包由调色板派生。
+    public static var sidebar: Color {
+        if let palette = ThemeRuntime.palette {
+            return palette.surface.mixed(with: palette.editorForeground, palette.isDark ? 0.045 : 0.035).color
+        }
+        return Color(nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                ? NSColor(srgbRed: 0.094, green: 0.098, blue: 0.110, alpha: 1)
+                : NSColor(srgbRed: 0xEF / 255, green: 0xEF / 255, blue: 0xEF / 255, alpha: 1)
+        })
     }
     /// 卡片背景(纯色)
     public static var card: Color {

@@ -10,3 +10,4 @@ alwaysApply: true
 - 改完代码:`Scripts/ci.sh` → `Scripts/restart.sh` 验证 → 按功能拆分提交(中文 Conventional Commits)→ `git push`。
 - 不适用本项目的全局 Java 规则:`ApiLog`、`ObjectUtils`、Controller 约定。
 - 功能完成后更新「开发进度.md」。
+- 配色:左/右侧栏与设置页左栏 `#EFEFEF`(`OMColors.sidebar`),中间内容区与设置页右侧 `#F6F6F7`(`OMColors.surface`);设置页左栏宽度与工作台左栏一致;禁止写死色值(详见 AGENTS.md 4.1)。

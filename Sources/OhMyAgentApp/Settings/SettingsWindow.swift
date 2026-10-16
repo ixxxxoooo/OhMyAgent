@@ -112,7 +112,7 @@ struct SettingsView: View {
     var body: some View {
         HStack(spacing: 0) {
             sidebar
-                .frame(width: 232)
+                .frame(width: CGFloat(PanelMetrics.clamp(workbench.layout.leftWidth, side: .left)))
             Divider()
             VStack(spacing: 0) {
                 // 顶部标题栏高度的可拖动区域:内容不会顶到红绿灯所在行
@@ -129,6 +129,7 @@ struct SettingsView: View {
                     .frame(maxWidth: .infinity)
             }
         }
+        .background(OMColors.surface)
         // 无标题栏窗口:内容铺满到窗口顶部,由侧栏/内容区各自预留标题栏高度,避免系统安全区叠加出多余留白
         .ignoresSafeArea(.container, edges: .top)
         .navigationTitle(router.page.title)
@@ -187,7 +188,7 @@ struct SettingsView: View {
             .listStyle(.sidebar)
             .scrollContentBackground(.hidden)
         }
-        .background(.regularMaterial)
+        .background(SidebarBackground())
     }
 
     /// 按搜索词过滤后的分组(标题或分组名包含关键字)。
