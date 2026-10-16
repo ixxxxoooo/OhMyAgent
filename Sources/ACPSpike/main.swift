@@ -42,6 +42,10 @@ do {
     let setup = try await client.newSession(cwd: cwd)
     print("[session/new] \(clock.now - t2) id=\(setup.sessionId) options=\(setup.configOptions.map { "\($0.id)=\($0.currentDisplayName)" })")
 
+    for item in setup.configOptions {
+        print("[option] \(item.id) current=\(item.currentValue.stringValue ?? "-") values=\(item.options.map { "\($0.value)=\($0.name)" })")
+    }
+
     if let promptText {
         let eventTask = Task {
             var thoughts = 0, chunks = 0

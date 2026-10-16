@@ -29,10 +29,12 @@ public enum ProtocolMapping {
     // MARK: - 请求方向
 
     /// 把 Anthropic `/v1/messages` 请求体转换为 OpenAI `/chat/completions` 请求体。
-    /// - Parameter data: Anthropic 请求 JSON
+    /// - Parameters:
+    ///   - data: Anthropic 请求 JSON
+    ///   - model: 覆盖发给上游的模型名(nil 沿用请求里的)
     /// - Returns: 映射结果
     /// - Throws: `ProxyMappingError.invalidRequest`
-    public static func openAIRequest(fromAnthropic data: Data) throws -> MappedRequest {
+    public static func openAIRequest(fromAnthropic data: Data, model override: String? = nil) throws -> MappedRequest {
         guard let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
               let rawMessages = root["messages"] as? [[String: Any]] else { throw ProxyMappingError.invalidRequest }
         var messages: [[String: Any]] = []
@@ -53,7 +55,7 @@ public enum ProtocolMapping {
                 messages.append(contentsOf: userMessages(blocks))
             }
         }
-        let model = (root["model"] as? String) ?? ""
+        let model = override ?? (root["model"] as? String) ?? ""
         let stream = (root["stream"] as? Bool) ?? false
         var out: [String: Any] = ["model": model, "messages": messages, "stream": stream]
         if stream { out["stream_options"] = ["include_usage": true] }
