@@ -13,6 +13,9 @@ final class AllowFirstDelegate: ACPClientDelegate, @unchecked Sendable {
         }
         return .cancelled
     }
+
+    func createTerminal(sessionId: String, command: String, args: [String], env: [String: String], cwd: String?, outputByteLimit: Int?) async throws -> String { "fake-terminal" }
+    func waitForTerminalExit(terminalId: String) async throws -> TerminalOutputSnapshot { TerminalOutputSnapshot(output: "done", exitCode: 0) }
 }
 
 /// 跨并发域传递结束原因的盒子(测试内顺序读写)。

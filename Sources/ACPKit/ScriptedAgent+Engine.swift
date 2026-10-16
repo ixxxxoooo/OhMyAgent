@@ -92,7 +92,13 @@ extension ScriptedAgent {
         case .delay(let millis):
             await scaledDelay(millis)
         case .hold:
-            while !cancelled.contains(sessionId) { try? await Task.sleep(for: .milliseconds(100)) }
+            while !cancelled.contains(sessionId) {
+                // 冻结期间收到的引导消息立即回显,便于验证「运行中发送」
+                for extra in steered.removeValue(forKey: sessionId) ?? [] {
+                    await emit(sessionId, parent: parent, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": .string("(已收到引导:\(extra))\n\n")]])
+                }
+                try? await Task.sleep(for: .milliseconds(100))
+            }
             return .cancelled
         case .builtin(let builtin):
             switch builtin {

@@ -9,7 +9,7 @@ import Foundation
 /// 工具调用的一行摘要。
 public struct ToolPresentation: Sendable, Equatable {
     /// 呈现类别(决定图标、展开内容与是否可归入“浏览”分组)。
-    public enum Category: String, Sendable, Equatable {
+    public enum Category: String, Sendable, Equatable, CaseIterable {
         case read, write, edit, delete, move, search, terminal, fetch, mcp, subagent, plan, think, other
     }
 
