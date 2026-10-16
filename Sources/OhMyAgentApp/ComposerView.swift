@@ -342,13 +342,14 @@ struct OptionMenu: View {
         }
     }
 
-    /// 模式色调 → 颜色(中性为次要文字色)。
+    /// 模式色调 → 颜色:优先取主题令牌(强调色/第二强调色/语法关键字色),系统主题下才回退到系统语义色。
     static func color(for tone: ModeTone) -> Color {
         switch tone {
         case .neutral: OMColors.secondaryText
+        case .accent: OMColors.accent
         case .green: OMColors.success
-        case .blue: Color(nsColor: .systemBlue)
-        case .purple: Color(nsColor: .systemPurple)
+        case .blue: ThemeRuntime.palette?.accent2.color ?? Color(nsColor: .systemBlue)
+        case .purple: ThemeRuntime.palette?.keyword.color ?? Color(nsColor: .systemPurple)
         case .amber: OMColors.warning
         case .red: OMColors.danger
         }

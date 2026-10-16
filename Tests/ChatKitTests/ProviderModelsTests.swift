@@ -282,12 +282,23 @@ struct ProviderSettingsModelTests {
 
 @Suite("模式色调")
 struct ModeToneTests {
-    @Test("Claude Code 的全部模式都有各自不同的色调;未知模式回退中性")
+    @Test("Claude Code 的全部模式都有各自不同的色调,默认模式用强调色而不是灰色")
     func allModes() {
         let tones = ["default", "acceptEdits", "plan", "auto", "dontAsk", "bypassPermissions"].map { ModeTone.tone(forMode: $0) }
         #expect(Set(tones).count == tones.count, "每种模式的色调互不相同")
-        #expect(ModeTone.tone(forMode: "default") == .neutral)
+        #expect(ModeTone.tone(forMode: "default") == .accent)
         #expect(ModeTone.tone(forMode: "bypassPermissions") == .red)
-        #expect(ModeTone.tone(forMode: "不存在") == .neutral)
+    }
+
+    @Test("OpenCode 的 build / plan 有色;未知模式稳定映射到彩色(非灰、非红),同一 ID 恒同色")
+    func openCodeAndUnknown() {
+        #expect(ModeTone.tone(forMode: "build") == .accent)
+        #expect(ModeTone.tone(forMode: "plan") == .blue)
+        for id in ["不存在", "custom-agent", "reviewer", "x"] {
+            let tone = ModeTone.tone(forMode: id)
+            #expect(tone != .neutral && tone != .red)
+            #expect(tone == ModeTone.tone(forMode: id))
+        }
+        #expect(ModeTone.tone(forMode: "") == .accent)
     }
 }
