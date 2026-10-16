@@ -226,7 +226,7 @@ struct HubOverlay: View {
             Image.om("search", size: 18).foregroundStyle(OMColors.secondaryText)
             TextField("搜索会话、项目、文件、操作与设置", text: $hub.query)
                 .textFieldStyle(.plain)
-                .font(.system(size: 18))
+                .font(OMFonts.custom(18))
                 .focused($focused)
                 .onSubmit { hub.runSelected() }
                 .onKeyPress(.downArrow) { hub.move(1); return .handled }
@@ -358,7 +358,7 @@ private struct HubRow: View {
     var body: some View {
         HStack(spacing: 10) {
             icon.frame(width: 20)
-            Text(titleText).font(.system(size: 13.5)).lineLimit(1)
+            Text(titleText).font(OMFonts.body).lineLimit(1)
             if let subtitle = item.candidate.subtitle, !subtitle.isEmpty {
                 Text(subtitle)
                     .font(OMFonts.small).foregroundStyle(OMColors.secondaryText)

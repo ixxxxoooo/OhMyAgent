@@ -208,9 +208,9 @@ struct MCPPanelView: View {
     private func color(_ entry: MCPServerEntry, _ health: MCPHealthStatus?) -> Color {
         if entry.isDisabled { return OMColors.tertiaryText }
         switch health?.state {
-        case .connected: return .green
+        case .connected: return OMColors.success
         case .needsAuth: return OMColors.warning
-        case .failed: return .red
+        case .failed: return OMColors.danger
         default: return OMColors.tertiaryText
         }
     }

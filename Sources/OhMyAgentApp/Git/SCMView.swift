@@ -221,13 +221,13 @@ private struct SCMContent: View {
                 Button { requestCommit(push: false) } label: {
                     Text(model.amend ? String(localized: "修补提交") : (model.status.stagedChanges.isEmpty ? String(localized: "提交全部") : String(localized: "提交"))).frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.omPrimary)
                 .controlSize(.small)
                 .disabled(!canCommit)
                 Button { requestCommit(push: true) } label: {
                     Text("提交并推送")
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.omSecondary)
                 .controlSize(.small)
                 .disabled(!canCommit)
             }

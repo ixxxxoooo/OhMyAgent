@@ -22,8 +22,8 @@ struct ShellCommandText: View {
 
     var body: some View {
         let text = Text(failed ? AttributedString(command) : CodeHighlighter.attributed(command, language: .shell))
-            .font(fontSize.map { .system(size: $0, design: .monospaced) } ?? OMFonts.monoSmall)
-            .foregroundStyle(failed ? Color.red : Color.primary)
+            .font(fontSize.map { OMFonts.custom($0, design: .monospaced) } ?? OMFonts.monoSmall)
+            .foregroundStyle(failed ? OMColors.danger : Color.primary)
             .lineLimit(lineLimit)
             .truncationMode(.middle)
         if selectable { text.textSelection(.enabled) } else { text }
@@ -75,7 +75,7 @@ struct CollapsibleOutput: View {
             ANSITextView(raw: text, fontSize: fontSize, maxLines: Self.renderLimit)
         } else {
             Text(text)
-                .font(.system(size: fontSize, design: .monospaced))
+                .font(OMFonts.custom(fontSize, design: .monospaced))
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }

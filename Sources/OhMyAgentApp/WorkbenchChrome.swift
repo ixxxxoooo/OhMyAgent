@@ -67,7 +67,7 @@ struct UsageRing: View {
         switch ContextTone(fraction: fraction ?? 0) {
         case .normal: return OMColors.secondaryText
         case .warn: return OMColors.warning
-        case .danger: return Color.red
+        case .danger: return OMColors.danger
         }
     }
 

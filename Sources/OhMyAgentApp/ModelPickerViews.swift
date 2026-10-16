@@ -23,7 +23,7 @@ struct ModelCopyButton: View {
                 copied = false
             }
         } label: {
-            Image.om(copied ? "checkmark" : "doc.on.doc", size: 11)
+            Image.om(copied ? "check" : "copy", size: 11)
                 .foregroundStyle(copied ? OMColors.success : OMColors.tertiaryText)
                 .frame(width: 20, height: 20)
                 .contentShape(Rectangle())

@@ -131,7 +131,7 @@ struct ProviderDetailView: View {
             ModelCopyButton(text: item.id)
             Spacer(minLength: 4)
             Button { draft.model = item.id } label: {
-                Image.om("star", size: 13).foregroundStyle(draft.model == item.id ? Color.yellow : OMColors.tertiaryText)
+                Image.om("star", size: 13).foregroundStyle(draft.model == item.id ? OMColors.warning : OMColors.tertiaryText)
                     .frame(width: 22, height: 22)
             }
             .buttonStyle(.plain)
@@ -199,9 +199,9 @@ struct ProviderDetailView: View {
     private func resultView(_ result: ProviderTestResult) -> some View {
         switch result {
         case .ok(let ms, let reply):
-            Label("连接成功(\(ms) ms)\(reply.isEmpty ? "" : ":\(reply)")", om: "checkmark.circle.fill").foregroundStyle(.green)
+            Label("连接成功(\(ms) ms)\(reply.isEmpty ? "" : ":\(reply)")", om: "checkmark.circle.fill").foregroundStyle(OMColors.success)
         case .failed(let message):
-            Label(message, om: "xmark.octagon.fill").foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+            Label(message, om: "xmark.octagon.fill").foregroundStyle(OMColors.danger).fixedSize(horizontal: false, vertical: true)
         }
     }
 

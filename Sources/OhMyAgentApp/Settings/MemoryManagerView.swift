@@ -73,7 +73,7 @@ struct MemoryEditor: View {
                     Button("删除", role: .destructive) { confirmDelete = true }
                 }
                 Button("还原") { text = original }.disabled(!isDirty)
-                Button(file.exists ? String(localized: "保存") : String(localized: "创建并保存"), action: save).buttonStyle(.borderedProminent)
+                Button(file.exists ? String(localized: "保存") : String(localized: "创建并保存"), action: save).buttonStyle(.omPrimary)
                     .disabled(!isDirty && file.exists).keyboardShortcut("s", modifiers: .command)
             }
             Text(file.url.abbreviatingHome).font(OMFonts.caption).foregroundStyle(OMColors.secondaryText).lineLimit(1).truncationMode(.middle)

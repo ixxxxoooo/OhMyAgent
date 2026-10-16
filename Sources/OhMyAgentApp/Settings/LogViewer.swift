@@ -108,7 +108,7 @@ struct LogViewerView: View {
         case .debug: return OMColors.tertiaryText
         case .info: return Color.primary
         case .warning: return OMColors.warning
-        case .error: return .red
+        case .error: return OMColors.danger
         }
     }
 }

@@ -163,9 +163,9 @@ struct SettingsView: View {
                 Color.clear.frame(height: TitlebarMetrics.height).background(WindowDragArea())
                 if let error = model.lastError {
                     Label(error, om: "xmark.octagon.fill")
-                        .font(OMFonts.small).foregroundStyle(.red)
+                        .font(OMFonts.small).foregroundStyle(OMColors.danger)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(10).background(Color.red.opacity(0.1))
+                        .padding(10).background(OMColors.danger.opacity(0.1))
                 }
                 page
                     .id(appearance.renderKey)

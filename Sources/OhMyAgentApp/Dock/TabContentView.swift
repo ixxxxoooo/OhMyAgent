@@ -394,7 +394,7 @@ struct SubagentStatusFooter: View {
             let tick = Int(date.timeIntervalSinceReferenceDate / 0.15)
             HStack(spacing: 8) {
                 Text(reduceMotion ? "✻" : WorkingStatus.glyph(tick: tick))
-                    .font(.system(size: 13, weight: .medium))
+                    .font(OMFonts.custom(13, weight: .medium))
                     .foregroundStyle(OMColors.accent)
                     .frame(width: 16)
                 Text(WorkingStatus.line(verb: WorkingStatus.verb(seed: Int(entry.startedAt.timeIntervalSince1970)), seconds: seconds, canInterrupt: false))
@@ -474,7 +474,7 @@ struct LSPStatusBar: View {
                 ProgressView().controlSize(.mini)
                 Text("语言服务器启动中…").foregroundStyle(OMColors.secondaryText)
             case .ready(let name):
-                Image.om("circle-check", size: 12).foregroundStyle(Color.green)
+                Image.om("circle-check", size: 12).foregroundStyle(OMColors.success)
                 Text(name).foregroundStyle(OMColors.secondaryText)
                 Spacer()
                 if controller.errorCount == 0, controller.warningCount == 0 {
@@ -484,14 +484,14 @@ struct LSPStatusBar: View {
                         Image.om("circle-x", size: 12)
                         Text("\(controller.errorCount)")
                     }
-                    .foregroundStyle(.red)
+                    .foregroundStyle(OMColors.danger)
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel("\(controller.errorCount) 个错误")
                     HStack(spacing: 3) {
                         Image.om("triangle-alert", size: 12)
                         Text("\(controller.warningCount)")
                     }
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(OMColors.warning)
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel("\(controller.warningCount) 个警告")
                 }

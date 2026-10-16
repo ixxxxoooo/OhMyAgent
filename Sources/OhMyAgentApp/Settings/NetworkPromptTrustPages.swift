@@ -101,7 +101,7 @@ struct ProjectTrustPage: View {
                     }
                 }
                 if let errorMessage {
-                    Text(errorMessage).font(OMFonts.caption).foregroundStyle(.red)
+                    Text(errorMessage).font(OMFonts.caption).foregroundStyle(OMColors.danger)
                 }
             }
             Section {

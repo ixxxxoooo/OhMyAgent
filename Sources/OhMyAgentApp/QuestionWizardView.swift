@@ -98,7 +98,7 @@ struct QuestionWizardCard: View {
                     Text("⎋").foregroundStyle(OMColors.tertiaryText)
                 }
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.omSecondary)
             .controlSize(.small)
             Button {
                 advance()
@@ -108,7 +108,7 @@ struct QuestionWizardCard: View {
                     Text("⏎").opacity(0.7)
                 }
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.omPrimary)
             .controlSize(.small)
             .disabled(!canAdvance)
         }
@@ -271,8 +271,8 @@ private struct QuestionBody: View {
 
     private func badge(_ index: Int, selected: Bool) -> some View {
         Text(letter(index))
-            .font(.system(size: 10.5, weight: .semibold, design: .rounded))
-            .foregroundStyle(selected ? Color.white : OMColors.secondaryText)
+            .font(OMFonts.custom(10.5, weight: .semibold, design: .rounded))
+            .foregroundStyle(selected ? OMColors.onAccent : OMColors.secondaryText)
             .frame(width: 18, height: 18)
             .background(selected ? OMColors.accent : Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
     }

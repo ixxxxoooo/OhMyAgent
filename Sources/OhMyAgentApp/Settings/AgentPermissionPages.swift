@@ -133,7 +133,7 @@ struct RuleListEditor: View {
             HStack {
                 Text(rule).font(OMFonts.mono).textSelection(.enabled)
                 Spacer()
-                Button { remove(rule) } label: { Image.om("minus.circle") }.buttonStyle(.borderless).accessibilityLabel("删除规则 \(rule)")
+                Button { remove(rule) } label: { Image.om("minus.circle") }.buttonStyle(.omPlain).accessibilityLabel("删除规则 \(rule)")
             }
         }
         HStack {
@@ -170,7 +170,7 @@ struct DirectoryListEditor: View {
                 Text(path).font(OMFonts.mono).lineLimit(1).truncationMode(.middle)
                 Spacer()
                 Button { model.set(["permissions", "additionalDirectories"], directories.filter { $0 != path }.nilIfEmpty) } label: { Image.om("minus.circle") }
-                    .buttonStyle(.borderless).accessibilityLabel("移除目录 \(path)")
+                    .buttonStyle(.omPlain).accessibilityLabel("移除目录 \(path)")
             }
         }
         Button("添加目录…") {

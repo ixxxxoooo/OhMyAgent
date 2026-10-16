@@ -34,8 +34,8 @@ struct GeneralPage: View {
         case .result(.available(let info)):
             Button("下载 \(info.version)") { updates.openDownload(info) }
             if let notes = info.notes { Text(notes).foregroundStyle(.secondary).lineLimit(1) }
-        case .result(.unsupportedSystem(let info)): Text("\(info.version) 需要 macOS \(info.minimumSystemVersion ?? "")").foregroundStyle(.orange)
-        case .result(.failed(let message)): Text(message).foregroundStyle(.red).lineLimit(2)
+        case .result(.unsupportedSystem(let info)): Text("\(info.version) 需要 macOS \(info.minimumSystemVersion ?? "")").foregroundStyle(OMColors.warning)
+        case .result(.failed(let message)): Text(message).foregroundStyle(OMColors.danger).lineLimit(2)
         }
     }
 
@@ -295,8 +295,8 @@ private struct ThemeCard: View {
             }
         } else {
             HStack(spacing: 0) {
-                Color.white
-                Color(white: 0.12)
+                OMColors.systemSidebar
+                OMColors.systemContentBackground
             }
             .overlay(Image.om("monitor", size: 14).foregroundStyle(.gray))
         }

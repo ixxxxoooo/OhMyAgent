@@ -89,7 +89,7 @@ struct MermaidBlockView: View {
                 downloadMenu
                 headerButton("maximize-2", help: "放大查看(悬浮窗,可拖动缩放)") { openFloating() }
             }
-            headerButton(copied ? "checkmark" : "doc.on.doc", help: "复制源码") { copySource() }
+            headerButton(copied ? "check" : "copy", help: "复制源码") { copySource() }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)

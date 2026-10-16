@@ -221,7 +221,7 @@ struct PlanView: View {
             ForEach(Array(entry.plan.enumerated()), id: \.offset) { _, item in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Image.om(icon(item.status))
-                        .foregroundStyle(item.status == "completed" ? Color.green : OMColors.secondaryText)
+                        .foregroundStyle(item.status == "completed" ? OMColors.success : OMColors.secondaryText)
                         .frame(width: 14)
                     Text(item.content)
                         .font(OMFonts.reading)
@@ -250,7 +250,7 @@ struct NoticeView: View {
 
     private var tint: Color {
         switch entry.severity {
-        case "error": return .red
+        case "error": return OMColors.danger
         case "warning": return .orange
         default: return OMColors.secondaryText
         }

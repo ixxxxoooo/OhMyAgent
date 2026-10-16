@@ -26,22 +26,27 @@ public enum OMColors {
         ThemeRuntime.palette.map { $0.surface.color } ?? contentBackground
     }
     /// 系统主题的内容区背景:浅色 #F6F6F7、深色 #1E1F22。
-    public static let contentBackground = Color(nsColor: NSColor(name: nil) { appearance in
+    public static let contentBackground = systemContentBackground
+    /// 系统主题的内容区背景(与是否选了主题包无关;主题卡片预览取样用)。
+    public static let systemContentBackground = Color(nsColor: NSColor(name: nil) { appearance in
         appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             ? NSColor(srgbRed: 0.118, green: 0.122, blue: 0.133, alpha: 1)
             : NSColor(srgbRed: 0xF6 / 255, green: 0xF6 / 255, blue: 0xF7 / 255, alpha: 1)
     })
-    /// 左右侧栏(含设置页左栏)背景:系统主题浅色 #EFEFEF、深色 #18191C;主题包由调色板派生。
+    /// 左右侧栏(含设置页左栏)背景:仅「跟随系统」与 Cursor 浅色主题为 #EFEFEF;其余主题取各自调色板的 `sidebarBackground`(未指定则由内容色推导)。
     public static var sidebar: Color {
         if let palette = ThemeRuntime.palette {
-            return palette.surface.mixed(with: palette.editorForeground, palette.isDark ? 0.045 : 0.035).color
+            return (palette.sidebarBackground
+                ?? palette.surface.mixed(with: palette.editorForeground, palette.isDark ? 0.045 : 0.035)).color
         }
-        return Color(nsColor: NSColor(name: nil) { appearance in
-            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-                ? NSColor(srgbRed: 0.094, green: 0.098, blue: 0.110, alpha: 1)
-                : NSColor(srgbRed: 0xEF / 255, green: 0xEF / 255, blue: 0xEF / 255, alpha: 1)
-        })
+        return systemSidebar
     }
+    /// 系统主题的侧栏背景(与是否选了主题包无关;主题卡片预览取样用)。
+    public static let systemSidebar = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            ? NSColor(srgbRed: 0.094, green: 0.098, blue: 0.110, alpha: 1)
+            : NSColor(srgbRed: 0xEF / 255, green: 0xEF / 255, blue: 0xEF / 255, alpha: 1)
+    })
     /// 卡片背景(纯色)
     public static var card: Color {
         if let palette = ThemeRuntime.palette { return palette.card.color }
@@ -66,6 +71,8 @@ public enum OMColors {
     public static var success: Color { diffAdded }
     /// 警示/危险色(负向语义:删除、报错)。
     public static var danger: Color { diffRemoved }
+    /// 强调色实底上的前景(按钮文字、选中徽标):恒为白色,保证在任意强调色上的对比度。
+    public static let onAccent = Color.white
     /// 主强调色:用户选择 > 主题默认 > 系统强调色。
     public static var accent: Color { ThemeRuntime.accent?.color ?? Color.accentColor }
     /// 第二强调色:链接、次要徽标;未指定时回退主强调色。
@@ -159,6 +166,16 @@ public enum OMFonts {
     public static var title: Font { .system(size: 15 * OMScale.ui, weight: .semibold) }
     public static var mono: Font { .system(size: 12.5 * OMScale.ui, design: .monospaced) }
     public static var monoSmall: Font { .system(size: 11.5 * OMScale.ui, design: .monospaced) }
+    /// 设置页分组标题(与 `title` 同族,略小,半粗)。
+    public static var sectionTitle: Font { .system(size: 13 * OMScale.ui, weight: .semibold) }
+    /// 受控的自定义字号(随界面字号缩放):仅用于令牌表覆盖不到的特例(Markdown 标题、徽标数字等)。
+    /// - Parameters:
+    ///   - size: 基准字号(未缩放)
+    ///   - weight: 字重
+    ///   - design: 字体设计
+    public static func custom(_ size: CGFloat, weight: Font.Weight = .regular, design: Font.Design = .default) -> Font {
+        .system(size: size * OMScale.ui, weight: weight, design: design)
+    }
     /// 时间线正文
     public static var reading: Font { .system(size: 13.5 * OMScale.ui * OMScale.timeline) }
     /// 时间线代码

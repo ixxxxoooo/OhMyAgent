@@ -37,7 +37,7 @@ struct FileHeaderBar: View {
             if let onToggleCompare {
                 HeaderIconButton(icon: "file-diff", help: isComparing ? "返回编辑器" : "对比 HEAD(Git 差异)", tint: isComparing ? OMColors.accent : nil, action: onToggleCompare)
             }
-            iconButton(copied ? "check" : "copy", help: copied ? "已复制" : "复制内容", tint: copied ? Color.green : nil) { copy() }
+            iconButton(copied ? "check" : "copy", help: copied ? "已复制" : "复制内容", tint: copied ? OMColors.success : nil) { copy() }
             iconButton("folder-open", help: "在 Finder 中显示") {
                 NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
             }

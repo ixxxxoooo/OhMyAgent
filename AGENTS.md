@@ -31,7 +31,7 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 - 构建并组装应用:`Scripts/bundle.sh [debug|release]`
 - 重启应用(结束旧进程 → 构建 → 启动):`Scripts/restart.sh`(`OMA_AGENT=fake` 使用脚本化 Agent;`OMA_DEMO=1` 进入演示模式)
 - 演示模式(隔离沙盒 + 脚本化 Agent,测试会话流/工具卡/子 Agent/Git 的首选方式):`Scripts/demo.sh [--reset] [--scenario <名>]`(自动转发全部 `OMA_*` 变量);无人值守导览截图:`Scripts/demo-tour.sh [步骤前缀...]`;完整指南 `.specstory/history/docs/20261016_演示模式自动化演示指南.md`
-- 本地 CI(本地化扫描 + 零警告构建 + 全部测试 + plist/strings 校验):`Scripts/ci.sh`
+- 本地 CI(本地化扫描 + UI 规范扫描 + 零警告构建 + 全部测试 + plist/strings 校验):`Scripts/ci.sh`
 - 性能门槛:`Scripts/perf.sh`;发布:`Scripts/release.sh`
 - 日志:`Scripts/logs.sh`(P1 之后可用)
 - 启用推送前 CI:`git config core.hooksPath .githooks`(已在本仓库启用)
@@ -63,13 +63,39 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
   - Bundle ID 为 `com.ixxxxoooo.OhMyAgent`;旧域 `com.ygw.OhMyAgent` 的偏好由 `LegacyDefaultsMigration` 首次启动时一次性迁移。
 - 无障碍:仅图标的控件必须有 `accessibilityLabel`;动画经 `omWithAnimation` 以遵循「减弱动态效果」。
 
-## 4.1 界面配色与布局约定(系统主题,浅色)
-- 左侧栏、右侧栏、设置页左栏背景统一为 `#EFEFEF`(`OMColors.sidebar` / `SidebarBackground`);中间内容区(会话流、编辑区、设置页右侧)背景统一为 `#F6F6F7`(`OMColors.surface` / `OMColors.contentBackground`)。深色与主题包由令牌派生,禁止在视图里写死色值或另起背景材质。
+## 4.1 界面配色与布局约定
+- 左侧栏、右侧栏、设置页左栏背景统一取 `OMColors.sidebar`(`SidebarBackground`);中间内容区(会话流、编辑区、设置页右侧)背景统一取 `OMColors.surface` / `OMColors.contentBackground`。
+- **`#EFEFEF`(侧栏)/`#F6F6F7`(内容区)只属于「跟随系统」浅色与「Cursor 浅色」主题**;其他主题(深色、Anthropic、Claude Code、OpenCode 等)必须在 `ThemePalette` 里提供各自的 `surface` 与 `sidebarBackground`(未提供时才由内容色与前景混合推导),禁止把这两个色值套到所有主题。新增主题必须同时给出内容色与侧栏色,并保证 `sidebar != surface`(`ThemeColorTests` 守卫)。
+- 深色与主题包由令牌派生,禁止在视图里写死色值或另起背景材质。
 - 设置页左栏宽度必须与工作台左栏一致(取 `WorkbenchModel.layout.leftWidth`),切换设置页时侧栏不跳动。
 - 搜索入口统一为中央搜索窗(⌘K,`HubSearch`):新增可搜索的内容类型时,在 `HubCandidateBuilder` 里加候选并补 `HubSearchEngineTests`。
 - 复制按钮一律只用图标(`copy`,复制成功短暂变为 `check`),不出现「复制」文字,必须带 `.help` 与 `accessibilityLabel`;右键菜单项因需要文字可保留。
 - 文件与文件夹的展示(chip、工具行、搜索结果、改动列表、补全)统一使用彩色文件类型图标 `OMFileIcon`,不要用通用文档图标。
 - 悬浮在输入区附近的新卡片/弹窗(吸附消息、消息编辑窗等)沿用底部输入框的样式(`omGlassCard`、圆角、内边距),不要另起一套。
+
+## 4.2 UI 组件与字号规范(全局唯一一套,所有界面遵守)
+`Scripts/ui-lint.py --check`(已接入 `Scripts/ci.sh`)会扫描 `Sources/OhMyAgentApp`;确需特例时在该行末尾写 `// ui-lint:allow 原因`。
+
+**字号**:只能用 `OMFonts` 令牌(随「界面字号」缩放),禁止 `.font(.system(size:…))`:
+- `title`(15 半粗):页面/弹窗标题;`sectionTitle`(13 半粗):设置页分组标题;
+- `body`(13.5):正文、设置行标题、列表主文本;`small`(11.5):次要文字、按钮、说明;`caption`(11):脚注、标签、状态栏;
+- `mono`(12.5)/`monoSmall`(11.5):代码与等宽;`reading`/`readingMono`:仅会话时间线(额外乘「时间线字号」);
+- 令牌覆盖不到的特例(Markdown 标题、徽标数字、搜索大输入框)使用 `OMFonts.custom(size, weight:, design:)`,仍随界面字号缩放。
+- 工具栏/面板里的紧凑控件(过滤栏、标签条、输出面板)高度 24pt,字号 `small`/`caption`,不得出现比 `small` 更大的控件字。
+
+**颜色**:一律 `OMColors`(`accent`、`danger`、`success`、`warning`、`secondaryText`、`tertiaryText`、`hairline`、`card`、`surface`、`sidebar`、`onAccent`),禁止 `Color.red/.green/.orange/.white`、写死 RGB、`foregroundStyle(.red)`。
+
+**图标**:只用 `Image.om`/`Label(_:om:)`(Lucide),禁止 SF Symbol;三档尺寸 12(行内)/14(工具条)/16(标题);颜色走 `OMColors`;仅图标控件必须 `.help` 与 `accessibilityLabel`。复制一律 `copy`,成功后短暂变 `check`(统一用 `OMCopyButton`),禁止 `doc.on.doc`/`checkmark` 作为复制图标。
+
+**按钮**(`OMButtonStyle`,`DesignSystem/UIControls.swift`):`.omPrimary`(主操作,每个区域至多一个)、`.omSecondary`(次操作)、`.omPlain`(文字按钮)、`.omDestructive`(破坏性)、`.omIcon`(仅图标);默认紧凑 24pt,大表单底部主按钮可用 `OMButtonStyle(.primary, size: .regular)`(28pt)。禁止 `.bordered/.borderedProminent/.borderless` 与 `.controlSize(.large)`。
+
+**选择与数值控件**:
+- 少量互斥选项用 `OMCompactSegmented`;开关用 `OMSwitch`(行内说明用设置行的 `Toggle`,固定 `.small`);
+- 档位/数值调节(宽度、字号等)用 `OMStepSlider`(带刻度的横向滑块),不用下拉;
+- 下拉式选择(模型、模式、思考强度、分支、面包屑、Agent、标签溢出、日志级别等)统一用 `OMPickList`:无箭头浮层、顶部搜索、↑↓ 切换、回车选中、Esc 关闭、当前项打勾;不使用 `.popover`/`Menu`/`.pickerStyle(.menu)` 做选择。
+
+**设置页**:分组标题 `sectionTitle`;行标题 `body`;说明 `Note`(`caption` + `secondaryText`);所有数字输入用 `SettingsNumericField`;右侧内容宽度由「外观 → 设置页宽度」统一控制;页面骨架用 `SettingsForm`/`ExtensionPage`,不要自己拼 `ScrollView`。
+**浮层与卡片**:沿用 `omGlassCard`、`OMMetrics.cardRadius`/`controlRadius`;阴影、描边用令牌,不另起一套。
 
 ## 5. 日志规范(P1 起强制)
 - 只使用 `OMLog`(`Log.<category>.info/debug/warning/error`),禁止 `print`/`NSLog`。

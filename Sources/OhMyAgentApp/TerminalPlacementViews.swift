@@ -88,7 +88,7 @@ struct TerminalSidePanel: View {
                 Text("终端").font(OMFonts.small.weight(.semibold))
                 Spacer(minLength: 4)
                 Button { workbench.hideTerminal() } label: { Image.om("xmark") }
-                    .buttonStyle(.borderless)
+                    .buttonStyle(.omPlain)
                     .help("关闭终端 (\(ShortcutStore.shared.binding(for: .togglePanel).display))")
                     .accessibilityLabel("关闭终端面板")
             }

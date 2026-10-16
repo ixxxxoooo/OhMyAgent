@@ -27,7 +27,7 @@ struct HooksSettingsPage: View {
                 .help("重新读取配置")
                 .accessibilityLabel("刷新")
             Button { editor = HookEditorTarget(entry: nil) } label: { Label("添加 Hook", om: "plus") }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.omPrimary)
         } content: {
             if grouped.isEmpty {
                 ExtensionEmptyCard(icon: "bolt.horizontal", title: String(localized: "没有配置 Hook"), message: String(localized: "Hook 可在工具调用前后、会话开始/结束等事件上运行命令。"))

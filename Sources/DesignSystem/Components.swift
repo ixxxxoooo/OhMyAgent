@@ -52,8 +52,8 @@ public struct OMStatusDot: View {
         switch state {
         case .idle: return OMColors.tertiaryText
         case .running: return OMColors.accent
-        case .success: return .green
-        case .failure: return .red
+        case .success: return OMColors.success
+        case .failure: return OMColors.danger
         case .warning: return OMColors.warning
         }
     }

@@ -570,7 +570,7 @@ struct AttentionDot: View {
         case .idle:
             EmptyView()
         case .unreadDone:
-            Circle().fill(Color.green).frame(width: 8, height: 8).accessibilityLabel("已完成,未读")
+            Circle().fill(OMColors.success).frame(width: 8, height: 8).accessibilityLabel("已完成,未读")
         case .running:
             blinking(.blue).accessibilityLabel("运行中")
         case .needsInput:

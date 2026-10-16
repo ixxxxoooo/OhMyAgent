@@ -19,7 +19,7 @@ struct WorkingIndicatorView: View {
                 let tick = Int(date.timeIntervalSinceReferenceDate / 0.15)
                 HStack(spacing: 8) {
                     Text(waitingForUser || reduceMotion ? "✻" : WorkingStatus.glyph(tick: tick))
-                        .font(.system(size: 13, weight: .medium))
+                        .font(OMFonts.custom(13, weight: .medium))
                         .foregroundStyle(waitingForUser ? OMColors.tertiaryText : OMColors.accent)
                         .frame(width: 16)
                     Text(label(seconds: seconds, start: start, waitingForUser: waitingForUser))

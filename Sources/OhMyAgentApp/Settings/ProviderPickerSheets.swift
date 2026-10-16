@@ -57,7 +57,7 @@ struct ModelFetchSheet: View {
             HStack { Spacer(); ProgressView(); Spacer() }.frame(maxHeight: .infinity)
         } else if let errorMessage {
             VStack(spacing: 8) {
-                Label(errorMessage, om: "xmark.octagon.fill").foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+                Label(errorMessage, om: "xmark.octagon.fill").foregroundStyle(OMColors.danger).fixedSize(horizontal: false, vertical: true)
                 Button("重试") { Task { await load() } }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

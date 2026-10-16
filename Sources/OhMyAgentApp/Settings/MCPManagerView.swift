@@ -52,7 +52,7 @@ struct MCPSettingsPage: View {
                 Label("添加服务器", om: "plus")
             }
             .menuStyle(.button)
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.omPrimary)
         } content: {
             if !all.isEmpty { scopeFilter }
             if entries.isEmpty {
@@ -128,7 +128,7 @@ struct MCPSettingsPage: View {
             healthLabel(entry)
             if entry.needsApproval {
                 Button("批准") { center.perform(String(localized: "已批准 \(entry.config.name)")) { try MCPStore(paths: center.paths).approveProjectServer(name: entry.config.name) } }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.omPrimary)
                     .controlSize(.small)
             } else {
                 OMSwitch(String(localized: "启用 \(entry.config.name)"), isOn: Binding(
@@ -190,9 +190,9 @@ struct MCPSettingsPage: View {
     private func tint(_ entry: MCPServerEntry) -> Color {
         guard let health = center.mcpHealth[entry.config.name] else { return OMColors.accent }
         switch health.state {
-        case .connected: return .green
+        case .connected: return OMColors.success
         case .needsAuth: return OMColors.warning
-        case .failed: return .red
+        case .failed: return OMColors.danger
         case .unknown: return OMColors.accent
         }
     }

@@ -37,7 +37,7 @@ struct SkillsSettingsPage: View {
                 .help("重新读取")
                 .accessibilityLabel("刷新")
             Button { showCreate = true } label: { Label(String(localized: "新建\(noun)"), om: "plus") }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.omPrimary)
         } content: {
             if total > 0 { ExtensionSearchField(placeholder: "搜索名称或描述", text: $search).frame(maxWidth: 360) }
             if items.isEmpty {
@@ -195,7 +195,7 @@ struct MarkdownItemEditor: View {
                     .help("在 Finder 中显示").accessibilityLabel("在 Finder 中显示")
                 if !item.source.isReadOnly {
                     Button("还原") { text = original }.disabled(!isDirty)
-                    Button("保存", action: save).buttonStyle(.borderedProminent).disabled(!isDirty).keyboardShortcut("s", modifiers: .command)
+                    Button("保存", action: save).buttonStyle(.omPrimary).disabled(!isDirty).keyboardShortcut("s", modifiers: .command)
                     Button("删除", role: .destructive, action: onDelete)
                 }
             }

@@ -36,7 +36,7 @@ struct PermissionCard: View {
             HStack(spacing: 8) {
                 ForEach(prompt.request.options) { option in
                     Button(option.name) { onChoose(option.optionId) }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.omSecondary)
                         .tint(option.kind == .allowOnce || option.kind == .allowAlways ? OMColors.accent : nil)
                 }
             }
@@ -140,11 +140,11 @@ struct GenericElicitationCard: View {
                 switch prompt.mode {
                 case .form:
                     Button("提交") { prompt.accept(); onFinish() }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.omPrimary)
                         .disabled(!prompt.canSubmit)
                 case .url(let url):
                     Button("打开链接") { openURL(url); prompt.acceptURL(); onFinish() }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.omPrimary)
                 }
             }
         }

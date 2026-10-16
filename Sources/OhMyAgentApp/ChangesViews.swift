@@ -19,14 +19,14 @@ struct ChangesSummaryView: View {
         let hasPending = entry.changes.contains { $0.status == .pending || $0.status == .partiallyReverted }
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                Image.om("doc.on.doc").foregroundStyle(OMColors.secondaryText)
+                Image.om("file-text").foregroundStyle(OMColors.secondaryText)
                 Text("本轮修改了 \(entry.changes.count) 个文件").font(OMFonts.small.weight(.semibold))
                 Text("+\(added)").foregroundStyle(OMColors.diffAdded).font(OMFonts.small)
                 Text("−\(removed)").foregroundStyle(OMColors.diffRemoved).font(OMFonts.small)
                 Spacer()
                 if hasPending {
                     Button("全部撤销") { model.revertAll(in: entry) }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.omSecondary)
                         .controlSize(.small)
                 }
             }

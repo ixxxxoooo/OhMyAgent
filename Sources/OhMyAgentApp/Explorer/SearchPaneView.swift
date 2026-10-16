@@ -38,7 +38,7 @@ struct SearchPaneView: View {
     }
 
     private func toggle(_ label: String, _ binding: Binding<Bool>, help: LocalizedStringKey) -> some View {
-        Toggle(isOn: binding) { Text(label).font(.system(size: 11, weight: .semibold, design: .monospaced)) }
+        Toggle(isOn: binding) { Text(label).font(OMFonts.custom(11, weight: .semibold, design: .monospaced)) }
             .toggleStyle(.button)
             .controlSize(.small)
             .help(help)

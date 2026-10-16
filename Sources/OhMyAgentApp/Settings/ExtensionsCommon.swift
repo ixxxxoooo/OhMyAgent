@@ -23,22 +23,22 @@ struct StatusBanner: View {
             }
             if let error = center.lastError {
                 HStack(alignment: .top, spacing: 8) {
-                    Image.om("xmark.octagon.fill").foregroundStyle(.red)
+                    Image.om("xmark.octagon.fill").foregroundStyle(OMColors.danger)
                     Text(error).font(OMFonts.small).textSelection(.enabled).lineLimit(4)
                     Spacer()
                     Button { center.lastError = nil } label: { Image.om("xmark") }.buttonStyle(.plain)
                         .accessibilityLabel("关闭错误提示")
                 }
                 .padding(.horizontal, 16).padding(.vertical, 8)
-                .background(Color.red.opacity(0.1))
+                .background(OMColors.danger.opacity(0.1))
             } else if let notice = center.lastNotice {
                 HStack(spacing: 8) {
-                    Image.om("checkmark.circle.fill").foregroundStyle(.green)
+                    Image.om("checkmark.circle.fill").foregroundStyle(OMColors.success)
                     Text(notice).font(OMFonts.small)
                     Spacer()
                 }
                 .padding(.horizontal, 16).padding(.vertical, 6)
-                .background(Color.green.opacity(0.08))
+                .background(OMColors.success.opacity(0.08))
                 .task(id: notice) {
                     try? await Task.sleep(for: .seconds(3))
                     if center.lastNotice == notice { center.lastNotice = nil }
@@ -135,7 +135,7 @@ struct SheetFooter: View {
                 Button("取消", action: onCancel).keyboardShortcut(.cancelAction)
                 Button(confirmTitle, action: onConfirm)
                     .keyboardShortcut(.defaultAction)
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.omPrimary)
                     .disabled(!problems.isEmpty)
             }
         }

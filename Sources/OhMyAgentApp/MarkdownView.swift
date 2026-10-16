@@ -44,7 +44,7 @@ struct MarkdownBlockView: View {
         switch block {
         case .heading(let level, let text):
             Text(inlineMarkdown(text))
-                .font(.system(size: headingSize(level), weight: .semibold))
+                .font(OMFonts.custom(headingSize(level), weight: .semibold))
                 .padding(.top, level <= 2 ? 6 : 2)
         case .paragraph(let text):
             Text(inlineMarkdown(text))
@@ -65,7 +65,7 @@ struct MarkdownBlockView: View {
                         if let checked = item.checked {
                             Image.om(checked ? "checkmark.square.fill" : "square")
                                 .foregroundStyle(checked ? OMColors.accent : OMColors.secondaryText)
-                                .font(.system(size: 12))
+                                .font(OMFonts.small)
                         } else {
                             Text(item.marker).foregroundStyle(OMColors.secondaryText)
                         }

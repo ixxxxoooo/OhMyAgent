@@ -24,7 +24,7 @@ struct WelcomeView: View {
             } label: {
                 Label("打开项目…", om: "folder.badge.plus")
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.omPrimary)
             .controlSize(.large)
             let recents = RecentStore.projects().prefix(5)
             if !recents.isEmpty {

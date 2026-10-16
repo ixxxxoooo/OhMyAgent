@@ -191,7 +191,7 @@ struct ToolRowView: View {
     private func leadingIcon(_ tool: ToolCall, _ p: ToolPresentation) -> some View {
         Image.om(ToolIcons.symbol(for: p.category), size: 11.5)
             .frame(width: 16)
-            .foregroundStyle(tool.status == .failed ? Color.red : OMColors.secondaryText)
+            .foregroundStyle(tool.status == .failed ? OMColors.danger : OMColors.secondaryText)
     }
 
     /// 这类工具的对象是文件:文件名前显示彩色文件类型图标。
@@ -209,7 +209,7 @@ struct ToolRowView: View {
                 }
                 Text(name)
                     .font(OMFonts.small.weight(.medium))
-                    .foregroundStyle(failed ? Color.red : Color.primary)
+                    .foregroundStyle(failed ? OMColors.danger : Color.primary)
                 if !dir.isEmpty, dir != "/" {
                     Text(dir).font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
                 }
@@ -222,13 +222,13 @@ struct ToolRowView: View {
         } else if p.category == .search {
             Text(p.subject)
                 .font(OMFonts.monoSmall)
-                .foregroundStyle(failed ? Color.red : Color.primary)
+                .foregroundStyle(failed ? OMColors.danger : Color.primary)
                 .lineLimit(1)
                 .truncationMode(.middle)
         } else {
             Text(p.subject)
                 .font(OMFonts.small.weight(.medium))
-                .foregroundStyle(failed ? Color.red : Color.primary)
+                .foregroundStyle(failed ? OMColors.danger : Color.primary)
                 .lineLimit(1)
                 .truncationMode(.middle)
         }
@@ -254,8 +254,8 @@ struct ToolRowView: View {
         switch status {
         case .pending: OMStatusDot(.idle)
         case .inProgress: ProgressView().controlSize(.mini)
-        case .completed: Image.om("checkmark", size: 9, weight: .bold).foregroundStyle(.green.opacity(0.8))
-        case .failed: Image.om("xmark", size: 9, weight: .bold).foregroundStyle(.red)
+        case .completed: Image.om("checkmark", size: 9, weight: .bold).foregroundStyle(OMColors.success.opacity(0.8))
+        case .failed: Image.om("xmark", size: 9, weight: .bold).foregroundStyle(OMColors.danger)
         }
     }
 
@@ -420,7 +420,7 @@ struct CommandBox: View {
             }
             if !cleaned.isEmpty {
                 CollapsibleOutput(raw: cleaned, followTail: status == .inProgress)
-                    .foregroundStyle(status == .failed ? Color.red : Color.primary)
+                    .foregroundStyle(status == .failed ? OMColors.danger : Color.primary)
             }
         }
         .padding(8)
@@ -443,7 +443,7 @@ struct CopyButton: View {
                 copied = false
             }
         } label: {
-            Image.om(copied ? "checkmark" : "doc.on.doc", size: 11)
+            Image.om(copied ? "check" : "copy", size: 11)
         }
         .buttonStyle(.plain)
         .foregroundStyle(OMColors.secondaryText)
@@ -649,7 +649,7 @@ struct TerminalOutputView: View {
                     ProgressView().controlSize(.mini)
                     if let onInterrupt {
                         Button("停止", action: onInterrupt)
-                            .buttonStyle(.bordered)
+                            .buttonStyle(.omSecondary)
                             .controlSize(.mini)
                     }
                 } else if let code = session.exitCode {
