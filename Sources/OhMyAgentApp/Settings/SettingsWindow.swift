@@ -1,5 +1,5 @@
 // @author ygw
-// 设置窗口(⌘,):15 个页面。Claude Code 自身的设置写回 settings.json 并热更新,客户端设置存 UserDefaults。
+// 设置窗口(⌘,):18 个页面。Claude Code 自身的设置写回 settings.json 并热更新,客户端设置存 UserDefaults。
 
 import IconKit
 import ChatKit
@@ -11,7 +11,7 @@ import WorkbenchKit
 /// 设置页。
 enum SettingsPage: String, CaseIterable, Identifiable {
     case general, appearance, shortcuts
-    case agent, providers, permissions, tools, agentExtensions
+    case agent, providers, prompts, network, permissions, trust, tools, agentExtensions
     case editor, terminal
     case usage, privacy, advanced, diagnostics
     var id: String { rawValue }
@@ -19,7 +19,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
     /// 侧栏分组(从上到下)。
     static let groups: [(title: String, pages: [SettingsPage])] = [
         ("客户端", [.general, .appearance, .shortcuts]),
-        ("Agent", [.agent, .providers, .permissions, .tools, .agentExtensions]),
+        ("Agent", [.agent, .providers, .prompts, .network, .permissions, .trust, .tools, .agentExtensions]),
         ("工作台", [.editor, .terminal]),
         ("其他", [.usage, .privacy, .advanced, .diagnostics]),
     ]
@@ -31,7 +31,10 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .shortcuts: return String(localized: "快捷键")
         case .agent: return String(localized: "Agent 与模型")
         case .providers: return String(localized: "模型提供商")
+        case .prompts: return String(localized: "提示词")
+        case .network: return String(localized: "网络")
         case .permissions: return String(localized: "权限")
+        case .trust: return String(localized: "项目信任")
         case .tools: return String(localized: "工具与扩展")
         case .agentExtensions: return String(localized: "Agent 注册表")
         case .editor: return String(localized: "编辑器")
@@ -50,7 +53,10 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .shortcuts: return "keyboard"
         case .agent: return "cpu"
         case .providers: return "server.rack"
+        case .prompts: return "doc.text"
+        case .network: return "network"
         case .permissions: return "lock.shield"
+        case .trust: return "shield-check"
         case .tools: return "puzzlepiece.extension"
         case .agentExtensions: return "square.stack.3d.up"
         case .editor: return "chevron.left.forwardslash.chevron.right"
@@ -189,7 +195,10 @@ struct SettingsView: View {
         case .appearance: AppearancePage()
         case .agent: AgentModelPage(model: model)
         case .providers: ModelProvidersPage()
+        case .prompts: PromptsPage()
+        case .network: NetworkPage()
         case .permissions: PermissionsPage(model: model)
+        case .trust: ProjectTrustPage(workbench: workbench)
         case .tools: ToolsExtensionsPage(center: center, router: router)
         case .editor: EditorPage()
         case .terminal: TerminalPage()

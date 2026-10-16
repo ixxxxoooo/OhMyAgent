@@ -33,6 +33,19 @@ public enum ClientPrefs {
         public static let featureFileSystem = "feature.fileSystem"
         public static let featureTerminal = "feature.terminal"
         public static let featureElicitation = "feature.elicitation"
+        /// 聊天内容宽度档位(narrow/standard/wide/full)
+        public static let chatWidth = "chat.width"
+        /// 发送键(enter / commandEnter)
+        public static let sendKey = "chat.sendKey"
+        /// 运行中再发送的默认行为(steer / queue)
+        public static let runningSend = "chat.runningSend"
+        /// 任务完成通知是否带提示音
+        public static let notifySound = "notify.sound"
+        public static let proxyMode = "network.proxyMode"
+        public static let proxyAddress = "network.proxyAddress"
+        public static let requestTimeout = "network.timeoutSeconds"
+        public static let appendPrompt = "prompt.append"
+        public static let loadClaudeMemory = "prompt.loadClaudeMemory"
     }
 
     /// 托盘图标是否启用:菜单栏开关打开,或 Dock 图标被隐藏(此时必须有托盘才能打开窗口)。默认开启。
@@ -45,6 +58,21 @@ public enum ClientPrefs {
     /// 任务完成时是否发送系统通知,默认开启。
     public static func notifiesOnFinish(_ defaults: UserDefaults = .standard) -> Bool {
         defaults.object(forKey: Key.notifyFinished) as? Bool ?? true
+    }
+
+    /// 发送键,默认 Return 发送。
+    public static func sendKey(_ defaults: UserDefaults = .standard) -> SendKey {
+        SendKey(rawValue: defaults.string(forKey: Key.sendKey) ?? "") ?? .enter
+    }
+
+    /// 运行中再发送的默认行为,默认引导。
+    public static func runningSendMode(_ defaults: UserDefaults = .standard) -> RunningSendMode {
+        RunningSendMode(rawValue: defaults.string(forKey: Key.runningSend) ?? "") ?? .steer
+    }
+
+    /// 完成通知是否带提示音,默认开启。
+    public static func notifiesWithSound(_ defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: Key.notifySound) as? Bool ?? true
     }
 
     /// 终端输出缓冲上限(字节),默认 1 MB,范围 64 KB–16 MB。
@@ -101,7 +129,7 @@ public enum ClientPrefs {
     /// 删除全部客户端偏好(不含 Claude 设置)。
     public static func resetAll(_ defaults: UserDefaults = .standard) {
         for key in defaults.dictionaryRepresentation().keys {
-            let prefixes = ["general.", "update.", "editor.", "terminal.", "usage.", "privacy.", "advanced.", "feature.", "appearance.", "shortcut."]
+            let prefixes = ["general.", "update.", "editor.", "terminal.", "usage.", "privacy.", "advanced.", "feature.", "appearance.", "shortcut.", "chat.", "notify.", "network.", "prompt."]
             if prefixes.contains(where: { key.hasPrefix($0) }) { defaults.removeObject(forKey: key) }
         }
     }

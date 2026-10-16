@@ -362,7 +362,7 @@ public final class SessionModel {
                 let prepared = self.prepareMCPServers(registry: registry, environment: tools.environment)
                 self.mcpServers = prepared.servers
                 self.bridge = prepared.bridge
-                let setup = try await client.newSession(cwd: cwd, mcpServers: prepared.servers, meta: self.providerMeta)
+                let setup = try await client.newSession(cwd: cwd, mcpServers: prepared.servers, meta: self.effectiveMeta())
                 self.sessionId = setup.sessionId
                 self.configOptions = setup.configOptions
                 self.phase = .ready
@@ -445,7 +445,7 @@ public final class SessionModel {
             return
         }
         if isRunning {
-            if !afterTurn, canSteer {
+            if !afterTurn, canSteer, ClientPrefs.runningSendMode() == .steer {
                 steer(trimmed, images: images)
             } else {
                 enqueueFollowUp(trimmed, images: images)
@@ -699,6 +699,11 @@ public final class SessionModel {
     public private(set) var providerName: String?
     /// 提供商的会话 `_meta`(含密钥,仅内存持有,禁止记录)
     @ObservationIgnored private var providerMeta: JSONValue?
+    /// 会话 `_meta`:提供商元数据 + 客户端选项(代理/超时/追加提示词/CLAUDE.md);仅对真实 Claude 通道合并。
+    private func effectiveMeta() -> JSONValue? {
+        guard activeDescriptor.kind == .claudeACP else { return providerMeta }
+        return SessionOptions(defaults: .standard).merged(into: providerMeta)
+    }
     /// 提供商地址(发送前探测用)
     @ObservationIgnored private var providerURL: URL?
     /// 提供商目录(测试可注入;默认 Application Support)
@@ -893,7 +898,7 @@ public final class SessionModel {
         turnChangeOrder.removeAll()
         Task { await checkpoints.reset() }
         let servers = mcpServers
-        let meta = providerMeta
+        let meta = effectiveMeta()
         Task { [weak self] in
             do {
                 let setup = try await client.newSession(cwd: cwd, mcpServers: servers, meta: meta)
@@ -942,7 +947,7 @@ public final class SessionModel {
         let cwd = workspace.path
         let canLoad = capabilities.loadSession
         let servers = mcpServers
-        let meta = providerMeta
+        let meta = effectiveMeta()
         Task { [weak self] in
             do {
                 let setup = canLoad
@@ -963,7 +968,7 @@ public final class SessionModel {
         guard let client, let sessionId, capabilities.canFork, !isRunning else { return }
         let cwd = workspace.path
         let servers = mcpServers
-        let meta = providerMeta
+        let meta = effectiveMeta()
         Task { [weak self] in
             do {
                 let setup = try await client.forkSession(sessionId: sessionId, cwd: cwd, mcpServers: servers, meta: meta)
