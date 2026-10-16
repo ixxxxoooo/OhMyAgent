@@ -21,13 +21,38 @@ struct TimelineEntryView: View {
         case .notice: NoticeView(entry: entry)
         case .changes: ChangesSummaryView(entry: entry)
         case .planDoc: PlanDocView(entry: entry)
+        case .turnSummary: TurnSummaryView(entry: entry)
+        }
+    }
+}
+
+/// 回合结束语:模型 · 耗时 · token · tps,右侧纯图标复制按钮。
+struct TurnSummaryView: View {
+    let entry: TimelineEntry
+
+    var body: some View {
+        if let summary = entry.summary {
+            HStack(spacing: 6) {
+                Text(verbatim: summary.parts.joined(separator: "  ·  "))
+                    .font(OMFonts.caption)
+                    .foregroundStyle(OMColors.tertiaryText)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                ModelCopyButton(text: summary.copyText, label: String(localized: "复制本轮信息"))
+            }
+            .padding(.horizontal, 2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(summary.copyText)
         }
     }
 }
 
 /// 用户消息:纯色卡片(可带图片缩略图;运行中引导的消息带「引导」标记)。
+/// 双击放大编辑(见 `UserMessageEditor`);为让双击生效,这里不启用文字选择,复制走右键菜单。
 struct UserMessageView: View {
     let entry: TimelineEntry
+    @Environment(\.stickyUser) private var sticky
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -48,15 +73,28 @@ struct UserMessageView: View {
             if !entry.text.isEmpty {
                 Text(entry.text)
                     .font(OMFonts.reading)
-                    .textSelection(.enabled)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .omSolidCard()
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2) { if !entry.isSteered { sticky?.editing = entry } }
+        .contextMenu {
+            Button("复制") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(entry.text, forType: .string)
+            }
+            if !entry.isSteered { Button("编辑并重新发送…") { sticky?.editing = entry } }
+        }
+        // 被吸顶卡接管时隐藏原行(保留布局,位置继续上报)
+        .opacity(sticky?.target?.stickyID == entry.id ? 0 : 1)
+        .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(chatScrollSpace)).minY } action: { sticky?.report(entry.id, minY: $0) }
+        .onDisappear { sticky?.forget(entry.id) }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("你:\(entry.text)")
+        .accessibilityHint(entry.isSteered ? "" : String(localized: "双击放大编辑"))
     }
 }
 
@@ -132,12 +170,14 @@ struct AssistantMessageView: View {
 /// 思维面板:默认始终折叠(流式中也不自动展开),仅显示计时;是否展开完全由用户决定。
 struct ThoughtView: View {
     let entry: TimelineEntry
+    @Environment(\.stickyUser) private var scrollState
     @State private var expanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Button {
-                omWithAnimation(.snappy(duration: 0.2)) { expanded.toggle() }
+                scrollState?.followSuspended = true
+                expanded.toggle()
             } label: {
                 HStack(spacing: 6) {
                     Image.om("chevron.right", size: 9, weight: .bold)
