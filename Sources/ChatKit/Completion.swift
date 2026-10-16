@@ -23,11 +23,27 @@ public struct CompletionContext: Sendable, Equatable {
 public struct CompletionItem: Identifiable, Sendable, Hashable {
     /// 候选类别(决定图标与排序分组)。
     public enum Kind: Sendable, Hashable {
+        /// 分组标题(补全菜单分节用)。
+        public var groupTitle: String {
+            switch self {
+            case .localCommand: return ChatL10n.t("客户端命令")
+            case .agentCommand: return ChatL10n.t("Agent 命令")
+            case .customCommand: return ChatL10n.t("自定义命令")
+            case .skill: return "Skills"
+            case .mcpPrompt: return "MCP"
+            case .subagent: return ChatL10n.t("子 Agent")
+            case .file: return ChatL10n.t("文件")
+            case .folder: return ChatL10n.t("文件夹")
+            }
+        }
+
         /// Agent 通告的内置命令(/compact、/init……)
         case agentCommand
         /// 客户端接管的命令(/config、/agents……)
         case localCommand
         case file
+        /// 文件夹(`@目录/`)
+        case folder
         /// Skill(含插件内的 Skill)
         case skill
         /// 用户/项目/插件的自定义斜杠命令
@@ -38,6 +54,8 @@ public struct CompletionItem: Identifiable, Sendable, Hashable {
         case subagent
     }
     public var id: String { "\(kind)-\(insertText)" }
+    /// 菜单分组标题。
+    public var groupTitle: String { kind.groupTitle }
     public var kind: Kind
     public var title: String
     public var subtitle: String?
@@ -164,8 +182,11 @@ public enum CompletionEngine {
             }
             items.append(CompletionItem(kind: kind, title: "/\(command.name)\(hint)", subtitle: summary, insertText: "/\(command.name)", badge: badge))
         }
-        // Agent 还没通告命令(连接中/失败)时,用本机配置兜底,让 Skills 与自定义命令在连接前也能选择
+        // Agent 还没通告命令(连接中/失败)时,用本机配置与 Claude Code 内置清单兜底,
+        // 让 Skills、自定义命令与内置命令在连接前也能选择;连接后以适配器通告为准
         if agentCommands.isEmpty {
+            items += ClaudeBuiltinCommands.items(excluding: Set(seen.map { String($0.dropFirst()) }))
+            seen.formUnion(ClaudeBuiltinCommands.catalog.map { "/\($0.name)" })
             for entry in entries where !seen.contains("/\(entry.name)") {
                 seen.insert("/\(entry.name)")
                 items.append(CompletionItem(kind: entry.kind, title: "/\(entry.name)" + (entry.hint.map { " <\($0)>" } ?? ""),
@@ -184,6 +205,15 @@ public enum CompletionEngine {
             return lo != ro ? lo < ro : lhs.2 < rhs.2
         }
         return sorted.prefix(limit).map(\.0)
+    }
+
+    /// 生成 `@路径` 插入文本:含空白时加引号,文件夹以 `/` 结尾,末尾带一个空格。
+    /// - Parameters:
+    ///   - path: 工作区相对路径
+    ///   - isDirectory: 是否为文件夹
+    public static func mentionInsertText(path: String, isDirectory: Bool) -> String {
+        let text = isDirectory && !path.hasSuffix("/") ? path + "/" : path
+        return text.contains(where: { $0.isWhitespace }) ? "@\"\(text)\" " : "@\(text) "
     }
 
     /// `@agent-名称` 子 Agent 提及候选。
@@ -294,6 +324,7 @@ public enum CompletionEngine {
 /// 工作区文件索引:后台枚举一次,之后查询只在内存中打分。
 public actor FileIndex {
     private var paths: [String] = []
+    private var directories: [String] = []
     private var root: URL?
     private var building: Task<Void, Never>?
 
@@ -312,9 +343,10 @@ public actor FileIndex {
         if self.root == root, building != nil { return }
         self.root = root
         paths = []
+        directories = []
         building = Task.detached(priority: .utility) { [weak self] in
-            let found = Self.enumerate(root: root)
-            await self?.finish(found, for: root)
+            let found = Self.enumerateAll(root: root)
+            await self?.finish(found.files, directories: found.directories, for: root)
         }
     }
 
@@ -325,9 +357,10 @@ public actor FileIndex {
         if let root { prepare(root: root) }
     }
 
-    private func finish(_ found: [String], for root: URL) {
+    private func finish(_ found: [String], directories dirs: [String], for root: URL) {
         guard self.root == root else { return }
         paths = found
+        directories = dirs
     }
 
     /// 等待索引完成(测试与首次查询使用)。
@@ -357,25 +390,54 @@ public actor FileIndex {
         return scored.sorted { $0.1 != $1.1 ? $0.1 > $1.1 : $0.0 < $1.0 }.prefix(limit).map(\.0)
     }
 
-    /// 同步枚举(在后台线程调用)。
-    nonisolated static func enumerate(root: URL) -> [String] {
+    /// 查询文件夹(相对路径,不带结尾斜杠)。
+    /// - Parameters:
+    ///   - query: 查询词(为空时返回最浅层的文件夹)
+    ///   - limit: 数量上限
+    public func searchDirectories(_ query: String, limit: Int = 8) -> [String] {
+        if query.isEmpty {
+            return directories.sorted { ($0.filter { $0 == "/" }.count, $0) < ($1.filter { $0 == "/" }.count, $1) }.prefix(limit).map { $0 }
+        }
+        var scored: [(String, Int)] = []
+        for path in directories {
+            let name = (path as NSString).lastPathComponent
+            if let nameScore = FuzzyMatcher.score(query: query, candidate: name) {
+                scored.append((path, nameScore + 40))
+            } else if let pathScore = FuzzyMatcher.score(query: query, candidate: path) {
+                scored.append((path, pathScore))
+            }
+        }
+        return scored.sorted { $0.1 != $1.1 ? $0.1 > $1.1 : $0.0 < $1.0 }.prefix(limit).map(\.0)
+    }
+
+    /// 同步枚举(在后台线程调用);只返回文件。
+    nonisolated static func enumerate(root: URL) -> [String] { enumerateAll(root: root).files }
+
+    /// 同步枚举文件与文件夹(在后台线程调用)。
+    nonisolated static func enumerateAll(root: URL) -> (files: [String], directories: [String]) {
         let keys: [URLResourceKey] = [.isDirectoryKey, .isRegularFileKey]
-        guard let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles, .skipsPackageDescendants]) else { return [] }
-        var result: [String] = []
+        guard let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles, .skipsPackageDescendants]) else { return ([], []) }
+        var files: [String] = []
+        var dirs: [String] = []
         let rootPath = root.standardizedFileURL.path
         for case let url as URL in enumerator {
             if Task.isCancelled { break }
             let name = url.lastPathComponent
             let values = try? url.resourceValues(forKeys: Set(keys))
+            let full = url.standardizedFileURL.path
+            let relative = full.hasPrefix(rootPath + "/") ? String(full.dropFirst(rootPath.count + 1)) : nil
             if values?.isDirectory == true {
-                if ignoredDirectories.contains(name) { enumerator.skipDescendants() }
+                if ignoredDirectories.contains(name) {
+                    enumerator.skipDescendants()
+                } else if let relative, dirs.count < maxFiles / 4 {
+                    dirs.append(relative)
+                }
                 continue
             }
             guard values?.isRegularFile == true else { continue }
-            let full = url.standardizedFileURL.path
-            if full.hasPrefix(rootPath + "/") { result.append(String(full.dropFirst(rootPath.count + 1))) }
-            if result.count >= maxFiles { break }
+            if let relative { files.append(relative) }
+            if files.count >= maxFiles { break }
         }
-        return result
+        return (files, dirs)
     }
 }

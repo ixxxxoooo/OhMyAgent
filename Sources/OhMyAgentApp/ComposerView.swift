@@ -313,25 +313,72 @@ struct ProviderMenu: View {
     }
 }
 
-/// 补全弹层:实心卡片(阅读/交互区域不使用玻璃),键盘与鼠标均可选择。
+/// 补全弹层:实心卡片(阅读/交互区域不使用玻璃),键盘与鼠标均可选择;多于一个类别时按类别分节。
 struct CompletionPopup: View {
     let items: [CompletionItem]
     let selected: Int
     let onPick: (CompletionItem) -> Void
 
-    /// 弹层固定高度(每行 36pt,最多 280pt)
-    var height: CGFloat { min(CGFloat(items.count) * 36 + 8, 320) }
+    /// 一行:分节标题或候选。
+    private enum Row: Identifiable {
+        case header(String)
+        case item(Int, CompletionItem)
+
+        var id: String {
+            switch self {
+            case .header(let title): return "h-\(title)"
+            case .item(_, let item): return item.id
+            }
+        }
+    }
+
+    /// 是否显示分节标题:多于一个类别、且每个类别在列表中连续出现(按相关度交错排列的斜杠命令不分节,避免标题重复)。
+    private var showsHeaders: Bool {
+        var order: [String] = []
+        for item in items where order.last != item.groupTitle { order.append(item.groupTitle) }
+        return order.count > 1 && order.count == Set(order).count
+    }
+
+    private var rows: [Row] {
+        var result: [Row] = []
+        var last: String?
+        for (index, item) in items.enumerated() {
+            if showsHeaders, item.groupTitle != last {
+                result.append(.header(item.groupTitle))
+                last = item.groupTitle
+            }
+            result.append(.item(index, item))
+        }
+        return result
+    }
+
+    /// 弹层固定高度(候选行 36pt、标题行 22pt,最多 320pt)
+    var height: CGFloat {
+        let headers = showsHeaders ? Set(items.map(\.groupTitle)).count : 0
+        return min(CGFloat(items.count) * 36 + CGFloat(headers) * 22 + 8, 320)
+    }
 
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                        row(item, isSelected: index == selected)
-                            .id(index)
-                            .onTapGesture { onPick(item) }
-                            .accessibilityElement(children: .combine)
-                            .accessibilityAddTraits(index == selected ? [.isButton, .isSelected] : .isButton)
+                    ForEach(rows) { row in
+                        switch row {
+                        case .header(let title):
+                            Text(title)
+                                .font(OMFonts.caption)
+                                .foregroundStyle(OMColors.tertiaryText)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 10)
+                                .frame(height: 22)
+                                .accessibilityAddTraits(.isHeader)
+                        case .item(let index, let item):
+                            self.row(item, isSelected: index == selected)
+                                .id(index)
+                                .onTapGesture { onPick(item) }
+                                .accessibilityElement(children: .combine)
+                                .accessibilityAddTraits(index == selected ? [.isButton, .isSelected] : .isButton)
+                        }
                     }
                 }
                 .padding(4)
@@ -380,6 +427,7 @@ struct CompletionPopup: View {
         case .agentCommand: return "slash"
         case .localCommand: return "terminal"
         case .file: return "doc.text"
+        case .folder: return "folder"
         case .skill: return "sparkles"
         case .customCommand: return "command"
         case .mcpPrompt: return "plug"

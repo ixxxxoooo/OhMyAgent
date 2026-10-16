@@ -67,6 +67,8 @@ public enum LocalCommands {
         LocalCommandSpec(name: "rename", summary: ChatL10n.t("重命名当前会话"), hint: ChatL10n.t("新名称")),
         LocalCommandSpec(name: "export", summary: ChatL10n.t("把当前对话导出为 Markdown")),
         LocalCommandSpec(name: "doctor", summary: ChatL10n.t("打开诊断页检查安装与配置")),
+        LocalCommandSpec(name: "usage", summary: ChatL10n.t("打开用量与花费统计")),
+        LocalCommandSpec(name: "cost", summary: ChatL10n.t("打开用量与花费统计")),
     ]
 
     /// 目录中的命令名集合。
@@ -91,6 +93,7 @@ public enum LocalCommands {
         case "config", "settings": return .settings(page: "general")
         case "permissions": return .settings(page: "permissions")
         case "doctor": return .settings(page: "diagnostics")
+        case "usage", "cost": return .settings(page: "usage")
         case "agents": return .extensions(section: "agents")
         case "skills": return .extensions(section: "skills")
         case "memory": return .extensions(section: "memory")
@@ -118,7 +121,7 @@ public enum LocalCommands {
         lines += [
             "",
             ChatL10n.f("**Agent 命令**:输入 `/` 可看到 Agent 通告的全部 %lld 个命令(内置命令、Skills、自定义命令、插件与 MCP 提示),", agentCommandCount),
-            ChatL10n.t("例如 `/compact`、`/init`、`/review`、`/goal <目标>`、`/usage`。"),
+            ChatL10n.t("例如 `/compact`、`/init`、`/review`、`/goal <目标>`、`/context`。"),
             "",
             ChatL10n.t("**提及**:`@文件` 引用文件;`@agent-名称` 点名某个子 Agent。"),
             "",

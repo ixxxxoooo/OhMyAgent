@@ -1067,13 +1067,20 @@ public final class SessionModel {
         case .mention:
             await fileIndex.prepare(root: workspace)
             await fileIndex.waitUntilReady()
-            let paths = await fileIndex.search(context.query)
+            let paths = await fileIndex.search(context.query, limit: 24)
+            let dirs = await fileIndex.searchDirectories(context.query, limit: 8)
             let files = paths.map { path in
                 CompletionItem(kind: .file, title: (path as NSString).lastPathComponent,
-                               subtitle: (path as NSString).deletingLastPathComponent, insertText: "@\(path) ")
+                               subtitle: (path as NSString).deletingLastPathComponent,
+                               insertText: CompletionEngine.mentionInsertText(path: path, isDirectory: false))
+            }
+            let folders = dirs.map { path in
+                CompletionItem(kind: .folder, title: (path as NSString).lastPathComponent + "/",
+                               subtitle: (path as NSString).deletingLastPathComponent,
+                               insertText: CompletionEngine.mentionInsertText(path: path, isDirectory: true))
             }
             let agents = CompletionEngine.agentMentionItems(query: context.query, agents: agentCatalog?() ?? [])
-            return agents + files
+            return agents + files + folders
         }
     }
 
