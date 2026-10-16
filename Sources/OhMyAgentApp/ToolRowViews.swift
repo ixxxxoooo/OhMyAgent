@@ -99,9 +99,7 @@ struct ToolRowView: View {
 
     private func row(_ tool: ToolCall, _ p: ToolPresentation, canExpand: Bool, isExpanded: Bool) -> some View {
         HStack(spacing: 7) {
-            Image.om(ToolIcons.symbol(for: p.category), size: 11.5)
-                .frame(width: 16)
-                .foregroundStyle(tool.status == .failed ? Color.red : OMColors.secondaryText)
+            leadingIcon(tool, p)
             if let server = p.mcpServer { OMTag(server, tint: OMColors.accent) }
             if let agentType = p.agentType { OMTag(agentType, tint: OMColors.accent) }
             if !p.verb.isEmpty {
@@ -185,6 +183,20 @@ struct ToolRowView: View {
                 }
                 Button("查看子 Agent 定义…") { AppActions.shared.openSettings(page: .subagents) }
             }
+        }
+    }
+
+    /// 行首图标:读/写/改文件的工具显示该文件的彩色类型图标,其余沿用功能图标。
+    @ViewBuilder
+    private func leadingIcon(_ tool: ToolCall, _ p: ToolPresentation) -> some View {
+        if p.subjectIsPath, !p.subject.isEmpty, [.read, .write, .edit].contains(p.category) {
+            OMFileIcon(name: (p.subject as NSString).lastPathComponent, size: 14)
+                .frame(width: 16)
+                .opacity(tool.status == .failed ? 0.5 : 1)
+        } else {
+            Image.om(ToolIcons.symbol(for: p.category), size: 11.5)
+                .frame(width: 16)
+                .foregroundStyle(tool.status == .failed ? Color.red : OMColors.secondaryText)
         }
     }
 
@@ -512,7 +524,7 @@ struct SearchHitRow: View {
     var body: some View {
         Button(action: open) {
             HStack(spacing: 6) {
-                Image.om("doc.text", size: 10.5).foregroundStyle(OMColors.secondaryText)
+                OMFileIcon(name: (hit.path as NSString).lastPathComponent, size: 13)
                 Text((hit.path as NSString).lastPathComponent).font(OMFonts.small.weight(.medium))
                 if let line = hit.line { Text(":\(line)").font(OMFonts.monoSmall).foregroundStyle(OMColors.tertiaryText) }
                 if let text = hit.text, !text.isEmpty {

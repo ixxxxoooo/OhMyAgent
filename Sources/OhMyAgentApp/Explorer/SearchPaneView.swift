@@ -111,6 +111,7 @@ struct SearchPaneView: View {
         } label: {
             HStack(spacing: 4) {
                 Image.om(collapsed.contains(file.path) ? "chevron-right" : "chevron-down", size: 10)
+                OMFileIcon(name: (file.path as NSString).lastPathComponent, size: 14)
                 Text((file.path as NSString).lastPathComponent).font(OMFonts.small.weight(.semibold))
                 Text((file.path as NSString).deletingLastPathComponent).font(OMFonts.caption).foregroundStyle(OMColors.secondaryText).lineLimit(1).truncationMode(.head)
                 Spacer()

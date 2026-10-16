@@ -187,7 +187,7 @@ struct SnippetDiffView: View {
         VStack(alignment: .leading, spacing: 6) {
             if showHeader {
                 HStack(spacing: 6) {
-                    Image.om("doc.text")
+                    OMFileIcon(name: (path as NSString).lastPathComponent, size: 14)
                     Text((path as NSString).lastPathComponent).font(OMFonts.small.weight(.medium))
                     if let diff {
                         Text("+\(diff.added)").foregroundStyle(OMColors.diffAdded)

@@ -57,6 +57,7 @@ struct FileChangeRow: View {
                         Image.om("chevron.right", size: 9, weight: .bold)
                             .rotationEffect(.degrees(expanded ? 90 : 0))
                             .foregroundStyle(OMColors.tertiaryText)
+                        OMFileIcon(name: change.fileName, size: 14)
                         Text(change.fileName).font(OMFonts.small.weight(.medium))
                         if change.original == nil { OMTag(String(localized: "新建"), tint: .green) }
                         Text("+\(change.diff.added)").foregroundStyle(OMColors.diffAdded)
