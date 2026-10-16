@@ -177,9 +177,11 @@ struct WorkbenchCommands: Commands {
             }
         }
         CommandGroup(after: .textEditing) {
-            Button("快速打开文件…") { PaletteModel.shared.present(.files, workbench: workbench) }
+            Button("搜索…") { HubModel.shared.present(.all, workbench: workbench) }
+                .keyboardShortcut(shortcuts.shortcut(for: .hubSearch))
+            Button("快速打开文件…") { PaletteModel.present(.files, workbench: workbench) }
                 .keyboardShortcut(shortcuts.shortcut(for: .quickOpen))
-            Button("命令面板…") { PaletteModel.shared.present(.commands, workbench: workbench) }
+            Button("命令面板…") { PaletteModel.present(.commands, workbench: workbench) }
                 .keyboardShortcut(shortcuts.shortcut(for: .commandPalette))
             Button("在文件中搜索") { workbench.showRight(.search); SearchModel.shared.requestFocus() }
                 .keyboardShortcut(shortcuts.shortcut(for: .globalSearch))

@@ -9,7 +9,7 @@ import SwiftUI
 enum ShortcutAction: String, CaseIterable, Identifiable {
     case newConversation, openWorkspace, extensions, send
     case toggleSidebar, toggleInspector, togglePanel
-    case saveFile, quickOpen, commandPalette, globalSearch, newTerminal
+    case saveFile, hubSearch, quickOpen, commandPalette, globalSearch, newTerminal
     case closeTab, reopenTab, nextTab, previousTab
     var id: String { rawValue }
 
@@ -23,6 +23,7 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
         case .toggleInspector: return String(localized: "切换工具栏")
         case .togglePanel: return String(localized: "切换终端面板")
         case .saveFile: return String(localized: "保存文件")
+        case .hubSearch: return String(localized: "搜索")
         case .quickOpen: return String(localized: "快速打开文件")
         case .commandPalette: return String(localized: "命令面板")
         case .globalSearch: return String(localized: "在文件中搜索")
@@ -45,6 +46,7 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
         case .toggleInspector: return ShortcutBinding(key: "b", modifiers: ["command", "option"])
         case .togglePanel: return ShortcutBinding(key: "j", modifiers: ["command"])
         case .saveFile: return ShortcutBinding(key: "s", modifiers: ["command"])
+        case .hubSearch: return ShortcutBinding(key: "k", modifiers: ["command"])
         case .quickOpen: return ShortcutBinding(key: "p", modifiers: ["command"])
         case .commandPalette: return ShortcutBinding(key: "p", modifiers: ["command", "shift"])
         case .globalSearch: return ShortcutBinding(key: "f", modifiers: ["command", "shift"])

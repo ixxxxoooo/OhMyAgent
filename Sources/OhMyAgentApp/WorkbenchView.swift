@@ -27,7 +27,7 @@ struct WorkbenchView: View {
                 workspaceBody
             }
         }
-        .overlay { PaletteOverlay(workbench: workbench) }
+        .overlay { HubOverlay(workbench: workbench) }
         .overlay { MermaidFloatingOverlay() }
         .overlay { ImagePreviewOverlay() }
         .tint(appearance.tint)
@@ -191,9 +191,13 @@ struct WorkbenchView: View {
         }
         if let mode = env["OMA_PALETTE"] {
             // 调试:打开命令面板/快速打开,可预填查询
-            PaletteModel.shared.present(mode == "commands" ? .commands : .files, workbench: workbench)
+            PaletteModel.present(mode == "commands" ? .commands : .files, workbench: workbench)
             try? await Task.sleep(for: .milliseconds(600))
-            PaletteModel.shared.query = env["OMA_PALETTE_QUERY"] ?? ""
+            HubModel.shared.query = env["OMA_PALETTE_QUERY"] ?? ""
+        }
+        if let raw = env["OMA_HUB"] {
+            // 调试:打开中央搜索窗(OMA_HUB=all|sessions|projects|files|actions|settings),可用 OMA_HUB_QUERY 预填查询
+            HubModel.shared.present(HubSegment(rawValue: raw) ?? .all, workbench: workbench, query: env["OMA_HUB_QUERY"] ?? "")
         }
         if let append = env["OMA_EDIT_APPEND"], !append.isEmpty, let file = env["OMA_OPEN_FILE"] {
             // 调试:等文件载入后追加文本,验证「未保存」标记;OMA_EDIT_SAVE=1 继续保存

@@ -63,24 +63,14 @@ extension WorkbenchModel {
 /// 左栏根视图。
 struct ProjectTreeView: View {
     @Bindable var workbench: WorkbenchModel
-    @State private var query = ""
-    @State private var searching = false
     @State private var showArchived = false
-    @FocusState private var searchFocused: Bool
-
-    /// 当前搜索关键字(去空白);为空表示不过滤。
-    private var key: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
-
-    private func matches(_ item: SidebarSession) -> Bool {
-        key.isEmpty || item.title.localizedCaseInsensitiveContains(key)
-    }
 
     /// 所有项目中已置顶的会话。
     private var pinned: [SidebarSession] {
         workbench.projects.flatMap { project in
             workbench.sidebarSessions(for: project).filter { item in
                 guard let id = item.sessionId else { return false }
-                return project.pinnedSessions.contains(id) && matches(item)
+                return project.pinnedSessions.contains(id)
             }
         }
     }
@@ -113,7 +103,7 @@ struct ProjectTreeView: View {
                         }
                     }
                     ForEach(workbench.orderedProjects) { project in
-                        ProjectGroup(workbench: workbench, project: project, key: key, showArchived: showArchived)
+                        ProjectGroup(workbench: workbench, project: project, showArchived: showArchived)
                     }
                 }
                 .padding(.horizontal, 8)
@@ -149,37 +139,13 @@ struct ProjectTreeView: View {
                 if let id = workbench.selectedProjectID { workbench.newConversation(in: id) }
             }
             .disabled(workbench.selectedProjectID == nil)
-            if searching {
-                HStack(spacing: 8) {
-                    Image.om("magnifyingglass", size: 14).opacity(0.7).frame(width: 16)
-                    TextField("搜索会话", text: $query)
-                        .textFieldStyle(.plain)
-                        .font(OMFonts.body)
-                        .focused($searchFocused)
-                        .onExitCommand { endSearch() }
-                    Button { endSearch() } label: { Image.om("xmark.circle.fill", size: 12) }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(OMColors.tertiaryText)
-                        .accessibilityLabel("清除搜索")
-                }
-                .padding(.horizontal, 10)
-                .frame(height: 30)
-                .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.primary.opacity(0.07)))
-            } else {
-                NavRow(title: "搜索", icon: "magnifyingglass", shortcut: nil) {
-                    searching = true
-                    searchFocused = true
-                }
+            NavRow(title: "搜索", icon: "magnifyingglass", shortcut: ShortcutStore.shared.binding(for: .hubSearch).display) {
+                HubModel.shared.present(.all, workbench: workbench)
             }
             NavRow(title: "自定义", icon: "slider.horizontal.3", shortcut: nil) { AppActions.shared.openSettings() }
         }
         .padding(.horizontal, 10)
         .padding(.bottom, 8)
-    }
-
-    private func endSearch() {
-        query = ""
-        searching = false
     }
 
     /// 分区标题行里的筛选菜单(显示已归档会话)。
@@ -297,53 +263,50 @@ private struct ProjectGroup: View {
 
     let workbench: WorkbenchModel
     let project: ProjectEntry
-    let key: String
     let showArchived: Bool
     @State private var hovering = false
     @State private var showAll = false
 
     private var isSelected: Bool { workbench.selectedProjectID == project.id }
-    private var expanded: Bool { !project.collapsed || !key.isEmpty }
+    private var expanded: Bool { !project.collapsed }
 
-    /// 本项目要在树中展示的会话(排除置顶,按搜索过滤,按开关决定是否含已归档)。
+    /// 本项目要在树中展示的会话(排除置顶,按开关决定是否含已归档)。
     private var rows: [SidebarSession] {
         workbench.sidebarSessions(for: project).filter { item in
             if let id = item.sessionId {
                 if project.pinnedSessions.contains(id) { return false }
                 if project.archivedSessions.contains(id) && !showArchived { return false }
             }
-            return key.isEmpty || item.title.localizedCaseInsensitiveContains(key)
+            return true
         }
     }
 
     var body: some View {
         let all = rows
-        if key.isEmpty || !all.isEmpty {
-            VStack(alignment: .leading, spacing: 2) {
-                header(count: all.count)
-                if expanded {
-                    if all.isEmpty {
-                        Text("暂无会话")
-                            .font(OMFonts.small)
-                            .foregroundStyle(OMColors.tertiaryText)
-                            .padding(.leading, 16)
-                            .padding(.vertical, 4)
-                    }
-                    let visible = showAll || !key.isEmpty ? all : Array(all.prefix(Self.previewCount))
-                    ForEach(visible) { item in
-                        SessionLine(workbench: workbench, item: item, mode: .tree)
-                        if item.isCurrent { SubagentRows(workbench: workbench, projectID: project.id) }
-                    }
-                    if all.count > Self.previewCount && key.isEmpty {
-                        Button(showAll ? String(localized: "收起") : String(localized: "显示更多(还有 \(all.count - Self.previewCount) 条)")) {
-                            omWithAnimation(.snappy(duration: 0.18)) { showAll.toggle() }
-                        }
-                        .buttonStyle(.plain)
+        VStack(alignment: .leading, spacing: 2) {
+            header(count: all.count)
+            if expanded {
+                if all.isEmpty {
+                    Text("暂无会话")
                         .font(OMFonts.small)
-                        .foregroundStyle(OMColors.secondaryText)
+                        .foregroundStyle(OMColors.tertiaryText)
                         .padding(.leading, 16)
                         .padding(.vertical, 4)
+                }
+                let visible = showAll ? all : Array(all.prefix(Self.previewCount))
+                ForEach(visible) { item in
+                    SessionLine(workbench: workbench, item: item, mode: .tree)
+                    if item.isCurrent { SubagentRows(workbench: workbench, projectID: project.id) }
+                }
+                if all.count > Self.previewCount {
+                    Button(showAll ? String(localized: "收起") : String(localized: "显示更多(还有 \(all.count - Self.previewCount) 条)")) {
+                        omWithAnimation(.snappy(duration: 0.18)) { showAll.toggle() }
                     }
+                    .buttonStyle(.plain)
+                    .font(OMFonts.small)
+                    .foregroundStyle(OMColors.secondaryText)
+                    .padding(.leading, 16)
+                    .padding(.vertical, 4)
                 }
             }
         }

@@ -1,5 +1,5 @@
 // @author ixxxxoooo
-// 命令面板与快速打开:⌘P 模糊查找项目文件,⇧⌘P(或在输入框前加 `>`)执行命令。
+// 命令面板的命令清单:供中央搜索窗(HubSearch)的「操作」分类使用;快速打开与命令面板入口都转到中央搜索窗。
 
 import AppKit
 import DesignSystem
@@ -7,84 +7,18 @@ import IconKit
 import SwiftUI
 import WorkbenchKit
 
-/// 面板模式。
+/// 面板模式(兼容旧入口:快速打开 = 搜索窗「文件」,命令面板 = 「操作」)。
 enum PaletteMode { case files, commands }
 
-/// 面板中的一行。
-struct PaletteItem: Identifiable {
-    let id: String
-    let title: String
-    let subtitle: String?
-    let trailing: String?
-    let icon: String
-    /// 标题中需要强调的字符位置
-    let positions: [Int]
-    let run: @MainActor () -> Void
-}
-
+/// 旧命令面板入口的转发器:统一打开中央搜索窗。
 @MainActor
-@Observable
-final class PaletteModel {
-    static let shared = PaletteModel()
-    var isPresented = false
-    var mode: PaletteMode = .files
-    var query = "" {
-        didSet {
-            if query != oldValue { selection = 0 }
-            // 在文件模式输入 ">" 切到命令模式
-            if mode == .files, query.hasPrefix(">") { mode = .commands; query = String(query.dropFirst()) }
-        }
-    }
-    var selection = 0
-
-    /// 打开面板。
-    func present(_ mode: PaletteMode, workbench: WorkbenchModel) {
-        self.mode = mode
-        query = ""
-        selection = 0
-        isPresented = true
-        if mode == .files, WorkspaceIndexModel.shared.root != workbench.selectedProjectID || WorkspaceIndexModel.shared.files.isEmpty {
-            WorkspaceIndexModel.shared.refresh(root: workbench.selectedProjectID)
-        }
-    }
-
-    func dismiss() { isPresented = false }
-
-    /// 当前查询对应的候选项。
-    func items(workbench: WorkbenchModel) -> [PaletteItem] {
-        switch mode {
-        case .files: return fileItems(workbench: workbench)
-        case .commands: return commandItems(workbench: workbench)
-        }
-    }
-
-    private func fileItems(workbench: WorkbenchModel) -> [PaletteItem] {
-        guard let root = workbench.selectedProjectID else { return [] }
-        let index = WorkspaceIndexModel.shared
-        let candidates = index.root == root ? index.files : []
-        return FuzzyMatcher.rank(query: query, in: candidates, limit: 60).map { match in
-            let name = (match.path as NSString).lastPathComponent
-            let dir = (match.path as NSString).deletingLastPathComponent
-            let nameOffset = match.path.count - name.count
-            let positions = match.positions.filter { $0 >= nameOffset }.map { $0 - nameOffset }
-            return PaletteItem(id: match.path, title: name, subtitle: dir.isEmpty ? nil : dir, trailing: nil, icon: "file", positions: positions) {
-                workbench.openFile((root as NSString).appendingPathComponent(match.path), preview: false)
-            }
-        }
-    }
-
-    private func commandItems(workbench: WorkbenchModel) -> [PaletteItem] {
-        let all = PaletteCommands.all(workbench: workbench) + DemoPaletteCommands.all(workbench: workbench)
-        let trimmed = query.trimmingCharacters(in: .whitespaces)
-        let ranked: [(PaletteCommand, [Int])]
-        if trimmed.isEmpty { ranked = all.map { ($0, []) } }
-        else {
-            ranked = all.compactMap { cmd in FuzzyMatcher.match(query: trimmed, path: cmd.title).map { (cmd, $0.positions, $0.score) } }
-                .sorted { $0.2 > $1.2 }.map { ($0.0, $0.1) }
-        }
-        return ranked.map { cmd, positions in
-            PaletteItem(id: cmd.id, title: cmd.title, subtitle: nil, trailing: cmd.shortcut, icon: cmd.icon, positions: positions, run: cmd.run)
-        }
+enum PaletteModel {
+    /// 打开中央搜索窗并定位到对应分类。
+    /// - Parameters:
+    ///   - mode: 快速打开或命令面板
+    ///   - workbench: 工作台
+    static func present(_ mode: PaletteMode, workbench: WorkbenchModel) {
+        HubModel.shared.present(mode == .files ? .files : .actions, workbench: workbench)
     }
 }
 
@@ -111,7 +45,7 @@ enum PaletteCommands {
                 if let url = WorkspaceStore.chooseDirectory() { AppActions.shared.openWorkspace(url) }
             },
             PaletteCommand(id: "quickOpen", title: String(localized: "快速打开文件"), icon: "file-search", shortcut: key(.quickOpen)) {
-                PaletteModel.shared.present(.files, workbench: workbench)
+                PaletteModel.present(.files, workbench: workbench)
             },
             PaletteCommand(id: "search", title: String(localized: "在文件中搜索"), icon: "text-search", shortcut: key(.globalSearch)) {
                 workbench.showRight(.search); SearchModel.shared.requestFocus()
@@ -146,118 +80,5 @@ enum PaletteCommands {
             PaletteCommand(id: "tools", title: String(localized: "工具与扩展…"), icon: "puzzle", shortcut: key(.extensions)) { AppActions.shared.openSettings(page: .mcp) },
             PaletteCommand(id: "shortcuts", title: String(localized: "快捷键设置"), icon: "keyboard", shortcut: nil) { AppActions.shared.openSettings(page: .shortcuts) },
         ]
-    }
-}
-
-/// 面板视图:覆盖在工作台顶部居中。
-struct PaletteOverlay: View {
-    let workbench: WorkbenchModel
-    @Bindable private var palette = PaletteModel.shared
-    @FocusState private var focused: Bool
-
-    var body: some View {
-        if palette.isPresented {
-            let items = palette.items(workbench: workbench)
-            ZStack(alignment: .top) {
-                Color.black.opacity(0.001)
-                    .contentShape(Rectangle())
-                    .onTapGesture { palette.dismiss() }
-                card(items)
-                    .padding(.top, 70)
-            }
-            .onChange(of: palette.mode) { focused = true }
-        }
-    }
-
-    private func card(_ items: [PaletteItem]) -> some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                Image.om(palette.mode == .files ? "file-search" : "command", size: 14).foregroundStyle(OMColors.secondaryText)
-                TextField(palette.mode == .files ? String(localized: "按文件名搜索(输入 > 执行命令)") : String(localized: "输入命令"), text: $palette.query)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 14))
-                    .focused($focused)
-                    .onSubmit { run(items) }
-                    .onKeyPress(.downArrow) { palette.selection = min(palette.selection + 1, max(items.count - 1, 0)); return .handled }
-                    .onKeyPress(.upArrow) { palette.selection = max(palette.selection - 1, 0); return .handled }
-                    .onKeyPress(.escape) { palette.dismiss(); return .handled }
-            }
-            .padding(.horizontal, 14).padding(.vertical, 10)
-            Divider()
-            if items.isEmpty {
-                Text(palette.mode == .files && WorkspaceIndexModel.shared.isLoading ? String(localized: "正在建立文件索引…") : String(localized: "没有匹配项"))
-                    .font(OMFonts.small).foregroundStyle(OMColors.secondaryText).padding(16)
-            } else {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(spacing: 0) {
-                            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                                PaletteRow(item: item, selected: index == palette.selection)
-                                    .id(item.id)
-                                    .onTapGesture { palette.selection = index; run(items) }
-                                    .accessibilityElement(children: .combine)
-                                    .accessibilityAddTraits(index == palette.selection ? [.isButton, .isSelected] : .isButton)
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
-                    .frame(height: min(CGFloat(items.count) * 29 + 8, 340))
-                    .onChange(of: palette.selection) { _, new in
-                        if items.indices.contains(new) { proxy.scrollTo(items[new].id) }
-                    }
-                }
-            }
-        }
-        .frame(width: 580)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(OMColors.hairline))
-        .shadow(color: .black.opacity(0.25), radius: 24, y: 8)
-        .onAppear { focused = true }
-    }
-
-    private func run(_ items: [PaletteItem]) {
-        guard items.indices.contains(palette.selection) else { return }
-        let item = items[palette.selection]
-        palette.dismiss()
-        item.run()
-    }
-}
-
-private struct PaletteRow: View {
-    let item: PaletteItem
-    let selected: Bool
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image.om(item.icon, size: 13).foregroundStyle(OMColors.secondaryText).frame(width: 18)
-            Text(titleText).font(.system(size: 13)).lineLimit(1)
-            if let subtitle = item.subtitle {
-                Text(subtitle).font(OMFonts.caption).foregroundStyle(OMColors.secondaryText).lineLimit(1).truncationMode(.head)
-            }
-            Spacer(minLength: 8)
-            if let trailing = item.trailing {
-                Text(trailing).font(OMFonts.caption).foregroundStyle(OMColors.secondaryText)
-            }
-        }
-        .padding(.horizontal, 12).padding(.vertical, 5)
-        .background(RoundedRectangle(cornerRadius: 6).fill(selected ? OMColors.accent.opacity(0.22) : .clear).padding(.horizontal, 4))
-        .contentShape(Rectangle())
-    }
-
-    /// 标题,匹配到的字符加粗并着色。
-    private var titleText: AttributedString {
-        var text = AttributedString(item.title)
-        guard !item.positions.isEmpty else { return text }
-        let chars = Array(item.title)
-        var cursor = text.startIndex
-        for (i, _) in chars.enumerated() {
-            let next = text.index(afterCharacter: cursor)
-            if item.positions.contains(i) {
-                text[cursor..<next].font = .system(size: 13, weight: .bold)
-                text[cursor..<next].foregroundColor = OMColors.accent
-            }
-            cursor = next
-        }
-        return text
     }
 }
