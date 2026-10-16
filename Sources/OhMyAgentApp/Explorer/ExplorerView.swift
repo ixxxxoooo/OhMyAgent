@@ -78,7 +78,7 @@ private struct FolderRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ExplorerRow(depth: depth, icon: expanded ? "folder-open" : "folder", title: entry.name, chevron: expanded ? "chevron-down" : "chevron-right", isActive: false) {
+            ExplorerRow(depth: depth, name: entry.name, isDirectory: true, expanded: expanded, chevron: expanded ? "chevron-down" : "chevron-right", isActive: false) {
                 expanded.toggle()
             }
             .contextMenu { ExplorerMenu(entry: entry, root: root, workbench: workbench) }
@@ -97,7 +97,7 @@ private struct FileRow: View {
 
     var body: some View {
         let active = isActive
-        ExplorerRow(depth: depth, icon: fileIcon, title: entry.name, chevron: nil, isActive: active) {
+        ExplorerRow(depth: depth, name: entry.name, isDirectory: false, expanded: false, chevron: nil, isActive: active) {
             workbench.openFile(entry.path, preview: true)
         }
         .simultaneousGesture(TapGesture(count: 2).onEnded { workbench.openFile(entry.path, preview: false) })
@@ -108,20 +108,13 @@ private struct FileRow: View {
         if case .file(let p)? = workbench.dock.focusedGroup?.active?.kind { return p == entry.path }
         return false
     }
-
-    private var fileIcon: String {
-        switch (entry.name as NSString).pathExtension.lowercased() {
-        case "swift", "js", "ts", "tsx", "jsx", "py", "rs", "go", "java", "kt", "c", "h", "cpp", "m", "sh", "json", "yml", "yaml": return "file-code"
-        case "md", "txt": return "file-text"
-        default: return "file"
-        }
-    }
 }
 
 private struct ExplorerRow: View {
     let depth: Int
-    let icon: String
-    let title: String
+    let name: String
+    let isDirectory: Bool
+    let expanded: Bool
     let chevron: String?
     let isActive: Bool
     let action: () -> Void
@@ -134,8 +127,8 @@ private struct ExplorerRow: View {
                     if let chevron { Image.om(chevron, size: 10) } else { Color.clear }
                 }
                 .frame(width: 12)
-                Image.om(icon, size: 13).foregroundStyle(OMColors.secondaryText)
-                Text(title).font(OMFonts.small).lineLimit(1).truncationMode(.middle)
+                OMFileIcon(name: name, isDirectory: isDirectory, expanded: expanded, size: 16)
+                Text(name).font(OMFonts.small).lineLimit(1).truncationMode(.middle)
                 Spacer(minLength: 0)
             }
             .padding(.leading, 8 + CGFloat(depth) * 12)

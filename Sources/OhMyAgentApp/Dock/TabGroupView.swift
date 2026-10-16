@@ -265,8 +265,14 @@ struct TabItemView: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Image.om(tabIcon(tab.kind), size: 12)
-                .foregroundStyle(isActive ? OMColors.accent : OMColors.tertiaryText)
+            if case .file(let path) = tab.kind {
+                // 文件标签:彩色文件类型图标(非活动标签略降不透明度)
+                OMFileIcon(name: (path as NSString).lastPathComponent, size: 14)
+                    .opacity(isActive ? 1 : 0.7)
+            } else {
+                Image.om(tabIcon(tab.kind), size: 12)
+                    .foregroundStyle(isActive ? OMColors.accent : OMColors.tertiaryText)
+            }
             Text(workbench.displayTitle(tab))
                 .font(OMFonts.small)
                 .italic(tab.isPreview)
