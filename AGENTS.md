@@ -90,7 +90,7 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 **按钮**(`OMButtonStyle`,`DesignSystem/UIControls.swift`):`.omPrimary`(主操作,每个区域至多一个)、`.omSecondary`(次操作)、`.omPlain`(文字按钮)、`.omDestructive`(破坏性)、`.omIcon`(仅图标);默认紧凑 24pt,大表单底部主按钮可用 `OMButtonStyle(.primary, size: .regular)`(28pt)。禁止 `.bordered/.borderedProminent/.borderless` 与 `.controlSize(.large)`。
 
 **选择与数值控件**:
-- 少量互斥选项用 `OMCompactSegmented`;开关用 `OMSwitch`(行内说明用设置行的 `Toggle`,固定 `.small`);
+- 少量互斥选项:工具条/标题栏用 `OMCompactSegmented`,设置表单内可用系统 `.segmented` 选择器;开关用 `OMSwitch`(行内说明用设置行的 `Toggle`,固定 `.small`);
 - 档位/数值调节(宽度、字号等)用 `OMStepSlider`(带刻度的横向滑块),不用下拉;
 - 下拉式选择(模型、模式、思考强度、分支、面包屑、Agent、标签溢出、日志级别等)统一用 `OMPickList`:无箭头浮层、顶部搜索、↑↓ 切换、回车选中、Esc 关闭、当前项打勾;不使用 `.popover`/`Menu`/`.pickerStyle(.menu)` 做选择。
 

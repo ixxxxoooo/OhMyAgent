@@ -52,7 +52,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .general: return String(localized: "通用")
-        case .appearance: return String(localized: "主题")
+        case .appearance: return String(localized: "外观")
         case .shortcuts: return String(localized: "快捷键")
         case .agent: return String(localized: "Agent 与模型")
         case .providers: return String(localized: "模型提供商")

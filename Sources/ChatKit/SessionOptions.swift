@@ -48,6 +48,23 @@ public enum ChatWidth: String, Sendable, CaseIterable, Identifiable {
     public static let customStep: Double = 20
     public static let customDefault: Double = 900
 
+    /// 滑块使用的预设档位(从窄到宽,不含自定义)。
+    public static var presets: [ChatWidth] { allCases.filter { $0 != .custom } }
+
+    /// 该宽度在滑块上对应的档位下标:自定义宽度吸附到点数最接近的预设。
+    /// - Parameters:
+    ///   - raw: `chat.width` 存储的档位原始值
+    ///   - custom: `chat.widthCustom` 存储的自定义点数
+    /// - Returns: `presets` 中的下标
+    public static func presetIndex(raw: String, custom: Double) -> Int {
+        let presets = Self.presets
+        let width = ChatWidth(rawValue: raw) ?? .standard
+        if width != .custom { return presets.firstIndex(of: width) ?? 0 }
+        let target = CGFloat(clampedCustom(custom))
+        let finite = presets.enumerated().filter { $0.element.points.isFinite }
+        return finite.min { abs($0.element.points - target) < abs($1.element.points - target) }?.offset ?? 0
+    }
+
     /// 预设档位的最大宽度(点);`full` 为不限制;`custom` 取默认自定义值。
     public var points: CGFloat {
         switch self {
@@ -138,6 +155,23 @@ public enum SettingsContentWidth: String, Sendable, CaseIterable, Identifiable {
     public static let customRange: ClosedRange<Double> = 560...1600
     public static let customStep: Double = 20
     public static let customDefault: Double = 900
+
+    /// 滑块使用的预设档位(从窄到宽,不含自定义)。
+    public static var presets: [SettingsContentWidth] { allCases.filter { $0 != .custom } }
+
+    /// 该宽度在滑块上对应的档位下标:自定义宽度吸附到点数最接近的预设。
+    /// - Parameters:
+    ///   - raw: `settings.width` 存储的档位原始值
+    ///   - custom: `settings.widthCustom` 存储的自定义点数
+    /// - Returns: `presets` 中的下标
+    public static func presetIndex(raw: String, custom: Double) -> Int {
+        let presets = Self.presets
+        let width = SettingsContentWidth(rawValue: raw) ?? .standard
+        if width != .custom { return presets.firstIndex(of: width) ?? 0 }
+        let target = CGFloat(clampedCustom(custom))
+        let finite = presets.enumerated().filter { $0.element.points.isFinite }
+        return finite.min { abs($0.element.points - target) < abs($1.element.points - target) }?.offset ?? 0
+    }
 
     /// 预设档位的最大宽度(点);`full` 为不限制;`custom` 取默认自定义值。
     public var points: CGFloat {

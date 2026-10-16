@@ -52,7 +52,7 @@ struct WorkbenchView: View {
     }
 
     /// 工作台主体:左侧各列 + 中栏 + 右侧各列(自绘布局,无原生 NavigationSplitView);
-    /// 项目栏、工具栏、终端侧栏落在哪一侧由 `layout.placement` 决定(设置 → 主题 → 布局)。
+    /// 项目栏、工具栏、终端侧栏落在哪一侧由 `layout.placement` 决定(设置 → 外观 → 布局)。
     /// 顶部浮层(回退/前进/面板开关)盖在整个工作区之上,按钮位置恒定且可点击。
     private var workspaceBody: some View {
         HStack(spacing: 0) {

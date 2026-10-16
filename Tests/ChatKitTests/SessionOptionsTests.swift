@@ -164,3 +164,22 @@ struct SettingsContentWidthTests {
         #expect(SettingsContentWidth.clampedCustom(.nan) == SettingsContentWidth.customDefault)
     }
 }
+
+@Suite("宽度滑块档位")
+struct WidthSliderPresetTests {
+    @Test("预设不含自定义,标准档下标正确")
+    func presetsExcludeCustom() {
+        #expect(!ChatWidth.presets.contains(.custom))
+        #expect(ChatWidth.presets[ChatWidth.presetIndex(raw: "standard", custom: 900)] == .standard)
+        #expect(SettingsContentWidth.presets[SettingsContentWidth.presetIndex(raw: "wide", custom: 900)] == .wide)
+    }
+
+    @Test("自定义宽度吸附到点数最近的预设,未知值回退标准")
+    func customSnapsToNearest() {
+        // 830pt 最接近 standard(820)
+        #expect(ChatWidth.presets[ChatWidth.presetIndex(raw: "custom", custom: 830)] == .standard)
+        // 1180pt 最接近 ultra(1200)
+        #expect(ChatWidth.presets[ChatWidth.presetIndex(raw: "custom", custom: 1180)] == .ultra)
+        #expect(SettingsContentWidth.presets[SettingsContentWidth.presetIndex(raw: "乱写", custom: 900)] == .standard)
+    }
+}

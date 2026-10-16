@@ -117,7 +117,7 @@ struct GeneralPage: View {
     }
 }
 
-/// 主题:主题包、强调色、聊天宽度、字号、材质与动效。
+/// 外观:主题包、强调色、聊天宽度、字号、材质与动效、面板布局。
 struct AppearancePage: View {
     @Bindable private var appearance = AppearanceModel.shared
     @AppStorage(ClientPrefs.Key.chatWidth) private var chatWidth = ChatWidth.standard.rawValue
@@ -153,42 +153,42 @@ struct AppearancePage: View {
                 Note("主强调色用于按钮与选中态;第二强调色用于链接与次要徽标。「跟随主题」使用所选主题的默认配色。")
             }
             Section("聊天宽度") {
-                Picker("内容宽度", selection: $chatWidth) {
-                    ForEach(ChatWidth.allCases) { width in
-                        Text(width.displayName).tag(width.rawValue)
-                    }
-                }
-                if chatWidth == ChatWidth.custom.rawValue {
-                    LabeledContent("自定义宽度 \(Int(ChatWidth.clampedCustom(chatWidthCustom))) pt") {
-                        Slider(value: $chatWidthCustom, in: ChatWidth.customRange, step: ChatWidth.customStep).frame(width: 220)
-                    }
-                } else if ChatWidth(rawValue: chatWidth) != .full {
-                    LabeledContent("当前宽度", value: "\(Int(ChatWidth.resolve(raw: chatWidth, custom: chatWidthCustom))) pt")
-                }
+                SettingsSliderRow(
+                    title: String(localized: "内容宽度"),
+                    valueText: chatWidthSummary,
+                    stops: ChatWidth.presets.map(\.displayName),
+                    index: Binding(
+                        get: { ChatWidth.presetIndex(raw: chatWidth, custom: chatWidthCustom) },
+                        set: { chatWidth = ChatWidth.presets[min(max($0, 0), ChatWidth.presets.count - 1)].rawValue }
+                    )
+                )
                 Note("控制会话时间线与输入框的最大宽度;窄屏或分屏时会自动收窄。")
             }
             Section("设置页宽度") {
-                Picker("内容宽度", selection: $settingsWidth) {
-                    ForEach(SettingsContentWidth.allCases) { width in
-                        Text(width.displayName).tag(width.rawValue)
-                    }
-                }
-                if settingsWidth == SettingsContentWidth.custom.rawValue {
-                    LabeledContent("自定义宽度 \(Int(SettingsContentWidth.clampedCustom(settingsWidthCustom))) pt") {
-                        Slider(value: $settingsWidthCustom, in: SettingsContentWidth.customRange, step: SettingsContentWidth.customStep).frame(width: 220)
-                    }
-                } else if SettingsContentWidth(rawValue: settingsWidth) != .full {
-                    LabeledContent("当前宽度", value: "\(Int(SettingsContentWidth.resolve(raw: settingsWidth, custom: settingsWidthCustom))) pt")
-                }
+                SettingsSliderRow(
+                    title: String(localized: "内容宽度"),
+                    valueText: settingsWidthSummary,
+                    stops: SettingsContentWidth.presets.map(\.displayName),
+                    index: Binding(
+                        get: { SettingsContentWidth.presetIndex(raw: settingsWidth, custom: settingsWidthCustom) },
+                        set: { settingsWidth = SettingsContentWidth.presets[min(max($0, 0), SettingsContentWidth.presets.count - 1)].rawValue }
+                    )
+                )
                 Note("统一控制所有设置页右侧内容的最大宽度;窗口较窄时自动收窄。")
             }
             Section("字号") {
-                LabeledContent("界面字号 \(Int(appearance.uiFontScale * 100))%") {
-                    Slider(value: $appearance.uiFontScale, in: 0.85...1.3, step: 0.05).frame(width: 220)
-                }
-                LabeledContent("时间线字号 \(Int(appearance.timelineFontScale * 100))%") {
-                    Slider(value: $appearance.timelineFontScale, in: 0.85...1.5, step: 0.05).frame(width: 220)
-                }
+                SettingsSliderRow(
+                    title: String(localized: "界面字号"),
+                    valueText: "\(Int((appearance.uiFontScale * 100).rounded()))%",
+                    stops: Self.fontStops(85...130),
+                    index: fontIndex($appearance.uiFontScale, lower: 85)
+                )
+                SettingsSliderRow(
+                    title: String(localized: "时间线字号"),
+                    valueText: "\(Int((appearance.timelineFontScale * 100).rounded()))%",
+                    stops: Self.fontStops(85...150),
+                    index: fontIndex($appearance.timelineFontScale, lower: 85)
+                )
                 Text("预览:Claude 的回复会按这个大小显示。`let x = 1`").font(OMFonts.reading).padding(8)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(OMColors.card, in: RoundedRectangle(cornerRadius: 8))
@@ -209,6 +209,33 @@ struct AppearancePage: View {
 }
 
 extension AppearancePage {
+    /// 聊天宽度当前值文案(档位名 + 点数)。
+    fileprivate var chatWidthSummary: String {
+        let width = ChatWidth(rawValue: chatWidth) ?? .standard
+        let resolved = ChatWidth.resolve(raw: chatWidth, custom: chatWidthCustom)
+        return width == .full ? width.displayName : "\(width.displayName) · \(Int(resolved)) pt"
+    }
+
+    /// 设置页宽度当前值文案(档位名 + 点数)。
+    fileprivate var settingsWidthSummary: String {
+        let width = SettingsContentWidth(rawValue: settingsWidth) ?? .standard
+        let resolved = SettingsContentWidth.resolve(raw: settingsWidth, custom: settingsWidthCustom)
+        return width == .full ? width.displayName : "\(width.displayName) · \(Int(resolved)) pt"
+    }
+
+    /// 字号档位文案:`85%`…(步长 5)。
+    fileprivate static func fontStops(_ range: ClosedRange<Int>) -> [String] {
+        stride(from: range.lowerBound, through: range.upperBound, by: 5).map { "\($0)%" }
+    }
+
+    /// 字号缩放(0.85…)与档位下标互转的绑定,步长 5%。
+    fileprivate func fontIndex(_ scale: Binding<Double>, lower: Int) -> Binding<Int> {
+        Binding(
+            get: { max(0, (Int((scale.wrappedValue * 100).rounded()) - lower) / 5) },
+            set: { scale.wrappedValue = Double(lower + $0 * 5) / 100 }
+        )
+    }
+
     /// 布局:终端位置、项目栏与工具栏所在侧(也可直接拖动终端标题条换位置)。
     @ViewBuilder
     fileprivate var layoutSection: some View {

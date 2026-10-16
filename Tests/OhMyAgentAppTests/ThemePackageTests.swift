@@ -123,9 +123,9 @@ struct ThemePackageTests {
         #expect(palette.diffAdded.blue > palette.diffAdded.red)
     }
 
-    @Test("设置页导航名为「主题」")
+    @Test("设置页导航名为「外观」")
     func pageTitle() {
-        #expect(SettingsPage.appearance.title == String(localized: "主题"))
+        #expect(SettingsPage.appearance.title == String(localized: "外观"))
     }
 
     @Test("侧栏色与内容色:仅 Cursor 浅色使用 #EFEFEF/#F6F6F7,其余主题各自提供且二者不同")

@@ -113,6 +113,26 @@ struct SettingsNumericField<Value: Equatable, Format: ParseableFormatStyle>: Vie
     }
 }
 
+/// 设置页「标题 + 当前值 + 档位滑块」行:标题与当前值在上,滑块占满整行宽度(宽度、字号等档位调节统一用它)。
+struct SettingsSliderRow: View {
+    let title: String
+    let valueText: String
+    let stops: [String]
+    @Binding var index: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(verbatim: title).font(OMFonts.body)
+                Spacer(minLength: 8)
+                Text(verbatim: valueText).font(OMFonts.small).foregroundStyle(OMColors.secondaryText).monospacedDigit()
+            }
+            OMStepSlider(stops: stops, index: $index, accessibilityName: title)
+        }
+        .padding(.vertical, 2)
+    }
+}
+
 /// 灰色说明文字。
 struct Note: View {
     let text: String
