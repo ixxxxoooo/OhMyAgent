@@ -1,6 +1,7 @@
 // @author ygw
-// 右栏检查器:本轮改动(当前会话最近一次的文件改动汇总)与计划(Agent 最近一次的任务清单)。
+// 右栏:文件 / 搜索 / Git 三个视图(本轮 Agent 改动与提交图谱并入 Git 页;计划在输入区上方的待办条;终端在底部面板与终端标签)。
 
+import AppKit
 import IconKit
 import ChatKit
 import DesignSystem
@@ -15,19 +16,17 @@ struct RightPaneView: View {
             paneBar
             Divider()
             switch workbench.layout.rightPane {
-            case .changes: ChangesPane(workbench: workbench)
-            case .files: ExplorerView(workbench: workbench)
-            case .search: SearchPaneView(workbench: workbench)
             case .git: SCMView(workbench: workbench)
-            case .terminal: RightTerminalPane(workbench: workbench)
-            default: sessionContent
+            case .search: SearchPaneView(workbench: workbench)
+            default: ExplorerView(workbench: workbench)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(OMColors.surface)
+        // 与左侧栏同一材质(侧栏材质),不再使用正文白底
+        .background(SidebarBackground())
     }
 
-    /// 图标分段条:右栏窄时也能放下 6 个视图;当前视图的标题显示在右侧。
+    /// 图标分段条:文件 / 搜索 / Git(对齐 VSCode 与 Cursor 的侧栏视图);当前视图标题显示在右侧。
     private var paneBar: some View {
         HStack(spacing: 2) {
             ForEach(RightPane.available, id: \.self) { pane in
@@ -55,35 +54,6 @@ struct RightPaneView: View {
         .padding(.trailing, TitlebarMetrics.trailingInset)
         .frame(height: TitlebarMetrics.height)
         .background(WindowDragArea())
-    }
-
-    @ViewBuilder
-    private var sessionContent: some View {
-        VStack(spacing: 0) {
-            if let model = workbench.activeSession {
-                content(model: model)
-            } else {
-                ContentUnavailableView { Label("没有会话", om: "bubble.left", size: 28) } description: { Text("选择一个项目后,这里会显示改动与计划。") }
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(OMColors.surface)
-    }
-
-    @ViewBuilder
-    private func content(model: SessionModel) -> some View {
-        switch workbench.layout.rightPane {
-        case .plan:
-            if let entry = model.timeline.entries.last(where: { $0.kind == .plan }) {
-                ScrollView {
-                    PlanView(entry: entry).padding(10)
-                }
-            } else {
-                ContentUnavailableView { Label("暂无计划", om: "checklist", size: 28) } description: { Text("Agent 制定任务计划后会显示在这里。") }
-            }
-        case .outline, .problems, .files, .search, .changes, .git, .terminal:
-            EmptyView()
-        }
     }
 
     /// 右栏视图对应的图标(Lucide 名)。
@@ -125,15 +95,19 @@ struct RightRail: View {
                     workbench.showRight(pane)
                 }
             }
-            railButton(title: String(localized: "输出"), icon: "panel-bottom") {
-                workbench.showBottom(.output)
+            Divider().frame(width: 16).padding(.vertical, 2)
+            railButton(title: String(localized: "底部面板"), icon: "panel-bottom") {
+                workbench.toggleBottom()
+            }
+            railButton(title: String(localized: "工具与扩展"), icon: "puzzlepiece.extension") {
+                AppActions.shared.openSettings(page: .tools)
             }
             Spacer()
         }
         .padding(.top, TitlebarMetrics.height + 6)
         .frame(width: TitlebarMetrics.trailingInset)
         .frame(maxHeight: .infinity)
-        .background(.regularMaterial)
+        .background(SidebarBackground())
         .overlay(alignment: .leading) { Divider() }
     }
 
@@ -150,31 +124,15 @@ struct RightRail: View {
     }
 }
 
-/// 「改动」页:本轮 Agent 的文件改动汇总(未提交的 Git 改动见「Git」页)。
-struct ChangesPane: View {
-    let workbench: WorkbenchModel
-
-    var body: some View {
-        if let model = workbench.activeSession,
-           let entry = model.timeline.entries.last(where: { $0.kind == .changes && !$0.changes.isEmpty }) {
-            ScrollView {
-                ChangesSummaryView(entry: entry)
-                    .environment(model)
-                    .padding(10)
-            }
-        } else {
-            ContentUnavailableView { Label("暂无改动", om: "doc.on.doc", size: 28) } description: { Text("Agent 修改文件后,这里会列出每个文件的差异;提交与分支请到 Git 页。") }
-        }
+/// 侧栏材质背景:与左侧栏(系统侧栏)同一视觉效果,供右栏与右栏快捷列使用。
+struct SidebarBackground: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .sidebar
+        view.blendingMode = .behindWindow
+        view.state = .followsWindowActiveState
+        return view
     }
-}
 
-/// 右栏终端:项目级常驻 shell(与底部面板、终端标签相互独立),切换分段不会结束进程。
-struct RightTerminalPane: View {
-    let workbench: WorkbenchModel
-
-    var body: some View {
-        let root = workbench.selectedProjectID ?? NSHomeDirectory()
-        TerminalTabView(id: "right:\(root)", fallbackDirectory: root, focusOnAppear: false)
-            .id(root)
-    }
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {}
 }

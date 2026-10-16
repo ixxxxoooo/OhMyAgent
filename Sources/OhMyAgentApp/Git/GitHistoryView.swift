@@ -130,6 +130,8 @@ struct CommitRow: View {
     let row: GitGraphRow
     let laneWidth: CGFloat
     let isSelected: Bool
+    /// 紧凑模式(右栏图谱分区):隐藏日期与短哈希,避免窄栏溢出
+    var compact = false
     static let height: CGFloat = 26
 
     var body: some View {
@@ -152,9 +154,11 @@ struct CommitRow: View {
                     .layoutPriority(1)
             }
             Spacer(minLength: 6)
-            Text(row.commit.date, format: .relative(presentation: .numeric, unitsStyle: .abbreviated))
-                .font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText).lineLimit(1)
-            Text(row.commit.shortHash).font(OMFonts.monoSmall).foregroundStyle(OMColors.secondaryText).lineLimit(1)
+            if !compact {
+                Text(row.commit.date, format: .relative(presentation: .numeric, unitsStyle: .abbreviated))
+                    .font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText).lineLimit(1)
+                Text(row.commit.shortHash).font(OMFonts.monoSmall).foregroundStyle(OMColors.secondaryText).lineLimit(1)
+            }
         }
         .padding(.leading, laneWidth > 0 ? 0 : 12)
         .padding(.trailing, 10)

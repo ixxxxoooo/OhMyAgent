@@ -135,8 +135,12 @@ struct WorkbenchTests {
         model.toggleLeft(); model.toggleRight(); model.toggleBottom()
         #expect(!model.layout.leftVisible && model.layout.rightVisible && model.layout.bottomVisible)
         model.layout.rightVisible = false
-        model.showRight(.plan)
-        #expect(model.layout.rightVisible && model.layout.rightPane == .plan)
+        model.showRight(.git)
+        #expect(model.layout.rightVisible && model.layout.rightPane == .git)
+        // 已下线的旧视图被校正回「文件」
+        model.layout.rightPane = .plan
+        model.layout.clamp()
+        #expect(model.layout.rightPane == .files)
         model.showBottom(.output)
         #expect(model.layout.bottomVisible)
         model.toggleCollapsed(a)

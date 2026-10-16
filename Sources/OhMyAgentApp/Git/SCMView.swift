@@ -8,7 +8,7 @@ import IconKit
 import SwiftUI
 import WorkbenchKit
 
-/// 右栏「改动」里的 Git 视图。
+/// 右栏「Git」页:分支/同步、提交框、本轮 Agent 改动、更改分组、提交图谱。
 struct SCMView: View {
     let workbench: WorkbenchModel
 
@@ -144,7 +144,7 @@ private struct SCMContent: View {
         Menu {
             Button("获取(fetch)") { Task { await model.fetch() } }
             Button("刷新") { Task { await model.refresh() } }
-            Button("查看提交历史") { workbench.openHistory(project: model.projectPath) }
+            Button("在标签页打开提交历史") { workbench.openHistory(project: model.projectPath) }
             Divider()
             Button("暂存当前更改到 stash…") {
                 if let message = GitDialogs.prompt(title: String(localized: "暂存到 stash"), message: String(localized: "包含未跟踪文件。可留空使用默认说明。"), placeholder: String(localized: "说明(可选)"), confirm: String(localized: "暂存")) {
@@ -230,6 +230,7 @@ private struct SCMContent: View {
     private var changeList: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
+                AgentChangesSection(workbench: workbench)
                 let conflicts = model.status.conflicts
                 if !conflicts.isEmpty {
                     SectionHeader(title: "冲突", count: conflicts.count, tint: OMColors.warning) { EmptyView() }
@@ -263,6 +264,7 @@ private struct SCMContent: View {
                     }
                     ForEach(untracked) { change in ChangeRow(workbench: workbench, model: model, change: change, section: .untracked) }
                 }
+                GitGraphSection(workbench: workbench, model: model)
             }
             .padding(.vertical, 4)
         }
@@ -342,8 +344,8 @@ private struct ChangeRow: View {
         let name = (change.path as NSString).lastPathComponent
         let dir = (change.path as NSString).deletingLastPathComponent
         HStack(spacing: 6) {
-            Image.om("file-code", size: 12).foregroundStyle(OMColors.secondaryText)
-            Text(name).font(OMFonts.small).lineLimit(1)
+            OMFileIcon(name: name, size: 14)
+            Text(name).font(OMFonts.small).lineLimit(1).layoutPriority(2)
             if !dir.isEmpty {
                 Text(dir).font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText).lineLimit(1).truncationMode(.head)
             }
@@ -351,7 +353,8 @@ private struct ChangeRow: View {
             if hovering { actions }
             badge
         }
-        .padding(.horizontal, 10).padding(.vertical, 3)
+        .padding(.horizontal, 10)
+        .frame(height: 24)   // 固定行高:悬停出现操作按钮时不改变高度
         .contentShape(Rectangle())
         .background(hovering ? Color.primary.opacity(0.06) : .clear)
         .onHover { hovering = $0 }

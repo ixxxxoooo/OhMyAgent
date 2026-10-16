@@ -23,8 +23,9 @@ public enum LeftPane: String, Codable, CaseIterable, Sendable {
 public enum RightPane: String, Codable, CaseIterable, Sendable {
     case changes, plan, outline, problems, files, search, git, terminal
 
-    /// 右栏分段顺序:改动、文件、搜索、Git、终端、计划
-    public static var available: [RightPane] { [.changes, .files, .search, .git, .terminal, .plan] }
+    /// 右栏分段顺序:文件、搜索、Git。
+    /// 旧版本的 `changes`(本轮改动)并入 Git 页,`plan` 由输入区上方的待办条承担,`terminal` 与底部面板/终端标签重复,故不再提供。
+    public static var available: [RightPane] { [.files, .search, .git] }
 }
 
 /// 底部面板视图。
@@ -43,7 +44,7 @@ public struct WorkbenchLayout: Codable, Equatable, Sendable {
     public var rightWidth: Double = PanelMetrics.rightDefault
     public var bottomHeight: Double = 240
     public var leftPane: LeftPane = .sessions
-    public var rightPane: RightPane = .changes
+    public var rightPane: RightPane = .files
     public var bottomPane: BottomPane = .output
 
     public init() {}
@@ -54,7 +55,7 @@ public struct WorkbenchLayout: Codable, Equatable, Sendable {
         rightWidth = min(max(rightWidth, PanelMetrics.rightRange.lowerBound), PanelMetrics.rightRange.upperBound)
         bottomHeight = min(max(bottomHeight, 120), 600)
         if !LeftPane.available.contains(leftPane) { leftPane = .sessions }
-        if !RightPane.available.contains(rightPane) { rightPane = .changes }
+        if !RightPane.available.contains(rightPane) { rightPane = .files }
         if !BottomPane.available.contains(bottomPane) { bottomPane = .output }
     }
 }

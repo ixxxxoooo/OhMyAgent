@@ -129,10 +129,7 @@ enum PaletteCommands {
             },
             PaletteCommand(id: "terminal", title: String(localized: "新建终端标签"), icon: "square-terminal", shortcut: key(.newTerminal)) { AppActions.shared.openTerminal() },
             PaletteCommand(id: "explorer", title: String(localized: "显示文件资源管理器"), icon: "folder", shortcut: nil) { workbench.showRight(.files) },
-            PaletteCommand(id: "changesPane", title: String(localized: "显示改动"), icon: "file-diff", shortcut: nil) { workbench.showRight(.changes) },
             PaletteCommand(id: "gitPane", title: String(localized: "显示 Git"), icon: "git-branch", shortcut: nil) { workbench.showRight(.git) },
-            PaletteCommand(id: "terminalPane", title: String(localized: "显示右栏终端"), icon: "terminal", shortcut: nil) { workbench.showRight(.terminal) },
-            PaletteCommand(id: "planPane", title: String(localized: "显示计划"), icon: "list-checks", shortcut: nil) { workbench.showRight(.plan) },
             PaletteCommand(id: "changesTab", title: String(localized: "在标签中查看本轮改动"), icon: "file-diff", shortcut: nil) {
                 if let id = workbench.selectedProjectID { workbench.openChanges(project: id) }
             },
