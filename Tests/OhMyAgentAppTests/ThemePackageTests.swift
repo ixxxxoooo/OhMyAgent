@@ -61,6 +61,24 @@ struct ThemePackageTests {
         }
     }
 
+    @Test("OpenCode 主题:深浅各一套,取自 OpenCode 默认配色并映射到调色板")
+    func opencodeThemes() throws {
+        let group = ThemePackage.all.filter { $0.group == .opencode }
+        #expect(Set(group.map(\.id)) == ["opencode-dark", "opencode-light"])
+        let dark = try #require(ThemePackage.find("opencode-dark").palette)
+        let light = try #require(ThemePackage.find("opencode-light").palette)
+        #expect(ThemePackage.find("opencode-dark").tone == .dark && ThemePackage.find("opencode-light").tone == .light)
+        // 深色:近黑底 + 桃橙主色 + 蓝色第二强调;浅色:白底 + 蓝色主色
+        #expect(dark.surface.hexString == "#0A0A0A")
+        #expect(dark.accent.hexString == "#FAB283" && dark.accent2.hexString == "#5C9CF5")
+        #expect(light.surface.hexString == "#FFFFFF" && light.accent.hexString == "#3B7DD8")
+        // 语法色已映射(关键字紫、字符串绿)
+        #expect(dark.keyword.hexString == "#9D7CD8" && dark.string.hexString == "#7FD88F")
+        #expect(light.string.hexString == "#3D9A57")
+        // 分组出现在设置页分组列表中,且有标题
+        #expect(ThemeGroup.allCases.contains(.opencode) && ThemeGroup.opencode.title == "OpenCode")
+    }
+
     @Test("强调色优先级:用户选择 > 主题默认 > 系统")
     func accentPriority() {
         withRuntime(.system) {

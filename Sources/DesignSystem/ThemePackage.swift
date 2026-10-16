@@ -96,7 +96,7 @@ public enum ThemeTone: String, Sendable {
 
 /// 主题分组(设置页分组展示)。
 public enum ThemeGroup: String, CaseIterable, Sendable {
-    case system, cursor, anthropic, claudeCode
+    case system, cursor, anthropic, claudeCode, opencode
 
     public var title: String {
         switch self {
@@ -104,6 +104,7 @@ public enum ThemeGroup: String, CaseIterable, Sendable {
         case .cursor: return "Cursor"
         case .anthropic: return "Anthropic"
         case .claudeCode: return "Claude Code"
+        case .opencode: return "OpenCode"
         }
     }
 }
@@ -280,12 +281,32 @@ extension ThemePackage {
         $0.setSyntax(keyword: 0xAA00AA, string: 0x00AA00, comment: 0x777777, number: 0xAA5500, type: 0x00AAAA, function: 0x0000AA, property: 0x000000)
     })
 
+    // OpenCode 系(取自 OpenCode 默认 TUI 主题:近黑底、桃橙主色、蓝/紫点缀)
+    static let opencodeDark = ThemePackage(id: "opencode-dark", name: String(localized: "OpenCode 深色"), group: .opencode, tone: .dark, palette: .make(.darkBase) {
+        $0.setBackgrounds(surface: 0x0A0A0A, card: 0x141414, gutter: 0x0F0F0F, currentLine: 0x1E1E1E)
+        $0.editorForeground = ThemeRGB(hex: 0xEEEEEE); $0.gutterForeground = ThemeRGB(hex: 0x606060)
+        $0.accent = ThemeRGB(hex: 0xFAB283); $0.accent2 = ThemeRGB(hex: 0x5C9CF5)
+        $0.success = ThemeRGB(hex: 0x7FD88F); $0.danger = ThemeRGB(hex: 0xE06C75); $0.warning = ThemeRGB(hex: 0xF5A742)
+        $0.diffAdded = ThemeRGB(hex: 0x1B3322); $0.diffRemoved = ThemeRGB(hex: 0x3F1F24)
+        $0.setSyntax(keyword: 0x9D7CD8, string: 0x7FD88F, comment: 0x808080, number: 0xF5A742, type: 0xE5C07B, function: 0xFAB283, property: 0xE06C75)
+    })
+
+    static let opencodeLight = ThemePackage(id: "opencode-light", name: String(localized: "OpenCode 浅色"), group: .opencode, tone: .light, palette: .make(.lightBase) {
+        $0.setBackgrounds(surface: 0xFFFFFF, card: 0xF5F5F5, gutter: 0xFAFAFA, currentLine: 0xF0F0F0)
+        $0.editorForeground = ThemeRGB(hex: 0x1A1A1A); $0.gutterForeground = ThemeRGB(hex: 0x9A9A9A)
+        $0.accent = ThemeRGB(hex: 0x3B7DD8); $0.accent2 = ThemeRGB(hex: 0x7B5BB6)
+        $0.success = ThemeRGB(hex: 0x3D9A57); $0.danger = ThemeRGB(hex: 0xD1383D); $0.warning = ThemeRGB(hex: 0xD68C27)
+        $0.diffAdded = ThemeRGB(hex: 0xDDF2E3); $0.diffRemoved = ThemeRGB(hex: 0xFBE0E1)
+        $0.setSyntax(keyword: 0x7B5BB6, string: 0x3D9A57, comment: 0x8A8A8A, number: 0xD68C27, type: 0xB0851F, function: 0x3B7DD8, property: 0xD1383D)
+    })
+
     /// 全部预置主题(设置页按分组展示)。
     public static let all: [ThemePackage] = [
         system,
         cursorLight, cursorLightColorblind, cursorDark, cursorDarkHC,
         anthropicLight, anthropicDark,
         claudeDark, claudeLight, claudeDarkDaltonized, claudeLightDaltonized, claudeDarkANSI, claudeLightANSI,
+        opencodeDark, opencodeLight,
     ]
 
     /// 按 id 查找,未知回退系统。
