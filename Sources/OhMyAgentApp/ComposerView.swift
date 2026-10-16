@@ -246,70 +246,137 @@ struct OptionMenu: View {
     }
 }
 
-/// 模型提供商菜单:按会话切换提供商与主模型(设置 → 模型提供商 里配置过提供商时才显示)。
+/// 模型提供商菜单:跨提供商的模型列表(按厂商分组、可搜索),选择后只影响当前会话。
+/// 只列出已启用且已配置密钥的提供商;设置 → 模型提供商 里配置过提供商时才显示。
 struct ProviderMenu: View {
     let model: SessionModel
     @State private var snapshot = ProviderSnapshot()
+    @State private var keyed: Set<String> = []
+    @State private var open = false
 
     var body: some View {
-        Group { content }
-            .task(id: model.providerID) { await reload() }
+        // 内容可能为空(尚无提供商),空视图上的 .task 不会触发,因此挂在一个零尺寸占位上
+        ZStack {
+            Color.clear.frame(width: 0, height: 0)
+                .task(id: model.providerID) { await reload() }
+            content
+        }
+        .onChange(of: open) { _, isOpen in if isOpen { Task { await reload() } } }
     }
 
     @ViewBuilder
     private var content: some View {
         if !snapshot.providers.isEmpty, model.descriptor.kind == .claudeACP {
-            Menu {
-                Button { model.switchProvider(ProviderOverride(providerId: nil)) } label: {
-                    if model.providerID == nil { Label("系统默认(~/.claude)", om: "checkmark") } else { Text("系统默认(~/.claude)") }
-                }
-                Divider()
-                ForEach(snapshot.providers) { provider in
-                    let models = Self.models(of: provider)
-                    if models.count > 1 {
-                        Menu(provider.name) {
-                            ForEach(models, id: \.self) { name in
-                                Button { model.switchProvider(ProviderOverride(providerId: provider.id, model: name)) } label: {
-                                    if model.providerID == provider.id && model.providerModel == name { Label(name, om: "checkmark") } else { Text(name) }
-                                }
-                            }
-                        }
-                    } else {
-                        Button { model.switchProvider(ProviderOverride(providerId: provider.id)) } label: {
-                            if model.providerID == provider.id { Label(provider.name, om: "checkmark") } else { Text(provider.name) }
-                        }
-                    }
-                }
-            } label: {
-                Label(title, om: "server.rack")
+            Button { open.toggle() } label: {
+                Label(title, om: "server")
                     .font(OMFonts.small)
                     .lineLimit(1)
             }
-            .fixedSize()
-            .menuStyle(.button)
             .buttonStyle(.plain)
             .foregroundStyle(OMColors.secondaryText)
+            .fixedSize()
             .disabled(model.isRunning || model.phase != .ready)
             .help("切换模型提供商与模型(仅影响当前会话)")
             .accessibilityLabel("模型提供商")
+            .popover(isPresented: $open, arrowEdge: .top) {
+                ProviderPickerPopover(model: model, snapshot: snapshot, keyed: keyed) { open = false }
+            }
         }
     }
 
-    /// 菜单标题:提供商名 · 模型;未使用提供商时显示「系统默认」。
+    /// 菜单标题:提供商名 · 模型展示名;未使用提供商时显示「系统默认」。
     private var title: String {
         guard let name = model.providerName else { return String(localized: "系统默认") }
-        return model.providerModel.map { "\(name) · \($0)" } ?? name
-    }
-
-    /// 提供商的可选模型(含当前主模型,去重保序)。
-    private static func models(of provider: ModelProvider) -> [String] {
-        var result = [provider.model]
-        for name in provider.availableModels ?? [] where !result.contains(name) { result.append(name) }
-        return result
+        guard let id = model.providerModel else { return name }
+        let display = snapshot.providers.first(where: { $0.id == model.providerID })?.displayName(forModel: id) ?? id
+        return "\(name) · \(display)"
     }
 
     private func reload() async {
-        snapshot = await Task.detached { ProviderStorage.load() }.value
+        let result = await Task.detached { (ProviderStorage.load(), ProviderStorage.keyedIds()) }.value
+        snapshot = result.0
+        keyed = result.1
+    }
+}
+
+/// 模型选择弹层:搜索 + 按厂商分组的模型列表。
+private struct ProviderPickerPopover: View {
+    let model: SessionModel
+    let snapshot: ProviderSnapshot
+    let keyed: Set<String>
+    let onClose: () -> Void
+    @State private var query = ""
+
+    private var sections: [ProviderMenuSection] {
+        ProviderMenuBuilder.sections(snapshot: snapshot, hasKey: { keyed.contains($0) || ProviderStorage.hasEnvironmentKey }, query: query)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Image.om("search", size: 12).foregroundStyle(OMColors.tertiaryText)
+                TextField("搜索模型", text: $query).textFieldStyle(.plain).font(OMFonts.body)
+            }
+            .padding(.horizontal, 10).frame(height: 30)
+            Divider()
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    if query.isEmpty {
+                        row(title: String(localized: "系统默认(~/.claude)"), subtitle: nil, selected: model.providerID == nil) {
+                            model.switchProvider(ProviderOverride(providerId: nil))
+                        }
+                    }
+                    ForEach(sections) { section in
+                        Text(section.providerName)
+                            .font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
+                            .padding(.horizontal, 12).padding(.top, 8).padding(.bottom, 2)
+                        ForEach(section.models) { item in
+                            row(title: item.name, subtitle: item.name == item.id ? nil : item.id,
+                                selected: model.providerID == section.providerId && (model.providerModel ?? "") == item.id) {
+                                model.switchProvider(ProviderOverride(providerId: section.providerId, model: item.id))
+                            }
+                        }
+                    }
+                    if sections.isEmpty && !query.isEmpty {
+                        Text("没有匹配的模型").font(OMFonts.small).foregroundStyle(OMColors.secondaryText).padding(12)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+            .frame(maxHeight: 320)
+            Divider()
+            HStack {
+                Text("仅当前会话生效").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
+                Spacer()
+                Button("管理提供商…") {
+                    onClose()
+                    AppActions.shared.openSettings(page: .providers)
+                }
+                .buttonStyle(.plain).font(OMFonts.caption).foregroundStyle(OMColors.secondaryText)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 8)
+        }
+        .frame(width: 300)
+    }
+
+    private func row(title: String, subtitle: String?, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            action()
+            onClose()
+        } label: {
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title).font(OMFonts.body).lineLimit(1)
+                    if let subtitle { Text(subtitle).font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText).lineLimit(1) }
+                }
+                Spacer(minLength: 4)
+                if selected { Image.om("check", size: 12) }
+            }
+            .padding(.horizontal, 12).padding(.vertical, 5)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 
