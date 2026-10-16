@@ -21,6 +21,10 @@ public actor ScriptedAgent: ACPRequestHandler {
     /// 各会话收到的引导消息
     var steered: [String: [String]] = [:]
     var clientTerminal = false
+    /// 是否提供演示历史会话(`session/list` 返回目录、`session/load` 回放完整内容);演示模式开启
+    let demoHistory: Bool
+    /// 正在回放历史的会话(回放不做任何停顿)
+    var replaying: Set<String> = []
     private var pump: Task<Void, Never>?
     /// 每个文本分片之间的停顿(毫秒),便于测试取消与流式合并。
     let chunkDelayMillis: Int
@@ -30,8 +34,10 @@ public actor ScriptedAgent: ACPRequestHandler {
     /// - Parameters:
     ///   - transport: 传输
     ///   - chunkDelayMillis: 分片间隔
+    ///   - demoHistory: 是否提供演示历史会话目录
     ///   - onClose: 连接关闭回调
-    public init(transport: any ACPTransport, chunkDelayMillis: Int = 15, onClose: (@Sendable () -> Void)? = nil) {
+    public init(transport: any ACPTransport, chunkDelayMillis: Int = 15, demoHistory: Bool = false, onClose: (@Sendable () -> Void)? = nil) {
+        self.demoHistory = demoHistory
         self.onClose = onClose
         self.connection = ACPConnection(transport: transport)
         self.chunkDelayMillis = chunkDelayMillis
@@ -90,6 +96,7 @@ public actor ScriptedAgent: ACPRequestHandler {
             Task { await self.sendCommands(sessionId: id) }
             return ["sessionId": .string(id), "configOptions": configOptions(sessionId: id)]
         case "session/list":
+            if demoHistory { return demoSessionList(cwd: p["cwd"]?.stringValue) }
             let list = sessions.keys.sorted().map { id -> JSONValue in ["sessionId": .string(id), "cwd": .string(sessions[id] ?? "/"), "title": .string("脚本会话 \(id)"), "updatedAt": "2026-10-16T01:00:00Z"] }
             return ["sessions": .array(list)]
         case "authenticate", "logout":
@@ -101,7 +108,9 @@ public actor ScriptedAgent: ACPRequestHandler {
             sessions[id] = p["cwd"]?.stringValue ?? sessions[id] ?? "/"
             modes[id] = modes[id] ?? "default"
             models[id] = models[id] ?? "scripted-1"
-            if method == "session/load" {
+            if method == "session/load", demoHistory, let history = DemoHistory.session(id: id) {
+                await replayDemoHistory(history, cwd: sessions[id] ?? "/")
+            } else if method == "session/load" {
                 // 回放历史
                 await update(id, ["sessionUpdate": "user_message_chunk", "content": ["type": "text", "text": .string("历史问题 \(id)")]])
                 await update(id, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": "历史"]])

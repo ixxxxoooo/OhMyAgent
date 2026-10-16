@@ -26,6 +26,11 @@ extension ScriptedAgent {
         if scaled > 0 { try? await Task.sleep(for: .milliseconds(scaled)) }
     }
 
+    /// 回放期间不停顿的版本(其余会话沿用统一节奏)。
+    func pause(_ sessionId: String) async {
+        if !replaying.contains(sessionId) { await pause() }
+    }
+
     // MARK: 步骤执行
 
     /// 依次执行一组步骤。
@@ -50,13 +55,13 @@ extension ScriptedAgent {
         case .thought(let pieces):
             for piece in pieces {
                 await emit(sessionId, parent: parent, ["sessionUpdate": "agent_thought_chunk", "content": ["type": "text", "text": .string(piece)]])
-                await pause()
+                await pause(sessionId)
                 if cancelled.contains(sessionId) { return .cancelled }
             }
         case .text(let pieces):
             for piece in pieces {
                 await emit(sessionId, parent: parent, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": .string(piece)]])
-                await pause()
+                await pause(sessionId)
                 if cancelled.contains(sessionId) { return .cancelled }
             }
         case .user(let text):
@@ -127,13 +132,13 @@ extension ScriptedAgent {
         let frozen = tool.finish == .running || tool.finish == .pending
         if frozen, !content.isEmpty { start["content"] = .array(content) }
         await emit(sessionId, parent: parent, start)
-        await pause()
+        await pause(sessionId)
         guard !frozen else { return }
         await emit(sessionId, parent: parent, [
             "sessionUpdate": "tool_call_update", "toolCallId": .string(toolId),
             "status": tool.finish == .failed ? "failed" : "completed", "content": .array(content),
         ])
-        await pause()
+        await pause(sessionId)
     }
 
     /// 需要批准的工具调用:待处理 → 请求权限 → 进行中 → 完成;拒绝/取消则失败。
@@ -169,7 +174,7 @@ extension ScriptedAgent {
             return .rejected
         }
         await emit(sessionId, parent: parent, ["sessionUpdate": "tool_call_update", "toolCallId": .string(toolId), "status": "in_progress"])
-        await pause()
+        await pause(sessionId)
         var content = tool.extra
         if let output = tool.output { content.append(["type": "content", "content": ["type": "text", "text": .string(output)]]) }
         await emit(sessionId, parent: parent, [

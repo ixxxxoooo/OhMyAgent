@@ -71,6 +71,7 @@ public struct DemoEnvironment: Sendable {
         if reset { UserDefaults(suiteName: Self.defaultsSuiteName)?.removePersistentDomain(forName: Self.defaultsSuiteName) }
         let infos = try await DemoWorkspace.materialize(paths: paths, reset: reset)
         try FileManager.default.createDirectory(at: providerDirectory, withIntermediateDirectories: true)
+        try DemoSeed.seed(paths: paths, infos: infos)
         return infos
     }
 
