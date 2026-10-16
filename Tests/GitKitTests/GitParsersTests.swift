@@ -1,6 +1,7 @@
 // @author ixxxxoooo
 // git 输出解析器测试(固定样本,不依赖真实仓库)。
 
+import CoreFoundation
 import Foundation
 import Testing
 
@@ -93,6 +94,27 @@ struct GitParsersTests {
         #expect(lines[1].author == "张三" && lines[1].summary == "初始提交" && lines[1].text == "line two")
         #expect(lines[2].isUncommitted && !lines[0].isUncommitted)
         #expect(lines.map(\.lineNumber) == [1, 2, 3])
+    }
+
+    @Test("blame:CRLF 文件逐行拆开(不会粘成一行),行尾 CR 去掉")
+    func blameCRLF() {
+        let h = String(repeating: "a", count: 40)
+        let raw = "\(h) 1 1 2\nauthor 李四\nauthor-time 1700000000\nsummary 提交\nfilename a.php\n\t<?php\r\n\(h) 2 2\n\techo 1;\r\n"
+        let lines = GitParsers.parseBlame(data: Data(raw.utf8))
+        #expect(lines.map(\.text) == ["<?php", "echo 1;"])
+        #expect(lines.map(\.lineNumber) == [1, 2])
+        #expect(lines[1].author == "李四")
+    }
+
+    @Test("blame:GBK 编码的源码行按 GB18030 解码,不出现替换字符")
+    func blameGBK() throws {
+        let h = String(repeating: "b", count: 40)
+        let gb18030 = String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.GB_18030_2000.rawValue)))
+        var data = Data("\(h) 1 1 1\nauthor a\nauthor-time 1\nsummary s\nfilename f\n\t".utf8)
+        data.append(try #require("// 注释内容".data(using: gb18030)))
+        data.append(0x0A)
+        let lines = GitParsers.parseBlame(data: data)
+        #expect(lines.first?.text == "// 注释内容")
     }
 
     @Test("分支与 stash 解析")

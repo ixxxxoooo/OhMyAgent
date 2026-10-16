@@ -305,7 +305,7 @@ public struct GitRepository: Sendable {
     public func blame(path: String) async throws -> [GitBlameLine] {
         try validatePaths([path])
         let output = try await git(["blame", "--porcelain", "--", path], timeout: 60)
-        return GitParsers.parseBlame(output.text)
+        return GitParsers.parseBlame(data: output.stdout)
     }
 
     // MARK: stash

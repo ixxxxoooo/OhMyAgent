@@ -1,6 +1,7 @@
 // @author ixxxxoooo
 // git 输出解析器:纯函数,便于用固定样本做单元测试。
 
+import CoreFoundation
 import Foundation
 
 public enum GitParsers {
@@ -97,22 +98,39 @@ public enum GitParsers {
         }
     }
 
-    /// 解析 `git blame --porcelain` 输出。
+    /// 解析 `git blame --porcelain` 输出(文本版,供测试与已解码的输出使用)。
     public static func parseBlame(_ text: String) -> [GitBlameLine] {
+        parseBlame(data: Data(text.utf8))
+    }
+
+    /// 解析 `git blame --porcelain` 的原始字节输出。
+    ///
+    /// 必须按字节在 `\n` 处切行:Swift 把 `\r\n` 当作单个字符,按字符切分会让 CRLF 文件的所有行粘成一行(显示乱码、错位)。
+    /// 每行内容独立解码:优先 UTF-8,失败时回退 GB18030(常见的老 GBK 源文件),避免整行变成替换字符。
+    /// - Parameter data: git 的标准输出
+    /// - Returns: 逐行追溯结果
+    public static func parseBlame(data: Data) -> [GitBlameLine] {
         struct Meta { var author = ""; var time: TimeInterval = 0; var summary = "" }
         var cache: [String: Meta] = [:]
         var result: [GitBlameLine] = []
         var currentHash = "", currentLine = 0
-        for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
-            if line.hasPrefix("\t") {
+        for rawLine in data.split(separator: 0x0A, omittingEmptySubsequences: false) {
+            if rawLine.first == 0x09 {
+                // 内容行:去掉前导 TAB 与 CRLF 文件遗留的行尾 CR
+                var body = rawLine.dropFirst()
+                if body.last == 0x0D { body = body.dropLast() }
                 let meta = cache[currentHash] ?? Meta()
                 result.append(GitBlameLine(lineNumber: currentLine, hash: currentHash, author: meta.author,
                                            date: Date(timeIntervalSince1970: meta.time), summary: meta.summary,
-                                           text: String(line.dropFirst())))
+                                           text: decodeLine(body)))
                 continue
             }
+            var headerBytes = rawLine
+            if headerBytes.last == 0x0D { headerBytes = headerBytes.dropLast() }
+            let line = String(decoding: headerBytes, as: UTF8.self)
             let parts = line.split(separator: " ", maxSplits: 3, omittingEmptySubsequences: false)
-            if parts.count >= 3, parts[0].count == 40, parts[0].allSatisfy(\.isHexDigit), let final = Int(parts[2]) {
+            // 提交哈希为 40 位(SHA-1)或 64 位(SHA-256)十六进制
+            if parts.count >= 3, parts[0].count == 40 || parts[0].count == 64, parts[0].allSatisfy(\.isHexDigit), let final = Int(parts[2]) {
                 currentHash = String(parts[0])
                 currentLine = final
                 if cache[currentHash] == nil { cache[currentHash] = Meta() }
@@ -125,6 +143,15 @@ public enum GitParsers {
             }
         }
         return result
+    }
+
+    /// 解码一行源码:UTF-8 优先,失败回退 GB18030,最后才用替换字符兜底。
+    private static func decodeLine<S: DataProtocol>(_ bytes: S) -> String {
+        let data = Data(bytes)
+        if let text = String(data: data, encoding: .utf8) { return text }
+        let gb18030 = String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.GB_18030_2000.rawValue)))
+        if let text = String(data: data, encoding: gb18030) { return text }
+        return String(decoding: data, as: UTF8.self)
     }
 
     /// `for-each-ref` 使用的格式串。

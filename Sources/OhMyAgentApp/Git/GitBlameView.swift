@@ -67,6 +67,16 @@ struct GitBlameTabView: View {
     }
 }
 
+private extension GitBlameLine {
+    /// 显示用文本:TAB 展开为 4 个空格(否则 TAB 在单行 Text 里宽度不定、列错位),超长行截断(压缩过的单行脚本会拖垮布局)。
+    var displayText: String {
+        let expanded = text.replacingOccurrences(of: "\t", with: "    ")
+        let limit = 1200
+        if expanded.isEmpty { return " " }
+        return expanded.count > limit ? String(expanded.prefix(limit)) + "…" : expanded
+    }
+}
+
 private struct BlameLineRow: View {
     let line: GitBlameLine
     let showsInfo: Bool
@@ -88,9 +98,10 @@ private struct BlameLineRow: View {
             .frame(width: 250, alignment: .leading)
             .padding(.horizontal, 8)
             Text("\(line.lineNumber)").font(OMFonts.monoSmall).foregroundStyle(OMColors.tertiaryText).frame(width: 40, alignment: .trailing)
-            Text(line.text.isEmpty ? " " : line.text).font(OMFonts.monoSmall).padding(.leading, 10).fixedSize()
+            Text(line.displayText).font(OMFonts.monoSmall).lineLimit(1).padding(.leading, 10).fixedSize(horizontal: true, vertical: false)
         }
-        .frame(height: 18)
+        .frame(height: 18, alignment: .leading)
+        .clipped()
         .background(band ? Color.primary.opacity(0.04) : .clear)
         .help(line.summary)
         .accessibilityElement(children: .ignore)
