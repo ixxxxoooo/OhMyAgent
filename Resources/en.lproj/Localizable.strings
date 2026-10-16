@@ -1701,3 +1701,14 @@
 "秒" = "sec";
 "行" = "lines";
 "0 表示使用默认值。对应 API_TIMEOUT_MS;网络较慢或模型响应久时可适当调大。" = "0 uses the default. Maps to API_TIMEOUT_MS; raise it on slow networks or when the model responds slowly.";
+"属性" = "Properties";
+"展开属性" = "Expand properties";
+"折叠属性" = "Collapse properties";
+"属性名,回车确认" = "Property name, press Return";
+"添加属性" = "Add property";
+"属性名" = "Property name";
+"空" = "Empty";
+"添加…" = "Add…";
+"删除属性" = "Delete property";
+"删除 %@" = "Delete %@";
+"正文为空" = "Body is empty";

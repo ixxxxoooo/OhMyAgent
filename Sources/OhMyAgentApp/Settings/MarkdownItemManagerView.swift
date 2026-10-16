@@ -58,6 +58,11 @@ struct SkillsSettingsPage: View {
                 }
             }
         }
+        .task(id: total) {
+            // 调试钩子:OMA_OPEN_ITEM=<名称片段> 自动打开对应条目的编辑弹窗(用于 UI 验证)
+            guard editing == nil, let key = ProcessInfo.processInfo.environment["OMA_OPEN_ITEM"], !key.isEmpty else { return }
+            editing = items.first { $0.name.localizedCaseInsensitiveContains(key) }
+        }
         .sheet(item: $editing) { item in
             MarkdownItemEditorSheet(center: center, item: item, onDelete: { pendingDelete = item }) { editing = nil }
         }
@@ -211,10 +216,7 @@ struct MarkdownItemEditor: View {
             if !text.isEmpty, !parsed.hasFrontmatter, item.kind != .command {
                 Label("缺少 frontmatter(--- 包裹的头部),Claude 可能无法识别描述。", om: "exclamationmark.triangle").font(OMFonts.small).foregroundStyle(OMColors.warning)
             }
-            TextEditor(text: $text)
-                .font(OMFonts.mono)
-                .disabled(item.source.isReadOnly)
-                .settingsEditorStyle()
+            MarkdownDocumentPane(text: $text, isReadOnly: item.source.isReadOnly)
         }
         .padding(16)
         .onAppear(perform: load)

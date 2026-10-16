@@ -45,6 +45,11 @@ struct MemoryManagerView: View {
                 EmptyHint(icon: "brain", title: String(localized: "选择一个文件"), message: String(localized: "记忆文件会在每次会话开始时作为上下文加载。"))
             }
         }
+        .task(id: files.count) {
+            // 调试钩子:OMA_OPEN_ITEM=<标题片段> 自动选中对应记忆文件(用于 UI 验证)
+            guard selectedID == nil, let key = ProcessInfo.processInfo.environment["OMA_OPEN_ITEM"], !key.isEmpty else { return }
+            selectedID = files.first { $0.title.localizedCaseInsensitiveContains(key) }?.id
+        }
         .sheet(isPresented: $showCreateRule) { RuleCreateSheet(center: center) { showCreateRule = false } }
     }
 }
@@ -78,9 +83,8 @@ struct MemoryEditor: View {
             if file.kind == .local {
                 Label("CLAUDE.local.md 只对你个人生效,请加入 .gitignore。", om: "info.circle").font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
             }
-            TextEditor(text: $text)
-                .font(OMFonts.mono)
-                .settingsEditorStyle()
+            // 规则文件的 frontmatter(如 paths)可在属性面板编辑;普通 CLAUDE.md 不主动加头部
+            MarkdownDocumentPane(text: $text, allowsCreatingProperties: file.kind == .userRule || file.kind == .projectRule)
         }
         .padding(16)
         .onAppear { text = MemoryStore(paths: center.paths).read(file); original = text }

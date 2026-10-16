@@ -124,7 +124,6 @@ wrench
 x
 zap
 minus
-clock
 git-graph
 folder-git
 list-tree
@@ -143,9 +142,7 @@ flag
 hourglass
 timer
 circle-dot-dashed
-hand
 arrow-big-up-dash
-terminal
 chevrons-down-up
 zoom-in
 zoom-out
@@ -160,3 +157,16 @@ eye-off
 star
 import
 cloud-download
+type
+tag
+text-align-start
+toggle-left
+hash
+chart-pie
+chart-line
+calendar-days
+coins
+trending-up
+list-plus
+chart-no-axes-column
+messages-square

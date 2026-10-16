@@ -125,6 +125,65 @@ public struct MarkdownDocument: Sendable, Equatable {
         return trimmed
     }
 
+    // MARK: - 属性视图(Obsidian 风格 Properties)
+
+    /// frontmatter 的一个属性(顶层键)。
+    public struct Property: Sendable, Equatable, Identifiable {
+        /// 属性值类型,决定属性面板里用哪种控件。
+        public enum Kind: Sendable, Equatable { case text, bool, list }
+        public var id: String { key }
+        public let key: String
+        public let kind: Kind
+        /// 文本值(`bool` 时为 "true"/"false";`list` 时为空)
+        public let text: String
+        /// 列表项(仅 `list`)
+        public let items: [String]
+    }
+
+    /// 全部属性(按出现顺序);注释与空行不算属性。
+    public var properties: [Property] {
+        keys.map { key in
+            guard let block = blocks.first(where: { $0.key == key }), let first = block.lines.first,
+                  let colon = first.firstIndex(of: ":") else {
+                return Property(key: key, kind: .text, text: "", items: [])
+            }
+            let inline = String(first[first.index(after: colon)...]).trimmingCharacters(in: .whitespaces)
+            let hasDashItems = block.lines.dropFirst().contains { $0.trimmingCharacters(in: .whitespaces).hasPrefix("- ") }
+            if (inline.hasPrefix("[") && inline.hasSuffix("]")) || (inline.isEmpty && hasDashItems) {
+                return Property(key: key, kind: .list, text: "", items: list(key) ?? [])
+            }
+            if let flag = bool(key) { return Property(key: key, kind: .bool, text: flag ? "true" : "false", items: []) }
+            return Property(key: key, kind: .text, text: value(key) ?? "", items: [])
+        }
+    }
+
+    /// 键名是否合法(字母、数字、下划线、连字符)。
+    public static func isValidKey(_ key: String) -> Bool {
+        key.range(of: "^[A-Za-z0-9_-]+$", options: .regularExpression) != nil
+    }
+
+    /// 新增一个空属性。
+    /// - Parameter key: 键名;非法或已存在时不修改
+    /// - Returns: 是否新增成功
+    @discardableResult
+    public mutating func addProperty(key: String) -> Bool {
+        guard Self.isValidKey(key), !keys.contains(key) else { return false }
+        replaceOrAppend(key, ["\(key):"])
+        return true
+    }
+
+    /// 重命名属性,保留值与续行。
+    /// - Returns: 是否重命名成功(旧键不存在、新键非法或已存在时失败)
+    @discardableResult
+    public mutating func renameKey(_ old: String, to new: String) -> Bool {
+        guard old != new, Self.isValidKey(new), !keys.contains(new),
+              let index = blocks.firstIndex(where: { $0.key == old }),
+              let first = blocks[index].lines.first, let colon = first.firstIndex(of: ":") else { return false }
+        blocks[index].lines[0] = new + String(first[colon...])
+        blocks[index].key = new
+        return true
+    }
+
     // MARK: - 修改
 
     /// 设置标量值;`nil` 删除该键(含续行)。已有键原位替换,新键追加到末尾。
