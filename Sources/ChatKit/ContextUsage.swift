@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 上下文用量明细:解析 Claude Code 本地命令 `/context` 的 Markdown 输出,并提供圆环色调与兜底分类。
 // ACP 的 `usage_update` 只有「已用 / 窗口」两个数,没有分类;分类明细来自 `/context`(不调用模型)。
 

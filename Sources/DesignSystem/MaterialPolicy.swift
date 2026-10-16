@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 材质策略:根据系统“减少透明度”、低电量模式与用户设置,决定使用玻璃还是不透明材质。
 
 import AppKit

@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 配置变更监听:FSEvents 监听 ~/.claude 与工作区(带路径过滤与去抖),~/.claude.json 用轻量轮询。
 
 import CoreServices

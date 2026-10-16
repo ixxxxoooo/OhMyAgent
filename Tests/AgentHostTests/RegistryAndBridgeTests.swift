@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // M7 测试:Agent 注册表、Bridge MCP 服务器。
 
 import ACPKit

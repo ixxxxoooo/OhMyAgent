@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 会话与 Bridge 的衔接:把 MCP 工具调用转换为对会话模型的操作,并准备注入 `session/new` 的 MCP 服务器列表。
 
 import ACPKit

@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 项目信任读写:保留 ~/.claude.json 中的其它字段。
 
 import Foundation

@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 应用更新模型:封装版本信息、手动/自动检查与「有新版本」系统通知。
 
 import AppKit

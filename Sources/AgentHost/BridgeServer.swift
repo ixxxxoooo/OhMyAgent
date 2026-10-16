@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // OhMyAgent Bridge:本机 Unix socket 上的 MCP 服务器(换行分隔 JSON-RPC)。
 // Agent 通过 stdio 垫片进程 `OhMyAgentBridge` 连接,即可调用客户端能力:打开文件、显示 diff、读取选区、系统通知。
 

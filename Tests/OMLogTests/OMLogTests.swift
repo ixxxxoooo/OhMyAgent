@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // OMLog 单元测试:脱敏、级别过滤、行格式、轮转、清理、并发写入、订阅。
 
 import Foundation

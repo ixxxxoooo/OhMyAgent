@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 侧栏分隔条几何:判断双击落在哪条分隔条上、属于左栏还是右栏(纯函数,便于测试)。
 
 import Foundation

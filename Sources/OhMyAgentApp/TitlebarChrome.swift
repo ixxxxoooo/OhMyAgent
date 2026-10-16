@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 无标题栏窗口的顶部部件(对齐 kuku 的 TopLeftOverlay / TopRightOverlay):
 // 窗口只保留红绿灯,侧栏开关与右栏开关以浮层固定在 35pt 顶部区域,坐标不随面板展开/收起而跳动;
 // 顶部空白区(标签栏空白、侧栏顶部、右栏头部)可拖动窗口。

@@ -1,5 +1,5 @@
 // swift-tools-version: 6.4
-// @author ygw
+// @author ixxxxoooo
 // OhMyAgent:macOS 27 原生 Claude Code Agent 客户端
 import PackageDescription
 

@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 演示模式隔离层测试:启用判断、路径解析、隔离位置均落在沙盒内,不触碰真实数据目录。
 
 import Foundation

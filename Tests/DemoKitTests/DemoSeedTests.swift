@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 演示预置数据测试:工作台状态可被 WorkbenchStore 读回,演示 `.claude` 能被 ClaudeConfigKit 各 Store 读出。
 
 import ACPKit

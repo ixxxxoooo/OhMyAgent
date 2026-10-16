@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // LSP 传输:语言服务器子进程的 stdio(Content-Length 分帧),以及内存分帧回环(测试用)。
 // 两者都实现 ACPKit 的 `ACPTransport`:每个完整 JSON 正文作为一行事件上抛,从而复用 `ACPConnection` 的 JSON-RPC 逻辑。
 

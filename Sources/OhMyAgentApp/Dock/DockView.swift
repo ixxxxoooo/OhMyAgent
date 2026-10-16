@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 停靠区根视图:递归渲染分屏树;分隔条可拖动调整比例;组被最大化时只显示该组。
 
 import DesignSystem

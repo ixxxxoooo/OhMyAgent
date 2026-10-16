@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 类型化 ACP 客户端:封装握手、会话、提示轮次与反向请求路由。
 
 import Foundation

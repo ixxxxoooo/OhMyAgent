@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // LSP 客户端与管理器测试:用脚本化服务器(内存回环)与 /bin/cat(真实子进程分帧)验证。
 
 import ACPKit

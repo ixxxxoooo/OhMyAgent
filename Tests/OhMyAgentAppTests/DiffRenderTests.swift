@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 统一 Diff 渲染回归:新增行的行号槽有独立底色,行与行之间没有接缝(截图里「绿色边缘怪异」的问题)。
 
 import AppKit

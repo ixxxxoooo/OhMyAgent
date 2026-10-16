@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 场景引擎的数据模型:把脚本化 Agent 的行为描述为声明式步骤(纯数据,可被测试与演示模式复用)。
 // 引擎本身(执行步骤)见 `ScriptedAgent+Engine.swift`,内置场景目录见 `DemoScenarios.swift`。
 

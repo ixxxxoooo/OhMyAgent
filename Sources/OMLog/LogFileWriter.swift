@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 文件日志写入器:串行队列异步追加、按大小轮转、按天数与个数清理。
 
 import Foundation
@@ -10,7 +10,7 @@ public final class LogFileWriter: @unchecked Sendable {
     private let maxBytes: Int
     private let maxFiles: Int
     private let retentionDays: Int
-    private let queue = DispatchQueue(label: "com.ygw.OhMyAgent.logwriter", qos: .utility)
+    private let queue = DispatchQueue(label: "com.ixxxxoooo.OhMyAgent.logwriter", qos: .utility)
     private var handle: FileHandle?
     private var currentPath: String?
     private var currentSize = 0

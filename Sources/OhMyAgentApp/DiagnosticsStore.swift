@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 诊断计时:记录进程启动到首帧的耗时,供「设置 → 诊断」与性能门槛检查使用。
 
 import Foundation

@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 彩色文件类型图标:数据来自 Material Icon Theme(见 `FileIconData`),按文件名/扩展名/文件夹名解析,
 // 渲染为非模板 NSImage(自带配色,深浅色下均清晰)。界面中的功能图标仍用 Lucide(单色模板)。
 

@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 标签保活 LRU:最近使用的标签保持挂载,会话标签常驻,已关闭的标签被清理。
 
 import Foundation

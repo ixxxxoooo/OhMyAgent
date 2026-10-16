@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // GitModel 测试:真实临时仓库上的刷新、暂存、提交、分支与错误处理。
 
 import Foundation

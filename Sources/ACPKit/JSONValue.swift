@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 通用 JSON 值类型,用于承载协议中的扩展字段与前向兼容数据。
 
 import Foundation

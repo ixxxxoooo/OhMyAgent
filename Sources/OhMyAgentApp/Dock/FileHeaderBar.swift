@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 文件标签页顶部的面包屑工具条(参考 kuku 的 FileViewer 与 Cursor 的 breadcrumbs):
 // 左侧是相对项目根的路径(目录弱化、文件名突出),右侧依次是显示模式切换(仅可渲染的类型)、在 Finder 中显示、复制内容。
 

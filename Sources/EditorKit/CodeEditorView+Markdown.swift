@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // Markdown 在编辑器里的渲染:把 `MarkdownLiveRenderer` 的块布局落成文本属性。
 // - 就地渲染(live):标题放大、加粗/斜体/删除线/行内代码/链接按样式显示,语法标记符在光标所在块以外折叠,
 //   光标进入某块时该块还原为带淡色标记符的源码(Typora 式)。

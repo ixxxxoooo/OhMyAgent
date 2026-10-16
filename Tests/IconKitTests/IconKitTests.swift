@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // IconKit:SVG path 解析(含圆弧)、Lucide 数据完整性、语义名映射、渲染非空、源码中不再残留 SF Symbol。
 
 import AppKit

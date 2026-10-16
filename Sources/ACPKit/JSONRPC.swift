@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // JSON-RPC 2.0 消息模型与行分帧工具。
 
 import Foundation

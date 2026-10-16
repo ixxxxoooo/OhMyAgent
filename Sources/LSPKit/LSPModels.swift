@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // LSP 协议数据模型(只覆盖客户端用到的子集)。位置单位为 UTF-16 代码单元(LSP 默认编码,与 NSString 一致)。
 
 import ACPKit

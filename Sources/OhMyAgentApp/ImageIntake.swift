@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 图片摄取:把粘贴板/拖拽/文件选择得到的图片转成可发送的 `ImageAttachment`。
 // 过大的图片会重新编码为 JPEG,避免超过 Claude 接口的单图 5 MB 限制。
 

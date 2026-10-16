@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 演示模式启动接入:在任何读取用户数据的代码之前准备沙盒并重定向主目录;提供「演示模式」徽标视图。
 
 import ChatKit

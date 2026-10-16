@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // Git 历史行渲染测试:泳道图与提交行能渲染出内容(设置 GH_DUMP 时落盘 PNG 供人工查看)。
 
 import AppKit

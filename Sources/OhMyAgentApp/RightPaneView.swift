@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 右栏:文件 / 搜索 / Git 三个视图(本轮 Agent 改动与提交图谱并入 Git 页;计划在输入区上方的待办条;终端在底部面板与终端标签)。
 
 import AppKit

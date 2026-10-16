@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 演示场景:子 Agent(多类型/嵌套/并行/后台/失败)、会话状态(等待/冻结/提示/错误/用量)、角色样式、全量串联。
 
 import Foundation

@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 读取项目当前 Git 分支:直接解析 .git/HEAD(不启动子进程),支持 worktree 与 submodule 的 gitdir 间接文件。
 
 import Foundation

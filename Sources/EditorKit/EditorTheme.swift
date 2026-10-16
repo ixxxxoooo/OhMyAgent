@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 编辑器主题:纯色高对比背景,绝不使用玻璃或模糊。
 
 import AppKit

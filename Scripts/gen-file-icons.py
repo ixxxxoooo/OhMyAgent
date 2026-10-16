@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# @author ygw
+# @author ixxxxoooo
 # 从 Material Icon Theme(MIT 许可,PKief)生成 Sources/IconKit/FileIconData.swift:
 # 资源管理器/标签页使用的彩色「文件类型」图标。只收录常用扩展名、特殊文件名与文件夹名,
 # 避免把 1200+ 个图标全部编进二进制。
@@ -107,7 +107,7 @@ def main():
         if skipped: print(f"提示:{n} 跳过 {skipped} 个图元")
         icons[n] = (size, shapes)
     def lit(s): return json.dumps(s, ensure_ascii=False)
-    out = ["// @author ygw",
+    out = ["// @author ixxxxoooo",
            "// 自动生成,请勿手改:Scripts/gen-file-icons.py(来源 Material Icon Theme 5.x,MIT 许可,见 Resources/Licenses)。",
            "// 格式:每个图标一段文本,首行为视口边长,其后每行「填充色 不透明度 path」。",
            "", "enum FileIconData {", "    static let icons: [String: String] = ["]

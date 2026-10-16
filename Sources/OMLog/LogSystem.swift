@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 日志系统:级别过滤、脱敏、os.Logger、文件落盘、内存环形缓冲与订阅、ACP 协议流量日志。
 
 import Foundation
@@ -45,7 +45,7 @@ public final class LogSystem: @unchecked Sendable {
     ///   - osLog: 是否同时写入统一日志
     public init(directory: URL? = nil, process: String = "app", level: LogLevel = .info, osLog: Bool = true) {
         osEnabled = osLog
-        for category in LogCategory.allCases { loggers[category] = Logger(subsystem: "com.ygw.OhMyAgent", category: category.rawValue) }
+        for category in LogCategory.allCases { loggers[category] = Logger(subsystem: "com.ixxxxoooo.OhMyAgent", category: category.rawValue) }
         state.withLock { $0.level = level; $0.process = process }
         if let directory { attachFiles(directory: directory, process: process) }
     }

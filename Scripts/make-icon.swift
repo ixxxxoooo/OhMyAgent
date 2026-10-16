@@ -1,5 +1,5 @@
 #!/usr/bin/env swift
-// @author ygw
+// @author ixxxxoooo
 // 程序化绘制 OhMyAgent 应用图标(macOS 图标规范:1024 画布,824 圆角方形主体 + 柔和投影),
 // 输出 AppIcon.iconset 全部尺寸并交给 iconutil 生成 icns。
 // 用法: swift Scripts/make-icon.swift <输出目录>   (默认 build/icon)

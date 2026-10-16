@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // Git 相关的原生对话框:文本输入与危险操作确认(同步模态,仅在用户点击时调用)。
 
 import AppKit

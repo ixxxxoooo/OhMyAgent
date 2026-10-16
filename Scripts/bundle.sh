@@ -1,5 +1,5 @@
 #!/bin/zsh
-# @author ygw
+# @author ixxxxoooo
 # 构建并组装 OhMyAgent.app(默认 Debug;传入 release 构建发布版)。
 set -euo pipefail
 cd "$(dirname "$0")/.."

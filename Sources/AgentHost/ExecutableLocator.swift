@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 定位 node、claude 与 claude-agent-acp 适配器。
 
 import Foundation

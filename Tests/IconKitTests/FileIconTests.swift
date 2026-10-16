@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 彩色文件类型图标:名称解析(文件名 > 扩展名 > 默认)、文件夹展开态、全部内置图标可解析并渲染。
 
 import AppKit

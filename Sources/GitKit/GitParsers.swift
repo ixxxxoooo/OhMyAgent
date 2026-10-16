@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // git 输出解析器:纯函数,便于用固定样本做单元测试。
 
 import Foundation

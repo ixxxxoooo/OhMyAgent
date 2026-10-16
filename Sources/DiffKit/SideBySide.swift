@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 并排 Diff:把统一视图的差异块转换为左右对齐的行(删除在左、新增在右,上下文两侧相同)。
 
 import Foundation

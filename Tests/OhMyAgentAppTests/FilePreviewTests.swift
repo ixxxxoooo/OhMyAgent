@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 文件渲染预览:类型识别、CSV 解析、SVG 能被系统渲染。
 
 import AppKit

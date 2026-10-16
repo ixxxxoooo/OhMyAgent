@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 终端视图:承载 TerminalStore 中的 SwiftTerm 视图;进程退出后显示提示条并可重新启动。
 
 import DesignSystem

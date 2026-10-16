@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 代码高亮(只读展示用):聊天代码块、Markdown 预览等把代码转成带语法颜色的 AttributedString。
 // 结果按「语言 + 内容」缓存,流式输出与反复重绘不重复扫描。
 

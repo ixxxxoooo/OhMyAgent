@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 轻量词法高亮:后台一次性扫描整个文件,按视口增量应用。
 
 import Foundation

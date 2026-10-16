@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 项目配置枢纽:按工作区共享一个 `ConfigCenter`,供对话区读取本机的 MCP、Skills、命令与子 Agent。
 // 设置页自己有独立的 ConfigCenter(随设置页生灭);这里的实例随应用存活,文件变化时自动刷新。
 

@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 演示仓库生成用的 git 封装:固定作者与时间,屏蔽用户全局配置与仓库定位类环境变量,保证每次生成结果一致。
 
 import Foundation

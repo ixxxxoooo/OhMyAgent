@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // OhMyAgentBridge:stdio ↔ Unix socket 垫片。Agent 把它当作 stdio 类型的 MCP 服务器启动,
 // 它把标准输入输出原样转发到 OhMyAgent 的 Bridge socket(环境变量 OMA_BRIDGE_SOCKET)。
 

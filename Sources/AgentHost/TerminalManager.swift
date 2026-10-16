@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 终端管理器:实现 ACP `terminal/*` 反向请求。使用管道合并 stdout/stderr(而非 PTY),
 // 因为 ACP 终端用于捕获命令输出;输出按字节上限保留尾部,并在 UTF-8 边界截断。
 

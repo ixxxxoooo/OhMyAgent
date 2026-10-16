@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // git 子进程执行器:在后台异步运行 /usr/bin/git,收集 stdout/stderr,支持超时与协作式取消。
 // 不经过 shell,参数以数组传递,杜绝命令注入。
 

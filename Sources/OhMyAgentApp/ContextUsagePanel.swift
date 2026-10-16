@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 输入区上方的「上下文用量」面板(参考 Cursor Context Usage 与 kuku):
 // 占用百分比、分段进度条与分类明细;打开时向 Agent 请求一次 `/context` 明细(不调用模型)。
 

@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 流程类图布局:节点尺寸 → 子图递归(整体视作超级节点)→ 分层布局 → 边裁剪 → 生成场景。
 
 import CoreGraphics

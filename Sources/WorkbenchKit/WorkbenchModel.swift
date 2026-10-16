@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 工作台模型:一个窗口承载多个项目,每个项目按需拉起各自 cwd 的 Agent 会话;布局与项目列表持久化。
 
 import ACPKit

@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 轻量 Markdown 块级解析器:把文本切分为段落、标题、列表、引用、代码块、表格与分隔线。
 // 行内语法(粗体、斜体、行内代码、链接)交给系统的 AttributedString(markdown:) 渲染。
 // 流式输出时未闭合的代码围栏视为代码块直到文本结尾。

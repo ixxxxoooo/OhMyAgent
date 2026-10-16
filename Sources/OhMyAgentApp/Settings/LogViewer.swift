@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 日志查看器:实时尾随内存环形缓冲,支持按级别/分类过滤与文本搜索;诊断页与底部「输出」面板共用。
 
 import AppKit

@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // ACP 集成验证工具:定位工具链、完成握手;带 `--prompt "文本"` 时对真实适配器跑一轮完整对话。
 // 用法: ACPSpike [--prompt "只回复 OK"] [--cwd /path]
 

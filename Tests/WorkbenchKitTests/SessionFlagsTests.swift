@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 会话置顶/归档、设置整页模式与旧状态文件兼容性测试。
 
 import ChatKit

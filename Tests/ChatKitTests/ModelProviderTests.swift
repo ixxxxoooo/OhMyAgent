@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 模型提供商:会话 `_meta` 生成(密钥只进 env)、校验、存储与权限、连接测试。
 
 import ACPKit

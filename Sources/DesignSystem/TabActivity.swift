@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 标签可见性:保活的标签在后台保持挂载,这里提供「是否可见」环境值与 AppKit 视图同步工具。
 
 import AppKit

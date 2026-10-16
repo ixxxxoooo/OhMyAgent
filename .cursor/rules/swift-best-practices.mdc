@@ -5,7 +5,7 @@ alwaysApply: true
 
 请先阅读并遵守仓库根目录的 `AGENTS.md`。要点:
 
-- 全程使用中文沟通与注释;文件头加 `@author ygw`。
+- 全程使用中文沟通与注释;文件头加 `@author ixxxxoooo`。
 - Swift 6 严格并发、零警告;UI 类型 `@MainActor`;`@Observable`;禁止强制解包与 `try!`;日志只用 `OMLog`。
 - 改完代码:`Scripts/ci.sh` → `Scripts/restart.sh` 验证 → 按功能拆分提交(中文 Conventional Commits)→ `git push`。
 - 不适用本项目的全局 Java 规则:`ApiLog`、`ObjectUtils`、Controller 约定。

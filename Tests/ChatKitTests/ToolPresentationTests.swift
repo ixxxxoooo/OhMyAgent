@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 工具呈现、搜索结果解析、ANSI 解析与时间线分组测试。
 
 import ACPKit

@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 编辑器内 Markdown 就地渲染:标题放大、标记符折叠、光标进入块后展开、源码模式不改字体。
 
 import AppKit

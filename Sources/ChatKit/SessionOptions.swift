@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 客户端级会话选项:网络代理/超时、追加系统提示词、是否加载 CLAUDE.md。
 // 这些选项在创建/恢复会话时合并进 ACP `_meta`(`claudeCode.options.env` 与 `systemPrompt.append`)。
 

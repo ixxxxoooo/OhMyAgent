@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 解析用户登录 shell 的环境变量。GUI 应用不会继承终端 PATH,需要主动取得。
 
 import Foundation

@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // M0 Spike C:TextKit 2 打开 5 万行文件,测量装载、首屏布局、滚动与输入耗时。
 
 import AppKit

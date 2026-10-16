@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 文件标签与语言服务器的桥接:位置换算、诊断转换、文档同步(防抖)、hover/定义/补全。
 
 import EditorKit

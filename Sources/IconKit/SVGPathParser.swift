@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // SVG path 数据解析器:M/L/H/V/C/S/Q/T/A/Z(含小写相对形式),圆弧按 SVG 规范转为三次贝塞尔。
 // 纯值类型、无副作用,可在任意线程调用。
 

@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 应用级动作桥:把 SwiftUI 的 openWindow / openSettings 暴露给 AppKit 代码(托盘、通知点击),
 // 并承载「打开某个会话」的跨窗口请求。
 

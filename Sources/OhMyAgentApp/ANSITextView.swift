@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // ANSI 文本视图:把 ChatKit.ANSIParser 的样式片段渲染为 SwiftUI 富文本。
 
 import ChatKit

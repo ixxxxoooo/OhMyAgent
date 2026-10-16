@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 图标目录:把应用里沿用的语义名(原 SF Symbol 命名)映射到 Lucide 图标名。
 // 视图层只通过 `Image.om(_:)` / `OMLabel` 引用图标,全部由 Lucide 原生路径绘制。
 

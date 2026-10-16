@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 运行中的等待文案:对齐 Claude Code 的「✻ Cogitating… (12s · esc to interrupt)」。
 // 纯逻辑(无视图),便于测试:动词表、按轮次稳定挑选、耗时格式化与整行文案。
 

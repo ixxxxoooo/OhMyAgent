@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 并排 Diff 视图渲染冒烟测试:能渲染出非空图像(设置 SBS_DUMP 时落盘 PNG 供人工查看)。
 
 import AppKit

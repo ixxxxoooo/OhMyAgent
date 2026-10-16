@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 设置页公共组件:settings.json 绑定、作用域选择器、说明文字。
 
 import IconKit

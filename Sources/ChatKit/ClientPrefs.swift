@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 客户端偏好(UserDefaults):仅属于 OhMyAgent 本身的设置。Claude Code 自身的设置写回 settings.json,不在此处。
 // 设置页用 @AppStorage 绑定同名键,业务代码用这里的静态访问器读取,因此修改立即生效。
 

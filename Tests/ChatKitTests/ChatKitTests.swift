@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // ChatKit 测试:时间线归并、Markdown 解析、事件合并、与 FakeAgent 的端到端会话。
 
 import ACPKit

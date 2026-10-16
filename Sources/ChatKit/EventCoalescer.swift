@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 事件合并器:在后台线程接收高频事件,按固定窗口(默认 12ms,约一帧)成批投递给主 actor,
 // 避免流式输出每个 token 都触发一次 UI 更新。批次通过 AsyncStream 严格按序投递。
 

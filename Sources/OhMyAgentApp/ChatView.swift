@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 对话区:时间线(锚定底部、流式时自动跟随)+ 浮动输入区。
 
 import IconKit

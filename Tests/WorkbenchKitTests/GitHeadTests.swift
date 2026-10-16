@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // Git HEAD 解析测试:分支、游离、worktree 间接文件与非仓库目录。
 
 import Foundation

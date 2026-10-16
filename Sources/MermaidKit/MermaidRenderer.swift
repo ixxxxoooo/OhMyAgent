@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 场景渲染:SwiftUI GraphicsContext 绘制(画布与 PNG 导出共用),支持深浅色。
 
 import AppKit

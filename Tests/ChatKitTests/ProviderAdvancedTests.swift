@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 模型提供商进阶参数:环境变量映射、鉴权头、会话级覆盖、模型列表解析与预设。
 
 import ACPKit

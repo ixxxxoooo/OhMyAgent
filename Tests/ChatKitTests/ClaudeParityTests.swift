@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // Claude Code 交互补全:客户端命令、斜杠来源标注、@子 Agent 提及、运行中引导/排队、目标、图片、提示行。
 
 import ACPKit

@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 供设置页使用的可观察设置模型:按层读写 settings.json,监听文件变化并自动刷新(热更新)。
 
 import Foundation

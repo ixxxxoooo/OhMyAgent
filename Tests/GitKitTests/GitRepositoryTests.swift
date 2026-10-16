@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // GitRepository 集成测试:在临时目录里用真实 git 建仓库,不依赖网络与用户全局配置。
 
 import DiffKit

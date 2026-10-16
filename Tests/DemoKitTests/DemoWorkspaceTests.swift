@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 演示项目生成测试:用 GitKit 回读生成的仓库,验证提交历史、分支、标签、stash、工作区各类改动与冲突。
 
 import Foundation

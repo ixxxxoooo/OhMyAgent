@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 演示场景目录:每个场景是一组声明式步骤,由 `ScriptedAgent` 的场景引擎执行。
 // 触发方式:提示词里写 `#demo-<场景名>`(演示模式在输入框以 `/demo-<场景名>` 斜杠命令暴露);
 // 旧关键字 `#sub` / `#sub2` / `#showcase` / `#mermaid` 继续有效(既有测试依赖)。
@@ -124,7 +124,7 @@ public enum DemoScenarios {
                                input: ["file_path": .string(cwd + "/Package.swift")], output: "// swift-tools-version: 6.4")),
             .tool(ScenarioTool(id: "t_grep", title: "搜索 TODO", kind: "search", name: "Grep",
                                input: ["pattern": "TODO", "path": .string(cwd + "/Sources")],
-                               output: "\(main):12:    // TODO: 处理错误\n\(cwd)/Sources/App/Util.swift:40:    // TODO: 缓存\n\(cwd)/Sources/App/Model.swift:7:// TODO(ygw): 拆分")),
+                               output: "\(main):12:    // TODO: 处理错误\n\(cwd)/Sources/App/Util.swift:40:    // TODO: 缓存\n\(cwd)/Sources/App/Model.swift:7:// TODO(ixxxxoooo): 拆分")),
             .tool(ScenarioTool(id: "t_glob", title: "查找 *.swift", kind: "search", name: "Glob",
                                input: ["pattern": "**/*.swift"], output: "\(main)\n\(cwd)/Sources/App/Util.swift\n\(cwd)/Package.swift")),
             .tool(ScenarioTool(id: "t_write", title: "写入 NOTES.md", kind: "edit", name: "Write",
@@ -139,7 +139,7 @@ public enum DemoScenarios {
                                input: ["command": "swift test --filter Tool", "description": "运行工具相关测试"],
                                output: "\u{1B}[32m✔\u{1B}[0m Test one passed\n\u{1B}[31m✘\u{1B}[0m Test two failed\n\u{1B}[1;33mwarning:\u{1B}[0m something\nexit 1")),
             .tool(ScenarioTool(id: "t_mcp", title: "mcp__github__create_issue", kind: "other", name: "mcp__github__create_issue",
-                               input: ["title": "修复崩溃", "repo": "ygw/demo"], output: "{\"number\": 42}")),
+                               input: ["title": "修复崩溃", "repo": "ixxxxoooo/demo"], output: "{\"number\": 42}")),
             .tool(ScenarioTool(id: "t_fetch", title: "获取 example.com", kind: "fetch", name: "WebFetch",
                                input: ["url": "https://example.com/docs"], output: "Example Domain")),
             .tool(ScenarioTool(id: "t_fail", title: "运行 false", kind: "execute", name: "Bash",

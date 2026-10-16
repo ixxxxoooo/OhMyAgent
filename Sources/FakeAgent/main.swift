@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // FakeAgent 可执行文件:在 stdin/stdout 上运行脚本化 ACP Agent,用于集成测试与离线演示。
 
 import ACPKit

@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 基于 AppKit TextKit 2 的高性能代码编辑器:NSTextView + NSTextLayoutManager + NSTextContentStorage。
 
 import AppKit

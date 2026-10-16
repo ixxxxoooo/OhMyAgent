@@ -1,5 +1,5 @@
 #!/bin/zsh
-# @author ygw
+# @author ixxxxoooo
 # 演示模式:构建 → 以 OMA_DEMO=1 启动(使用脚本化 Agent 与隔离沙盒,不抢焦点)。
 # 用法: Scripts/demo.sh [--reset] [--scenario <名>] [debug|release]
 #   --reset            重建演示沙盒(项目、Git 仓库、工作台状态)

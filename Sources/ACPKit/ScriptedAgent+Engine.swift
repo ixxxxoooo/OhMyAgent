@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 场景引擎的执行端:把 `ScenarioStep` 翻译成 ACP 的 `session/update` 与反向请求。
 // 子 Agent 内部的更新统一带上 `_meta.claudeCode.parentToolUseId`,与真实适配器的行为一致。
 

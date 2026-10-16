@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 「在对话中引用选区」:把编辑器选区转换为 `@相对路径:起始行-结束行` 并追加到输入框草稿。
 
 import EditorKit

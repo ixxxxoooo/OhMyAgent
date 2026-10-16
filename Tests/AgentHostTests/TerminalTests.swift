@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // TerminalManager 测试:真实子进程的输出捕获、退出码、截断、终止。
 
 import Foundation

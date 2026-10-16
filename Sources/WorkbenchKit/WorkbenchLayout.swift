@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 工作台布局与持久化模型:三栏 + 底部面板的显隐/尺寸/当前视图,以及项目列表。
 
 import Foundation

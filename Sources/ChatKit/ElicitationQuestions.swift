@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // AskUserQuestion 的「问卷」视图模型:把适配器下发的 `question_<n>` / `question_<n>_custom` 字段
 // 归并成逐题步骤(向导),并提供选择/自定义输入的互斥规则(对齐 kuku 的问答面板)。
 // 纯逻辑,无视图;非问卷形态的表单(MCP 任意表单)返回 nil,由通用表单渲染。

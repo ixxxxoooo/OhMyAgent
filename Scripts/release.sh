@@ -1,5 +1,5 @@
 #!/bin/zsh
-# @author ygw
+# @author ixxxxoooo
 # 发布流水线:release 构建 → 打包瘦身后的 ACP 适配器 → Developer ID 签名(Hardened Runtime)
 #            → 公证并装订 → 生成 zip/dmg 与 appcast 条目。
 #

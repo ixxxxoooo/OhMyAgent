@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 演示用 `~/.claude`:写入沙盒主目录,让设置/扩展页(Skills、命令、Subagent、MCP、Hooks、插件、记忆、权限)都有数据。
 // 内容全部是虚构示例,不含任何真实密钥;结构与 ClaudeConfigKit 读取的布局一致。
 

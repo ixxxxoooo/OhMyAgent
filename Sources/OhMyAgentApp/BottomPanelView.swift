@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 底部面板:顶部可拖拽调整高度的分隔条 + 标签(输出,后续加入终端与问题)+ 内容。
 
 import IconKit

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# @author ygw
+# @author ixxxxoooo
 # 本地假 Anthropic 兼容网关(开发/验证用,不连外网):
 #   python3 Scripts/mock-anthropic.py [--port 3456] [--mode ok|404|500|slow|drop]
 # 支持 GET /v1/models 与 POST /v1/messages(含 SSE 流式)。用于验证 ANTHROPIC_BASE_URL 指向自定义网关时,

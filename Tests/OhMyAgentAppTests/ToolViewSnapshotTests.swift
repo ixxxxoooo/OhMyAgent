@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 工具视图渲染测试:用 NSHostingView 把工具行/分组渲染为位图,浅色与深色各一份。
 // 断言:能渲染出非空内容、尺寸合理、浅深色确有差异;设置 OMA_SNAPSHOT_DIR 时同时导出 PNG 供人工核对。
 

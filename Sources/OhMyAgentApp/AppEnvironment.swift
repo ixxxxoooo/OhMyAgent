@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 应用级环境:唯一的工作台模型与会话工厂。启动时按环境变量/旧版偏好恢复项目。
 
 import AgentHost

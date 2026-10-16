@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 行索引:UTF-16 偏移与行号互转,供行号标尺、跳转与 Diff 标记使用。
 
 import Foundation

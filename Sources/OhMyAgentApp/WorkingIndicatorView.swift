@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 会话流末尾的等待指示:参考 Claude Code 的「✻ 思考中… (12s · 按 Esc 中断)」。
 // 轮次运行期间始终显示;等待用户批准/回答时改为静态提示,不再转动。
 

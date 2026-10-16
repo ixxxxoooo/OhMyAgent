@@ -1,6 +1,6 @@
 # Claude Code 功能映射矩阵
 
-> @author ygw
+> @author ixxxxoooo
 > 通道说明:
 > - **A**:ACP 原生(经适配器)
 > - **B**:配置文件层(直接读写 `~/.claude/settings.json`、`~/.claude.json`、`.mcp.json`、`.claude/*`、`CLAUDE.md`)

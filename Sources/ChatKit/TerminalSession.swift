@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 终端会话视图模型:在命令运行期间以 150ms 间隔拉取输出快照,结束后停止轮询。
 
 import ACPKit

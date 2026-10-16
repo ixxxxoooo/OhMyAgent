@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 终端控制器测试:真实 PTY 子进程的输出、退出码、环境净化、目录回退与按标签回收。
 
 import Foundation

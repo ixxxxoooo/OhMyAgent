@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 编辑器的语言智能扩展点(EditorKit 不依赖 LSPKit):诊断、悬停、跳转定义、补全。
 // 应用层把 LSP 结果转换成这里的轻量类型并通过回调注入。
 

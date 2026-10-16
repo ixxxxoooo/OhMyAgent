@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 演示模式的沙盒目录布局:所有演示数据都放在一个独立目录里,绝不触碰真实的工作台状态与 ~/.claude。
 
 import Foundation

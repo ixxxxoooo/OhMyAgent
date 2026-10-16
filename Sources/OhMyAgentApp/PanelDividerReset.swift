@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 侧栏分隔条增强:双击分隔条恢复该侧栏的默认宽度。
 // 拖拽缩放由原生 NavigationSplitView / inspector 提供;这里只监听双击(不拦截事件,不影响拖拽)。
 

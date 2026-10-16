@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // ACP v1 核心数据模型。解码一律宽松:未知字段忽略、未知枚举值保留,保证前向兼容。
 
 import Foundation

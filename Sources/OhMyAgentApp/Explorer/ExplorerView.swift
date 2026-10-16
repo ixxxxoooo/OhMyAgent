@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 资源管理器:按需展开的文件树;单击预览、双击固定;右键菜单支持新建/重命名/移到废纸篓等。
 
 import AppKit

@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 自动生成,请勿手改:Scripts/gen-file-icons.py(来源 Material Icon Theme 5.x,MIT 许可,见 Resources/Licenses)。
 // 格式:每个图标一段文本,首行为视口边长,其后每行「填充色 不透明度 path」。
 

@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 性能基线测试:JSON-RPC 分帧与解码吞吐(预算:单连接 ≥ 5 MB/s)。
 // 测试以 debug 构建运行,阈值取预算并留余量;`swift test -c release` 可得到更接近发布版的数据。
 

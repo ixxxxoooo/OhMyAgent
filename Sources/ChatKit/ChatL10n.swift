@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // ChatKit 内的本地化:库本身没有资源包,文案键(中文原文)取自主应用的 `Localizable.strings`。
 // 找不到译文时原样返回中文,因此测试与脚本化环境不受影响。
 

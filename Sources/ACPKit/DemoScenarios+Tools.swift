@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 演示场景:各类工具卡(文件、终端、联网/MCP、待办/计划)、权限变体、计划批准、提问向导、Mermaid、Markdown。
 // 路径以工作区目录为根,与 DemoKit 生成的 `atlas-web` 演示项目的目录结构一致。
 
@@ -145,8 +145,8 @@ extension DemoScenarios {
                                input: ["url": "https://www.swift.org/migration/documentation/migrationguide/", "prompt": "总结迁移步骤"],
                                output: "迁移分三步:\n1. 开启 `-strict-concurrency=complete`\n2. 逐个模块修复 Sendable 诊断\n3. 切换到 Swift 6 语言模式")),
             .tool(ScenarioTool(id: "w_gh", title: "mcp__github__list_pull_requests", kind: "other", name: "mcp__github__list_pull_requests",
-                               input: ["owner": "ygw", "repo": "atlas-web", "state": "open"],
-                               output: "[{\"number\": 128, \"title\": \"feat: 指标计数\", \"user\": \"ygw\"}, {\"number\": 131, \"title\": \"fix: 路由大小写\", \"user\": \"mei\"}]")),
+                               input: ["owner": "ixxxxoooo", "repo": "atlas-web", "state": "open"],
+                               output: "[{\"number\": 128, \"title\": \"feat: 指标计数\", \"user\": \"ixxxxoooo\"}, {\"number\": 131, \"title\": \"fix: 路由大小写\", \"user\": \"mei\"}]")),
             .tool(ScenarioTool(id: "w_pw", title: "mcp__playwright__browser_navigate", kind: "other", name: "mcp__playwright__browser_navigate",
                                input: ["url": "http://localhost:5173"], output: "Page title: Atlas")),
             .tool(ScenarioTool(id: "w_fs", title: "mcp__filesystem__read_file", kind: "other", name: "mcp__filesystem__read_file",

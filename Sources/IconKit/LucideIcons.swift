@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 由 Scripts/gen-icons.py 自动生成,请勿手改。来源:Lucide 1.57.0(ISC 许可,见 Resources/Licenses/Lucide-LICENSE.txt)。
 // 每个图标是 24×24 视口内的若干 SVG path 数据(圆/矩形/折线等已在生成时转换为 path)。
 

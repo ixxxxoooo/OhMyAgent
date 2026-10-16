@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 行级 Diff:Myers O(ND) 算法 + 分块(hunk)+ 按块回退。
 // 纯值类型、无 UI 依赖,可在任意线程调用;超大差异自动退化为整体替换以保证时间/内存上界。
 

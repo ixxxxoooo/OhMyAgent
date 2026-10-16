@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 终端控制器:每个终端标签对应一个 PTY 子进程(用户登录 shell)+ SwiftTerm 渲染视图。
 // 视图与进程由 TerminalStore 持有,标签切换/隐藏不会终止会话;关闭标签才会结束进程。
 

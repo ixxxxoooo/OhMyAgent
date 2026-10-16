@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // Lucide 图标渲染:SVG path → CGPath → 模板化 NSImage(分辨率无关,自动适配深浅色与着色)。
 // 同一份 NSImage 可用于 SwiftUI `Image`、菜单项、工具栏与 `NSStatusItem`。
 

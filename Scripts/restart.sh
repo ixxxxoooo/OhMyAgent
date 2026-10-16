@@ -1,5 +1,5 @@
 #!/bin/zsh
-# @author ygw
+# @author ixxxxoooo
 # 重启应用:结束旧的应用与 Agent 子进程 → 重新构建 → 启动。
 # 用法: Scripts/restart.sh [debug|release]   (设置 OMA_AGENT=fake 可使用脚本化 Agent;OMA_DEMO=1 进入演示模式)
 set -euo pipefail

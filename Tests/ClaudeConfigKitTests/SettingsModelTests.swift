@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // M6 测试:权限规则、权限存储、用量统计、设置模型。全部使用临时目录。
 
 import Foundation

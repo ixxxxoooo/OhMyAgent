@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 演示模式的命令面板入口:「演示场景」命令组,每个场景一条,选中后在当前会话运行(等价于输入 `/demo-<名>`)。
 
 import ACPKit

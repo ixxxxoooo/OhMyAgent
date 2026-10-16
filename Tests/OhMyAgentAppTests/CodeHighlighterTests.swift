@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 语法高亮:语言识别(扩展名/围栏别名)、新增语言的词法片段、带色文本与缓存。
 
 import EditorKit

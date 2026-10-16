@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 用量统计:读取 Claude Code 的 `~/.claude/stats-cache.json`(通道 B,只读)。
 
 import Foundation

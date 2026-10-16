@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // SwiftUI 封装:将 AppKit 编辑器嵌入 SwiftUI 视图层级。
 
 import DesignSystem

@@ -1,5 +1,5 @@
 #!/bin/zsh
-# @author ygw
+# @author ixxxxoooo
 # 性能门槛验证:多次冷启动测量「进程启动→首帧」耗时,并采样空载内存(footprint)。
 # 用法: Scripts/perf.sh [次数,默认 5]   需先 Scripts/bundle.sh release。
 set -euo pipefail

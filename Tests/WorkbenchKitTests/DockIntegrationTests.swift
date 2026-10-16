@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 停靠布局与工作台的集成:选择项目打开会话标签、统一打开入口、关闭联动、持久化与启动恢复。
 
 import ChatKit

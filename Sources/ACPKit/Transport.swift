@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 传输抽象与 Stdio 实现。
 
 import Foundation

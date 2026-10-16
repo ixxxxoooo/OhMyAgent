@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 资源管理器、文件索引、全局搜索与命令面板共享的状态模型。
 
 import Foundation

@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // DiffKit 测试:Myers 正确性(含随机属性测试)、分块、按块回退、检查点冲突检测。
 
 import Foundation

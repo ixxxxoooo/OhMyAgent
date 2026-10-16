@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 演示历史会话测试:目录规模与唯一性、session/list 与 session/load 回放(无停顿、终态)。
 
 import Foundation

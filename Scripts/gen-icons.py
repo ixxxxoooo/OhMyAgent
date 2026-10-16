@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# @author ygw
+# @author ixxxxoooo
 # 从 Lucide(ISC 许可)生成 Sources/IconKit/LucideIcons.swift。
 # 用法:Scripts/gen-icons.py [--src <lucide-static 解压目录>]
 # 不带 --src 时自动 `npm pack lucide-static` 到临时目录。
@@ -59,7 +59,7 @@ def main():
     if missing:
         raise SystemExit(f"Lucide 中不存在:{missing}")
     version = json.load(open(os.path.join(src, "package.json")))["version"]
-    out = ["// @author ygw",
+    out = ["// @author ixxxxoooo",
            f"// 由 Scripts/gen-icons.py 自动生成,请勿手改。来源:Lucide {version}(ISC 许可,见 Resources/Licenses/Lucide-LICENSE.txt)。",
            "// 每个图标是 24×24 视口内的若干 SVG path 数据(圆/矩形/折线等已在生成时转换为 path)。",
            "", "enum LucideData {", "    static let version = \"%s\"" % version, "    static let icons: [String: [String]] = ["]

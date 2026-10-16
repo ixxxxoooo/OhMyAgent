@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // ClaudeConfigKit 测试:全部使用临时目录作为 home 与工作区,不触碰真实配置。
 
 import Foundation
@@ -407,7 +407,7 @@ struct PluginStoreTests {
     func installedPlugins() throws {
         let box = try Sandbox(); defer { box.cleanup() }
         let install = box.home.appendingPathComponent(".claude/plugins/cache/mk/demo/1.0.0")
-        try box.write(#"{"name":"demo","description":"演示","author":{"name":"ygw"}}"#, to: ".claude-plugin/plugin.json", base: install)
+        try box.write(#"{"name":"demo","description":"演示","author":{"name":"ixxxxoooo"}}"#, to: ".claude-plugin/plugin.json", base: install)
         try box.write("x", to: "skills/a/SKILL.md", base: install)
         try box.write("x", to: "skills/b/SKILL.md", base: install)
         try box.write("x", to: "agents/z.md", base: install)
@@ -417,7 +417,7 @@ struct PluginStoreTests {
 
         let store = PluginStore(paths: box.paths)
         var plugin = try #require(store.installed().first)
-        #expect(plugin.name == "demo" && plugin.marketplace == "mk" && plugin.author == "ygw")
+        #expect(plugin.name == "demo" && plugin.marketplace == "mk" && plugin.author == "ixxxxoooo")
         #expect(plugin.skillCount == 2 && plugin.agentCount == 1 && plugin.mcpServerNames == ["m1"])
         #expect(!plugin.isEnabled)
         #expect(store.enabledRoots().isEmpty)

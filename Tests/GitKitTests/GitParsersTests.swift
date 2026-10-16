@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // git 输出解析器测试(固定样本,不依赖真实仓库)。
 
 import Foundation

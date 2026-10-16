@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // LSP 基础协议分帧:`Content-Length: N\r\n\r\n` + N 字节 JSON 正文。
 
 import Foundation

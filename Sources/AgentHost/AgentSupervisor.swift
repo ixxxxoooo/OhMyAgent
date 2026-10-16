@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // Agent 监督者:拉起子进程、完成握手、监测退出,并向上层提供状态流。
 
 import ACPKit

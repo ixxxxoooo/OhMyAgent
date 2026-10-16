@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 脚本化 Agent 的演示历史会话支持:`session/list` 返回预置目录,`session/load` 无停顿回放完整内容。
 
 import Foundation

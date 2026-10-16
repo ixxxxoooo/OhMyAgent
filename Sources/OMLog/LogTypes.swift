@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 日志基础类型:级别、分类、条目与行格式。
 
 import Foundation

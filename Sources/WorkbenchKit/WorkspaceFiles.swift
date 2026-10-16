@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 工作区文件能力(无视图):目录列举、文件索引、模糊匹配(快速打开)、全局文本搜索。
 
 import Foundation

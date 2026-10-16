@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 页脚分支切换器:列表过滤与远程分支名转换。
 
 import Foundation
