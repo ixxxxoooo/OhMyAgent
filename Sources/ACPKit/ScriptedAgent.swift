@@ -179,6 +179,7 @@ public actor ScriptedAgent: ACPRequestHandler {
             "sessionUpdate": "available_commands_update",
             "availableCommands": [
                 ["name": "compact", "description": "压缩上下文", "input": JSONValue.null],
+                ["name": "context", "description": "查看上下文用量", "input": JSONValue.null],
                 ["name": "review", "description": "审查改动", "input": ["hint": "可选范围"]],
             ],
         ])
@@ -306,6 +307,26 @@ public actor ScriptedAgent: ACPRequestHandler {
         await update(sessionId, ["sessionUpdate": "tool_call_update", "toolCallId": subId, "status": "completed"])
     }
 
+    /// `/context` 的模拟输出。
+    static let contextReport = """
+    ## Context Usage
+
+    **Model:** scripted-1  
+    **Tokens:** 62.4k / 200k (31%)
+
+    ### Estimated usage by category
+
+    | Category | Tokens | Percentage |
+    |----------|--------|------------|
+    | System prompt | 2.4k | 1.2% |
+    | System tools | 7.2k | 3.6% |
+    | Skills | 10.6k | 5.3% |
+    | MCP tools | 13.4k | 6.7% |
+    | Messages | 28.8k | 14.4% |
+    | Free space | 105.6k | 52.8% |
+    | Autocompact buffer | 32k | 16% |
+    """
+
     private func runPrompt(_ p: JSONValue) async throws -> JSONValue {
         guard let sessionId = p["sessionId"]?.stringValue else {
             throw JSONRPCError(code: JSONRPCError.invalidParams, message: "缺少 sessionId")
@@ -314,6 +335,11 @@ public actor ScriptedAgent: ACPRequestHandler {
         running.insert(sessionId)
         defer { running.remove(sessionId) }
         let text = (p["prompt"]?.arrayValue ?? []).compactMap { $0["text"]?.stringValue }.joined(separator: "\n")
+        if text.trimmingCharacters(in: .whitespacesAndNewlines) == "/context" {
+            // 模拟 Claude 的本地命令:不调用模型,直接输出 Markdown 明细(格式与真实抓取一致)
+            await update(sessionId, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": .string(Self.contextReport)]])
+            return ["stopReason": "end_turn"]
+        }
         if text.contains("#notice") {
             await update(sessionId, ["sessionUpdate": "notice", "severity": "warning", "title": "上下文已压缩", "description": "旧消息已被摘要,可能丢失细节。"])
         }

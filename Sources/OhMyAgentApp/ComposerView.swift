@@ -364,6 +364,8 @@ struct CompletionPopup: View {
 /// 输入区下方的上下文条:左侧 Git 分支;右侧连接状态、用量与 Agent 切换(原状态栏功能)。
 struct ComposerFooter: View {
     let model: SessionModel
+    /// 上下文用量面板是否展开(面板渲染在输入区上方,由对话视图持有)
+    @Binding var usageOpen: Bool
     @State private var head: GitHead?
 
     var body: some View {
@@ -375,8 +377,8 @@ struct ComposerFooter: View {
             }
             Spacer()
             footerStatus
-            if let usage = model.usage, usage.used != nil || usage.costAmount != nil {
-                UsageButton(usage: usage)
+            if model.supportsContextBreakdown || model.usage?.used != nil || model.usage?.costAmount != nil || model.contextUsage != nil {
+                UsageButton(model: model, isOpen: $usageOpen)
             }
             AgentMenu(model: model)
         }

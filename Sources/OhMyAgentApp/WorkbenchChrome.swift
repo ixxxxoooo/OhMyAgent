@@ -55,77 +55,57 @@ struct AgentMenu: View {
     }
 }
 
-/// 上下文用量环。
+/// 上下文用量环:无数据时为虚线轨道,有数据时画进度弧,高占用依次变为警告色/危险色。
 struct UsageRing: View {
-    let fraction: Double
+    /// 占用比例(0...1);nil 表示尚无数据
+    let fraction: Double?
+
+    /// 有占用但很小时进度弧至少显示的比例,避免低占用时看起来像「没有数据」。
+    private static let minVisible = 0.04
+
+    private var tone: Color {
+        switch ContextTone(fraction: fraction ?? 0) {
+        case .normal: return OMColors.secondaryText
+        case .warn: return OMColors.warning
+        case .danger: return Color.red
+        }
+    }
 
     var body: some View {
+        let shown = fraction.map { $0 > 0 ? max(min($0, 1), Self.minVisible) : 0 } ?? 0
         ZStack {
-            Circle().stroke(OMColors.hairline, lineWidth: 2.5)
+            Circle().stroke(OMColors.hairline, style: StrokeStyle(lineWidth: 2.2, dash: fraction == nil ? [2, 2] : []))
             Circle()
-                .trim(from: 0, to: min(max(fraction, 0), 1))
-                .stroke(fraction > 0.9 ? Color.red : fraction > 0.7 ? OMColors.warning : OMColors.accent, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                .trim(from: 0, to: shown)
+                .stroke(tone, style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
                 .rotationEffect(.degrees(-90))
         }
         .frame(width: 16, height: 16)
-        .accessibilityLabel("上下文用量 \(Int(fraction * 100))%")
+        .accessibilityHidden(true)
     }
 }
 
-/// 用量按钮:点击弹出上下文占用与费用详情。
+/// 用量按钮(输入区页脚):圆环显示上下文占用,点击展开/收起输入区上方的「上下文用量」面板。
 struct UsageButton: View {
-    let usage: UsageUpdate
-    @State private var shown = false
+    let model: SessionModel
+    @Binding var isOpen: Bool
 
-    /// 费用是否超过设置页中的预算阈值(阈值为 0 表示关闭)。
-    private func overBudget(_ cost: Double) -> Bool {
-        let budget = ClientPrefs.budgetUSD()
-        return budget > 0 && cost >= budget
-    }
-
-    private var fraction: Double {
-        guard let used = usage.used, let size = usage.size, size > 0 else { return 0 }
-        return Double(used) / Double(size)
+    /// 圆环使用的占用比例:优先 Agent 实时上报,其次 `/context` 明细。
+    private var fraction: Double? {
+        ContextUsage(reported: model.usage ?? UsageUpdate())?.fraction ?? model.contextUsage?.fraction
     }
 
     var body: some View {
-        Button { shown.toggle() } label: {
-            Group {
-                if usage.size != nil { UsageRing(fraction: fraction) } else { Image.om("gauge.with.needle", size: 12) }
-            }
-            .frame(width: 22, height: 18)
+        Button { omWithAnimation { isOpen.toggle() } } label: {
+            UsageRing(fraction: fraction).frame(width: 22, height: 18)
         }
         .buttonStyle(.plain)
-        .help("用量详情")
-        .accessibilityLabel("用量详情")
-        .accessibilityValue(usage.size != nil ? "上下文已使用 \(Int(fraction * 100))%" : "暂无数据")
-        .popover(isPresented: $shown, arrowEdge: .top) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("会话用量").font(OMFonts.title)
-                if let used = usage.used {
-                    if let size = usage.size, size > 0 {
-                        ProgressView(value: min(fraction, 1))
-                        Text("上下文 \(used.formatted()) / \(size.formatted()) tokens(\(Int(fraction * 100))%)").font(OMFonts.small)
-                    } else {
-                        Text("已用 \(used.formatted()) tokens").font(OMFonts.small)
-                    }
-                }
-                if let cost = usage.costAmount {
-                    Text("累计费用 \(cost.formatted(.number.precision(.fractionLength(2...4)))) \(usage.costCurrency ?? "USD")").font(OMFonts.small)
-                    if overBudget(cost) {
-                        Label("已超过预算提醒阈值", om: "exclamationmark.triangle.fill").font(OMFonts.small).foregroundStyle(OMColors.warning)
-                    }
-                }
-                Text("数据来自 Agent 上报,订阅账号可能不显示费用。")
-                    .font(OMFonts.caption)
-                    .foregroundStyle(OMColors.secondaryText)
-            }
-            .padding(14)
-            .frame(width: 260, alignment: .leading)
-        }
+        .help(fraction.map { String(localized: "上下文 \(Int(($0 * 100).rounded()))%") } ?? String(localized: "上下文用量"))
+        .accessibilityLabel("上下文用量")
+        .accessibilityValue(fraction.map { String(localized: "已使用 \(Int(($0 * 100).rounded()))%") } ?? String(localized: "暂无数据"))
+        .accessibilityAddTraits(isOpen ? .isSelected : [])
     }
 }
-
 
 /// 读取宿主窗口的 key 状态:窗口成为 key 时回调 true,失去时回调 false。
 struct WindowFocusReader: NSViewRepresentable {

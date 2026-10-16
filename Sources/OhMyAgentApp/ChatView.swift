@@ -13,6 +13,8 @@ struct ChatView: View {
     @State private var position = ScrollPosition(edge: .bottom)
     @State private var isPinnedToBottom = true
     @State private var scrollPhase: ScrollPhase = .idle
+    /// 上下文用量面板是否展开
+    @State private var usageOpen = ProcessInfo.processInfo.environment["OMA_USAGE_PANEL"] != nil   // 调试钩子:启动即展开
     /// 聊天内容宽度档位(设置 → 外观)
     @AppStorage(ClientPrefs.Key.chatWidth) private var chatWidth = ChatWidth.standard.rawValue
 
@@ -40,9 +42,13 @@ struct ChatView: View {
                 }
                 PlanDock(model: model)
                 GoalChip(model: model)
+                if usageOpen {
+                    ContextUsagePanel(model: model) { omWithAnimation { usageOpen = false } }
+                        .transition(.opacity.combined(with: .offset(y: 6)))
+                }
                 ComposerDockView(model: model, workbench: AppEnvironment.shared.workbench)
                 ComposerView(model: model)
-                ComposerFooter(model: model)
+                ComposerFooter(model: model, usageOpen: $usageOpen)
             }
             .frame(maxWidth: contentMaxWidth)
             .padding(.horizontal, 16)

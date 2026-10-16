@@ -240,6 +240,10 @@ public final class SessionModel {
     public private(set) var configOptions: [SessionConfigOption] = []
     public private(set) var availableCommands: [AvailableCommand] = []
     public private(set) var usage: UsageUpdate?
+    /// 上下文分类明细(`/context` 探测结果;未探测或 Agent 不支持时为 nil)。
+    public private(set) var contextUsage: ContextUsage?
+    /// 正在探测上下文明细:非 nil 时拦截消息分片(按 messageId 累积),不进入时间线。
+    private var contextProbeChunks: [String: String]?
     public private(set) var sessionTitle: String? { didSet { if sessionTitle != oldValue { recordRecent() } } }
     public private(set) var pendingPermissions: [PermissionPrompt] = [] { didSet { if pendingPermissions.isEmpty != oldValue.isEmpty { publishAttention() } } }
     public private(set) var pendingElicitations: [ElicitationPrompt] = [] { didSet { if pendingElicitations.isEmpty != oldValue.isEmpty { publishAttention() } } }
@@ -1054,6 +1058,54 @@ public final class SessionModel {
         setConfigOption(option.id, value: option.options[(index + 1) % option.options.count].value)
     }
 
+    // MARK: - 上下文用量明细
+
+    /// 是否正在探测上下文明细。
+    public var isProbingContext: Bool { contextProbeChunks != nil }
+
+    /// 当前 Agent 是否支持上下文分类明细(Claude Code 的 `/context`,或 Agent 自行声明了同名命令)。
+    public var supportsContextBreakdown: Bool {
+        activeDescriptor.kind == .claudeACP || availableCommands.contains { $0.name == "context" }
+    }
+
+    /// 刷新上下文分类明细:向 Agent 发送本地命令 `/context` 并解析(不调用模型、不进时间线)。
+    ///
+    /// 轮次进行中、未连接、已在探测或 Agent 不支持时直接跳过;失败只记日志,不打扰用户。
+    public func refreshContextUsage() async {
+        guard supportsContextBreakdown, phase == .ready, !isRunning, contextProbeChunks == nil, let client, let sessionId else { return }
+        let started = ContinuousClock.now
+        contextProbeChunks = [:]
+        defer { contextProbeChunks = nil }
+        do {
+            try await Self.withTimeout(seconds: 8) { _ = try await client.prompt(sessionId: sessionId, content: [.text("/context")]) }
+            // 分片经合并器批量投递:先冲刷并稍等,确保输出全部被拦截后再解析
+            coalescer?.flush()
+            try? await Task.sleep(for: .milliseconds(80))
+            let text = (contextProbeChunks ?? [:]).values.max { $0.count < $1.count } ?? ""
+            if let parsed = ContextUsageParser.parse(text) {
+                contextUsage = parsed
+                log.info("上下文明细已刷新", ["session": sessionId, "categories": "\(parsed.categories.count)", "ms": "\(OMLogger.milliseconds(since: started))"])
+            } else {
+                log.warning("上下文明细解析失败", ["session": sessionId, "chars": "\(text.count)"])
+            }
+        } catch {
+            log.warning("上下文明细探测失败", ["session": sessionId, "error": "\(error)"])
+        }
+    }
+
+    /// 带超时地执行一个异步操作;超时抛出 `CancellationError`。
+    private static func withTimeout(seconds: Double, _ operation: @escaping @Sendable () async throws -> Void) async throws {
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask { try await operation() }
+            group.addTask {
+                try await Task.sleep(for: .seconds(seconds))
+                throw CancellationError()
+            }
+            defer { group.cancelAll() }
+            _ = try await group.next()
+        }
+    }
+
     // MARK: - 模型提供商(会话级切换)
 
     /// 切换当前会话使用的模型提供商/主模型。
@@ -1103,6 +1155,7 @@ public final class SessionModel {
         let setup = try await client.newSession(cwd: cwd, mcpServers: servers, meta: meta)
         sessionId = setup.sessionId
         configOptions = setup.configOptions
+        contextUsage = nil
     }
 
     // MARK: - 配置选项
@@ -1342,6 +1395,9 @@ public final class SessionModel {
         case .sessionInfo(let title, _):
             if let title { sessionTitle = sessionId.flatMap { ClientPrefs.sessionTitleOverrides()[$0] } ?? title }
         case .usage(let value): usage = value
+        case .agentMessageChunk(let messageId, let content) where contextProbeChunks != nil:
+            // 上下文探测期间的输出属于 `/context` 命令,只累积不展示;适配器可能以不同 messageId 重复发送整份输出
+            if case .text(let text) = content { contextProbeChunks?[messageId ?? "default", default: ""] += text }
         default: timeline.apply(update)
         }
     }
