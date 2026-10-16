@@ -214,7 +214,7 @@ struct MarkdownItemEditor: View {
             TextEditor(text: $text)
                 .font(OMFonts.mono)
                 .disabled(item.source.isReadOnly)
-                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(OMColors.hairline))
+                .settingsEditorStyle()
         }
         .padding(16)
         .onAppear(perform: load)
@@ -302,7 +302,7 @@ struct AgentCreateSheet: View {
             FormRow(label: String(localized: "工具"), hint: String(localized: "逗号分隔,留空表示继承全部工具")) { TextField("Read, Grep, Glob", text: $tools).textFieldStyle(.roundedBorder) }
             FormRow(label: String(localized: "模型"), hint: String(localized: "可选:sonnet / opus / haiku / inherit")) { TextField("留空继承", text: $model).textFieldStyle(.roundedBorder) }
             FormRow(label: String(localized: "系统提示")) {
-                TextEditor(text: $prompt).font(OMFonts.mono).frame(height: 110).overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(OMColors.hairline))
+                TextEditor(text: $prompt).font(OMFonts.mono).frame(height: 110).settingsEditorStyle()
             }
             FormRow(label: String(localized: "位置")) {
                 Picker("", selection: $scope) { Text("用户").tag(ConfigScope.user); Text("项目").tag(ConfigScope.project) }.pickerStyle(.segmented).labelsHidden()

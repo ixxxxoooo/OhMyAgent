@@ -71,6 +71,15 @@ struct SettingsForm<Content: View>: View {
 }
 
 extension View {
+    /// 设置页内多行文本编辑器(TextEditor)的统一外观:透明底 + 内边距 + 浅底色 + 细描边,
+    /// 记忆、提示词、环境变量、MCP/Hook/子 Agent 编辑表单共用,避免各处一套样式。
+    func settingsEditorStyle() -> some View {
+        scrollContentBackground(.hidden)
+            .padding(8)
+            .background(OMColors.surface, in: RoundedRectangle(cornerRadius: OMMetrics.controlRadius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: OMMetrics.controlRadius, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
+    }
+
     /// 设置页右侧内容区统一背景:隐藏系统分组表单/列表自带的底色,铺 `OMColors.surface`,避免上下色差。
     func settingsSurface() -> some View {
         scrollContentBackground(.hidden)

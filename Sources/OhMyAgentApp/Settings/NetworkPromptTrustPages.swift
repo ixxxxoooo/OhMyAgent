@@ -54,9 +54,7 @@ struct PromptsPage: View {
                 TextEditor(text: $prompt)
                     .font(OMFonts.mono)
                     .frame(minHeight: 140)
-                    .scrollContentBackground(.hidden)
-                    .padding(6)
-                    .background(OMColors.card, in: RoundedRectangle(cornerRadius: 8))
+                    .settingsEditorStyle()
                     .accessibilityLabel("追加系统提示词")
                 HStack {
                     Text("\(prompt.count) 字").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)

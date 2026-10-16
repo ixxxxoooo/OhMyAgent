@@ -216,7 +216,7 @@ struct AgentEditSheet: View {
                 TextField("说明", text: $draft.summary)
                 VStack(alignment: .leading) {
                     Text("环境变量(每行 KEY=VALUE)").font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
-                    TextEditor(text: $draft.env).font(OMFonts.monoSmall).frame(height: 70)
+                    TextEditor(text: $draft.env).font(OMFonts.monoSmall).frame(height: 70).settingsEditorStyle()
                 }
             }
             .formStyle(.grouped)

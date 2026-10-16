@@ -75,6 +75,7 @@ struct AdvancedPage: View {
                 TextEditor(text: $envText)
                     .font(OMFonts.monoSmall)
                     .frame(minHeight: 110)
+                    .settingsEditorStyle()
                     .onChange(of: envText) { envDirty = true }
                 HStack {
                     Button("保存") { saveEnv() }.disabled(!envDirty)

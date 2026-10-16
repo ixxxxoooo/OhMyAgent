@@ -174,9 +174,7 @@ struct ProviderDetailView: View {
                     TextEditor(text: optional($draft.customHeaders))
                         .font(OMFonts.monoSmall)
                         .frame(height: 60)
-                        .scrollContentBackground(.hidden)
-                        .padding(4)
-                        .background(OMColors.card, in: RoundedRectangle(cornerRadius: 6))
+                        .settingsEditorStyle()
                     Note("每行一个「Name: Value」;Anthropic 协议经 ANTHROPIC_CUSTOM_HEADERS 交给 Claude Code(只进进程环境变量),OpenAI 协议由内置代理附带。")
                 }
                 Note("这些参数通过环境变量交给 Claude Code(CLAUDE_CODE_MAX_OUTPUT_TOKENS / CLAUDE_CODE_AUTO_COMPACT_WINDOW / CLAUDE_CODE_EFFORT_LEVEL),留空使用默认值;Claude Code 不支持自定义 temperature。")

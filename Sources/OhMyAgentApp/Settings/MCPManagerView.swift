@@ -336,7 +336,7 @@ struct MCPEditorSheet: View {
         TextEditor(text: text)
             .font(OMFonts.mono)
             .frame(height: 64)
-            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(OMColors.hairline))
+            .settingsEditorStyle()
     }
 
     private func load() {
@@ -378,7 +378,7 @@ struct MCPJSONSheet: View {
             TextEditor(text: $json)
                 .font(OMFonts.mono)
                 .frame(height: 180)
-                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(OMColors.hairline))
+                .settingsEditorStyle()
             SheetFooter(problems: name.isEmpty ? [String(localized: "请填写名称")] : [], confirmTitle: String(localized: "添加"), onCancel: onClose) {
                 if center.perform(String(localized: "已添加 \(name)"), { try MCPStore(paths: center.paths).addJSON(name: name, json: json, scope: scope) }) { onClose() }
             }

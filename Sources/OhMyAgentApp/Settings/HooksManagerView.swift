@@ -128,7 +128,7 @@ struct HookEditorSheet: View {
             case "command": FormRow(label: String(localized: "命令"), hint: String(localized: "通过 stdin 接收事件 JSON;退出码 2 表示阻止")) { TextField("", text: $command).textFieldStyle(.roundedBorder).font(OMFonts.mono) }
             case "http": FormRow(label: "URL") { TextField("https://", text: $url).textFieldStyle(.roundedBorder).font(OMFonts.mono) }
             case "prompt", "agent":
-                FormRow(label: String(localized: "提示词")) { TextEditor(text: $prompt).font(OMFonts.mono).frame(height: 80).overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(OMColors.hairline)) }
+                FormRow(label: String(localized: "提示词")) { TextEditor(text: $prompt).font(OMFonts.mono).frame(height: 80).settingsEditorStyle() }
             default: FormRow(label: String(localized: "命令")) { TextField("", text: $command).textFieldStyle(.roundedBorder).font(OMFonts.mono) }
             }
             FormRow(label: String(localized: "超时(秒)")) { TextField("默认", text: $timeout).textFieldStyle(.roundedBorder).frame(width: 90) }

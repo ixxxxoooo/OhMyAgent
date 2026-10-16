@@ -36,7 +36,7 @@ struct MemoryManagerView: View {
                     .accessibilityElement(children: .combine)
                 }
                 .listStyle(.inset)
-                .settingsSurface()
+                .scrollContentBackground(.hidden)
             }
         } detail: {
             if let file = selected {
@@ -80,7 +80,7 @@ struct MemoryEditor: View {
             }
             TextEditor(text: $text)
                 .font(OMFonts.mono)
-                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(OMColors.hairline))
+                .settingsEditorStyle()
         }
         .padding(16)
         .onAppear { text = MemoryStore(paths: center.paths).read(file); original = text }
