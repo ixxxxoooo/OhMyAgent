@@ -140,6 +140,7 @@ ALLOWLIST = (
     ("Sources/AgentHost/BridgeServer.swift", None),      # MCP Bridge 返回给 Agent 的错误
     ("Sources/AgentHost/TerminalManager.swift", None),
     ("Sources/ChatKit/SessionBridge.swift", None),
+    ("Sources/IconKit/BrandIcons.swift", None),           # 厂商匹配关键字(用户自建提供商名称),不是界面文案
     ("Sources/ChatKit/SessionModel.swift", "仅允许写入工作区内的文件: \u0000"),
     ("Sources/LSPKit/LSPClient.swift", "未实现: \u0000"),
     ("Sources/OMLog/", None),                            # 日志文本不本地化
