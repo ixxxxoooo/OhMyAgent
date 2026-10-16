@@ -12,7 +12,7 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 ### 模块地图(`Sources/`)
 - `ACPKit`:JSON-RPC、ACP v1 模型、连接 actor、脚本化 Agent(测试用)与声明式场景引擎(`ScenarioEngine`、演示场景目录 `DemoScenarios`、演示历史会话 `DemoHistory`)。
 - `AgentHost`:子进程、工具链定位、Agent 注册表、Bridge(进程内 HTTP MCP,挂在 `LocalGateway` 上,无辅助进程)。
-- `ChatKit`:会话模型(含运行中引导/排队/图片/目标)、时间线、补全(来源徽标、@子 Agent)、等待文案(`WorkingStatus`)、AskUserQuestion 向导模型(`ElicitationQuestions`)、客户端斜杠命令(`LocalCommands`)、Markdown 解析、更新检查、AttentionCenter(运行/未读状态)、RecentStore(无视图);提供商模型 `ProviderModels`、模型映射 `ModelMapping`(Claude Code 槽位 → 任意提供商模型)/`ProviderBridge`(注册到网关)、模式色调 `ModeTone`、`OpenCodeImporter`(两阶段导入,确认前不读密钥);Claude Code 内置命令清单 `ClaudeBuiltinCommands`、自动跟随状态机 `FollowState`、会话标题生成 `TitleGenerator`、草稿文件提及解析 `FileMentions`。
+- `ChatKit`:会话模型(含运行中引导/排队/图片/目标)、时间线、补全(来源徽标、@子 Agent)、等待文案(`WorkingStatus`)、AskUserQuestion 向导模型(`ElicitationQuestions`)、客户端斜杠命令(`LocalCommands`)、Markdown 解析、更新检查、AttentionCenter(运行/未读状态)、RecentStore(无视图);提供商模型 `ProviderModels`、模型映射 `ModelMapping`(Claude Code 槽位 → 任意提供商模型)/`ProviderBridge`(注册到网关)、模式色调 `ModeTone`、`OpenCodeImporter`(两阶段导入,确认前不读密钥);Claude Code 内置命令清单 `ClaudeBuiltinCommands`、自动跟随状态机 `FollowState`、会话标题生成 `TitleGenerator`、草稿文件提及解析 `FileMentions`、输入框内联 chip 布局 `ComposerMentionLayout`、回合提前结束启发式 `TurnEndHeuristics`、设置页宽度 `SettingsContentWidth`、MCP 按需加载 `McpToolSearch`、上下文优化建议 `ContextAdvisor`。
 - `WorkbenchKit`:工作台模型(多项目、项目→会话树、布局与状态持久化、标签页 LRU 保活 `TabKeepAlive`、标签导航历史 `NavHistory`、侧栏尺寸 `PanelMetrics`、标签快捷操作 `TabShortcuts`、面板摆放 `PanelPlacement`(终端放底部/左右栏/编辑区,项目栏与工具栏可换边;含拖动落点几何),无视图)。
 - `ClaudeConfigKit`:读写 `~/.claude`、`.mcp.json` 等配置。
 - `DiffKit` / `EditorKit`:Diff 与编辑器(含 `CodeHighlighter` 代码高亮缓存、`MarkdownLive` 就地渲染)。
@@ -80,7 +80,7 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 ## 6. UI 验证约定(不抢焦点)
 - 启动:`open -g -n build/OhMyAgent.app --env OMA_AGENT=fake --env OMA_PROJECT_ROOT=$PWD`。
 - 演示模式:`OMA_DEMO=1`、`OMA_DEMO_ROOT`、`OMA_DEMO_RESET=1`、`OMA_DEMO_SCENARIO=<场景名>`;输入框 `/demo-<场景名>` 或命令面板「演示场景」运行场景;新增工具卡/条目类型必须补演示场景(覆盖守卫测试会失败提醒)。
-- 调试钩子:`OMA_DRAFT`、`OMA_OPEN_SETTINGS`、`OMA_SETTINGS_PAGE`、`OMA_AGENT=fake|direct`、`OMA_LSP_PROBE=行:列`、`OMA_AUTOALLOW`(自动批准权限)、`OMA_USAGE_PANEL`(展开上下文用量面板)、`OMA_BRANCH_MENU`(展开分支切换弹层)、`OMA_ATTACH_IMAGE=路径1:路径2`(给输入框添加图片附件)、`OMA_PERF_OUT`、`OMA_TOGGLE_LEFT=秒`(延迟切换左栏)、`OMA_TAB_OVERFLOW=1`(标签溢出时自动展开「全部标签」下拉)、`OMA_TERMINAL_PLACEMENT=bottom|right|left|editor`、`OMA_SIDEBAR_SIDE`/`OMA_TOOLS_SIDE=left|right`、`OMA_SHOW_TERMINAL=1`(面板摆放)、`OMA_HUB=all|sessions|projects|files|actions|settings`(打开中央搜索窗)、`OMA_HUB_QUERY`(预填搜索词)。
+- 调试钩子:`OMA_DRAFT`、`OMA_OPEN_SETTINGS`、`OMA_SETTINGS_PAGE`、`OMA_AGENT=fake|direct`、`OMA_LSP_PROBE=行:列`、`OMA_AUTOALLOW`(自动批准权限)、`OMA_USAGE_PANEL`(展开上下文用量面板)、`OMA_BRANCH_MENU`(展开分支切换弹层)、`OMA_ATTACH_IMAGE=路径1:路径2`(给输入框添加图片附件)、`OMA_PERF_OUT`、`OMA_TOGGLE_LEFT=秒`(延迟切换左栏)、`OMA_TAB_OVERFLOW=1`(标签溢出时自动展开「全部标签」下拉)、`OMA_TERMINAL_PLACEMENT=bottom|right|left|editor`、`OMA_SIDEBAR_SIDE`/`OMA_TOOLS_SIDE=left|right`、`OMA_SHOW_TERMINAL=1`(面板摆放)、`OMA_HUB=all|sessions|projects|files|actions|settings`(打开中央搜索窗)、`OMA_HUB_QUERY`(预填搜索词)、`OMA_OPEN_ITEM=<名称片段>`(设置页的技能/子 Agent/记忆自动打开对应条目)。
 - 截图用 `screencapture -x -o -l<windowId>`;禁止用 osascript 发送按键;验证后删除截图。
 - 每次改动后重启应用与适配器子进程,确认修改在运行时真实生效。
 
