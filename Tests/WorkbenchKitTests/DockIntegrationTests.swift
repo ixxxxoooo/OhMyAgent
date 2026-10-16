@@ -31,10 +31,10 @@ struct DockIntegrationTests {
         let (model, ids, root, _) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
         #expect(model.dock.allTabs.count == 2)
-        #expect(model.dock.focusedGroup?.active?.kind == .chat(projectID: ids[1]))
+        #expect(model.dock.focusedGroup?.active?.kind == .chat(projectID: ids[1], slot: nil))
         model.select(project: ids[0])
         #expect(model.dock.allTabs.count == 2)
-        #expect(model.dock.focusedGroup?.active?.kind == .chat(projectID: ids[0]))
+        #expect(model.dock.focusedGroup?.active?.kind == .chat(projectID: ids[0], slot: nil))
         model.shutdownAll()
     }
 
@@ -42,7 +42,7 @@ struct DockIntegrationTests {
     func activatingChatTabSelectsProject() throws {
         let (model, ids, root, _) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
-        let first = try #require(model.dock.tab(for: .chat(projectID: ids[0]))?.id)
+        let first = try #require(model.dock.tab(for: .chat(projectID: ids[0], slot: nil))?.id)
         model.activateTab(first)
         #expect(model.selectedProjectID == ids[0])
         model.shutdownAll()
@@ -75,7 +75,7 @@ struct DockIntegrationTests {
         model.openChanges(project: ids[0])
         model.removeProject(ids[0])
         #expect(model.dock.allTabs.allSatisfy { !WorkbenchModel.belongs($0.kind, toProject: ids[0]) })
-        #expect(model.dock.tab(for: .chat(projectID: ids[1])) != nil)
+        #expect(model.dock.tab(for: .chat(projectID: ids[1], slot: nil)) != nil)
         model.shutdownAll()
     }
 
@@ -98,7 +98,7 @@ struct DockIntegrationTests {
         #expect(!kinds.contains(.file(path: ids[0] + "/missing.txt")))
         #expect(!kinds.contains(.terminal(id: "t1")))
         #expect(!kinds.contains(.subagent(projectID: ids[0], toolCallID: "tc")))
-        #expect(kinds.contains(.chat(projectID: ids[0])))
+        #expect(kinds.contains(.chat(projectID: ids[0], slot: nil)))
         reopened.shutdownAll()
     }
 }

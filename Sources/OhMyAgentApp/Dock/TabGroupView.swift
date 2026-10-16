@@ -47,8 +47,9 @@ extension WorkbenchModel {
     @MainActor
     func displayTitle(_ tab: WorkbenchTab) -> String {
         switch tab.kind {
-        case .chat(let id):
-            return sessions[id]?.sessionTitle ?? projects.first { $0.id == id }?.name ?? tab.title
+        case .chat:
+            if let title = session(forTab: tab)?.sessionTitle, !title.isEmpty { return title }
+            return tab.title
         case .subagent(let project, let toolCallID):
             return sessions[project]?.timeline.toolEntry(id: toolCallID)?.tool?.title ?? tab.title
         default:

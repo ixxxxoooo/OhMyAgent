@@ -34,7 +34,7 @@ struct TabKeepAliveTests {
 
     @Test("会话标签常驻,不占用上限")
     func chatIsResident() {
-        let chat = WorkbenchTab(kind: .chat(projectID: "/p"), title: "会话")
+        let chat = WorkbenchTab(kind: .chat(projectID: "/p", slot: nil), title: "会话")
         let tabs = [chat] + files(5)
         var keep = TabKeepAlive(limit: 2)
         keep.activate(chat.id, in: tabs)

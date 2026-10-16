@@ -46,7 +46,11 @@ struct TabBarView: View {
                                 .id(tab.id)
                                 .onDrop(of: [.plainText, .fileURL], delegate: TabStripDropDelegate(workbench: workbench, groupID: group.id, index: index))
                         }
-                        if isMainGroup { newConversationButton }
+                        // 标签放得下时「+」紧跟最后一个标签;溢出后固定在滚动区右侧,不会被挤出可视范围
+                        if isMainGroup {
+                            // 溢出后用等宽占位保持内容宽度不变,避免「+」移出后又判定为不溢出而来回抖动
+                            if overflowing { Color.clear.frame(width: TabMetrics.height, height: TabMetrics.height) } else { newConversationButton }
+                        }
                         Color.clear
                             .frame(minWidth: 24, maxWidth: .infinity)
                             .contentShape(Rectangle())
@@ -70,7 +74,10 @@ struct TabBarView: View {
                     omWithAnimation(.snappy(duration: 0.2)) { proxy.scrollTo(id, anchor: .center) }
                 }
             }
-            if overflowing { overflowButton }
+            if overflowing {
+                if isMainGroup { newConversationButton }
+                overflowButton
+            }
             if trailingInset > 0 { Color.clear.frame(width: trailingInset).background(WindowDragArea()) }
         }
         .frame(height: TitlebarMetrics.height)
@@ -139,7 +146,7 @@ struct TabItemView: View {
                 .lineLimit(1)
                 .frame(maxWidth: TabMetrics.labelMaxWidth, alignment: .leading)
                 .fixedSize(horizontal: true, vertical: false)
-            if case .chat(let projectID) = tab.kind, let uid = workbench.sessions[projectID]?.uid {
+            if case .chat = tab.kind, let uid = workbench.session(forTab: tab)?.uid {
                 AttentionDot(uid: uid)
             }
             trailing
@@ -312,7 +319,7 @@ struct TabOverflowList: View {
     private static func subtitle(of tab: WorkbenchTab) -> String {
         switch tab.kind {
         case .file(let path), .diff(let path), .blame(let path): return (path as NSString).abbreviatingWithTildeInPath
-        case .chat(let id), .changes(let id), .history(let id, _): return (id as NSString).abbreviatingWithTildeInPath
+        case .chat(let id, _), .changes(let id), .history(let id, _): return (id as NSString).abbreviatingWithTildeInPath
         case .subagent: return String(localized: "子 Agent 会话")
         case .terminal, .agentTerminal: return String(localized: "终端")
         case .preview: return String(localized: "预览")
@@ -367,7 +374,7 @@ private struct TabOverflowRow: View {
                             .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 3))
                     }
                     if item.tab.isDirty { Circle().fill(OMColors.warning).frame(width: 6, height: 6).help("有未保存修改") }
-                    if case .chat(let projectID) = item.tab.kind, let uid = workbench.sessions[projectID]?.uid {
+                    if case .chat = item.tab.kind, let uid = workbench.session(forTab: item.tab)?.uid {
                         AttentionDot(uid: uid)
                     }
                 }

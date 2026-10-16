@@ -18,7 +18,7 @@ struct TabContentView: View {
 
     var body: some View {
         switch tab.kind {
-        case .chat(let projectID): ChatPane(workbench: workbench, projectID: projectID)
+        case .chat(let projectID, let slot): ChatPane(workbench: workbench, projectID: projectID, slot: slot)
         case .file(let path): FileTabView(workbench: workbench, tab: tab, path: path)
         case .diff(let path): DiffTabView(workbench: workbench, path: path)
         case .changes(let projectID): ChangesTabView(workbench: workbench, projectID: projectID)
@@ -37,11 +37,12 @@ struct TabContentView: View {
 private struct ChatPane: View {
     let workbench: WorkbenchModel
     let projectID: String
+    let slot: String?
     private let appearance = AppearanceModel.shared
 
     var body: some View {
         Group {
-            if let model = workbench.sessions[projectID] {
+            if let model = workbench.conversations[ConversationKey(projectID: projectID, slot: slot)] {
                 ChatView(model: model)
                     .id(appearance.renderKey)
                     .environment(model)
@@ -49,7 +50,7 @@ private struct ChatPane: View {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .task { workbench.ensureSession(for: projectID) }
+        .task { workbench.ensureSession(project: projectID, slot: slot) }
     }
 }
 
@@ -90,7 +91,7 @@ struct FileTabView: View {
         let previewKind = FilePreviewKind.of(path: path)
         let mode = previewKind.map { FileViewModeStore.shared.mode(for: path, kind: $0) } ?? .source
         let markdownMode: MarkdownEditorMode = previewKind == .markdown ? (mode == .live ? .live : .source) : .off
-        let changesRevision = workbench.sessions.values.reduce(0) { $0 + $1.changesRevision }
+        let changesRevision = workbench.allSessions.reduce(0) { $0 + $1.changesRevision }
         let markers: [Int: LineMarker] = {
             guard let marks = agentMarks, doc.text == marks.text else { return [:] }
             return Dictionary(uniqueKeysWithValues: marks.lines.map { ($0 - 1, LineMarker.agent) })
@@ -234,7 +235,7 @@ struct FileTabView: View {
 /// 在所有会话的时间线中查找某文件最近一次改动。
 @MainActor
 private func latestChange(for path: String, in workbench: WorkbenchModel) -> (model: SessionModel, change: FileChange)? {
-    for model in workbench.sessions.values {
+    for model in workbench.allSessions {
         for entry in model.timeline.entries.reversed() where entry.kind == .changes {
             if let change = entry.changes.first(where: { $0.path == path }) { return (model, change) }
         }

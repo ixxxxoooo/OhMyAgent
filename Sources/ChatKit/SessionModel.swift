@@ -1023,6 +1023,9 @@ public final class SessionModel {
         Task { await client.cancel(sessionId: sessionId) }
     }
 
+    /// 会话是否还是「空白」的:没有任何消息、草稿与附件(新建标签时据此复用空白会话标签,避免堆出一排空标签)。
+    public var isPristine: Bool { timeline.entries.isEmpty && draft.isEmpty && attachments.isEmpty }
+
     /// 开始新对话:复用同一 Agent 进程创建新的 ACP 会话,并清空时间线。
     public func newConversation() {
         guard let client, phase == .ready else { return }

@@ -267,7 +267,7 @@ struct CenterColumn: View {
         .id(appearance.themeRevision)
         .onChange(of: pendingViewerRequest) { _, request in
             // 统一打开入口:工具行/Bridge/改动汇总发出的「查看文件」请求都变成文件标签
-            guard let request, let model = workbench.sessions.values.first(where: { $0.viewerRequest == request }) else { return }
+            guard let request, let model = workbench.allSessions.first(where: { $0.viewerRequest == request }) else { return }
             model.viewerRequest = nil
             workbench.openFile(request.path, line: request.line)
         }
@@ -275,6 +275,6 @@ struct CenterColumn: View {
 
     /// 任一会话中待处理的文件查看请求。
     private var pendingViewerRequest: FileViewRequest? {
-        workbench.sessions.values.lazy.compactMap(\.viewerRequest).first
+        workbench.allSessions.lazy.compactMap(\.viewerRequest).first
     }
 }

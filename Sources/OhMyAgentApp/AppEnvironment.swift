@@ -52,6 +52,6 @@ final class AppEnvironment {
     /// 当前所有会话(当前项目的排在最前)。
     var sessionModels: [SessionModel] {
         let active = workbench.activeSession
-        return (active.map { [$0] } ?? []) + workbench.sessions.values.filter { $0 !== active }
+        return (active.map { [$0] } ?? []) + workbench.allSessions.filter { $0 !== active }
     }
 }

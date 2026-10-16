@@ -9,8 +9,9 @@ import Foundation
 
 /// 标签承载的内容类型(同一类型且参数相同视为同一内容)。
 public enum TabKind: Codable, Hashable, Sendable {
-    /// 项目会话
-    case chat(projectID: String)
+    /// 项目会话:每个会话一个标签,`slot` 是该标签独立会话的稳定标识;
+    /// nil 表示旧版本留下的「项目主会话」(旧状态文件里没有 slot 字段,可选值解码为 nil,保证兼容)
+    case chat(projectID: String, slot: String?)
     /// 子 Agent 的只读完整会话
     case subagent(projectID: String, toolCallID: String)
     /// 文件(行号等导航状态存放在标签上,不参与身份)
@@ -364,10 +365,13 @@ public struct DockLayout: Codable, Equatable, Sendable {
     public func restoredForLaunch(projectIDs: Set<String>) -> DockLayout {
         var copy = self
         copy.maximizedGroupID = nil
+        // 会话进程不跨启动保留:每个项目只恢复一个会话标签,其余多开的会话标签丢弃
+        var chatProjects = Set<String>()
         copy.closeTabs { tab in
             switch tab.kind {
             case .subagent, .preview, .terminal, .agentTerminal: return true
-            case .chat(let id), .changes(let id), .history(let id, _): return !projectIDs.contains(id)
+            case .chat(let id, _): return !projectIDs.contains(id) || !chatProjects.insert(id).inserted
+            case .changes(let id), .history(let id, _): return !projectIDs.contains(id)
             case .file(let path), .diff(let path), .blame(let path):
                 return !projectIDs.contains { path == $0 || path.hasPrefix($0 + "/") } || !FileManager.default.fileExists(atPath: path)
             }

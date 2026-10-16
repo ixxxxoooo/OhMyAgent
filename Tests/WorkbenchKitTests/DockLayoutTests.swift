@@ -170,7 +170,7 @@ struct DockLayoutTests {
     func persistenceAndSanitize() throws {
         var dock = DockLayout()
         let a = dock.open(file("a"), title: "a")
-        let b = dock.open(.chat(projectID: "/p"), title: "对话")
+        let b = dock.open(.chat(projectID: "/p", slot: nil), title: "对话")
         dock.drop(b, onGroup: try #require(dock.location(of: a)?.group), zone: .bottom)
         let data = try JSONEncoder().encode(dock)
         let restored = try JSONDecoder().decode(DockLayout.self, from: data)
@@ -191,12 +191,12 @@ struct DockLayoutTests {
     @Test("按条件批量关闭标签")
     func closeWhere() {
         var dock = DockLayout()
-        dock.open(.chat(projectID: "/p1"), title: "c1")
-        dock.open(.chat(projectID: "/p2"), title: "c2")
+        dock.open(.chat(projectID: "/p1", slot: nil), title: "c1")
+        dock.open(.chat(projectID: "/p2", slot: nil), title: "c2")
         dock.open(.changes(projectID: "/p1"), title: "改动")
         dock.closeTabs { tab in
             switch tab.kind {
-            case .chat(let id), .changes(let id): return id == "/p1"
+            case .chat(let id, _), .changes(let id): return id == "/p1"
             default: return false
             }
         }
@@ -207,7 +207,7 @@ struct DockLayoutTests {
     func openAsTabInFocusedGroup() {
         var dock = DockLayout()
         dock.open(file("x"), title: "x")
-        dock.open(.chat(projectID: "p"), title: "chat")
+        dock.open(.chat(projectID: "p", slot: nil), title: "chat")
         let term = TabKind.agentTerminal(projectID: "p", terminalID: "t1")
         let a = dock.open(term, title: "ls")
         #expect(dock.groups.count == 1)
@@ -223,7 +223,7 @@ struct DockLayoutTests {
     @Test("重启恢复时 Agent 终端标签被剔除")
     func agentTerminalNotRestored() {
         var dock = DockLayout()
-        dock.open(.chat(projectID: "p"), title: "chat")
+        dock.open(.chat(projectID: "p", slot: nil), title: "chat")
         dock.open(.agentTerminal(projectID: "p", terminalID: "t"), title: "ls")
         let restored = dock.restoredForLaunch(projectIDs: ["p"])
         #expect(restored.allTabs.count == 1)

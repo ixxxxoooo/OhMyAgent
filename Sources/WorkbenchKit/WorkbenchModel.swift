@@ -8,18 +8,31 @@ import Foundation
 import Observation
 import OMLog
 
+/// 会话的身份:项目 + 会话标签槽位(槽位 nil 为旧版本的项目主会话)。
+public struct ConversationKey: Hashable, Sendable {
+    public let projectID: String
+    public let slot: String?
+
+    public init(projectID: String, slot: String?) {
+        self.projectID = projectID
+        self.slot = slot
+    }
+}
+
 @MainActor
 @Observable
 public final class WorkbenchModel {
     public private(set) var projects: [ProjectEntry]
     public private(set) var selectedProjectID: String?
     public var layout: WorkbenchLayout { didSet { if layout != oldValue { scheduleSave() } } }
-    /// 每个项目的活动会话(按需创建)
-    public private(set) var sessions: [String: SessionModel] = [:]
+    /// 全部会话:每个会话标签对应一个独立的 SessionModel(按需创建,标签关闭时回收)
+    public private(set) var conversations: [ConversationKey: SessionModel] = [:]
+    /// 每个项目最近一次激活的会话槽位(决定「项目当前会话」)
+    public private(set) var lastSlot: [String: String?] = [:]
     /// 主窗口当前显示的内容:工作台或设置整页(不持久化,启动时总是工作台)。
     public var mode: WorkbenchMode = .workspace
     /// 停靠布局:标签组与分屏(持久化)。
-    public var dock: DockLayout { didSet { if dock != oldValue { scheduleSave() } } }
+    public var dock: DockLayout { didSet { if dock != oldValue { reapConversations(); scheduleSave() } } }
 
     /// 最近关闭的标签(⌘⇧T 恢复,不持久化)。
     @ObservationIgnored private var closedTabs = ClosedTabStack()
@@ -53,11 +66,48 @@ public final class WorkbenchModel {
 
     /// 会话模型所属的项目 ID。
     public func projectID(of model: SessionModel) -> String? {
-        sessions.first { $0.value === model }?.key
+        conversations.first { $0.value === model }?.key.projectID
     }
 
-    /// 当前项目的会话模型(尚未创建时为 nil)。
+    /// 每个项目的「当前会话」:该项目最近激活的会话标签对应的会话;没有记录时取任意一个。
+    public var sessions: [String: SessionModel] {
+        var result: [String: SessionModel] = [:]
+        for (key, model) in conversations {
+            if let slot = lastSlot[key.projectID], ConversationKey(projectID: key.projectID, slot: slot) == key {
+                result[key.projectID] = model
+            } else if result[key.projectID] == nil {
+                result[key.projectID] = model
+            }
+        }
+        return result
+    }
+
+    /// 所有会话模型(含后台标签里的)。
+    public var allSessions: [SessionModel] { Array(conversations.values) }
+
+    /// 当前项目的当前会话(尚未创建时为 nil)。
     public var activeSession: SessionModel? { selectedProjectID.flatMap { sessions[$0] } }
+
+    /// 标签对应的会话(非会话标签或尚未创建时为 nil)。
+    public func session(forTab tab: WorkbenchTab) -> SessionModel? {
+        guard case .chat(let projectID, let slot) = tab.kind else { return nil }
+        return conversations[ConversationKey(projectID: projectID, slot: slot)]
+    }
+
+    /// 回收没有标签承载的会话(标签被关闭、项目被移除后调用);运行中的轮次随进程一起结束。
+    private func reapConversations() {
+        guard !conversations.isEmpty else { return }
+        let alive = Set(dock.allTabs.compactMap { tab -> ConversationKey? in
+            if case .chat(let projectID, let slot) = tab.kind { return ConversationKey(projectID: projectID, slot: slot) }
+            return nil
+        })
+        for key in conversations.keys where !alive.contains(key) {
+            conversations[key]?.shutdown()
+            conversations[key] = nil
+            if let slot = lastSlot[key.projectID], ConversationKey(projectID: key.projectID, slot: slot) == key { lastSlot[key.projectID] = nil }
+            log.info("回收会话", ["project": key.projectID, "slot": key.slot ?? "-"])
+        }
+    }
 
     /// 项目排序(对齐 kuku):置顶优先 → 添加时间倒序 → 路径兜底。
     /// 不再按「最近打开」排序:选中/切换项目不会让左栏项目换位。
@@ -112,12 +162,24 @@ public final class WorkbenchModel {
         return id
     }
 
-    /// 选中项目;会话尚未创建时创建并预热连接。
+    /// 项目当前应显示的会话槽位:最近激活的;否则编辑区里已有的该项目会话标签;都没有时为 nil(主会话)。
+    private func preferredSlot(for id: String) -> String? {
+        if let slot = lastSlot[id], dock.tab(for: .chat(projectID: id, slot: slot)) != nil { return slot }
+        for tab in dock.allTabs {
+            if case .chat(let p, let slot) = tab.kind, p == id { return slot }
+        }
+        return nil
+    }
+
+    /// 选中项目:显示它最近使用的会话标签,没有时创建一个并预热连接。
     public func select(project id: String) {
         guard let project = projects.first(where: { $0.id == id }) else { return }
         selectedProjectID = id
-        ensureSession(for: id)
-        dock.open(.chat(projectID: id), title: project.name)
+        let slot = preferredSlot(for: id)
+        let tab = dock.open(.chat(projectID: id, slot: slot), title: project.name)
+        dock.activate(tab)
+        lastSlot[id] = .some(slot)
+        ensureSession(project: id, slot: slot)
         mode = .workspace
         scheduleSave()
     }
@@ -125,12 +187,15 @@ public final class WorkbenchModel {
     /// 移除项目:关闭其会话(不删除磁盘上的任何内容)。
     public func removeProject(_ id: String) {
         guard let index = projects.firstIndex(where: { $0.id == id }) else { return }
-        sessions[id]?.shutdown()
-        sessions[id] = nil
         projects.remove(at: index)
         dock.closeTabs { Self.belongs($0.kind, toProject: id) }
+        for key in conversations.keys where key.projectID == id {
+            conversations[key]?.shutdown()
+            conversations[key] = nil
+        }
+        lastSlot[id] = nil
         if selectedProjectID == id { selectedProjectID = orderedProjects.first?.id }
-        if let selected = selectedProjectID { ensureSession(for: selected) }
+        if let selected = selectedProjectID { select(project: selected) }
         log.info("移除项目", ["path": id])
         scheduleSave()
     }
@@ -147,7 +212,7 @@ public final class WorkbenchModel {
     /// 标签内容是否归属某项目(会话/改动按项目 ID,文件/Diff 按路径前缀)。
     static func belongs(_ kind: TabKind, toProject id: String) -> Bool {
         switch kind {
-        case .chat(let p), .changes(let p), .subagent(let p, _), .history(let p, _), .agentTerminal(let p, _): return p == id
+        case .chat(let p, _), .changes(let p), .subagent(let p, _), .history(let p, _), .agentTerminal(let p, _): return p == id
         case .file(let path), .diff(let path), .blame(let path): return path == id || path.hasPrefix(id + "/")
         case .terminal, .preview: return false
         }
@@ -266,7 +331,7 @@ public final class WorkbenchModel {
     @discardableResult
     public func reopenClosedTab() -> Bool {
         while let closed = closedTabs.pop() {
-            if case .chat(let projectID) = closed.kind, !projects.contains(where: { $0.id == projectID }) { continue }
+            if case .chat(let projectID, _) = closed.kind, !projects.contains(where: { $0.id == projectID }) { continue }
             mode = .workspace
             let id = dock.open(closed.kind, title: closed.title, preview: false, line: closed.line)
             dock.activate(id)
@@ -293,11 +358,12 @@ public final class WorkbenchModel {
 
     /// 聚焦组内激活标签若为会话,则把它所属项目设为当前项目。
     public func syncSelectionFromDock() {
-        guard case .chat(let id)? = dock.focusedGroup?.active?.kind, id != selectedProjectID,
-              projects.contains(where: { $0.id == id }) else { return }
+        guard case .chat(let id, let slot)? = dock.focusedGroup?.active?.kind, projects.contains(where: { $0.id == id }) else { return }
+        let changed = id != selectedProjectID || lastSlot[id] != .some(slot)
         selectedProjectID = id
-        ensureSession(for: id)
-        scheduleSave()
+        lastSlot[id] = .some(slot)
+        ensureSession(project: id, slot: slot)
+        if changed { scheduleSave() }
     }
 
     // MARK: 会话置顶与归档
@@ -350,33 +416,99 @@ public final class WorkbenchModel {
         scheduleSave()
     }
 
-    /// 在项目下开始新对话(选中项目并重置其会话)。
+    /// 在项目下开始新对话:新开一个会话标签(各自独立的 Agent 会话);
+    /// 若当前项目的活动会话标签还是空白的,直接复用它,不再多开一个空标签。
     public func newConversation(in id: String) {
-        select(project: id)
+        guard let project = projects.first(where: { $0.id == id }) else { return }
+        selectedProjectID = id
+        mode = .workspace
+        if let current = sessions[id], current.isPristine,
+           let tab = dock.allTabs.first(where: { if case .chat(let p, _) = $0.kind { return p == id && session(forTab: $0) === current } else { return false } }) {
+            dock.activate(tab.id)
+            syncSelectionFromDock()
+            return
+        }
+        let slot = UUID().uuidString
+        let tab = dock.open(.chat(projectID: id, slot: slot), title: String(localized: "新对话") + " · " + project.name)
+        dock.activate(tab)
+        lastSlot[id] = .some(slot)
+        ensureSession(project: id, slot: slot)
         closeSubagentTabs(in: id)
-        sessions[id]?.newConversation()
+        scheduleSave()
     }
 
-    /// 在项目下打开历史会话。
+    /// 在项目下打开历史会话:已经在某个标签里打开的直接切过去;否则新开一个标签承载。
     public func openHistory(project id: String, sessionId: String, title: String?) {
-        select(project: id)
-        closeSubagentTabs(in: id)
-        guard let model = sessions[id] else { return }
+        guard let project = projects.first(where: { $0.id == id }) else { return }
+        mode = .workspace
+        selectedProjectID = id
+        if let (key, _) = conversations.first(where: { $0.key.projectID == id && $0.value.sessionId == sessionId }),
+           let tab = dock.tab(for: .chat(projectID: id, slot: key.slot)) {
+            dock.activate(tab.id)
+            syncSelectionFromDock()
+            return
+        }
+        // 当前活动会话还是空白的就在它身上打开,否则新开一个标签
+        var target = sessions[id]
+        if target == nil || target?.isPristine != true {
+            let slot = UUID().uuidString
+            let tab = dock.open(.chat(projectID: id, slot: slot), title: title ?? project.name)
+            dock.activate(tab)
+            lastSlot[id] = .some(slot)
+            target = ensureSession(project: id, slot: slot)
+        } else {
+            syncSelectionFromDock()
+        }
+        guard let model = target else { return }
         let summary = model.history.first { $0.sessionId == sessionId } ?? SessionSummary(sessionId: sessionId, cwd: id, title: title)
-        model.openSession(summary)
+        if model.phase == .ready {
+            model.openSession(summary)
+        } else {
+            // 新会话还在连接:连上后再打开历史会话
+            pendingOpen[model.uid] = summary
+            Task { [weak self, weak model] in
+                for _ in 0..<150 {
+                    guard let model else { return }
+                    if model.phase == .ready { break }
+                    try? await Task.sleep(for: .milliseconds(100))
+                }
+                guard let self, let model, let pending = self.pendingOpen.removeValue(forKey: model.uid) else { return }
+                model.openSession(pending)
+            }
+        }
+        closeSubagentTabs(in: id)
+        scheduleSave()
     }
 
-    /// 会话模型创建(幂等)。
+    /// 等待连接就绪后再打开的历史会话(按会话 uid)。
+    @ObservationIgnored private var pendingOpen: [String: SessionSummary] = [:]
+
+    /// 会话模型创建(幂等):确保某个会话槽位有对应的 SessionModel。
+    /// - Parameters:
+    ///   - id: 项目 ID
+    ///   - slot: 会话槽位(nil 为项目主会话)
     @discardableResult
-    public func ensureSession(for id: String) -> SessionModel? {
-        if let existing = sessions[id] { return existing }
+    public func ensureSession(project id: String, slot: String?) -> SessionModel? {
+        let key = ConversationKey(projectID: id, slot: slot)
+        if let existing = conversations[key] { return existing }
         guard let project = projects.first(where: { $0.id == id }) else { return nil }
         let model = makeSession(project.url)
-        model.onHistoryChanged = { [weak self] history in self?.cacheHistory(history, for: id) }
-        model.onAgentEdit = { [weak self] edit in self?.followAgentEdit(edit, project: id) }
-        sessions[id] = model
+        wire(model, project: id)
+        conversations[key] = model
         if autoConnect { model.connect() }
         return model
+    }
+
+    /// 确保项目当前会话存在(兼容旧调用)。
+    @discardableResult
+    public func ensureSession(for id: String) -> SessionModel? {
+        ensureSession(project: id, slot: preferredSlot(for: id))
+    }
+
+    /// 给会话挂接历史缓存与跟随回调。
+    private func wire(_ model: SessionModel, project id: String) {
+        model.onHistoryChanged = { [weak self] history in self?.cacheHistory(history, for: id) }
+        model.onAgentEdit = { [weak self] edit in self?.followAgentEdit(edit, project: id) }
     }
 
     /// 是否开启「跟随 Agent」;默认读偏好设置(测试可替换)。
@@ -393,10 +525,12 @@ public final class WorkbenchModel {
 
     /// 用新的 Agent 替换项目会话(窗口内切换 Agent)。
     public func replaceSession(for id: String, with model: SessionModel) {
-        sessions[id]?.shutdown()
-        model.onHistoryChanged = { [weak self] history in self?.cacheHistory(history, for: id) }
-        model.onAgentEdit = { [weak self] edit in self?.followAgentEdit(edit, project: id) }
-        sessions[id] = model
+        let slot = preferredSlot(for: id)
+        let key = ConversationKey(projectID: id, slot: slot)
+        conversations[key]?.shutdown()
+        wire(model, project: id)
+        conversations[key] = model
+        lastSlot[id] = .some(slot)
         if autoConnect { model.connect() }
     }
 
@@ -418,7 +552,7 @@ public final class WorkbenchModel {
 
     /// 关闭所有会话(应用退出)。
     public func shutdownAll() {
-        for model in sessions.values { model.shutdown() }
+        for model in conversations.values { model.shutdown() }
         saveNow()
     }
 
