@@ -56,8 +56,10 @@ enum GitProcess {
 
     /// 子进程环境:禁用交互提示与分页,固定英文输出便于解析,避免不必要的仓库锁。
     static func environment() -> [String: String] {
+        // 仓库定位类变量必须剔除:从 git 钩子启动的进程会继承它们,导致命令落到错误的仓库
+        let repositoryVariables: Set<String> = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_PREFIX", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_NAMESPACE"]
         var env = ProcessInfo.processInfo.environment.filter { key, _ in
-            !key.hasPrefix("OMA_") && !key.hasPrefix("ANTHROPIC_")
+            !key.hasPrefix("OMA_") && !key.hasPrefix("ANTHROPIC_") && !repositoryVariables.contains(key)
         }
         env["GIT_TERMINAL_PROMPT"] = "0"
         env["GIT_PAGER"] = "cat"

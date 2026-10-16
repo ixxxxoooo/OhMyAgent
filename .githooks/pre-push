@@ -4,4 +4,7 @@
 # 临时跳过:OMA_SKIP_PREPUSH=1 git push
 [[ "${OMA_SKIP_PREPUSH:-}" == "1" ]] && exit 0
 cd "$(git rev-parse --show-toplevel)"
+# 钩子由 git 调用时会带上 GIT_DIR 等变量;测试里的临时仓库如果继承它们,
+# `git init/commit` 会直接写进真实仓库(曾把 main 指向测试提交)。必须在跑 CI 前清掉。
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_PREFIX GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_NAMESPACE
 Scripts/ci.sh
