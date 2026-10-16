@@ -1,6 +1,6 @@
 # OhMyAgent 项目 Agent 规范
 
-> @author ygw
+> @author ixxxxoooo
 > 本文件是后续所有 Agent(Cursor、Claude Code 等)在本仓库工作的唯一规范。冲突时以本文件为准;
 > 用户级全局规则中与 Java 相关的条目(`ApiLog`、`ObjectUtils` 等)**不适用于本项目**。
 
@@ -30,7 +30,7 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 - 构建并组装应用:`Scripts/bundle.sh [debug|release]`
 - 重启应用(结束旧进程 → 构建 → 启动):`Scripts/restart.sh`(`OMA_AGENT=fake` 使用脚本化 Agent;`OMA_DEMO=1` 进入演示模式)
 - 演示模式(隔离沙盒 + 脚本化 Agent,测试会话流/工具卡/子 Agent/Git 的首选方式):`Scripts/demo.sh [--reset] [--scenario <名>]`(自动转发全部 `OMA_*` 变量);无人值守导览截图:`Scripts/demo-tour.sh [步骤前缀...]`;完整指南 `.specstory/history/docs/20261016_演示模式自动化演示指南.md`
-- 本地 CI(零警告构建 + 全部测试):`Scripts/ci.sh`
+- 本地 CI(本地化扫描 + 零警告构建 + 全部测试 + plist/strings 校验):`Scripts/ci.sh`
 - 性能门槛:`Scripts/perf.sh`;发布:`Scripts/release.sh`
 - 日志:`Scripts/logs.sh`(P1 之后可用)
 - 启用推送前 CI:`git config core.hooksPath .githooks`(已在本仓库启用)
@@ -53,10 +53,13 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 - 异步用 `async/await` 与结构化并发(`Task`、`TaskGroup`),避免回调嵌套与 `DispatchQueue` 手写同步(系统 API 桥接除外)。
 - 主线程不得做磁盘/网络/子进程阻塞操作;热路径(流式渲染、滚动、输入)避免不必要的分配与视图重建。
 - 方法 ≤ 300 行;命名:类型 UpperCamelCase,方法/变量 lowerCamelCase,常量不使用全大写下划线风格(遵循 Swift API 设计准则)。
-- 注释一律中文;每个类型与方法写文档注释(用途、参数、返回值);文件头含 `@author ygw`。
+- 注释一律中文;每个类型与方法写文档注释(用途、参数、返回值);文件头含 `@author ixxxxoooo`。
 - 对外接口入参做合法性校验。
 - 测试使用 Swift Testing(`@Test`/`#expect`),新功能必须带测试;测试不得依赖真实模型或网络。
-- 本地化:界面文案用字面量(中文为开发语言)并同步 `Resources/en.lproj/Localizable.strings`;以 `String` 传入的文案用 `String(localized:)`。
+- 本地化(中英双语):界面文案用字面量(中文为开发语言,键为中文原文),新增文案必须同步 `Resources/en.lproj/Localizable.strings`;以 `String` 传入的文案(`NSMenu` 标题、`panel.prompt`、三目表达式、含插值的 `Label(_:om:)` 等)用 `String(localized:)`;插值占位符须与运行时类型一致(`Int`→`%lld`、`String`→`%@`,`Int32` 先转 `Int`)。
+  - `zh-Hans.lproj/Localizable.strings` 由 `Scripts/sync-zh-strings.py` 自动生成(恒等映射),禁止手改;`InfoPlist.strings` 管应用名与版权。开发区域为 `en`(非中文系统回退英文)。
+  - 批量追加译文用 `Scripts/add-strings.py`;`Scripts/l10n-scan.py --check` 扫描遗漏的中文字面量(豁免项在脚本 `ALLOWLIST`),已接入 `Scripts/ci.sh`。
+  - Bundle ID 为 `com.ixxxxoooo.OhMyAgent`;旧域 `com.ygw.OhMyAgent` 的偏好由 `LegacyDefaultsMigration` 首次启动时一次性迁移。
 - 无障碍:仅图标的控件必须有 `accessibilityLabel`;动画经 `omWithAnimation` 以遵循「减弱动态效果」。
 
 ## 5. 日志规范(P1 起强制)
