@@ -24,7 +24,10 @@ struct BranchSwitcher: View {
         Button { shown.toggle() } label: {
             HStack(spacing: 4) {
                 Image.om("git-branch", size: 12)
-                Text(head.displayName).lineLimit(1).truncationMode(.middle).frame(maxWidth: 180, alignment: .leading)
+                // 宽度随分支名自适应,过长才在 180pt 处中间省略(`frame(maxWidth:)` 会撑满上限,所以用自定义布局)
+                ClampedWidth(maximum: 180) {
+                    Text(head.displayName).lineLimit(1).truncationMode(.middle)
+                }
                 Image.om("chevron-down", size: 9).opacity(hovering || shown ? 0.9 : 0.5)
             }
             .padding(.horizontal, 6)
@@ -44,6 +47,23 @@ struct BranchSwitcher: View {
                 onChanged()
             }
         }
+    }
+}
+
+/// 宽度取「子视图理想宽度」与上限中较小者的布局:内容短时紧贴内容,过长时限制在上限内。
+private struct ClampedWidth: Layout {
+    /// 宽度上限
+    let maximum: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let child = subviews.first else { return .zero }
+        let ideal = child.sizeThatFits(.init(width: nil, height: proposal.height))
+        let width = min(ideal.width, maximum, proposal.width ?? .infinity)
+        return child.sizeThatFits(.init(width: width, height: proposal.height))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews.first?.place(at: bounds.origin, proposal: .init(width: bounds.width, height: bounds.height))
     }
 }
 
