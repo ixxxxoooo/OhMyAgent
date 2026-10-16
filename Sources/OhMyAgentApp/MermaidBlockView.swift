@@ -31,7 +31,8 @@ enum MermaidResult: Sendable {
 
 /// 离线线程解析与布局。
 func renderMermaid(_ source: String) async -> MermaidResult {
-    await Task.detached(priority: .userInitiated) {
+    if let cached = await MermaidSceneCache.cached(source) { return cached }
+    let result = await Task.detached(priority: .userInitiated) { () -> MermaidResult in
         let started = Date()
         do {
             let kind = try Mermaid.kind(of: source)
@@ -46,6 +47,9 @@ func renderMermaid(_ source: String) async -> MermaidResult {
             return .failure(MermaidError(error.localizedDescription))
         }
     }.value
+    // 只缓存成功的场景(失败可能是流式输出尚未完整)
+    if case .scene = result { await MermaidSceneCache.store(result, for: source) }
+    return result
 }
 
 /// 聊天内的 Mermaid 图块。
@@ -56,6 +60,12 @@ struct MermaidBlockView: View {
     @State private var showSource = false
     @State private var copied = false
 
+    init(source: String) {
+        self.source = source
+        // 重新挂载(切换标签/会话、滚动回来)时直接用缓存,避免先空白再出图
+        _result = State(initialValue: MermaidSceneCache.cached(source))
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
@@ -63,8 +73,10 @@ struct MermaidBlockView: View {
             content
         }
         .omSolidCard(cornerRadius: 10)
-        .task(id: source) { result = await renderMermaid(source) }
+        .task(id: source) { if result == nil || !isCached { result = await renderMermaid(source) } }
     }
+
+    private var isCached: Bool { MermaidSceneCache.cached(source) != nil }
 
     private var header: some View {
         HStack(spacing: 10) {

@@ -1,19 +1,20 @@
 // @author ixxxxoooo
 // 标签保活(LRU):最近使用的若干标签的视图保持挂载,切换时无需重建编辑器/重新高亮;
-// 会话标签常驻(重建整条时间线代价很高),其余标签超出上限后按最久未使用卸载。
+// 会话与终端标签常驻(重建时间线/终端视图代价很高),其余标签按「权重」计入预算,超出后按最久未使用卸载;
+// 只有用户关闭标签,其对应视图才会被销毁。
 
 import Foundation
 
 /// 一个标签组内的保活状态(纯值类型,便于测试)。
 public struct TabKeepAlive: Equatable, Sendable {
-    /// 同时保活的非会话标签上限(含当前激活标签)。
-    public static let defaultLimit = 5
+    /// 非常驻标签的保活预算(各类标签按权重计入,含当前激活标签)。
+    public static let defaultLimit = 10
 
     /// 最近使用顺序,最近的在前。
     public private(set) var order: [UUID] = []
     public let limit: Int
 
-    /// - Parameter limit: 非会话标签的保活上限(至少 1)
+    /// - Parameter limit: 非常驻标签的保活预算(至少 1)
     public init(limit: Int = TabKeepAlive.defaultLimit) {
         self.limit = max(limit, 1)
     }
@@ -30,11 +31,19 @@ public struct TabKeepAlive: Equatable, Sendable {
             order.insert(id, at: 0)
         }
         let resident = Set(tabs.filter(\.isResident).map(\.id))
-        var kept = 0
+        let weights = Dictionary(uniqueKeysWithValues: tabs.map { ($0.id, $0.keepAliveWeight) })
+        var used = 0
+        var keptAny = false
         order = order.filter { tabID in
             if resident.contains(tabID) { return true }
-            kept += 1
-            return kept <= limit
+            let weight = weights[tabID] ?? 1
+            // 最近使用的那个标签即使单个权重超过预算也要保留
+            if !keptAny || used + weight <= limit {
+                keptAny = true
+                used += weight
+                return true
+            }
+            return false
         }
     }
 
@@ -46,9 +55,20 @@ public struct TabKeepAlive: Equatable, Sendable {
 }
 
 extension WorkbenchTab {
-    /// 会话标签常驻,不参与 LRU 淘汰。
+    /// 会话与终端标签常驻,不参与 LRU 淘汰。
     var isResident: Bool {
-        if case .chat = kind { return true }
-        return false
+        switch kind {
+        case .chat, .terminal: return true
+        default: return false
+        }
+    }
+
+    /// 保活权重:越重的视图(整条时间线、Diff、提交图)越快占满预算。
+    var keepAliveWeight: Int {
+        switch kind {
+        case .subagent: return 3
+        case .diff, .changes, .history: return 2
+        default: return 1
+        }
     }
 }

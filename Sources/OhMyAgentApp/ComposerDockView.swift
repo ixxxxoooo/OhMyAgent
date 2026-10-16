@@ -126,7 +126,7 @@ struct ComposerDockView: View {
                     case .queued:
                         ForEach(model.followUps) { item in QueuedRow(model: model, item: item) }
                     case .subagents:
-                        TimelineView(.periodic(from: .now, by: 1)) { _ in
+                        ActiveTimeline(interval: 1) { _ in
                             VStack(spacing: 1) {
                                 ForEach(subagents, id: \.entry.id) { item in
                                     SubagentDockRow(entry: item.entry, depth: item.depth, model: model, workbench: workbench)
@@ -134,7 +134,7 @@ struct ComposerDockView: View {
                             }
                         }
                     case .terminals:
-                        TimelineView(.periodic(from: .now, by: 1)) { _ in
+                        ActiveTimeline(interval: 1) { _ in
                             VStack(spacing: 1) {
                                 ForEach(terminals) { session in
                                     TerminalDockRow(session: session, model: model, workbench: workbench)

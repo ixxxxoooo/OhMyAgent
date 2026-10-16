@@ -14,9 +14,9 @@ struct WorkingIndicatorView: View {
     var body: some View {
         if model.isRunning, let start = model.turnStartedAt {
             let waitingForUser = !model.pendingPermissions.isEmpty || !model.pendingElicitations.isEmpty
-            TimelineView(.periodic(from: start, by: reduceMotion || waitingForUser ? 1 : 0.15)) { context in
-                let seconds = Int(context.date.timeIntervalSince(start))
-                let tick = Int(context.date.timeIntervalSinceReferenceDate / 0.15)
+            ActiveTimeline(interval: reduceMotion || waitingForUser ? 1 : 0.15, start: start) { date in
+                let seconds = Int(date.timeIntervalSince(start))
+                let tick = Int(date.timeIntervalSinceReferenceDate / 0.15)
                 HStack(spacing: 8) {
                     Text(waitingForUser || reduceMotion ? "✻" : WorkingStatus.glyph(tick: tick))
                         .font(.system(size: 13, weight: .medium))

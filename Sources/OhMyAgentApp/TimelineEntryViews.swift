@@ -143,7 +143,7 @@ struct ThoughtView: View {
                     Image.om("chevron.right", size: 9, weight: .bold)
                         .rotationEffect(.degrees(expanded ? 90 : 0))
                     if entry.isStreaming {
-                        TimelineView(.periodic(from: .now, by: 1)) { _ in
+                        ActiveTimeline(interval: 1) { _ in
                             Text("思考中… \(Int(entry.elapsedSeconds)) 秒")
                         }
                     } else {

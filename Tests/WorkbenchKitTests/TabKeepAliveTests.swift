@@ -58,4 +58,39 @@ struct TabKeepAliveTests {
         tabs.append(fresh)
         #expect(keep.mounted(in: tabs, active: fresh.id).contains { $0.id == fresh.id })
     }
+
+    @Test("终端标签常驻")
+    func terminalIsResident() {
+        let terminal = WorkbenchTab(kind: .terminal(id: "t1"), title: "终端")
+        let tabs = [terminal] + files(4)
+        var keep = TabKeepAlive(limit: 2)
+        for tab in tabs { keep.activate(tab.id, in: tabs) }
+        let mounted = keep.mounted(in: tabs, active: tabs[4].id).map(\.title)
+        #expect(mounted.contains("终端"))
+        #expect(mounted.count == 3)
+    }
+
+    @Test("重标签按权重占用预算:子 Agent 权重 3")
+    func weighted() {
+        let heavy = WorkbenchTab(kind: .subagent(projectID: "/p", toolCallID: "a"), title: "子Agent")
+        let tabs = files(3) + [heavy]
+        var keep = TabKeepAlive(limit: 4)
+        for tab in tabs { keep.activate(tab.id, in: tabs) }
+        // 预算 4:子 Agent(3) + 最近的 1 个文件
+        let mounted = keep.mounted(in: tabs, active: heavy.id).map(\.title)
+        #expect(mounted == ["f2", "子Agent"])
+    }
+
+    @Test("单个标签权重超过预算时仍保留当前标签")
+    func oversizedActiveKept() {
+        let heavy = WorkbenchTab(kind: .subagent(projectID: "/p", toolCallID: "a"), title: "子Agent")
+        var keep = TabKeepAlive(limit: 1)
+        keep.activate(heavy.id, in: [heavy])
+        #expect(keep.mounted(in: [heavy], active: heavy.id).count == 1)
+    }
+
+    @Test("默认预算比旧版更大")
+    func defaultBudget() {
+        #expect(TabKeepAlive.defaultLimit >= 8)
+    }
 }

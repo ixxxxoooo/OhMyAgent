@@ -224,7 +224,7 @@ struct ToolRowView: View {
                 .font(OMFonts.caption)
                 .foregroundStyle(OMColors.tertiaryText)
         } else {
-            TimelineView(.periodic(from: .now, by: 1)) { _ in
+            ActiveTimeline(interval: 1) { _ in
                 Text(Self.format(entry.elapsedSeconds))
                     .font(OMFonts.caption)
                     .foregroundStyle(OMColors.tertiaryText)

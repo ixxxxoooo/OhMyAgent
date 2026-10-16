@@ -13,7 +13,7 @@ struct MarkdownView: View {
     let text: String
 
     var body: some View {
-        let blocks = MarkdownParser.parse(text)
+        let blocks = MarkdownCache.blocks(for: text)
         VStack(alignment: .leading, spacing: 10) {
             ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
                 MarkdownBlockView(block: block)
