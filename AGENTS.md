@@ -99,6 +99,14 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 **设置页**:分组标题 `sectionTitle`;行标题 `body`;说明 `Note`(`caption` + `secondaryText`);所有数字输入用 `SettingsNumericField`;右侧内容宽度由「外观 → 设置页宽度」统一控制;页面骨架用 `SettingsForm`/`ExtensionPage`,不要自己拼 `ScrollView`。
 **浮层与卡片**:沿用 `omGlassCard`、`OMMetrics.cardRadius`/`controlRadius`;阴影、描边用令牌,不另起一套。
 
+## 4.3 主题渗透规范(所有界面必须跟随主题)
+- **颜色只来自 `OMColors` / `ThemePalette`**:前景、次要/三级文字、分隔线、填充(`subtleFill/hoverFill/selectedFill/pressedFill`)、状态(`statusRunning/Waiting/Unread/Idle`)、遮罩(`scrim`)、阴影(`shadowInk`)、图表序列(`chart(_:)`)都有令牌;`Color.primary/.secondary/.black/.white`、`NSColor.label/.separatorColor` 等系统色一律禁止(`Scripts/ui-lint.py` 扫描 `Sources/OhMyAgentApp`、`EditorKit`、`MermaidKit` 等)。
+- **读取令牌即自动刷新**:`ThemeRuntime` 的读取走 `ThemeTracker.revision`(Observation),视图 `body` 里读 `OMColors.*` 即可随主题热更新,**不要**靠 `.id(...)` 强制重建;AppKit 桥接(终端、编辑器、托盘)监听 `ThemeRuntime.didChange` 重新应用。
+- **新增主题**须同时提供:`surface`、`sidebarBackground`、`accent/accent2`、语法色、Diff 色、状态色;可选 `style`(圆角/描边/阴影/玻璃/填充倍率)与 `ansi`(16 色,缺省由状态色推导)。`ThemeTokenTests` 守卫对比度与 ANSI 完整性。
+- **终端、编辑器、聊天代码块、Mermaid、Git 图谱、状态点**都从主题取色:终端 `OMTerminalPalette`,Mermaid 经 `ThemeBridges` 注册 `MermaidTheme`,代码高亮缓存键包含主题 id。
+- **字号补充**:`OMFonts.custom` 仅限 Markdown 标题、徽标数字、搜索大输入框等令牌覆盖不到的特例;空状态用 `body`/`small`;紧凑控件不超过 `small`。
+- **例外**:模式/思考强度选择器沿用原生 `Menu`(无搜索,选项极少),其余下拉统一 `OMPickList`。
+
 ## 5. 日志规范(P1 起强制)
 - 只使用 `OMLog`(`Log.<category>.info/debug/warning/error`),禁止 `print`/`NSLog`。
 - 日志文件:`~/Library/Logs/OhMyAgent/`;排查问题先看这里。
