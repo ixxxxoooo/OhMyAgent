@@ -23,7 +23,8 @@ struct TabContentView: View {
         case .diff(let path): DiffTabView(workbench: workbench, path: path)
         case .changes(let projectID): ChangesTabView(workbench: workbench, projectID: projectID)
         case .subagent(let projectID, let toolCallID): SubagentTabView(workbench: workbench, projectID: projectID, toolCallID: toolCallID)
-        case .preview(let id): PreviewTabView(id: id)
+        case .preview(let id):
+            if id == WorkbenchModel.outputTabID { LogViewerView() } else { PreviewTabView(id: id) }
         case .history(let projectID, let path): GitHistoryTabView(workbench: workbench, projectID: projectID, path: path)
         case .blame(let path): GitBlameTabView(workbench: workbench, path: path)
         case .agentTerminal(let projectID, let terminalID): AgentTerminalTabView(workbench: workbench, projectID: projectID, terminalID: terminalID)

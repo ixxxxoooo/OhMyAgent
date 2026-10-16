@@ -236,37 +236,12 @@ extension AppearancePage {
         )
     }
 
-    /// 布局:终端位置、项目栏与工具栏所在侧(也可直接拖动终端标题条换位置)。
+    /// 布局:迷你工作台示意图,拖动面板卡片到左栏/右栏/底部/编辑区(也可直接拖动面板标题条换位置)。
     @ViewBuilder
     fileprivate var layoutSection: some View {
         Section("布局") {
-            Picker("终端位置", selection: Binding(
-                get: { workbench.layout.placement.terminal },
-                set: { workbench.setTerminalPlacement($0) }
-            )) {
-                Text("底部").tag(TerminalPlacement.bottom)
-                Text("右栏").tag(TerminalPlacement.right)
-                Text("左栏").tag(TerminalPlacement.left)
-                Text("编辑区").tag(TerminalPlacement.editor)
-            }
-            .pickerStyle(.segmented)
-            Picker("项目栏位置", selection: Binding(
-                get: { workbench.layout.placement.sidebarSide },
-                set: { workbench.setSidebarSide($0) }
-            )) {
-                Text("左侧").tag(PanelSide.left)
-                Text("右侧").tag(PanelSide.right)
-            }
-            .pickerStyle(.segmented)
-            Picker("文件 / 搜索 / Git 位置", selection: Binding(
-                get: { workbench.layout.placement.toolsSide },
-                set: { workbench.setToolsSide($0) }
-            )) {
-                Text("左侧").tag(PanelSide.left)
-                Text("右侧").tag(PanelSide.right)
-            }
-            .pickerStyle(.segmented)
-            Note("终端标题条可以直接拖到窗口的左侧、右侧、底部或中间来换位置;换位置不会中断终端里正在运行的进程。")
+            LayoutDragEditor(workbench: workbench)
+            Note("把「项目栏 / 文件 / Git / 终端 / 输出」的卡片拖到想要的位置;终端和输出的标题条也可以直接拖到窗口的左侧、右侧、底部或中间。换位置不会中断终端里正在运行的进程。")
             Button("恢复默认布局") { workbench.resetLayout() }
         }
     }

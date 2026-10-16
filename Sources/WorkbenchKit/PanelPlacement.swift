@@ -77,6 +77,8 @@ public enum PanelColumn: String, CaseIterable, Identifiable, Sendable {
     case tools
     /// 终端侧栏
     case terminal
+    /// 输出(日志)侧栏
+    case output
 
     public var id: String { rawValue }
 }
@@ -85,6 +87,8 @@ public enum PanelColumn: String, CaseIterable, Identifiable, Sendable {
 public struct PanelPlacement: Codable, Equatable, Sendable {
     /// 终端位置
     public var terminal: TerminalPlacement = .bottom
+    /// 输出(日志)面板位置
+    public var output: TerminalPlacement = .bottom
     /// 项目栏所在侧
     public var sidebarSide: PanelSide = .left
     /// 工具栏(文件/搜索/Git)所在侧
@@ -92,18 +96,20 @@ public struct PanelPlacement: Codable, Equatable, Sendable {
 
     public init() {}
 
-    public init(terminal: TerminalPlacement = .bottom, sidebarSide: PanelSide = .left, toolsSide: PanelSide = .right) {
+    public init(terminal: TerminalPlacement = .bottom, output: TerminalPlacement = .bottom, sidebarSide: PanelSide = .left, toolsSide: PanelSide = .right) {
         self.terminal = terminal
+        self.output = output
         self.sidebarSide = sidebarSide
         self.toolsSide = toolsSide
     }
 
-    private enum CodingKeys: String, CodingKey { case terminal, sidebarSide, toolsSide }
+    private enum CodingKeys: String, CodingKey { case terminal, output, sidebarSide, toolsSide }
 
     /// 容错解码:字段缺失或取值未知时回落到默认值。
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         terminal = (try? c.decodeIfPresent(TerminalPlacement.self, forKey: .terminal)) ?? .bottom
+        output = (try? c.decodeIfPresent(TerminalPlacement.self, forKey: .output)) ?? .bottom
         sidebarSide = (try? c.decodeIfPresent(PanelSide.self, forKey: .sidebarSide)) ?? .left
         toolsSide = (try? c.decodeIfPresent(PanelSide.self, forKey: .toolsSide)) ?? .right
     }
@@ -116,6 +122,7 @@ public extension WorkbenchLayout {
         case .sidebar: return placement.sidebarSide
         case .tools: return placement.toolsSide
         case .terminal: return placement.terminal.side
+        case .output: return placement.output.side
         }
     }
 
@@ -125,6 +132,7 @@ public extension WorkbenchLayout {
         case .sidebar: return leftVisible
         case .tools: return rightVisible
         case .terminal: return terminalVisible && placement.terminal.isSide
+        case .output: return outputVisible && placement.output.isSide
         }
     }
 
@@ -138,9 +146,9 @@ public extension WorkbenchLayout {
         columns(on: side).filter { isVisible($0) }
     }
 
-    /// 某一侧的开关按钮数量(项目栏、工具栏各一个;终端侧栏没有标题栏开关)。
+    /// 某一侧的开关按钮数量(项目栏、工具栏各一个;终端/输出侧栏没有标题栏开关)。
     func toggleCount(on side: PanelSide) -> Int {
-        columns(on: side).filter { $0 != .terminal }.count
+        columns(on: side).filter { $0 == .sidebar || $0 == .tools }.count
     }
 
     /// 某列的宽度。
@@ -149,6 +157,116 @@ public extension WorkbenchLayout {
         case .sidebar: return leftWidth
         case .tools: return rightWidth
         case .terminal: return terminalWidth
+        case .output: return outputWidth
         }
+    }
+}
+
+/// 可摆放的面板条目(外观页的拖拽布局编辑器使用)。
+public enum PanelItem: String, CaseIterable, Identifiable, Sendable {
+    /// 项目与会话树
+    case sidebar
+    /// 文件 / 搜索 / Git
+    case tools
+    /// 终端
+    case terminal
+    /// 输出(日志)
+    case output
+
+    public var id: String { rawValue }
+
+    /// 拖拽载荷前缀。
+    public static let payloadPrefix = "oma-panel:"
+
+    /// 拖拽载荷。
+    public var payload: String { Self.payloadPrefix + rawValue }
+
+    /// 由拖拽载荷解析面板条目。
+    /// - Parameter payload: 载荷文本
+    public static func parse(payload: String) -> PanelItem? {
+        guard payload.hasPrefix(payloadPrefix) else { return nil }
+        return PanelItem(rawValue: String(payload.dropFirst(payloadPrefix.count)))
+    }
+
+    /// 该面板可以去的区域:项目栏与工具栏只能在左右两侧,终端与输出四处都行。
+    public var allowedZones: [PanelZone] {
+        switch self {
+        case .sidebar, .tools: return [.left, .right]
+        case .terminal, .output: return PanelZone.allCases
+        }
+    }
+}
+
+/// 窗口里的摆放区域。
+public enum PanelZone: String, CaseIterable, Identifiable, Sendable {
+    case left, right, bottom, editor
+
+    public var id: String { rawValue }
+
+    /// 对应终端/输出的摆放值。
+    public var placement: TerminalPlacement {
+        switch self {
+        case .left: return .left
+        case .right: return .right
+        case .bottom: return .bottom
+        case .editor: return .editor
+        }
+    }
+
+    /// 对应的侧(仅左右)。
+    public var side: PanelSide? {
+        switch self {
+        case .left: return .left
+        case .right: return .right
+        default: return nil
+        }
+    }
+}
+
+public extension WorkbenchLayout {
+    /// 面板条目当前所在区域。
+    /// - Parameter item: 面板条目
+    func zone(of item: PanelItem) -> PanelZone {
+        switch item {
+        case .sidebar: return placement.sidebarSide == .left ? .left : .right
+        case .tools: return placement.toolsSide == .left ? .left : .right
+        case .terminal: return Self.zone(for: placement.terminal)
+        case .output: return Self.zone(for: placement.output)
+        }
+    }
+
+    private static func zone(for placement: TerminalPlacement) -> PanelZone {
+        switch placement {
+        case .left: return .left
+        case .right: return .right
+        case .bottom: return .bottom
+        case .editor: return .editor
+        }
+    }
+
+    /// 某区域里摆放的全部面板(项目栏、工具栏、终端、输出的固定顺序)。
+    /// - Parameter zone: 区域
+    func items(in zone: PanelZone) -> [PanelItem] {
+        PanelItem.allCases.filter { self.zone(of: $0) == zone }
+    }
+}
+
+@MainActor
+public extension WorkbenchModel {
+    /// 把面板放到某个区域(拖拽布局编辑器的落点处理)。
+    /// - Parameters:
+    ///   - item: 面板条目
+    ///   - zone: 目标区域
+    /// - Returns: 是否生效;面板不允许去该区域(如项目栏放到底部)时为 false
+    @discardableResult
+    func place(_ item: PanelItem, in zone: PanelZone) -> Bool {
+        guard item.allowedZones.contains(zone) else { return false }
+        switch item {
+        case .sidebar: if let side = zone.side { setSidebarSide(side) }
+        case .tools: if let side = zone.side { setToolsSide(side) }
+        case .terminal: setTerminalPlacement(zone.placement)
+        case .output: setOutputPlacement(zone.placement)
+        }
+        return true
     }
 }

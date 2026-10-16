@@ -82,6 +82,7 @@ struct WorkbenchView: View {
                 case .sidebar: workbench.layout.leftWidth = value
                 case .tools: workbench.layout.rightWidth = value
                 case .terminal: workbench.layout.terminalWidth = value
+                case .output: workbench.layout.outputWidth = value
                 }
             }
         )
@@ -99,6 +100,8 @@ struct WorkbenchView: View {
                     .id(appearance.themeRevision)
             case .terminal:
                 TerminalSidePanel(workbench: workbench)
+            case .output:
+                OutputSidePanel(workbench: workbench)
             }
         }
         .frame(width: CGFloat(width.wrappedValue))

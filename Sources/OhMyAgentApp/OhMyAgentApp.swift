@@ -207,7 +207,7 @@ struct WorkbenchCommands: Commands {
                 // 终端不在底部时:快捷键切换终端,输出面板另设入口
                 Button(workbench.isTerminalShown ? String(localized: "隐藏终端") : String(localized: "显示终端")) { workbench.toggleTerminal() }
                     .keyboardShortcut(shortcuts.shortcut(for: .togglePanel))
-                Button(workbench.layout.bottomVisible ? String(localized: "隐藏输出面板") : String(localized: "显示输出面板")) { workbench.toggleBottom() }
+                Button(workbench.isOutputShown ? String(localized: "隐藏输出面板") : String(localized: "显示输出面板")) { workbench.toggleOutput() }
             }
             Divider()
             Button("工具与扩展…") {

@@ -1769,3 +1769,14 @@
 "加密的文件" = "Encrypted files";
 "条目过大" = "Entry too large";
 "无法打开表格" = "Cannot Open Spreadsheet";
+"把「项目栏 / 文件 / Git / 终端 / 输出」的卡片拖到想要的位置;终端和输出的标题条也可以直接拖到窗口的左侧、右侧、底部或中间。换位置不会中断终端里正在运行的进程。" = "Drag the Sidebar / Files & Git / Terminal / Output cards where you want them; you can also drag the Terminal and Output title bars to the left, right, bottom or center of the window. Moving a panel does not interrupt running terminal processes.";
+"布局编辑器" = "Layout editor";
+"拖到左栏或右栏" = "Drag to the left or right column";
+"拖到左栏、右栏、底部或编辑区" = "Drag to the left, right, bottom or editor";
+"拖动到其它区域可更换位置" = "Drag to another zone to move it";
+"项目栏" = "Projects";
+"文件 / Git" = "Files / Git";
+"拖动可把输出移到左侧、右侧、底部或编辑区" = "Drag to move Output to the left, right, bottom or editor";
+"关闭输出" = "Close Output";
+"关闭输出面板" = "Close the Output panel";
+"输出面板" = "Output panel";

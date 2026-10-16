@@ -52,12 +52,16 @@ public struct WorkbenchLayout: Codable, Equatable, Sendable {
     public var terminalVisible = false
     /// 终端侧栏宽度
     public var terminalWidth: Double = PanelMetrics.terminalDefault
+    /// 输出侧栏是否可见(输出放到左/右侧时有效)
+    public var outputVisible = false
+    /// 输出侧栏宽度
+    public var outputWidth: Double = PanelMetrics.terminalDefault
 
     public init() {}
 
     private enum CodingKeys: String, CodingKey {
         case leftVisible, rightVisible, bottomVisible, leftWidth, rightWidth, bottomHeight
-        case leftPane, rightPane, bottomPane, placement, terminalVisible, terminalWidth
+        case leftPane, rightPane, bottomPane, placement, terminalVisible, terminalWidth, outputVisible, outputWidth
     }
 
     /// 容错解码:新增字段缺失或取值未知时使用默认值,旧版本状态文件可继续读取。
@@ -75,6 +79,8 @@ public struct WorkbenchLayout: Codable, Equatable, Sendable {
         placement = (try? c.decodeIfPresent(PanelPlacement.self, forKey: .placement)) ?? PanelPlacement()
         terminalVisible = try c.decodeIfPresent(Bool.self, forKey: .terminalVisible) ?? false
         terminalWidth = try c.decodeIfPresent(Double.self, forKey: .terminalWidth) ?? PanelMetrics.terminalDefault
+        outputVisible = try c.decodeIfPresent(Bool.self, forKey: .outputVisible) ?? false
+        outputWidth = try c.decodeIfPresent(Double.self, forKey: .outputWidth) ?? PanelMetrics.terminalDefault
     }
 
     /// 限制各尺寸在合理范围内(防止损坏的状态文件导致不可见的面板),并校正与摆放位置相关的状态。
@@ -82,13 +88,17 @@ public struct WorkbenchLayout: Codable, Equatable, Sendable {
         leftWidth = min(max(leftWidth, PanelMetrics.leftRange.lowerBound), PanelMetrics.leftRange.upperBound)
         rightWidth = min(max(rightWidth, PanelMetrics.rightRange.lowerBound), PanelMetrics.rightRange.upperBound)
         terminalWidth = min(max(terminalWidth, PanelMetrics.terminalRange.lowerBound), PanelMetrics.terminalRange.upperBound)
+        outputWidth = min(max(outputWidth, PanelMetrics.terminalRange.lowerBound), PanelMetrics.terminalRange.upperBound)
         bottomHeight = min(max(bottomHeight, 120), 600)
         if !LeftPane.available.contains(leftPane) { leftPane = .sessions }
         if !RightPane.available.contains(rightPane) { rightPane = .files }
         if !BottomPane.available.contains(bottomPane) { bottomPane = .output }
-        // 终端不在底部时,底部面板只剩「输出」;终端不在左/右侧时,侧栏不可见
+        // 底部面板只显示摆放在底部的面板;没有任何面板在底部时,底部面板不可见
         if placement.terminal != .bottom && bottomPane == .terminal { bottomPane = .output }
+        if placement.output != .bottom && bottomPane == .output && placement.terminal == .bottom { bottomPane = .terminal }
+        if placement.terminal != .bottom && placement.output != .bottom { bottomVisible = false }
         if !placement.terminal.isSide { terminalVisible = false }
+        if !placement.output.isSide { outputVisible = false }
     }
 }
 

@@ -48,11 +48,11 @@ struct PanelPlacementViewTests {
     func dragState() {
         let drag = TerminalDragState.shared
         drag.workspaceFrame = CGRect(x: 100, y: 50, width: 1000, height: 800)
-        drag.update(CGPoint(x: 150, y: 450))
+        drag.update(CGPoint(x: 150, y: 450), panel: .terminal)
         #expect(drag.isDragging && drag.target == .left)
         #expect(drag.finish(at: CGPoint(x: 1080, y: 450)) == .right)
         #expect(!drag.isDragging && drag.target == nil)
-        drag.update(CGPoint(x: 10, y: 10))
+        drag.update(CGPoint(x: 10, y: 10), panel: .terminal)
         #expect(drag.finish(at: CGPoint(x: 10, y: 10)) == nil)
     }
 }

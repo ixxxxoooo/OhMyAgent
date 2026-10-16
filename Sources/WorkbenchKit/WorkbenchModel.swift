@@ -672,25 +672,90 @@ public final class WorkbenchModel {
         layout.leftWidth = PanelMetrics.leftDefault
         layout.rightWidth = PanelMetrics.rightDefault
         layout.terminalWidth = PanelMetrics.terminalDefault
+        layout.outputWidth = PanelMetrics.terminalDefault
         layout.bottomHeight = 240
     }
 
-    /// 应用新的摆放配置;终端位置变化时迁移其显示状态。
+    /// 应用新的摆放配置;终端/输出位置变化时迁移其显示状态。
     private func applyPlacement(_ next: PanelPlacement) {
-        let wasShown = isTerminalShown
-        let old = layout.placement.terminal
+        let terminalWasShown = isTerminalShown
+        let outputWasShown = isOutputShown
+        let oldTerminal = layout.placement.terminal
+        let oldOutput = layout.placement.output
         guard next != layout.placement else { return }
         layout.placement = next
-        if next.terminal != old {
+        if next.terminal != oldTerminal {
             // 清理旧位置:编辑区标签关闭(不进入「最近关闭」),底部/侧栏显隐复位
-            if old == .editor { for tab in residentTerminalTabs { dock.close(tab.id) } }
-            if old == .bottom, layout.bottomPane == .terminal { layout.bottomPane = .output; layout.bottomVisible = false }
-            if old.isSide { layout.terminalVisible = false }
-            layout.clamp()
-            if wasShown { showTerminal() }
-            syncSelectionFromDock()
+            if oldTerminal == .editor { for tab in residentTerminalTabs { dock.close(tab.id) } }
+            if oldTerminal == .bottom, layout.bottomPane == .terminal { layout.bottomPane = .output; layout.bottomVisible = false }
+            if oldTerminal.isSide { layout.terminalVisible = false }
+        }
+        if next.output != oldOutput {
+            if oldOutput == .editor { for tab in outputTabs { dock.close(tab.id) } }
+            if oldOutput == .bottom, layout.bottomPane == .output { layout.bottomPane = .terminal; layout.bottomVisible = layout.bottomVisible && next.terminal == .bottom }
+            if oldOutput.isSide { layout.outputVisible = false }
         }
         layout.clamp()
+        if next.terminal != oldTerminal, terminalWasShown { showTerminal() }
+        if next.output != oldOutput, outputWasShown { showOutput() }
+        if next.terminal != oldTerminal || next.output != oldOutput { syncSelectionFromDock() }
+        layout.clamp()
+    }
+
+    // MARK: 输出面板
+
+    /// 输出面板在编辑区里的标签标识(放在编辑区时作为预览类标签)。
+    public static let outputTabID = "oma-output"
+
+    /// 编辑区中的输出标签。
+    private var outputTabs: [WorkbenchTab] {
+        dock.allTabs.filter { $0.kind == .preview(id: Self.outputTabID) }
+    }
+
+    /// 输出面板当前是否显示在界面上。
+    public var isOutputShown: Bool {
+        switch layout.placement.output {
+        case .bottom: return layout.bottomVisible && layout.bottomPane == .output
+        case .left, .right: return layout.outputVisible
+        case .editor: return !outputTabs.isEmpty
+        }
+    }
+
+    /// 显示输出面板(按当前摆放位置)。
+    public func showOutput() {
+        switch layout.placement.output {
+        case .bottom: showBottom(.output)
+        case .left, .right: layout.outputVisible = true
+        case .editor:
+            let tab = dock.open(.preview(id: Self.outputTabID), title: String(localized: "输出"))
+            mode = .workspace
+            dock.activate(tab)
+            syncSelectionFromDock()
+        }
+    }
+
+    /// 隐藏输出面板。
+    public func hideOutput() {
+        switch layout.placement.output {
+        case .bottom: if layout.bottomPane == .output { layout.bottomVisible = false }
+        case .left, .right: layout.outputVisible = false
+        case .editor:
+            for tab in outputTabs { dock.close(tab.id) }
+            syncSelectionFromDock()
+        }
+    }
+
+    /// 切换输出面板显隐。
+    public func toggleOutput() {
+        if isOutputShown { hideOutput() } else { showOutput() }
+    }
+
+    /// 把输出面板移动到新位置。
+    /// - Parameter target: 目标位置
+    public func setOutputPlacement(_ target: TerminalPlacement) {
+        var next = layout.placement
+        next.output = target
+        applyPlacement(next)
     }
 
     /// 显示底部面板并切换到某视图。

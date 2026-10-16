@@ -252,5 +252,6 @@ private struct GridRow: View {
             .overlay(alignment: .trailing) { Rectangle().fill(OMColors.hairline.opacity(0.6)).frame(width: 0.5) }
             .contentShape(Rectangle())
             .onTapGesture { selection = CellPosition(row: row, column: column) }
+            .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 }

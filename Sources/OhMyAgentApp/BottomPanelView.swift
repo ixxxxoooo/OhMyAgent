@@ -11,14 +11,20 @@ struct BottomPanelView: View {
     @Bindable var workbench: WorkbenchModel
     @State private var dragStartHeight: Double?
 
-    /// 底部面板可用的视图:终端不在底部时只剩「输出」。
+    /// 底部面板可用的视图:只列出摆放在底部的面板(终端、输出)。
     private var panes: [BottomPane] {
-        workbench.layout.placement.terminal == .bottom ? BottomPane.available : BottomPane.available.filter { $0 != .terminal }
+        BottomPane.available.filter { pane in
+            switch pane {
+            case .terminal: return workbench.layout.placement.terminal == .bottom
+            case .output: return workbench.layout.placement.output == .bottom
+            case .problems: return false
+            }
+        }
     }
 
-    /// 实际显示的视图(终端不在底部时强制为输出)。
+    /// 实际显示的视图(当前选择不在底部时取第一个可用的)。
     private var currentPane: BottomPane {
-        panes.contains(workbench.layout.bottomPane) ? workbench.layout.bottomPane : .output
+        panes.contains(workbench.layout.bottomPane) ? workbench.layout.bottomPane : (panes.first ?? .output)
     }
 
     var body: some View {
@@ -28,10 +34,10 @@ struct BottomPanelView: View {
                 ForEach(panes, id: \.self) { pane in
                     Button(Self.title(pane)) { workbench.layout.bottomPane = pane }
                         .buttonStyle(.plain)
-                        .font(OMFonts.small.weight(workbench.layout.bottomPane == pane ? .semibold : .regular))
-                        .foregroundStyle(workbench.layout.bottomPane == pane ? Color.primary : OMColors.secondaryText)
+                        .font(OMFonts.small.weight(currentPane == pane ? .semibold : .regular))
+                        .foregroundStyle(currentPane == pane ? Color.primary : OMColors.secondaryText)
                         .padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(workbench.layout.bottomPane == pane ? OMColors.accent.opacity(0.12) : .clear, in: Capsule())
+                        .background(currentPane == pane ? OMColors.accent.opacity(0.12) : .clear, in: Capsule())
                 }
                 Spacer()
                 Button { workbench.layout.bottomVisible = false } label: { Image.om("xmark") }
@@ -40,7 +46,7 @@ struct BottomPanelView: View {
                     .accessibilityLabel("关闭底部面板")
             }
             .padding(.horizontal, 10).padding(.vertical, 4)
-            .background { if currentPane == .terminal { Color.clear.terminalDragHandle(workbench) } }
+            .background { Color.clear.terminalDragHandle(workbench, panel: currentPane == .terminal ? .terminal : .output) }
             Divider()
             Group {
                 switch currentPane {

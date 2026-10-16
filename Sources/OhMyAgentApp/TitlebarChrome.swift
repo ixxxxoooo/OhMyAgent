@@ -82,7 +82,7 @@ struct TitlebarOverlay: View {
 
     /// 某一侧的面板开关(项目栏、工具栏),由外向内。
     private func toggles(on side: PanelSide) -> [PanelColumn] {
-        workbench.layout.columns(on: side).filter { $0 != .terminal }
+        workbench.layout.columns(on: side).filter { $0 == .sidebar || $0 == .tools }
     }
 
     /// 单个面板开关按钮:图标随所在侧变化,提示与快捷键随面板变化。

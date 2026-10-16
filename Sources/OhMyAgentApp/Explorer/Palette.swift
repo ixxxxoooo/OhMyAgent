@@ -72,8 +72,8 @@ enum PaletteCommands {
             workbench.layout.placement.terminal == .bottom
                 ? PaletteCommand(id: "bottom", title: workbench.layout.bottomVisible ? String(localized: "隐藏底部面板") : String(localized: "显示底部面板"), icon: "panel-bottom", shortcut: key(.togglePanel)) { workbench.toggleBottom() }
                 : PaletteCommand(id: "bottom", title: workbench.isTerminalShown ? String(localized: "隐藏终端") : String(localized: "显示终端"), icon: "square-terminal", shortcut: key(.togglePanel)) { workbench.toggleTerminal() },
-            PaletteCommand(id: "output", title: workbench.layout.bottomVisible && workbench.layout.bottomPane == .output ? String(localized: "隐藏输出面板") : String(localized: "显示输出面板"), icon: "panel-bottom", shortcut: nil) {
-                if workbench.layout.bottomVisible && workbench.layout.bottomPane == .output { workbench.layout.bottomVisible = false } else { workbench.showBottom(.output) }
+            PaletteCommand(id: "output", title: workbench.isOutputShown ? String(localized: "隐藏输出面板") : String(localized: "显示输出面板"), icon: "panel-bottom", shortcut: nil) {
+                workbench.toggleOutput()
             },
             PaletteCommand(id: "resetLayout", title: String(localized: "恢复默认布局"), icon: "undo-2", shortcut: nil) { workbench.resetLayout() },
             PaletteCommand(id: "settings", title: String(localized: "设置…"), icon: "settings", shortcut: "⌘,") { AppActions.shared.openSettings() },
