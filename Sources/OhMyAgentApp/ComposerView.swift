@@ -53,6 +53,7 @@ struct ComposerView: View {
             .frame(height: textHeight)
             HStack(spacing: 6) {
                 OptionMenu(model: model, category: "mode", icon: "slider.horizontal.3")
+                ProviderMenu(model: model)
                 OptionMenu(model: model, category: "model", icon: "cpu")
                 OptionMenu(model: model, category: "thought_level", icon: "brain")
                 if model.canAttachImages {
@@ -215,6 +216,73 @@ struct OptionMenu: View {
             .foregroundStyle(OMColors.secondaryText)
             .help(option.name)
         }
+    }
+}
+
+/// 模型提供商菜单:按会话切换提供商与主模型(设置 → 模型提供商 里配置过提供商时才显示)。
+struct ProviderMenu: View {
+    let model: SessionModel
+    @State private var snapshot = ProviderSnapshot()
+
+    var body: some View {
+        Group { content }
+            .task(id: model.providerID) { await reload() }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if !snapshot.providers.isEmpty, model.descriptor.kind == .claudeACP {
+            Menu {
+                Button { model.switchProvider(ProviderOverride(providerId: nil)) } label: {
+                    if model.providerID == nil { Label("系统默认(~/.claude)", om: "checkmark") } else { Text("系统默认(~/.claude)") }
+                }
+                Divider()
+                ForEach(snapshot.providers) { provider in
+                    let models = Self.models(of: provider)
+                    if models.count > 1 {
+                        Menu(provider.name) {
+                            ForEach(models, id: \.self) { name in
+                                Button { model.switchProvider(ProviderOverride(providerId: provider.id, model: name)) } label: {
+                                    if model.providerID == provider.id && model.providerModel == name { Label(name, om: "checkmark") } else { Text(name) }
+                                }
+                            }
+                        }
+                    } else {
+                        Button { model.switchProvider(ProviderOverride(providerId: provider.id)) } label: {
+                            if model.providerID == provider.id { Label(provider.name, om: "checkmark") } else { Text(provider.name) }
+                        }
+                    }
+                }
+            } label: {
+                Label(title, om: "server.rack")
+                    .font(OMFonts.small)
+                    .lineLimit(1)
+            }
+            .fixedSize()
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .foregroundStyle(OMColors.secondaryText)
+            .disabled(model.isRunning || model.phase != .ready)
+            .help("切换模型提供商与模型(仅影响当前会话)")
+            .accessibilityLabel("模型提供商")
+        }
+    }
+
+    /// 菜单标题:提供商名 · 模型;未使用提供商时显示「系统默认」。
+    private var title: String {
+        guard let name = model.providerName else { return String(localized: "系统默认") }
+        return model.providerModel.map { "\(name) · \($0)" } ?? name
+    }
+
+    /// 提供商的可选模型(含当前主模型,去重保序)。
+    private static func models(of provider: ModelProvider) -> [String] {
+        var result = [provider.model]
+        for name in provider.availableModels ?? [] where !result.contains(name) { result.append(name) }
+        return result
+    }
+
+    private func reload() async {
+        snapshot = await Task.detached { ProviderStorage.load() }.value
     }
 }
 

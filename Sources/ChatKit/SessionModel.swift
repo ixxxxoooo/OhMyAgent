@@ -697,6 +697,11 @@ public final class SessionModel {
 
     /// 当前会话使用的模型提供商名称(未启用提供商时为 nil,即沿用 ~/.claude 配置)
     public private(set) var providerName: String?
+    /// 当前会话使用的提供商 ID 与主模型(未启用提供商时为 nil)
+    public private(set) var providerID: String?
+    public private(set) var providerModel: String?
+    /// 会话级提供商覆盖(输入框菜单设置;nil 表示跟随设置里的全局启用项)
+    public private(set) var providerOverride: ProviderOverride?
     /// 提供商的会话 `_meta`(含密钥,仅内存持有,禁止记录)
     @ObservationIgnored private var providerMeta: JSONValue?
     /// 会话 `_meta`:提供商元数据 + 客户端选项(代理/超时/追加提示词/CLAUDE.md);仅对真实 Claude 通道合并。
@@ -730,19 +735,24 @@ public final class SessionModel {
     /// 解析启用的模型提供商(后台读盘);缺密钥/配置无效时提示并回退到 ~/.claude 默认配置。
     private func resolveProvider(for descriptor: AgentDescriptor) async {
         providerName = nil
+        providerID = nil
+        providerModel = nil
         providerMeta = nil
         providerURL = nil
         guard descriptor.kind == .claudeACP else { return }
         let directory = providerDirectory
         let environment = providerEnvironment
+        let override = providerOverride
         let outcome = await Task.detached(priority: .userInitiated) { () -> Result<ResolvedProvider?, ProviderStorage.ResolveError> in
-            do { return .success(try ProviderStorage.resolveActive(directory: directory, environment: environment)) }
+            do { return .success(try ProviderStorage.resolveActive(directory: directory, environment: environment, override: override)) }
             catch let error as ProviderStorage.ResolveError { return .failure(error) }
             catch { return .success(nil) }
         }.value
         switch outcome {
         case .success(let resolved?):
             providerName = resolved.provider.name
+            providerID = resolved.provider.id
+            providerModel = resolved.provider.model
             providerMeta = resolved.meta
             providerURL = resolved.provider.url
             log.info("使用模型提供商", ["provider": resolved.provider.id, "model": resolved.provider.model, "baseURL": ModelGateway.origin(of: resolved.provider.url ?? workspace)])
@@ -1026,6 +1036,57 @@ public final class SessionModel {
         let current = option.currentValue.stringValue
         let index = option.options.firstIndex { $0.value == current } ?? -1
         setConfigOption(option.id, value: option.options[(index + 1) % option.options.count].value)
+    }
+
+    // MARK: - 模型提供商(会话级切换)
+
+    /// 切换当前会话使用的模型提供商/主模型。
+    ///
+    /// 有对话内容且 Agent 支持恢复时,用新的 `_meta` 恢复同一会话(保留上下文);否则新建会话。
+    /// 运行中、未连接或非 Claude 通道时忽略。
+    /// - Parameter override: 新的覆盖;`ProviderOverride(providerId: nil)` 表示系统默认;传 nil 表示跟随全局设置
+    public func switchProvider(_ override: ProviderOverride?) {
+        guard activeDescriptor.kind == .claudeACP, phase == .ready, !isRunning, let client, let sessionId else { return }
+        let hadConversation = !timeline.entries.isEmpty
+        let canResume = capabilities.canResume
+        let cwd = workspace.path
+        let servers = mcpServers
+        let started = ContinuousClock.now
+        providerOverride = override
+        Task { [weak self] in
+            guard let self else { return }
+            await self.resolveProvider(for: self.activeDescriptor)
+            let meta = self.effectiveMeta()
+            let label = self.providerName ?? ChatL10n.t("系统默认")
+            let target = self.providerModel.map { "\(label) · \($0)" } ?? label
+            do {
+                if hadConversation, canResume {
+                    let setup = try await client.resumeSession(sessionId: sessionId, cwd: cwd, mcpServers: servers, meta: meta)
+                    if !setup.configOptions.isEmpty { self.configOptions = setup.configOptions }
+                    self.timeline.appendNotice("已切换到 \(target),对话上下文已保留。")
+                } else {
+                    try await self.startFreshSession(client: client, cwd: cwd, servers: servers, meta: meta)
+                    self.timeline.appendNotice("已切换到 \(target)。")
+                }
+                self.log.info("会话切换提供商", ["provider": self.providerID ?? "default", "ms": "\(OMLogger.milliseconds(since: started))"])
+            } catch {
+                // 恢复失败:退回到新会话,避免卡在半切换状态
+                self.log.warning("恢复会话失败,改为新建会话", ["error": "\(error)"])
+                do {
+                    try await self.startFreshSession(client: client, cwd: cwd, servers: servers, meta: meta)
+                    self.timeline.appendNotice("已切换到 \(target),但之前的对话上下文无法沿用,已开始新会话。", severity: "warning")
+                } catch {
+                    self.timeline.appendNotice("切换失败:\(error.localizedDescription)", isError: true)
+                }
+            }
+        }
+    }
+
+    /// 用给定 `_meta` 新建会话并替换当前会话 ID。
+    private func startFreshSession(client: ACPClient, cwd: String, servers: [MCPServerConfig], meta: JSONValue?) async throws {
+        let setup = try await client.newSession(cwd: cwd, mcpServers: servers, meta: meta)
+        sessionId = setup.sessionId
+        configOptions = setup.configOptions
     }
 
     // MARK: - 配置选项
