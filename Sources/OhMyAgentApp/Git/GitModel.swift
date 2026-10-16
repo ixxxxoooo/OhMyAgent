@@ -29,6 +29,8 @@ final class GitModel {
     /// 最近一次失败的提示(用户关闭后清除)
     var lastError: String?
     var commitMessage = ""
+    /// 修补上一次提交(amend)
+    var amend = false
     @ObservationIgnored private var refreshing = false
 
     init(projectPath: String) {
@@ -127,17 +129,30 @@ final class GitModel {
     /// - Parameter push: 提交后是否继续推送
     func commit(push: Bool = false) async {
         let message = commitMessage
-        let needsStageAll = status.stagedChanges.isEmpty
-        let ok = await perform(push ? String(localized: "提交并推送") : String(localized: "提交")) { repo in
+        let amending = amend
+        // amend 时允许暂存区为空(只改提交说明);否则没有暂存内容就先暂存全部
+        let needsStageAll = status.stagedChanges.isEmpty && !amending
+        let ok = await perform(push ? String(localized: "提交并推送") : (amending ? String(localized: "修补上次提交") : String(localized: "提交"))) { repo in
             if needsStageAll { try await repo.stageAll() }
-            try await repo.commit(message: message)
+            try await repo.commit(message: message, amend: amending)
             if push { try await repo.push(status: nil) }
         }
-        if ok { commitMessage = "" }
+        if ok { commitMessage = ""; amend = false }
     }
 
+    /// 切换「修补上次提交」;打开且输入框为空时预填上一次提交的说明。
+    func setAmend(_ on: Bool) async {
+        amend = on
+        guard on, commitMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let repo,
+              let last = try? await repo.log(limit: 1).first else { return }
+        commitMessage = last.subject
+    }
+
+    /// 中止进行中的合并(调用方应先确认)。
+    func abortMerge() async { await perform(String(localized: "中止合并")) { try await $0.abortMerge() } }
+
     func fetch() async { await perform(String(localized: "获取")) { try await $0.fetch() } }
-    func pull() async { await perform(String(localized: "拉取")) { try await $0.pull() } }
+    func pull(rebase: Bool = false) async { await perform(rebase ? String(localized: "拉取(rebase)") : String(localized: "拉取")) { try await $0.pull(rebase: rebase) } }
     func push() async { let current = status; await perform(String(localized: "推送")) { try await $0.push(status: current) } }
 
     func checkout(_ branch: String) async { await perform(String(localized: "切换分支")) { try await $0.checkout(branch) } }

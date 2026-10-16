@@ -43,10 +43,15 @@ private struct SCMContent: View {
             if let error = model.lastError { errorBanner(error) }
         }
         .task {
-            // 面板可见期间轮询;操作完成后另有即时刷新
+            // 面板可见期间轮询(状态不变时逐步退避,大仓库按单次耗时放慢);操作完成后另有即时刷新
+            var delay = 3.0
             while !Task.isCancelled {
+                let before = model.status
+                let started = ContinuousClock.now
                 await model.refresh(full: model.branches.isEmpty)
-                try? await Task.sleep(for: .seconds(3))
+                let took = (ContinuousClock.now - started).seconds
+                delay = PollBackoff.next(previous: delay, changed: model.status != before, duration: took)
+                try? await Task.sleep(for: .seconds(delay))
             }
         }
     }
@@ -143,6 +148,15 @@ private struct SCMContent: View {
     private var moreMenu: some View {
         Menu {
             Button("获取(fetch)") { Task { await model.fetch() } }
+            Button("拉取并 rebase") { Task { await model.pull(rebase: true) } }
+                .disabled(model.status.upstream == nil)
+            if !model.status.conflicts.isEmpty {
+                Button("中止合并", role: .destructive) {
+                    if GitDialogs.confirmDestructive(title: String(localized: "中止合并?"), message: String(localized: "合并中的改动与冲突解决进度会被放弃,回到合并前的状态。"), button: String(localized: "中止合并")) {
+                        Task { await model.abortMerge() }
+                    }
+                }
+            }
             Button("刷新") { Task { await model.refresh() } }
             Button("在标签页打开提交历史") { workbench.openHistory(project: model.projectPath) }
             Divider()
@@ -158,7 +172,11 @@ private struct SCMContent: View {
                 Menu("Stash") {
                     ForEach(model.stashes) { stash in
                         Menu("\(stash.index): \(stash.message)") {
-                            Button("应用并移除(pop)") { Task { await model.stashPop(stash.index) } }
+                            Button("应用并移除(pop)") {
+                                if GitDialogs.confirmDestructive(title: String(localized: "应用并移除这个 stash?"), message: String(localized: "与当前改动冲突时可能产生合并冲突。"), button: String(localized: "应用")) {
+                                    Task { await model.stashPop(stash.index) }
+                                }
+                            }
                             Button("丢弃", role: .destructive) {
                                 if GitDialogs.confirmDestructive(title: String(localized: "丢弃这个 stash?"), message: stash.message, button: String(localized: "丢弃")) {
                                     Task { await model.stashDrop(stash.index) }
@@ -200,18 +218,26 @@ private struct SCMContent: View {
                 .padding(8)
                 .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
             HStack(spacing: 6) {
-                Button { Task { await model.commit() } } label: {
-                    Text(model.status.stagedChanges.isEmpty ? String(localized: "提交全部") : String(localized: "提交")).frame(maxWidth: .infinity)
+                Button { requestCommit(push: false) } label: {
+                    Text(model.amend ? String(localized: "修补提交") : (model.status.stagedChanges.isEmpty ? String(localized: "提交全部") : String(localized: "提交"))).frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
                 .disabled(!canCommit)
-                Button { Task { await model.commit(push: true) } } label: {
+                Button { requestCommit(push: true) } label: {
                     Text("提交并推送")
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 .disabled(!canCommit)
+            }
+            Toggle("修补上一次提交(amend)", isOn: Binding(get: { model.amend }, set: { value in Task { await model.setAmend(value) } }))
+                .toggleStyle(.checkbox)
+                .controlSize(.small)
+                .font(OMFonts.caption)
+                .disabled(model.status.headOID == nil)
+            if model.amend, model.status.ahead == 0, model.status.upstream != nil {
+                Text("上一次提交已推送,修补后需要强制推送。").font(OMFonts.caption).foregroundStyle(OMColors.warning)
             }
             if !model.status.conflicts.isEmpty {
                 Text("存在冲突,解决后才能提交。").font(OMFonts.caption).foregroundStyle(OMColors.warning)
@@ -220,8 +246,21 @@ private struct SCMContent: View {
         .padding(10)
     }
 
+    /// 提交:没有暂存内容时先确认「将提交全部改动」,避免静默 `git add -A`。
+    private func requestCommit(push: Bool) {
+        if model.status.stagedChanges.isEmpty, !model.amend {
+            let count = model.committableCount
+            guard GitDialogs.confirmDestructive(
+                title: String(localized: "没有已暂存的更改,提交全部 \(count) 个文件?"),
+                message: String(localized: "将先暂存所有改动(包含未跟踪文件)再提交。"),
+                button: String(localized: "提交全部")
+            ) else { return }
+        }
+        Task { await model.commit(push: push) }
+    }
+
     private var canCommit: Bool {
-        model.busy == nil && model.status.conflicts.isEmpty && model.committableCount > 0
+        model.busy == nil && model.status.conflicts.isEmpty && (model.committableCount > 0 || model.amend)
             && !model.commitMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
@@ -384,6 +423,15 @@ private struct ChangeRow: View {
 
     private func openDiff() { workbench.openDiff(model.absolutePath(change.path)) }
 
+    /// 冲突整文件取一方会丢掉另一方的修改,先确认。
+    private func confirmResolve(_ resolution: GitConflictResolution) {
+        let name = (change.path as NSString).lastPathComponent
+        let title = resolution == .ours ? String(localized: "整个文件保留我的版本?") : String(localized: "整个文件采用对方的版本?")
+        if GitDialogs.confirmDestructive(title: title, message: String(localized: "\(name) 中另一方的修改会被丢弃。"), button: String(localized: "确认")) {
+            Task { await model.resolve(change.path, with: resolution) }
+        }
+    }
+
     @ViewBuilder
     private var actions: some View {
         switch section {
@@ -404,8 +452,8 @@ private struct ChangeRow: View {
             }
             rowButton("plus", "暂存") { Task { await model.stage([change.path]) } }
         case .conflict:
-            Button("保留我的") { Task { await model.resolve(change.path, with: .ours) } }.buttonStyle(.plain).font(OMFonts.caption).foregroundStyle(OMColors.accent)
-            Button("采用对方") { Task { await model.resolve(change.path, with: .theirs) } }.buttonStyle(.plain).font(OMFonts.caption).foregroundStyle(OMColors.accent)
+            Button("保留我的") { confirmResolve(.ours) }.buttonStyle(.plain).font(OMFonts.caption).foregroundStyle(OMColors.accent)
+            Button("采用对方") { confirmResolve(.theirs) }.buttonStyle(.plain).font(OMFonts.caption).foregroundStyle(OMColors.accent)
             rowButton("check", "标记已解决") { Task { await model.markResolved(change.path) } }
         }
     }
