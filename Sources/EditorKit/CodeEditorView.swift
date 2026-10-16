@@ -24,6 +24,9 @@ public final class CodeEditorView: NSView {
     private let ruler: LineNumberRulerView
     private let engine = HighlightEngine()
     var theme: EditorTheme
+    /// 上次应用的字体族与字号偏好,用来判断偏好是否真的变了
+    private var appliedFamily = EditorFontPrefs.preferredFamily
+    private var appliedSize = EditorFontPrefs.preferredSize
     var language: SyntaxLanguage = .plain
     private var lineIndex = LineIndex(text: "")
     var highlightedRange = NSRange(location: 0, length: 0)
@@ -139,6 +142,11 @@ public final class CodeEditorView: NSView {
         NotificationCenter.default.addObserver(
             self, selector: #selector(viewportDidChange),
             name: NSView.boundsDidChangeNotification, object: scrollView.contentView
+        )
+        // 设置页修改字体族/字号后,已打开的编辑器立即跟随(不依赖 SwiftUI 的刷新时机,后台保活的标签同样生效)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(defaultsDidChange),
+            name: UserDefaults.didChangeNotification, object: nil
         )
     }
 
@@ -403,6 +411,24 @@ public final class CodeEditorView: NSView {
         scheduleHighlight()
         markdown.layout = nil
         scheduleMarkdownRender(delay: .zero)
+    }
+
+    /// 偏好变化通知可能在任意线程投递:切回主线程后再比较字体。
+    @objc nonisolated private func defaultsDidChange() {
+        Task { @MainActor [weak self] in self?.refreshFontFromPrefs() }
+    }
+
+    /// 字体族或字号偏好变化时更新字体与行高;颜色等其他主题项保持不变。
+    /// 通知会在任何偏好变化时触发,所以先比较偏好值,没变就直接返回。
+    func refreshFontFromPrefs() {
+        let family = EditorFontPrefs.preferredFamily
+        let size = EditorFontPrefs.preferredSize
+        guard family != appliedFamily || size != appliedSize else { return }
+        appliedFamily = family
+        appliedSize = size
+        var next = theme
+        next.font = EditorFontPrefs.font(family: family, size: size)
+        apply(theme: next)
     }
 
     /// 把主题里的字体与行高写入文本视图、默认段落样式和已有文本。

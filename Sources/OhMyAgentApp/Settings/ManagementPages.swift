@@ -52,8 +52,9 @@ struct EditorPage: View {
                     }
                 }
                 LabeledContent {
-                    TextField(EditorFontPrefs.systemMonospace, text: $customFamily)
+                    TextField("", text: $customFamily, prompt: Text(verbatim: EditorFontPrefs.systemMonospace))
                         .frame(width: 220)
+                        .multilineTextAlignment(.trailing)
                         .onSubmit(commitCustomFamily)
                 } label: {
                     Text("自定义字体")
