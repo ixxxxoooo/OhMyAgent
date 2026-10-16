@@ -17,5 +17,9 @@ cp "$BIN/OhMyAgentBridge" "$APP/Contents/MacOS/OhMyAgentBridge"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 for lproj in Resources/*.lproj(N); do cp -R "$lproj" "$APP/Contents/Resources/"; done
+# 内置 ACP 适配器:缺依赖时自动安装并裁剪,拷入 Resources/acp(应用据此免配置直接连接 Claude Code)
+Scripts/stage-adapter.sh
+mkdir -p "$APP/Contents/Resources/acp"
+rsync -a --delete --exclude='.lock-hash' build/acp-stage/ "$APP/Contents/Resources/acp/"
 codesign --force --sign - --deep "$APP" >/dev/null 2>&1 || true
 echo "已生成 $APP"

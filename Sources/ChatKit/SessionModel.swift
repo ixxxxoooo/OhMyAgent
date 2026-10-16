@@ -230,6 +230,8 @@ public final class SessionModel {
     public let timeline = TimelineStore()
 
     public private(set) var phase: SessionPhase = .idle
+    /// 连接过程中的补充说明(如「正在安装适配器」);连接结束后为 nil
+    public private(set) var connectNote: String?
     public private(set) var isRunning = false { didSet { if isRunning != oldValue { publishAttention() } } }
     /// 当前轮次开始时间(用于等待文案的计时;不运行时为空)。
     public private(set) var turnStartedAt: Date?
@@ -338,8 +340,22 @@ public final class SessionModel {
         let cwd = workspace.path
         log.info("开始连接 Agent", ["agent": descriptor.id, "cwd": cwd])
         connectTask = Task { [weak self] in
-            let tools = await Toolchain.shared.resolve()
+            var tools = await Toolchain.shared.resolve()
             guard let self else { return }
+            // 应用包未内置适配器时自动安装,用户无需手动运行脚本
+            if descriptor.kind == .claudeACP, tools.adapterEntry == nil, tools.nodePath != nil {
+                self.connectNote = String(localized: "正在安装 Claude Code 适配器(仅首次需要,约几十秒)…")
+                do {
+                    tools = try await Toolchain.shared.ensureAdapter(tools)
+                } catch {
+                    self.log.error("自动安装适配器失败", error: error, ["agent": descriptor.id, "ms": "\(OMLogger.milliseconds(since: connectStart))"])
+                    self.connectNote = nil
+                    self.connectTask = nil
+                    self.phase = .failed(error.localizedDescription)
+                    return
+                }
+                self.connectNote = nil
+            }
             self.log.info("工具链解析完成", ["node": tools.nodePath ?? "-", "nodeVersion": tools.nodeVersion ?? "-", "claude": tools.claudePath ?? "-", "adapter": tools.adapterEntry ?? "-"])
             let environment = ClientPrefs.filterTerminalEnvironment(tools.environment, inherit: ClientPrefs.terminalInheritsEnvironment())
             let manager = TerminalManager(workspace: cwd, environment: { environment }, onCreated: { [weak self] created in

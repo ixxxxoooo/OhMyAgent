@@ -28,18 +28,8 @@ if [[ -n "${OMA_BUILD:-}" ]]; then /usr/libexec/PlistBuddy -c "Set :CFBundleVers
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"
 BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Contents/Info.plist")"
 
-# 3. 打包 ACP 适配器(去掉 sourcemap/类型声明/文档,约 67MB → 32MB;不含平台二进制,依赖系统 node 与 claude)
-if [[ -d Vendor/acp/node_modules ]]; then
-  mkdir -p "$APP/Contents/Resources/acp"
-  rsync -a --delete \
-    --exclude='*.map' --exclude='*.d.ts' --exclude='*.d.mts' --exclude='*.d.cts' \
-    --exclude='*.md' --exclude='LICENSE*' --exclude='test' --exclude='tests' --exclude='__tests__' \
-    --exclude='.github' --exclude='docs' \
-    Vendor/acp/node_modules "$APP/Contents/Resources/acp/"
-  cp Vendor/acp/package.json "$APP/Contents/Resources/acp/"
-else
-  echo "警告:未找到 Vendor/acp/node_modules,产物将依赖用户本机安装的适配器"
-fi
+# 3. ACP 适配器已由 bundle.sh 经 Scripts/stage-adapter.sh 裁剪并放入 Resources/acp(约 32MB,不含平台二进制,依赖系统 node 与 claude)
+[[ -f "$APP/Contents/Resources/acp/node_modules/@agentclientprotocol/claude-agent-acp/dist/index.js" ]] || { echo "错误:产物缺少内置适配器"; exit 1; }
 
 # 4. 签名:先签内嵌可执行文件,最后签 app 本体(不使用 --deep)
 SIGN_ARGS=(--force --sign "$IDENTITY" --options runtime --entitlements "$ENTITLEMENTS")

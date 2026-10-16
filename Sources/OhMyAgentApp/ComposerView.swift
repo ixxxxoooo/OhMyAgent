@@ -148,7 +148,7 @@ struct ComposerView: View {
 
     private var placeholder: String {
         switch model.phase {
-        case .connecting: return String(localized: "正在连接 Agent,可以先输入…")
+        case .connecting: return model.connectNote ?? String(localized: "正在连接 Agent,可以先输入…")
         case .failed: return String(localized: "Agent 未连接,发送将尝试重新连接")
         default:
             let commandToSend = sendKey == SendKey.commandEnter.rawValue
@@ -410,7 +410,7 @@ struct ComposerFooter: View {
     private var footerStatus: some View {
         switch model.phase {
         case .connecting:
-            HStack(spacing: 4) { ProgressView().controlSize(.mini); Text("正在连接…") }
+            HStack(spacing: 4) { ProgressView().controlSize(.mini); Text(model.connectNote == nil ? String(localized: "正在连接…") : String(localized: "正在安装适配器…")) }
         case .failed:
             HStack(spacing: 4) { OMStatusDot(.failure); Text("连接失败").foregroundStyle(OMColors.warning) }
         case .idle:

@@ -42,6 +42,20 @@ public actor Toolchain {
         return result
     }
 
+    /// 确保适配器可用:定位不到时自动用 npm 安装到 Application Support,并更新缓存(无需重新解析登录 shell 环境)。
+    /// - Parameter tools: 当前定位结果
+    /// - Returns: 补全适配器后的定位结果;无需安装或缺少 node 时原样返回
+    /// - Throws: 安装失败(缺 npm、网络错误等)
+    public func ensureAdapter(_ tools: LocatedTools) async throws -> LocatedTools {
+        guard tools.adapterEntry == nil, let node = tools.nodePath else { return tools }
+        let entry = try await AdapterInstaller.shared.install(nodePath: node, environment: tools.environment)
+        var updated = tools
+        updated.adapterEntry = entry
+        cached = updated
+        Log.agent.info("适配器已自动安装并生效", ["adapter": entry])
+        return updated
+    }
+
     /// 查找工程根目录(开发期用于定位 `Vendor/acp`):环境变量 > 自可执行文件向上查找。
     /// - Returns: 工程根目录;找不到时为 nil
     public nonisolated static func projectRoot() -> String? {

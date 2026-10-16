@@ -45,6 +45,37 @@ struct LocatorTests {
         #expect(launch.workingDirectory == "/work")
     }
 
+    @Test("适配器自动安装:npm 参数跳过平台二进制并固定版本")
+    func adapterInstallArguments() {
+        let args = AdapterInstaller.installArguments(prefix: "/tmp/acp")
+        #expect(args.first == "install")
+        #expect(args.contains("--omit=optional"))
+        #expect(args.contains("--ignore-scripts"))
+        #expect(args.last == "@agentclientprotocol/claude-agent-acp@\(AdapterInstaller.version)")
+        #expect(args[args.firstIndex(of: "--prefix").map { $0 + 1 } ?? 0] == "/tmp/acp")
+    }
+
+    @Test("适配器自动安装:入口已存在时直接返回而不调用 npm")
+    func adapterInstallIdempotent() async throws {
+        let prefix = FileManager.default.temporaryDirectory.appendingPathComponent("oma-acp-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: prefix) }
+        let entry = prefix.appendingPathComponent(AdapterInstaller.entryRelativePath)
+        try FileManager.default.createDirectory(at: entry.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("// stub".utf8).write(to: entry)
+        let result = try await AdapterInstaller.shared.install(nodePath: "/nonexistent/node", environment: [:], prefix: prefix)
+        #expect(result == entry.path)
+    }
+
+    @Test("适配器自动安装:找不到 npm 时给出明确错误")
+    func adapterInstallNoNPM() async {
+        let prefix = FileManager.default.temporaryDirectory.appendingPathComponent("oma-acp-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: prefix) }
+        if AdapterInstaller.locateNPM(nodePath: "/nonexistent/bin/node", environment: ["PATH": "/nonexistent"]) != nil { return }
+        await #expect(throws: AdapterInstallError.self) {
+            try await AdapterInstaller.shared.install(nodePath: "/nonexistent/bin/node", environment: ["PATH": "/nonexistent"], prefix: prefix)
+        }
+    }
+
     @Test("通用 ACP 提供者在 PATH 中解析命令")
     func genericResolve() throws {
         let descriptor = AgentDescriptor(id: "x", name: "X", kind: .genericACP, command: "sh", args: ["-c", "true"])

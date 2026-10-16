@@ -56,7 +56,7 @@ public enum AgentLaunchError: Error, LocalizedError, Sendable {
     public var errorDescription: String? {
         switch self {
         case .missingNode: return String(localized: "未找到 Node.js(需要 22 或更高版本)。请安装 Node,或在设置 → 高级中指定路径。")
-        case .missingAdapter: return String(localized: "未找到 claude-agent-acp 适配器。请在设置 → 高级中指定路径,或运行 Scripts/install-adapter.sh。")
+        case .missingAdapter: return String(localized: "未找到 claude-agent-acp 适配器。应用会自动安装;如仍失败,请检查网络后重试,或在设置 → 高级中指定路径。")
         case .missingClaude: return String(localized: "未找到 claude 命令行工具。请先安装 Claude Code。")
         case .missingCommand(let name): return String(localized: "Agent「\(name)」未配置可执行文件。")
         case .missingHelper(let name): return String(localized: "缺少随应用分发的辅助程序 \(name),请重新安装或运行 Scripts/bundle.sh。")
