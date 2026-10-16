@@ -38,8 +38,8 @@ public struct WorkbenchLayout: Codable, Equatable, Sendable {
     public var leftVisible = true
     public var rightVisible = false
     public var bottomVisible = false
-    public var leftWidth: Double = 260
-    public var rightWidth: Double = 340
+    public var leftWidth: Double = PanelMetrics.leftDefault
+    public var rightWidth: Double = PanelMetrics.rightDefault
     public var bottomHeight: Double = 240
     public var leftPane: LeftPane = .sessions
     public var rightPane: RightPane = .changes
@@ -49,8 +49,8 @@ public struct WorkbenchLayout: Codable, Equatable, Sendable {
 
     /// 限制各尺寸在合理范围内(防止损坏的状态文件导致不可见的面板)。
     public mutating func clamp() {
-        leftWidth = min(max(leftWidth, 200), 420)
-        rightWidth = min(max(rightWidth, 260), 640)
+        leftWidth = min(max(leftWidth, PanelMetrics.leftRange.lowerBound), PanelMetrics.leftRange.upperBound)
+        rightWidth = min(max(rightWidth, PanelMetrics.rightRange.lowerBound), PanelMetrics.rightRange.upperBound)
         bottomHeight = min(max(bottomHeight, 120), 600)
         if !LeftPane.available.contains(leftPane) { leftPane = .sessions }
         if !RightPane.available.contains(rightPane) { rightPane = .changes }

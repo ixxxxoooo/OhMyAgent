@@ -121,7 +121,7 @@ struct WorkbenchTests {
         state.projects = [ProjectEntry(url: env.dirs[0]), ProjectEntry(url: env.root.appendingPathComponent("已删除"))]
         try env.store.save(state)
         let model = makeModel(env.store)
-        #expect(model.layout.leftWidth == 200 && model.layout.rightWidth == 640 && model.layout.bottomHeight == 120)
+        #expect(model.layout.leftWidth == 180 && model.layout.rightWidth == 800 && model.layout.bottomHeight == 120)
         #expect(model.projects.count == 1)
         model.shutdownAll()
     }
@@ -146,5 +146,35 @@ struct WorkbenchTests {
         #expect(model.projects[0].sessions.count == 30)
         #expect(model.projects[0].sessions.first?.title == "会话0")
         model.shutdownAll()
+    }
+}
+
+@Suite("侧栏分隔条")
+struct PanelDividerTests {
+    private let three = [
+        PanelColumn(minX: 0, maxX: 260, hidden: false),
+        PanelColumn(minX: 261, maxX: 900, hidden: false),
+        PanelColumn(minX: 901, maxX: 1240, hidden: false),
+    ]
+
+    @Test("三列:左分隔条属于左栏,右分隔条属于右栏,中间不命中")
+    func threeColumns() {
+        #expect(PanelDividers.side(at: 260.5, columns: three, leftVisible: true, rightVisible: true) == .left)
+        #expect(PanelDividers.side(at: 900.5, columns: three, leftVisible: true, rightVisible: true) == .right)
+        #expect(PanelDividers.side(at: 500, columns: three, leftVisible: true, rightVisible: true) == nil)
+    }
+
+    @Test("左栏折叠:唯一的分隔条属于右栏")
+    func leftCollapsed() {
+        var columns = three
+        columns[0].hidden = true
+        #expect(PanelDividers.side(at: 900.5, columns: columns, leftVisible: false, rightVisible: true) == .right)
+    }
+
+    @Test("两列:按显隐状态判别")
+    func twoColumns() {
+        let columns = [PanelColumn(minX: 0, maxX: 260, hidden: false), PanelColumn(minX: 261, maxX: 900, hidden: false)]
+        #expect(PanelDividers.side(at: 260.5, columns: columns, leftVisible: true, rightVisible: false) == .left)
+        #expect(PanelDividers.side(at: 260.5, columns: columns, leftVisible: false, rightVisible: true) == .right)
     }
 }

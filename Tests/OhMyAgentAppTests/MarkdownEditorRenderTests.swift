@@ -18,8 +18,13 @@ struct MarkdownEditorRenderTests {
         view.frame = NSRect(x: 0, y: 0, width: 640, height: 480)
         view.markdownMode = mode
         view.setText(source, language: .markdown)
-        try? await Task.sleep(for: .milliseconds(500))
+        await settle { mode != .live || (self.font(view, at: 0)?.pointSize ?? 10) < 1 }
         return (view, window)
+    }
+
+    /// 轮询等待条件成立(最多 5 秒),避免固定睡眠在高负载下不稳定。
+    private func settle(_ condition: () -> Bool) async {
+        for _ in 0..<100 where !condition() { try? await Task.sleep(for: .milliseconds(50)) }
     }
 
     private func font(_ view: CodeEditorView, at location: Int) -> NSFont? {
@@ -52,13 +57,13 @@ struct MarkdownEditorRenderTests {
         let (view, window) = await makeEditor(mode: .live)
         window.makeFirstResponder(view.textView)
         view.textView.setSelectedRange(NSRange(location: 3, length: 0))
-        try await Task.sleep(for: .milliseconds(100))
+        await settle { (self.font(view, at: 0)?.pointSize ?? 0) > 5 }
         let marker = try #require(font(view, at: 0))
         #expect(marker.pointSize > 5)
         // 光标移到别处,标题块重新折叠
         let ns = view.textView.string as NSString
         view.textView.setSelectedRange(NSRange(location: ns.range(of: "项一").location, length: 0))
-        try await Task.sleep(for: .milliseconds(100))
+        await settle { (self.font(view, at: 0)?.pointSize ?? 10) < 1 }
         #expect((font(view, at: 0)?.pointSize ?? 10) < 1)
     }
 
@@ -74,7 +79,7 @@ struct MarkdownEditorRenderTests {
     func rerenderAfterEdit() async throws {
         let (view, _) = await makeEditor(mode: .live)
         view.setText("## 新标题\n", language: .markdown)
-        try await Task.sleep(for: .milliseconds(400))
+        await settle { (self.font(view, at: 0)?.pointSize ?? 10) < 1 && (self.font(view, at: 4)?.pointSize ?? 0) > 15 }
         #expect((font(view, at: 0)?.pointSize ?? 10) < 1)
         #expect((font(view, at: 4)?.pointSize ?? 0) > 15)
     }

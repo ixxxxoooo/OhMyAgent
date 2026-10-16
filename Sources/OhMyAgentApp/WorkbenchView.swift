@@ -55,7 +55,7 @@ struct WorkbenchView: View {
                 NavigationSplitView(columnVisibility: columnVisibility) {
                     ProjectTreeView(workbench: workbench)
                         .id(appearance.fontRevision)
-                        .navigationSplitViewColumnWidth(min: 220, ideal: CGFloat(workbench.layout.leftWidth), max: 420)
+                        .navigationSplitViewColumnWidth(min: CGFloat(PanelMetrics.leftRange.lowerBound), ideal: CGFloat(workbench.layout.leftWidth), max: CGFloat(PanelMetrics.leftRange.upperBound))
                 } detail: {
                     CenterColumn(workbench: workbench)
                         .navigationTitle(title)
@@ -64,7 +64,7 @@ struct WorkbenchView: View {
                 }
                 .inspector(isPresented: $workbench.layout.rightVisible) {
                     RightPaneView(workbench: workbench)
-                        .inspectorColumnWidth(min: 280, ideal: CGFloat(workbench.layout.rightWidth), max: 640)
+                        .inspectorColumnWidth(min: CGFloat(PanelMetrics.rightRange.lowerBound), ideal: CGFloat(workbench.layout.rightWidth), max: CGFloat(PanelMetrics.rightRange.upperBound))
                         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
                             if width > 0 { workbench.layout.rightWidth = Double(width) }
                         }
@@ -72,6 +72,15 @@ struct WorkbenchView: View {
                 if !workbench.layout.rightVisible { RightRail(workbench: workbench) }
             }
             StatusBarView(workbench: workbench)
+        }
+        .background(PanelDividerReset(onReset: resetPanelWidth, visibility: { (left: workbench.layout.leftVisible, right: workbench.layout.rightVisible) }))
+    }
+
+    /// 双击分隔条:把对应侧栏宽度恢复默认并持久化。
+    private func resetPanelWidth(_ side: PanelSide) {
+        switch side {
+        case .left: workbench.layout.leftWidth = PanelMetrics.leftDefault
+        case .right: workbench.layout.rightWidth = PanelMetrics.rightDefault
         }
     }
 
