@@ -5,6 +5,7 @@
 import DesignSystem
 import IconKit
 import SwiftUI
+import WorkbenchKit
 
 /// 文件面包屑工具条。
 struct FileHeaderBar: View {
@@ -18,8 +19,12 @@ struct FileHeaderBar: View {
     let onMode: (FileViewMode) -> Void
     /// 读取当前文档文本(复制用);无内容返回 nil
     let currentText: () -> String?
+    /// 在面包屑下拉里点选文件时打开
+    var onOpen: (String) -> Void = { _ in }
 
     @State private var copied = false
+    /// 当前展开下拉的面包屑段(绝对路径)
+    @State private var openedSegment: String?
 
     var body: some View {
         HStack(spacing: 10) {
@@ -38,28 +43,25 @@ struct FileHeaderBar: View {
 
     // MARK: 面包屑
 
-    /// 相对项目根的路径分段;不在项目内时回退为 `~` 缩写的绝对路径。
-    private var segments: (dir: String, name: String) {
-        let relative = FileBreadcrumb.relativePath(path, root: projectRoot)
-        let parts = relative.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
-        let name = parts.last ?? relative
-        let dir = parts.dropLast().joined(separator: " / ")
-        return (dir, name)
-    }
+    private var segments: [FileBreadcrumb.Segment] { FileBreadcrumb.segments(path: path, root: projectRoot) }
 
+    /// 每一段都是按钮:点击弹出同级文件与目录(对标 Cursor/VS Code 的面包屑)。
     private var breadcrumb: some View {
-        let parts = segments
-        return HStack(spacing: 0) {
-            if !parts.dir.isEmpty {
-                Text(parts.dir + " / ")
-                    .foregroundStyle(OMColors.secondaryText)
-                    .lineLimit(1).truncationMode(.head)
+        HStack(spacing: 0) {
+            ForEach(Array(segments.enumerated()), id: \.element.path) { index, segment in
+                let isLast = index == segments.count - 1
+                if index > 0 { Text("›").foregroundStyle(OMColors.tertiaryText).padding(.horizontal, 3) }
+                BreadcrumbButton(
+                    segment: segment, isLast: isLast,
+                    isOpen: Binding(get: { openedSegment == segment.path }, set: { openedSegment = $0 ? segment.path : nil }),
+                    onOpen: { target in openedSegment = nil; onOpen(target) }
+                )
+                .layoutPriority(isLast ? 1 : 0)
             }
-            Text(parts.name).foregroundStyle(Color.primary).lineLimit(1).truncationMode(.middle).layoutPriority(1)
         }
         .font(OMFonts.monoSmall)
         .help(path)
-        .accessibilityElement(children: .ignore)
+        .accessibilityElement(children: .contain)
         .accessibilityLabel(String(localized: "文件路径"))
         .accessibilityValue(FileBreadcrumb.relativePath(path, root: projectRoot))
     }
@@ -135,8 +137,145 @@ private struct ModeSwitch: View {
     }
 }
 
+/// 面包屑的一段:点击展开其所在目录的同级项。
+private struct BreadcrumbButton: View {
+    let segment: FileBreadcrumb.Segment
+    let isLast: Bool
+    @Binding var isOpen: Bool
+    let onOpen: (String) -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button { isOpen.toggle() } label: {
+            Text(segment.name)
+                .foregroundStyle(isLast ? Color.primary : OMColors.secondaryText)
+                .lineLimit(1).truncationMode(isLast ? .middle : .head)
+                .padding(.horizontal, 4)
+                .frame(height: 20)
+                .background(RoundedRectangle(cornerRadius: 5, style: .continuous).fill(hovering || isOpen ? Color.primary.opacity(0.07) : .clear))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .popover(isPresented: $isOpen, arrowEdge: .bottom) {
+            BreadcrumbMenu(startDirectory: segment.parentDirectory, current: segment.path, onOpen: onOpen)
+        }
+        .accessibilityLabel(segment.name)
+        .accessibilityHint(String(localized: "显示同级文件"))
+    }
+}
+
+/// 面包屑下拉:列出目录内容;点目录进入,点文件打开,当前项打勾,顶部「返回」回到上一级。
+private struct BreadcrumbMenu: View {
+    let startDirectory: String
+    let current: String
+    let onOpen: (String) -> Void
+    @State private var directory: String
+    @State private var entries: [FileEntry] = []
+
+    init(startDirectory: String, current: String, onOpen: @escaping (String) -> Void) {
+        self.startDirectory = startDirectory
+        self.current = current
+        self.onOpen = onOpen
+        _directory = State(initialValue: startDirectory)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if directory != startDirectory {
+                Button { directory = (directory as NSString).deletingLastPathComponent } label: {
+                    HStack(spacing: 6) {
+                        Image.om("chevron-left", size: 11)
+                        Text((directory as NSString).lastPathComponent).font(OMFonts.small).lineLimit(1)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 10).frame(height: 26).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("返回上一级")
+                Divider()
+            }
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(entries) { entry in
+                        BreadcrumbRow(entry: entry, isCurrent: entry.path == current) {
+                            if entry.isDirectory { directory = entry.path } else { onOpen(entry.path) }
+                        }
+                    }
+                    if entries.isEmpty { Text("空文件夹").font(OMFonts.small).foregroundStyle(OMColors.secondaryText).padding(10) }
+                }
+                .padding(4)
+            }
+        }
+        .frame(width: 260, height: min(max(CGFloat(entries.count), 1) * 24 + 16 + (directory != startDirectory ? 27 : 0), 340))
+        .task(id: directory) {
+            let target = directory
+            entries = await Task.detached(priority: .userInitiated) { WorkspaceFiles.list(directory: target) }.value
+        }
+    }
+}
+
+private struct BreadcrumbRow: View {
+    let entry: FileEntry
+    let isCurrent: Bool
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                OMFileIcon(name: entry.name, isDirectory: entry.isDirectory, expanded: false, size: 15)
+                Text(entry.name).font(OMFonts.small).lineLimit(1).truncationMode(.middle)
+                Spacer(minLength: 0)
+                if isCurrent { Image.om("check", size: 11).foregroundStyle(OMColors.accent) }
+                else if entry.isDirectory { Image.om("chevron-right", size: 10).foregroundStyle(OMColors.tertiaryText) }
+            }
+            .padding(.horizontal, 8).frame(height: 24)
+            .background(RoundedRectangle(cornerRadius: 5, style: .continuous).fill(hovering ? Color.primary.opacity(0.08) : .clear))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+    }
+}
+
 /// 面包屑路径处理(纯函数,便于测试)。
 enum FileBreadcrumb {
+    /// 面包屑的一段。
+    struct Segment: Equatable {
+        /// 显示名
+        let name: String
+        /// 该段对应的绝对路径(目录或文件)
+        let path: String
+
+        /// 该段所在的目录:下拉列出它的内容。
+        var parentDirectory: String { (path as NSString).deletingLastPathComponent }
+    }
+
+    /// 把文件路径拆成逐级的面包屑段。项目内从项目根的下一级开始;项目外从 `~` 或 `/` 开始。
+    /// - Parameters:
+    ///   - path: 文件绝对路径
+    ///   - root: 项目根目录绝对路径
+    /// - Returns: 从外到内的段;末段为文件本身
+    static func segments(path: String, root: String) -> [Segment] {
+        let base = root.hasSuffix("/") ? String(root.dropLast()) : root
+        var prefix: String
+        var rest: String
+        if !base.isEmpty, path.hasPrefix(base + "/") {
+            prefix = base
+            rest = String(path.dropFirst(base.count + 1))
+        } else {
+            prefix = ""
+            rest = String(path.dropFirst(path.hasPrefix("/") ? 1 : 0))
+        }
+        var result: [Segment] = []
+        for part in rest.split(separator: "/", omittingEmptySubsequences: true) {
+            prefix += "/" + part
+            result.append(Segment(name: String(part), path: prefix))
+        }
+        return result
+    }
+
     /// 取相对项目根的路径;不在项目内时返回用 `~` 缩写主目录的绝对路径。
     /// - Parameters:
     ///   - path: 文件绝对路径

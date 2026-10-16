@@ -25,3 +25,22 @@ struct FileBreadcrumbTests {
         #expect(FileBreadcrumb.relativePath(home + "/notes/a.md", root: "/elsewhere") == "~/notes/a.md")
     }
 }
+
+@Suite("面包屑分段")
+struct FileBreadcrumbSegmentTests {
+    @Test("项目内从根的下一级逐级拆分,末段为文件")
+    func inside() {
+        let parts = FileBreadcrumb.segments(path: "/p/a/b/c.md", root: "/p")
+        #expect(parts.map(\.name) == ["a", "b", "c.md"])
+        #expect(parts.map(\.path) == ["/p/a", "/p/a/b", "/p/a/b/c.md"])
+        #expect(parts[0].parentDirectory == "/p")
+        #expect(parts[2].parentDirectory == "/p/a/b")
+    }
+
+    @Test("项目外从根开始;同名前缀目录不误判")
+    func outside() {
+        let parts = FileBreadcrumb.segments(path: "/proj2/a.md", root: "/proj")
+        #expect(parts.map(\.name) == ["proj2", "a.md"])
+        #expect(parts[0].parentDirectory == "/")
+    }
+}

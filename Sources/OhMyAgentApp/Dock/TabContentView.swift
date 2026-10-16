@@ -99,7 +99,8 @@ struct FileTabView: View {
                 modes: previewKind.map { FileViewMode.available(for: $0) } ?? [],
                 mode: mode,
                 onMode: { FileViewModeStore.shared.set($0, for: path) },
-                currentText: { doc.text }
+                currentText: { doc.text },
+                onOpen: { workbench.openFile($0, preview: true) }
             )
             banner(doc)
             Group {
