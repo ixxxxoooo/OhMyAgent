@@ -32,7 +32,7 @@ public enum ConfigScope: String, Sendable, CaseIterable, Hashable, Identifiable 
     public var displayName: String {
         switch self {
         case .user: return String(localized: "用户")
-        case .project: return String(localized: "scope.project", defaultValue: "项目")
+        case .project: return String(localized: "工作区")
         case .local: return String(localized: "本地")
         }
     }

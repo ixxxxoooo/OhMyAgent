@@ -226,6 +226,8 @@ struct OptionMenu: View {
     let model: SessionModel
     let category: String
     let icon: String
+    /// 模型选择弹层是否展开
+    @State private var pickerShown = false
 
     var body: some View {
         if let option = model.option(category: category) {
@@ -257,7 +259,8 @@ struct OptionMenu: View {
     private func menu(option: SessionConfigOption, rows: [Row]) -> some View {
         let current = option.currentValue.stringValue ?? ""
         let tint = category == "mode" ? Self.color(for: ModeTone.tone(forMode: current)) : OMColors.secondaryText
-        return Menu {
+        if category == "model" { return AnyView(modelPicker(option: option, rows: rows, current: current, tint: tint)) }
+        return AnyView(Menu {
             ForEach(rows) { row in
                 Button {
                     model.setConfigOption(option.id, value: row.value)
@@ -277,7 +280,41 @@ struct OptionMenu: View {
         .buttonStyle(.plain)
         .foregroundStyle(tint)
         .help(option.name)
+        .accessibilityLabel(option.name))
+    }
+
+    /// 模型选择列表的行(输入区与「编辑并重新发送」共用):映射启用时只列已映射槽位,否则沿用 Agent 自带列表。
+    static func modelPickerRows(model: SessionModel, option: SessionConfigOption) -> [ModelPickerRow] {
+        let current = option.currentValue.stringValue ?? ""
+        if !model.mappedModels.isEmpty {
+            return option.options.compactMap { item in
+                guard let slot = ModelSlot(optionValue: item.value), let mapped = model.mappedModels[slot] else { return nil }
+                return ModelPickerRow(id: item.value, name: "\(mapped.displayName) · \(slot.title)", brand: brand(for: mapped),
+                                      copyText: mapped.modelId, isSelected: current == item.value)
+            }
+        }
+        return option.options.map {
+            ModelPickerRow(id: $0.value, name: $0.name, brand: BrandIcon.resolve(modelId: $0.name, providerPreset: nil, providerName: $0.name),
+                           copyText: $0.value, isSelected: current == $0.value)
+        }
+    }
+
+    /// 模型选择:点击弹出列表,每行厂商图标 + 模型名 + 复制按钮(NSMenu 项无法放按钮,故用弹层)。
+    private func modelPicker(option: SessionConfigOption, rows: [Row], current: String, tint: Color) -> some View {
+        let pickerRows = Self.modelPickerRows(model: model, option: option)
+        return Button { pickerShown.toggle() } label: {
+            label(option: option, rows: rows, current: current)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(tint)
+        .help(option.name)
         .accessibilityLabel(option.name)
+        .popover(isPresented: $pickerShown, arrowEdge: .top) {
+            ModelPickerList(sections: [ModelPickerSection(id: "models", title: nil, rows: pickerRows)], searchable: pickerRows.count > 8) { value in
+                pickerShown = false
+                model.setConfigOption(option.id, value: value)
+            }
+        }
     }
 
     @ViewBuilder

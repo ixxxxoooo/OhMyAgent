@@ -52,40 +52,48 @@ struct ModelMappingPage: View {
         .disabled(slot != .main && model.snapshot.mapping[.main] == nil)
     }
 
-    /// 一个槽位的下拉:跟随默认 + 按提供商分组的全部可用模型。
+    /// 一个槽位的选择器:点击弹出带搜索的列表(跟随默认 + 按提供商分组的全部可用模型,每行厂商图标 + 复制按钮)。
     private func picker(_ slot: ModelSlot) -> some View {
-        let sections = ProviderMenuBuilder.sections(snapshot: model.snapshot, hasKey: { model.hasKey(id: $0) })
         let current = model.snapshot.mapping[slot]
-        return Menu {
-            Button {
-                model.setMapping(slot, nil)
-            } label: {
-                HStack {
-                    Text(slot == .main ? String(localized: "未设置(沿用 ~/.claude)") : String(localized: "跟随默认"))
-                    if current == nil { Image.om("checkmark") }
+        return SlotPickerButton(
+            sections: pickerSections(slot: slot, current: current),
+            label: { pickerLabel(slot: slot, current: current) },
+            onPick: { id in
+                if id == Self.followID {
+                    model.setMapping(slot, nil)
+                } else if let target = Self.decode(id) {
+                    model.setMapping(slot, target)
                 }
             }
-            ForEach(sections) { section in
-                Section(section.providerName) {
-                    ForEach(section.models) { item in
-                        Button {
-                            model.setMapping(slot, ModelTarget(providerId: section.providerId, model: item.id))
-                        } label: {
-                            HStack {
-                                Image(nsImage: Self.menuImage(modelId: item.id, provider: provider(section.providerId), name: section.providerName))
-                                Text(verbatim: item.name)
-                                if current == ModelTarget(providerId: section.providerId, model: item.id) { Image.om("checkmark") }
-                            }
-                        }
-                    }
-                }
-            }
-        } label: {
-            pickerLabel(slot: slot, current: current)
-        }
-        .menuStyle(.button)
-        .fixedSize()
+        )
         .accessibilityLabel(String(localized: "\(slot.title) 使用的模型"))
+    }
+
+    private static let followID = "__follow__"
+
+    /// 行 ID 编码:`提供商ID\u{1F}模型ID`(避开模型名里常见的分隔符)。
+    private static func encode(_ target: ModelTarget) -> String { "\(target.providerId)\u{1F}\(target.model)" }
+
+    private static func decode(_ id: String) -> ModelTarget? {
+        let parts = id.split(separator: "\u{1F}", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
+        guard parts.count == 2 else { return nil }
+        return ModelTarget(providerId: parts[0], model: parts[1])
+    }
+
+    private func pickerSections(slot: ModelSlot, current: ModelTarget?) -> [ModelPickerSection] {
+        var result = [ModelPickerSection(id: "follow", title: nil, rows: [
+            ModelPickerRow(id: Self.followID, name: slot == .main ? String(localized: "未设置(沿用 ~/.claude)") : String(localized: "跟随默认"), isSelected: current == nil),
+        ])]
+        for section in ProviderMenuBuilder.sections(snapshot: model.snapshot, hasKey: { model.hasKey(id: $0) }) {
+            let owner = provider(section.providerId)
+            result.append(ModelPickerSection(id: section.providerId, title: section.providerName, rows: section.models.map { item in
+                let target = ModelTarget(providerId: section.providerId, model: item.id)
+                return ModelPickerRow(id: Self.encode(target), name: item.name,
+                                      brand: BrandIcon.resolve(modelId: item.id, providerPreset: owner?.presetId, providerName: section.providerName),
+                                      copyText: item.id, isSelected: current == target)
+            }))
+        }
+        return result
     }
 
     /// 下拉按钮的标题:厂商图标 + 模型名(+ 提供商名);目标已失效时标红提示。
@@ -133,10 +141,29 @@ struct ModelMappingPage: View {
         if provider.requiresKey, !model.hasKey(id: provider.id) { return String(localized: "缺少 API Key") }
         return nil
     }
+}
 
-    private static func menuImage(modelId: String, provider: ModelProvider?, name: String) -> NSImage {
-        if case .vector(let key) = BrandIcon.resolve(modelId: modelId, providerPreset: provider?.presetId, providerName: name),
-           let image = BrandIconRenderer.nsImage(key, size: 14) { return image }
-        return OMIconRenderer.nsImage("cpu", size: 14)
+/// 槽位选择按钮:标题 + 弹层列表(选择后自动关闭)。
+private struct SlotPickerButton<Label: View>: View {
+    let sections: [ModelPickerSection]
+    @ViewBuilder let label: () -> Label
+    let onPick: (String) -> Void
+    @State private var shown = false
+
+    var body: some View {
+        Button { shown.toggle() } label: {
+            HStack(spacing: 6) {
+                label()
+                Image.om("chevron-down", size: 10).foregroundStyle(OMColors.tertiaryText)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: $shown, arrowEdge: .bottom) {
+            ModelPickerList(sections: sections, searchable: true) { id in
+                shown = false
+                onPick(id)
+            }
+        }
     }
 }

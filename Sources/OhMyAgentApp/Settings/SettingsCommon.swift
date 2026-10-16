@@ -33,14 +33,14 @@ struct ScopeHeader: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack {
+            HStack(alignment: .center, spacing: 10) {
                 Text("写入位置").font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
                 Picker("", selection: $model.scope) {
                     ForEach(ConfigScope.allCases) { scope in
                         Text(scope.displayName).tag(scope)
                     }
                 }
-                .pickerStyle(.segmented).labelsHidden().frame(width: 220)
+                .pickerStyle(.segmented).labelsHidden().fixedSize()
                 Spacer()
             }
             Text(verbatim: omLocalized(hint)).font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)

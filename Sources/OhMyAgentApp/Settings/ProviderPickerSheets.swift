@@ -67,10 +67,14 @@ struct ModelFetchSheet: View {
                     Toggle(isOn: Binding(get: { selected.contains(id) || existing.contains(id) }, set: { on in
                         if on { selected.insert(id) } else { selected.remove(id) }
                     })) {
-                        Text(id).font(OMFonts.monoSmall)
+                        HStack(spacing: 6) {
+                            BrandIconView(BrandIcon.resolve(modelId: id, providerPreset: provider.presetId, providerName: provider.name), size: 14)
+                            Text(id).font(OMFonts.monoSmall)
+                        }
                     }
                     .toggleStyle(.checkbox)
                     .disabled(existing.contains(id))
+                    ModelCopyButton(text: id)
                     Spacer()
                     if existing.contains(id) { OMTag(String(localized: "已添加")) }
                 }

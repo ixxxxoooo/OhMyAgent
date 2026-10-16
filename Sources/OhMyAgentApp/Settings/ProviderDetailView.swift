@@ -117,6 +117,7 @@ struct ProviderDetailView: View {
         HStack(spacing: 8) {
             Toggle("", isOn: modelBinding(item.id, \.enabled)).labelsHidden().toggleStyle(.checkbox)
                 .accessibilityLabel(String(localized: "可用于模型映射 \(item.id)"))
+            BrandIconView(BrandIcon.resolve(modelId: item.id, providerPreset: draft.presetId, providerName: draft.name), size: 15)
             VStack(alignment: .leading, spacing: 1) {
                 TextField("", text: Binding(
                     get: { draft.modelList.first { $0.id == item.id }?.displayName ?? "" },
@@ -126,6 +127,7 @@ struct ProviderDetailView: View {
                 .textFieldStyle(.plain).font(OMFonts.body).multilineTextAlignment(.leading)
                 if item.name != item.id { Text(item.id).font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText) }
             }
+            ModelCopyButton(text: item.id)
             Spacer(minLength: 4)
             Button { draft.model = item.id } label: {
                 Image.om("star", size: 13).foregroundStyle(draft.model == item.id ? Color.yellow : OMColors.tertiaryText)
