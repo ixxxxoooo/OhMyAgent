@@ -2,6 +2,7 @@
 // 基于 AppKit TextKit 2 的高性能代码编辑器:NSTextView + NSTextLayoutManager + NSTextContentStorage。
 
 import AppKit
+import DesignSystem
 
 /// 行标记(用于 Diff 与 Agent 跟随)。
 public enum LineMarker: Sendable {
@@ -148,6 +149,17 @@ public final class CodeEditorView: NSView {
             self, selector: #selector(defaultsDidChange),
             name: UserDefaults.didChangeNotification, object: nil
         )
+        // 主题包/强调色变化:重新生成配色并整体重绘
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(themeDidChange),
+            name: ThemeRuntime.didChange, object: nil
+        )
+    }
+
+    /// 主题变化后重新应用编辑器配色并清空高亮缓存。
+    @objc private func themeDidChange() {
+        CodeHighlighter.clearCache()
+        apply(theme: .default)
     }
 
     deinit {

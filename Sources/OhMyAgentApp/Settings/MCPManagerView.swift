@@ -85,7 +85,7 @@ struct MCPManagerView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.config.name).font(OMFonts.body).lineLimit(1)
                 HStack(spacing: 4) {
-                    Tag(entry.scope.displayName, color: .accentColor)
+                    Tag(entry.scope.displayName, color: OMColors.accent2)
                     Tag(entry.config.transport.rawValue)
                     if entry.isDisabled { Tag(String(localized: "已禁用"), color: .gray) }
                     if entry.needsApproval { Tag(String(localized: "待批准"), color: OMColors.warning) }
@@ -121,7 +121,7 @@ struct MCPManagerView: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
                     Text(config.name).font(OMFonts.title)
-                    Tag(entry.scope.displayName, color: .accentColor)
+                    Tag(entry.scope.displayName, color: OMColors.accent2)
                     Spacer()
                     detailActions(entry)
                 }

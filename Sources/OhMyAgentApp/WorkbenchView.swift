@@ -29,7 +29,7 @@ struct WorkbenchView: View {
         }
         .overlay { PaletteOverlay(workbench: workbench) }
         .overlay { MermaidFloatingOverlay() }
-        .tint(appearance.accent.color)
+        .tint(appearance.tint)
         .frame(minWidth: 860, minHeight: 560)
         .background(WindowFocusReader(onWindow: { window in actions.mainWindow = window; WindowChrome.apply(to: window) }, onChange: { key in
             windowIsKey = key
@@ -56,7 +56,7 @@ struct WorkbenchView: View {
         HStack(spacing: 0) {
             if workbench.layout.leftVisible {
                 ProjectTreeView(workbench: workbench)
-                    .id(appearance.fontRevision)
+                    .id(appearance.renderKey)
                     .frame(width: CGFloat(workbench.layout.leftWidth))
                     .clipped()
                     .background(SidebarBackground())
@@ -67,6 +67,7 @@ struct WorkbenchView: View {
             if workbench.layout.rightVisible {
                 PanelResizer(width: $workbench.layout.rightWidth, side: .right)
                 RightPaneView(workbench: workbench)
+                    .id(appearance.themeRevision)
                     .frame(width: CGFloat(workbench.layout.rightWidth))
                     .clipped()
             }
@@ -217,6 +218,7 @@ struct WorkbenchView: View {
 /// 中栏:停靠区(标签组与分屏)+ 底部面板。
 struct CenterColumn: View {
     @Bindable var workbench: WorkbenchModel
+    private let appearance = AppearanceModel.shared
 
     var body: some View {
         VStack(spacing: 0) {
@@ -226,6 +228,8 @@ struct CenterColumn: View {
                 BottomPanelView(workbench: workbench)
             }
         }
+        // 主题/强调色变化时整体重建,令牌颜色立即生效(终端进程由 TerminalStore 持有,不受影响)
+        .id(appearance.themeRevision)
         .onChange(of: pendingViewerRequest) { _, request in
             // 统一打开入口:工具行/Bridge/改动汇总发出的「查看文件」请求都变成文件标签
             guard let request, let model = workbench.sessions.values.first(where: { $0.viewerRequest == request }) else { return }

@@ -73,7 +73,7 @@ struct PluginsManagerView: View {
                             HStack(spacing: 4) {
                                 Text(plugin.name).font(OMFonts.body.weight(.semibold))
                                 Tag("v\(plugin.version)")
-                                Tag(plugin.scope, color: .accentColor)
+                                Tag(plugin.scope, color: OMColors.accent2)
                                 if !plugin.marketplace.isEmpty { Tag(plugin.marketplace) }
                             }
                             if !plugin.description.isEmpty { Text(plugin.description).font(OMFonts.small).foregroundStyle(OMColors.secondaryText) }

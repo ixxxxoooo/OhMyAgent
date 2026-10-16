@@ -85,7 +85,19 @@ struct RightPaneView: View {
 }
 
 /// 侧栏材质背景:左右栏共用的同一视觉效果。
-struct SidebarBackground: NSViewRepresentable {
+struct SidebarBackground: View {
+    var body: some View {
+        // 选择主题包后侧栏使用主题派生的纯色;系统主题保持原生侧栏毛玻璃
+        if let palette = ThemeRuntime.palette {
+            palette.surface.mixed(with: palette.editorForeground, palette.isDark ? 0.045 : 0.035).color
+        } else {
+            SidebarMaterial()
+        }
+    }
+}
+
+/// 原生侧栏毛玻璃。
+private struct SidebarMaterial: NSViewRepresentable {
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = NSVisualEffectView()
         view.material = .sidebar

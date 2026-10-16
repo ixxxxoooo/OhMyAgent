@@ -43,7 +43,7 @@ private struct ChatPane: View {
         Group {
             if let model = workbench.sessions[projectID] {
                 ChatView(model: model)
-                    .id(appearance.fontRevision)
+                    .id(appearance.renderKey)
                     .environment(model)
             } else {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)

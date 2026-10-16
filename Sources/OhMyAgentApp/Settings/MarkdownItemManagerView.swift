@@ -116,7 +116,7 @@ struct MarkdownItemEditor: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(item.name).font(OMFonts.title)
-                Tag(item.source.displayName, color: .accentColor)
+                Tag(item.source.displayName, color: OMColors.accent2)
                 Spacer()
                 if item.kind == .agent || item.userInvocable {
                     Button {

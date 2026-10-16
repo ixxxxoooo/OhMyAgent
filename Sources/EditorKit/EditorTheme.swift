@@ -2,6 +2,7 @@
 // 编辑器主题:纯色高对比背景,绝不使用玻璃或模糊。
 
 import AppKit
+import DesignSystem
 
 /// 编辑器主题,颜色均为动态颜色,自动适配深浅色。
 @MainActor
@@ -22,6 +23,29 @@ public struct EditorTheme {
 
     /// 默认主题。
     public static var `default`: EditorTheme {
+        if let palette = ThemeRuntime.palette { return themed(palette) }
+        return systemDefault
+    }
+
+    /// 由主题包调色板生成的编辑器主题。
+    static func themed(_ palette: ThemePalette) -> EditorTheme {
+        EditorTheme(
+            background: palette.editorBackground.nsColor,
+            foreground: palette.editorForeground.nsColor,
+            gutterBackground: palette.gutterBackground.nsColor,
+            gutterForeground: palette.gutterForeground.nsColor,
+            currentLine: palette.currentLine.nsColor,
+            font: EditorFontPrefs.preferredFont,
+            colors: [
+                .keyword: palette.keyword.nsColor, .string: palette.string.nsColor, .comment: palette.comment.nsColor,
+                .number: palette.number.nsColor, .type: palette.type.nsColor, .function: palette.function.nsColor,
+                .property: palette.property.nsColor,
+            ]
+        )
+    }
+
+    /// 系统主题(随系统深浅色自动切换)。
+    private static var systemDefault: EditorTheme {
         func dynamic(light: NSColor, dark: NSColor) -> NSColor {
             NSColor(name: nil) { appearance in
                 appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light

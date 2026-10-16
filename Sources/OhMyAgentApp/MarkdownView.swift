@@ -27,7 +27,13 @@ struct MarkdownView: View {
 /// - Parameter source: 原文
 func inlineMarkdown(_ source: String) -> AttributedString {
     let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-    return (try? AttributedString(markdown: source, options: options)) ?? AttributedString(source)
+    guard var result = try? AttributedString(markdown: source, options: options) else { return AttributedString(source) }
+    // 链接使用第二强调色(与主强调色区分)
+    let linkColor = OMColors.accent2
+    for run in result.runs where run.link != nil {
+        result[run.range].foregroundColor = linkColor
+    }
+    return result
 }
 
 /// 单个块的视图。

@@ -14,29 +14,43 @@ public enum OMMetrics {
     public static let spacing: CGFloat = 12
 }
 
-/// 颜色令牌。
+/// 颜色令牌。系统主题下全部使用系统语义色;选择主题包后按调色板取色。
 public enum OMColors {
     /// 时间线与编辑区背景(纯色)
-    public static let surface = Color(nsColor: .textBackgroundColor)
+    public static var surface: Color {
+        ThemeRuntime.palette.map { $0.surface.color } ?? Color(nsColor: .textBackgroundColor)
+    }
     /// 卡片背景(纯色)
-    public static let card = Color(nsColor: NSColor(name: nil) { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            ? NSColor(srgbRed: 0.145, green: 0.150, blue: 0.165, alpha: 1)
-            : NSColor(srgbRed: 0.975, green: 0.977, blue: 0.985, alpha: 1)
-    })
+    public static var card: Color {
+        if let palette = ThemeRuntime.palette { return palette.card.color }
+        return Color(nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                ? NSColor(srgbRed: 0.145, green: 0.150, blue: 0.165, alpha: 1)
+                : NSColor(srgbRed: 0.975, green: 0.977, blue: 0.985, alpha: 1)
+        })
+    }
     /// 玻璃回退时的不透明 chrome 背景
     public static let opaqueChrome = Color(nsColor: .windowBackgroundColor)
     /// 分隔线
     public static let hairline = Color(nsColor: .separatorColor)
     public static let secondaryText = Color(nsColor: .secondaryLabelColor)
     public static let tertiaryText = Color(nsColor: .tertiaryLabelColor)
-    public static let diffAdded = Color(nsColor: .systemGreen)
-    public static let diffRemoved = Color(nsColor: .systemRed)
-    public static let warning = Color(nsColor: .systemOrange)
-    public static let accent = Color.accentColor
+    /// 新增(绿 / 色盲主题为蓝)
+    public static var diffAdded: Color { ThemeRuntime.palette.map { $0.success.color } ?? Color(nsColor: .systemGreen) }
+    /// 删除(红 / 色盲主题为橙)
+    public static var diffRemoved: Color { ThemeRuntime.palette.map { $0.danger.color } ?? Color(nsColor: .systemRed) }
+    public static var warning: Color { ThemeRuntime.palette.map { $0.warning.color } ?? Color(nsColor: .systemOrange) }
+    /// 成功色。
+    public static var success: Color { diffAdded }
+    /// 警示/危险色(负向语义:删除、报错)。
+    public static var danger: Color { diffRemoved }
+    /// 主强调色:用户选择 > 主题默认 > 系统强调色。
+    public static var accent: Color { ThemeRuntime.accent?.color ?? Color.accentColor }
+    /// 第二强调色:链接、次要徽标;未指定时回退主强调色。
+    public static var accent2: Color { ThemeRuntime.accent2?.color ?? accent }
 }
 
-/// Diff 配色:全部为不透明预混合色(随深浅色切换),避免半透明叠加在行与行之间留下接缝、边缘发灰。
+/// Diff 配色:全部为不透明预混合色(随主题切换),避免半透明叠加在行与行之间留下接缝、边缘发灰。
 public enum OMDiffPalette {
     /// 行类别。
     public enum Kind: Sendable { case added, removed, context, empty }
@@ -49,8 +63,21 @@ public enum OMDiffPalette {
         })
     }
 
+    /// 行号槽相对正文的混合比例:深色主题提亮、浅色主题压暗。
+    private static func gutterMix(_ bg: ThemeRGB, toward bar: ThemeRGB, dark: Bool) -> ThemeRGB {
+        bg.mixed(with: bar, dark ? 0.16 : 0.10)
+    }
+
     /// 正文区背景。
     public static func background(_ kind: Kind) -> Color {
+        if let palette = ThemeRuntime.palette {
+            switch kind {
+            case .added: return palette.diffAdded.color
+            case .removed: return palette.diffRemoved.color
+            case .context: return palette.editorBackground.color
+            case .empty: return palette.editorBackground.mixed(with: palette.editorForeground, 0.04).color
+            }
+        }
         switch kind {
         case .added: return addedBackground
         case .removed: return removedBackground
@@ -61,6 +88,14 @@ public enum OMDiffPalette {
 
     /// 行号槽背景(比正文深一档)。
     public static func gutter(_ kind: Kind) -> Color {
+        if let palette = ThemeRuntime.palette {
+            switch kind {
+            case .added: return gutterMix(palette.diffAdded, toward: palette.success, dark: palette.isDark).color
+            case .removed: return gutterMix(palette.diffRemoved, toward: palette.danger, dark: palette.isDark).color
+            case .context: return palette.gutterBackground.color
+            case .empty: return palette.gutterBackground.mixed(with: palette.editorForeground, 0.02).color
+            }
+        }
         switch kind {
         case .added: return addedGutter
         case .removed: return removedGutter
@@ -72,8 +107,8 @@ public enum OMDiffPalette {
     /// 左侧强调色条。
     public static func bar(_ kind: Kind) -> Color {
         switch kind {
-        case .added: return Color(nsColor: .systemGreen)
-        case .removed: return Color(nsColor: .systemRed)
+        case .added: return OMColors.diffAdded
+        case .removed: return OMColors.diffRemoved
         case .context, .empty: return .clear
         }
     }

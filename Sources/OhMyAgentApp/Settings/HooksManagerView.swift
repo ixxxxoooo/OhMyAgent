@@ -48,7 +48,7 @@ struct HooksManagerView: View {
         HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 4) {
-                    Tag(entry.handler.type, color: .accentColor)
+                    Tag(entry.handler.type, color: OMColors.accent2)
                     if !entry.matcher.isEmpty { Tag(String(localized: "匹配 \(entry.matcher)")) }
                     Tag(entry.origin.displayName)
                     if let timeout = entry.handler.timeout { Tag("\(timeout)s") }

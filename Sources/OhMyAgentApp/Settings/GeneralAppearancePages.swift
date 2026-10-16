@@ -116,33 +116,51 @@ struct GeneralPage: View {
     }
 }
 
-/// 外观。
+/// 主题:主题包、强调色、聊天宽度、字号、材质与动效。
 struct AppearancePage: View {
     @Bindable private var appearance = AppearanceModel.shared
     @AppStorage(ClientPrefs.Key.chatWidth) private var chatWidth = ChatWidth.standard.rawValue
+    @AppStorage(ClientPrefs.Key.chatWidthCustom) private var chatWidthCustom = ChatWidth.customDefault
 
     var body: some View {
         SettingsForm {
             Section("主题") {
-                Picker("外观", selection: $appearance.theme) { ForEach(AppTheme.allCases) { Text($0.displayName).tag($0) } }
-                    .pickerStyle(.segmented)
-                Picker("强调色", selection: $appearance.accent) {
-                    ForEach(AccentChoice.allCases) { choice in
-                        HStack {
-                            Circle().fill(choice.color ?? Color.accentColor).frame(width: 10, height: 10)
-                            Text(choice.displayName)
-                        }.tag(choice)
+                ForEach(ThemeGroup.allCases, id: \.self) { group in
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(group.title).font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 220), spacing: 8)], alignment: .leading, spacing: 8) {
+                            ForEach(ThemePackage.all.filter { $0.group == group }) { package in
+                                ThemeCard(package: package, selected: appearance.themeID == package.id) {
+                                    appearance.themeID = package.id
+                                }
+                            }
+                        }
                     }
                 }
+                Picker("模式", selection: $appearance.theme) { ForEach(AppTheme.allCases) { Text($0.displayName).tag($0) } }
+                    .pickerStyle(.segmented)
+                    .disabled(appearance.themePackage.tone != .system)
+                Note("「模式」只在主题为「跟随系统」时可选;其余主题自带明暗。")
+            }
+            Section("强调色") {
+                AccentPicker(title: "主强调色", choice: $appearance.accent, hex: $appearance.customAccentHex)
+                AccentPicker(title: "第二强调色", choice: $appearance.accent2, hex: $appearance.customAccent2Hex)
+                AccentPreview().id(appearance.themeRevision)
+                Note("主强调色用于按钮与选中态;第二强调色用于链接与次要徽标。「跟随主题」使用所选主题的默认配色。")
             }
             Section("聊天宽度") {
                 Picker("内容宽度", selection: $chatWidth) {
-                    Text("窄").tag(ChatWidth.narrow.rawValue)
-                    Text("标准").tag(ChatWidth.standard.rawValue)
-                    Text("宽").tag(ChatWidth.wide.rawValue)
-                    Text("铺满").tag(ChatWidth.full.rawValue)
+                    ForEach(ChatWidth.allCases) { width in
+                        Text(width.displayName).tag(width.rawValue)
+                    }
                 }
-                .pickerStyle(.segmented)
+                if chatWidth == ChatWidth.custom.rawValue {
+                    LabeledContent("自定义宽度 \(Int(ChatWidth.clampedCustom(chatWidthCustom))) pt") {
+                        Slider(value: $chatWidthCustom, in: ChatWidth.customRange, step: ChatWidth.customStep).frame(width: 220)
+                    }
+                } else if ChatWidth(rawValue: chatWidth) != .full {
+                    LabeledContent("当前宽度", value: "\(Int(ChatWidth.resolve(raw: chatWidth, custom: chatWidthCustom))) pt")
+                }
                 Note("控制会话时间线与输入框的最大宽度;窄屏或分屏时会自动收窄。")
             }
             Section("字号") {
@@ -164,8 +182,130 @@ struct AppearancePage: View {
                 Note("系统「减少透明度」「减少动态效果」始终优先。代码、Diff、编辑器等阅读区域恒为纯色,不受影响。")
             }
             Section {
-                Button("恢复默认外观") { appearance.reset() }
+                Button("恢复默认主题") { appearance.reset(); chatWidth = ChatWidth.standard.rawValue; chatWidthCustom = ChatWidth.customDefault }
             }
         }
+    }
+}
+
+/// 主题卡片:迷你色板 + 名称,选中时描边。
+private struct ThemeCard: View {
+    let package: ThemePackage
+    let selected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 6) {
+                swatch
+                    .frame(height: 34)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
+                HStack(spacing: 4) {
+                    Text(package.name).font(OMFonts.small).lineLimit(1)
+                    Spacer(minLength: 0)
+                    if selected { Image.om("check", size: 11).foregroundStyle(OMColors.accent) }
+                }
+            }
+            .padding(6)
+            .background(selected ? OMColors.accent.opacity(0.10) : Color.clear, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(selected ? OMColors.accent : OMColors.hairline.opacity(0.6), lineWidth: selected ? 1.5 : 0.5))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(package.name)
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
+    }
+
+    /// 迷你预览:左半底色 + 卡片条 + 强调色点。
+    @ViewBuilder private var swatch: some View {
+        if let palette = package.palette {
+            ZStack(alignment: .leading) {
+                palette.surface.color
+                HStack(spacing: 5) {
+                    RoundedRectangle(cornerRadius: 3).fill(palette.card.color).frame(width: 34, height: 22)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Capsule().fill(palette.editorForeground.color.opacity(0.7)).frame(width: 40, height: 3)
+                        Capsule().fill(palette.comment.color).frame(width: 26, height: 3)
+                    }
+                    Spacer(minLength: 0)
+                    HStack(spacing: 3) {
+                        Circle().fill(palette.accent.color).frame(width: 9, height: 9)
+                        Circle().fill(palette.accent2.color).frame(width: 9, height: 9)
+                    }
+                }
+                .padding(.horizontal, 7)
+            }
+        } else {
+            HStack(spacing: 0) {
+                Color.white
+                Color(white: 0.12)
+            }
+            .overlay(Image.om("monitor", size: 14).foregroundStyle(.gray))
+        }
+    }
+}
+
+/// 强调色选择行:预设色圆点 + 「跟随主题」+ 自定义取色。
+private struct AccentPicker: View {
+    let title: LocalizedStringKey
+    @Binding var choice: AccentChoice
+    @Binding var hex: String
+
+    private var customColor: Binding<Color> {
+        Binding(
+            get: { ThemeRGB(hexString: hex)?.color ?? .gray },
+            set: { newValue in
+                if let srgb = NSColor(newValue).usingColorSpace(.sRGB) {
+                    hex = ThemeRGB(red: srgb.redComponent, green: srgb.greenComponent, blue: srgb.blueComponent).hexString
+                    choice = .custom
+                }
+            }
+        )
+    }
+
+    var body: some View {
+        LabeledContent(title) {
+            HStack(spacing: 6) {
+                ForEach(AccentChoice.allCases.filter { $0 != .custom }) { item in
+                    Button { choice = item } label: {
+                        ZStack {
+                            if let color = item.color {
+                                Circle().fill(color)
+                            } else {
+                                Circle().strokeBorder(OMColors.secondaryText, style: StrokeStyle(lineWidth: 1, dash: [2, 2]))
+                            }
+                            if choice == item { Circle().strokeBorder(Color.primary, lineWidth: 2).padding(-3) }
+                        }
+                        .frame(width: 16, height: 16)
+                    }
+                    .buttonStyle(.plain)
+                    .help(item.displayName)
+                    .accessibilityLabel(item.displayName)
+                    .accessibilityAddTraits(choice == item ? [.isSelected] : [])
+                }
+                ColorPicker("自定义", selection: customColor, supportsOpacity: false)
+                    .labelsHidden()
+                    .help("自定义颜色")
+            }
+        }
+    }
+}
+
+/// 强调色预览条:按钮、链接、徽标与 Diff 色。
+private struct AccentPreview: View {
+    var body: some View {
+        HStack(spacing: 10) {
+            Text("主按钮").font(OMFonts.small).foregroundStyle(.white)
+                .padding(.horizontal, 10).padding(.vertical, 4)
+                .background(OMColors.accent, in: Capsule())
+            Text("链接示例").font(OMFonts.small).foregroundStyle(OMColors.accent2).underline()
+            Tag("徽标", color: OMColors.accent2)
+            Tag("新增", color: OMColors.diffAdded)
+            Tag("删除", color: OMColors.danger)
+            Spacer(minLength: 0)
+        }
+        .padding(8)
+        .background(OMColors.card, in: RoundedRectangle(cornerRadius: 8))
     }
 }

@@ -18,31 +18,51 @@ public enum AppTheme: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// 强调色。
+/// 强调色预设。`system` 表示「跟随主题」(系统主题时为系统强调色);`custom` 使用自定义十六进制色。
 public enum AccentChoice: String, CaseIterable, Identifiable, Sendable {
-    case system, blue, purple, pink, orange, green, graphite
+    case system, graphite, clay, blue, purple, pink, orange, green, cyan, red, yellow, custom
     public var id: String { rawValue }
     public var displayName: String {
         switch self {
-        case .system: return String(localized: "系统")
+        case .system: return String(localized: "跟随主题")
+        case .graphite: return String(localized: "石墨")
+        case .clay: return String(localized: "陶土")
         case .blue: return String(localized: "蓝色")
         case .purple: return String(localized: "紫色")
         case .pink: return String(localized: "粉色")
         case .orange: return String(localized: "橙色")
         case .green: return String(localized: "绿色")
-        case .graphite: return String(localized: "石墨")
+        case .cyan: return String(localized: "青色")
+        case .red: return String(localized: "红色")
+        case .yellow: return String(localized: "黄色")
+        case .custom: return String(localized: "自定义")
         }
     }
-    /// 对应颜色;`system` 返回 nil 表示使用系统强调色。
-    public var color: Color? {
+    /// 预设颜色;`system` 与 `custom` 返回 nil(由调用方决定)。
+    public var rgb: ThemeRGB? {
+        switch self {
+        case .system, .custom: return nil
+        case .graphite: return ThemeRGB(hex: 0x5C6370)
+        case .clay: return ThemeRGB(hex: 0xD97757)
+        case .blue: return ThemeRGB(hex: 0x0A84FF)
+        case .purple: return ThemeRGB(hex: 0xAF52DE)
+        case .pink: return ThemeRGB(hex: 0xFF4F8B)
+        case .orange: return ThemeRGB(hex: 0xF28A1B)
+        case .green: return ThemeRGB(hex: 0x30B45A)
+        case .cyan: return ThemeRGB(hex: 0x12B5CB)
+        case .red: return ThemeRGB(hex: 0xE5484D)
+        case .yellow: return ThemeRGB(hex: 0xE8B90C)
+        }
+    }
+    /// 对应颜色;`system`/`custom` 返回 nil。
+    public var color: Color? { rgb?.color }
+
+    /// 解析最终颜色:自定义色优先于预设;`system` 返回 nil(跟随主题)。
+    public func resolved(customHex: String) -> ThemeRGB? {
         switch self {
         case .system: return nil
-        case .blue: return .blue
-        case .purple: return .purple
-        case .pink: return .pink
-        case .orange: return .orange
-        case .green: return .green
-        case .graphite: return .gray
+        case .custom: return ThemeRGB(hexString: customHex)
+        default: return rgb
         }
     }
 }
@@ -53,8 +73,18 @@ public enum AccentChoice: String, CaseIterable, Identifiable, Sendable {
 public final class AppearanceModel {
     public static let shared = AppearanceModel()
 
+    /// 外观模式(跟随系统/浅/深);仅在主题包为「跟随系统」时生效,其余主题自带明暗。
     public var theme: AppTheme { didSet { save("theme", theme.rawValue); applyTheme() } }
-    public var accent: AccentChoice { didSet { save("accent", accent.rawValue) } }
+    /// 主题包 id(见 `ThemePackage.all`)。
+    public var themeID: String { didSet { save("themePackage", themeID); themeChanged() } }
+    /// 主强调色(`system` 跟随主题)。
+    public var accent: AccentChoice { didSet { save("accent", accent.rawValue); themeChanged() } }
+    /// 自定义主强调色(`#RRGGBB`)。
+    public var customAccentHex: String { didSet { save("accentHex", customAccentHex); themeChanged() } }
+    /// 第二强调色(链接、次要徽标;`system` 跟随主题)。
+    public var accent2: AccentChoice { didSet { save("accent2", accent2.rawValue); themeChanged() } }
+    /// 自定义第二强调色(`#RRGGBB`)。
+    public var customAccent2Hex: String { didSet { save("accent2Hex", customAccent2Hex); themeChanged() } }
     /// 界面字号缩放(0.85–1.3)
     public var uiFontScale: Double { didSet { save("uiFontScale", uiFontScale); applyScale() } }
     /// 时间线字号缩放(0.85–1.5)
@@ -69,6 +99,20 @@ public final class AppearanceModel {
     public var fallbackOnLowPower: Bool { didSet { save("fallbackOnLowPower", fallbackOnLowPower); MaterialPolicy.shared.fallbackOnLowPower = fallbackOnLowPower } }
     /// 每次字号变化递增,用于让时间线整体刷新字体。
     public private(set) var fontRevision = 0
+    /// 每次主题/强调色变化递增,用于让依赖令牌颜色的视图整体刷新。
+    public private(set) var themeRevision = 0
+
+    /// 当前主题包。
+    public var themePackage: ThemePackage { ThemePackage.find(themeID) }
+
+    /// 视图刷新键:字号或主题任一变化都会改变。读取它的视图会被 Observation 追踪。
+    public var renderKey: String { "\(fontRevision)-\(themeRevision)" }
+
+    /// 全局 tint(跟随生效的强调色)。读取 `themeRevision` 以建立 Observation 依赖。
+    public var tint: Color {
+        _ = themeRevision
+        return ThemeRuntime.accent?.color ?? Color.accentColor
+    }
 
     private static let prefix = "appearance."
     private var isLoading = true
@@ -79,7 +123,11 @@ public final class AppearanceModel {
         func double(_ key: String, _ fallback: Double) -> Double { defaults.object(forKey: Self.prefix + key) as? Double ?? fallback }
         func bool(_ key: String, _ fallback: Bool) -> Bool { defaults.object(forKey: Self.prefix + key) as? Bool ?? fallback }
         theme = AppTheme(rawValue: string("theme") ?? "") ?? .system
+        themeID = string("themePackage") ?? ThemePackage.system.id
         accent = AccentChoice(rawValue: string("accent") ?? "") ?? .system
+        customAccentHex = string("accentHex") ?? "#D97757"
+        accent2 = AccentChoice(rawValue: string("accent2") ?? "") ?? .system
+        customAccent2Hex = string("accent2Hex") ?? "#5769F7"
         uiFontScale = double("uiFontScale", 1)
         timelineFontScale = double("timelineFontScale", 1)
         isCompact = bool("compact", false)
@@ -95,7 +143,8 @@ public final class AppearanceModel {
 
     /// 恢复默认外观。
     public func reset() {
-        theme = .system; accent = .system; uiFontScale = 1; timelineFontScale = 1
+        theme = .system; themeID = ThemePackage.system.id; accent = .system; accent2 = .system
+        customAccentHex = "#D97757"; customAccent2Hex = "#5769F7"; uiFontScale = 1; timelineFontScale = 1
         isCompact = false; reduceMotion = false; alwaysOpaque = false; fallbackOnLowPower = true
     }
 
@@ -107,12 +156,28 @@ public final class AppearanceModel {
         MaterialPolicy.shared.fallbackOnLowPower = fallbackOnLowPower
     }
 
+    /// 把主题选择同步到运行时令牌,并强制应用明暗。
     private func applyTheme() {
-        switch theme {
+        ThemeRuntime.package = themePackage
+        ThemeRuntime.accentOverride = accent.resolved(customHex: customAccentHex)
+        ThemeRuntime.accent2Override = accent2.resolved(customHex: customAccent2Hex)
+        // 非系统主题自带明暗;系统主题按「外观模式」
+        let tone: ThemeTone = themePackage.tone == .system
+            ? (theme == .light ? .light : (theme == .dark ? .dark : .system))
+            : themePackage.tone
+        switch tone {
         case .system: NSApp?.appearance = nil
         case .light: NSApp?.appearance = NSAppearance(named: .aqua)
         case .dark: NSApp?.appearance = NSAppearance(named: .darkAqua)
         }
+    }
+
+    /// 主题或强调色变化:刷新运行时、递增修订号并通知编辑器。
+    private func themeChanged() {
+        guard !isLoading else { return }
+        applyTheme()
+        themeRevision += 1
+        NotificationCenter.default.post(name: ThemeRuntime.didChange, object: nil)
     }
 
     private func applyScale() {

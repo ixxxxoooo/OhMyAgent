@@ -27,7 +27,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .general: return String(localized: "通用")
-        case .appearance: return String(localized: "外观")
+        case .appearance: return String(localized: "主题")
         case .shortcuts: return String(localized: "快捷键")
         case .agent: return String(localized: "Agent 与模型")
         case .providers: return String(localized: "模型提供商")
@@ -122,7 +122,7 @@ struct SettingsView: View {
                         .padding(10).background(Color.red.opacity(0.1))
                 }
                 page
-                    .id(appearance.fontRevision)
+                    .id(appearance.renderKey)
                     .frame(maxWidth: usesFullWidth ? .infinity : 720)
                     .frame(maxWidth: .infinity)
             }
@@ -130,7 +130,7 @@ struct SettingsView: View {
         // 无标题栏窗口:内容铺满到窗口顶部,由侧栏/内容区各自预留标题栏高度,避免系统安全区叠加出多余留白
         .ignoresSafeArea(.container, edges: .top)
         .navigationTitle(router.page.title)
-        .tint(appearance.accent.color)
+        .tint(appearance.tint)
         .onExitCommand { workbench.closeSettings() }
         .task {
             model.start()
