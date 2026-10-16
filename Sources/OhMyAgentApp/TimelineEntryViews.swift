@@ -135,9 +135,9 @@ struct UserMessageView: View {
     @State private var hovering = false
 
     var body: some View {
-        if let sticky, let model = sticky.model, sticky.editing?.id == entry.id {
-            // 就地编辑:原位置展开为输入卡片
-            UserMessageEditor(model: model, entry: entry, maxWidth: .infinity) { sticky.editing = nil }
+        if let sticky, let model = sticky.model, sticky.editing?.id == entry.id, !sticky.isEditorFloating(for: entry.id) {
+            // 就地编辑:原位置展开为输入卡片(从吸顶卡发起的编辑悬浮在顶部,见 StickyUserOverlay)
+            UserMessageEditor(model: model, entry: entry, maxWidth: .infinity) { sticky.finishEditing() }
                 .id(entry.id)
         } else {
             messageCard
@@ -172,7 +172,7 @@ struct UserMessageView: View {
         .omGlass(in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(alignment: .bottomTrailing) {
             if !entry.isSteered {
-                Button { sticky?.editing = entry } label: {
+                Button { sticky?.beginEditing(entry, pinned: false) } label: {
                     Image.om("square-pen", size: 12).foregroundStyle(OMColors.secondaryText).frame(width: 24, height: 24).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -184,16 +184,16 @@ struct UserMessageView: View {
         }
         .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .onHover { hovering = $0 }
-        .onTapGesture(count: 2) { if !entry.isSteered { sticky?.editing = entry } }
+        .onTapGesture(count: 2) { if !entry.isSteered { sticky?.beginEditing(entry, pinned: false) } }
         .contextMenu {
             Button("复制") {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(entry.text, forType: .string)
             }
-            if !entry.isSteered { Button("编辑并重新发送…") { sticky?.editing = entry } }
+            if !entry.isSteered { Button("编辑并重新发送…") { sticky?.beginEditing(entry, pinned: false) } }
         }
         // 被吸顶卡接管时隐藏原行(保留布局,位置继续上报)
-        .opacity(sticky?.target?.stickyID == entry.id && sticky?.editing?.id != entry.id ? 0 : 1)
+        .opacity(sticky?.target?.stickyID == entry.id && !(sticky?.editing?.id == entry.id && sticky?.editorPinned != true) ? 0 : 1)
         .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(chatScrollSpace)).minY } action: { sticky?.report(entry.id, minY: $0) }
         .onDisappear { sticky?.forget(entry.id) }
         .accessibilityElement(children: .combine)
@@ -232,12 +232,22 @@ struct AttachmentThumbnail: View {
             .accessibilityLabel("图片 \(attachment.name)")
             .accessibilityHint("查看原图")
             if let onRemove, hovering {
+                // 按图片右上角的明暗自动取反色:浅色图配深色按钮、深色图配浅色按钮,并带描边与投影,任何背景上都看得清
+                let onLight = AttachmentImageCache.isLightAtTopRight(attachment)
+                let fill = onLight ? OMColors.maskInk.opacity(0.82) : OMColors.onAccent.opacity(0.95)
+                let glyph = onLight ? OMColors.onAccent : OMColors.maskInk
                 Button(action: onRemove) {
-                    Image.om("circle-x", size: 14)
-                        .foregroundStyle(OMColors.onAccent, OMColors.maskInk.opacity(0.65))
+                    Image.om("x", size: 9, weight: .bold)
+                        .foregroundStyle(glyph)
+                        .frame(width: 17, height: 17)
+                        .background(fill, in: Circle())
+                        .overlay(Circle().strokeBorder(glyph.opacity(0.55), lineWidth: 1))
+                        .shadow(color: OMColors.shadowInk.opacity(0.35), radius: 2, y: 0.5)
+                        .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
-                .padding(2)
+                .padding(3)
+                .help("移除图片")
                 .accessibilityLabel("移除图片")
                 .transition(.opacity)
             }
@@ -250,6 +260,48 @@ struct AttachmentThumbnail: View {
 @MainActor
 enum AttachmentImageCache {
     private static let cache = NSCache<NSUUID, NSImage>()
+    private static let lightCache = NSCache<NSUUID, NSNumber>()
+
+    /// 图片右上角区域是否偏亮(决定叠在上面的按钮用深色还是浅色)。
+    /// 缩到 8×8 取右上 3×3 的平均亮度,结果按附件缓存;解码失败按「偏亮」处理(主题底色多为浅色)。
+    /// - Parameter attachment: 图片附件
+    static func isLightAtTopRight(_ attachment: ImageAttachment) -> Bool {
+        let key = attachment.id as NSUUID
+        if let hit = lightCache.object(forKey: key) { return hit.boolValue }
+        let value = topRightLuminance(of: attachment).map { $0 > 0.55 } ?? true
+        lightCache.setObject(NSNumber(value: value), forKey: key)
+        return value
+    }
+
+    /// 右上角平均亮度(0 深 … 1 亮);透明像素按浅色底合成。
+    private static func topRightLuminance(of attachment: ImageAttachment) -> Double? {
+        guard let image = image(for: attachment),
+              let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
+        let side = 8
+        var pixels = [UInt8](repeating: 0, count: side * side * 4)
+        let drawn = pixels.withUnsafeMutableBytes { buffer -> Bool in
+            guard let context = CGContext(data: buffer.baseAddress, width: side, height: side, bitsPerComponent: 8, bytesPerRow: side * 4,
+                                          space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            // 先铺浅色底,再画图,透明区域不会被当成黑色
+            context.setFillColor(gray: 0.96, alpha: 1)
+            context.fill(CGRect(x: 0, y: 0, width: side, height: side))
+            context.interpolationQuality = .medium
+            context.draw(cgImage, in: CGRect(x: 0, y: 0, width: side, height: side))
+            return true
+        }
+        guard drawn else { return nil }
+        var total = 0.0
+        var count = 0.0
+        // 位图内存首行即画面顶部:右上角 = 前 3 行的右侧 3 列
+        for row in 0..<3 {
+            for column in (side - 3)..<side {
+                let offset = (row * side + column) * 4
+                total += 0.2126 * Double(pixels[offset]) + 0.7152 * Double(pixels[offset + 1]) + 0.0722 * Double(pixels[offset + 2])
+                count += 1
+            }
+        }
+        return count > 0 ? total / count / 255 : nil
+    }
 
     static func image(for attachment: ImageAttachment) -> NSImage? {
         let key = attachment.id as NSUUID

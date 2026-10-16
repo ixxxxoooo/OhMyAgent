@@ -25,12 +25,36 @@ final class StickyUserState {
     private(set) var target: StickyUser.Target?
     /// 正在「编辑并重新发送」的用户消息(非 nil 时弹出编辑窗)
     var editing: TimelineEntry?
+    /// 编辑是从吸顶卡发起的:编辑卡就悬浮在顶部、向下展开,不跳回消息原来的滚动位置
+    private(set) var editorPinned = false
+    /// 编辑中的草稿:编辑卡在「悬浮」与「原位」之间切换时不丢已输入的内容
+    var editDraft: String?
     /// 用户刚展开/折叠了某一行:暂停「贴底自动跟随」,避免内容增高把视口拽走(滚回底部后自动恢复)
     @ObservationIgnored var followSuspended = false
     @ObservationIgnored private(set) weak var model: SessionModel?
 
     /// 绑定会话模型。
     func bind(_ model: SessionModel) { self.model = model }
+
+    /// 开始编辑一条用户消息。
+    /// - Parameters:
+    ///   - entry: 要编辑的消息
+    ///   - pinned: 是否从吸顶卡发起(true 时编辑卡悬浮在顶部,不回到原位置)
+    func beginEditing(_ entry: TimelineEntry, pinned: Bool) {
+        editDraft = nil
+        editorPinned = pinned
+        editing = entry
+    }
+
+    /// 结束编辑(取消或发送)。
+    func finishEditing() {
+        editing = nil
+        editorPinned = false
+        editDraft = nil
+    }
+
+    /// 编辑卡是否应显示在顶部悬浮层(而不是消息原位)。
+    func isEditorFloating(for id: UUID) -> Bool { editing?.id == id && editorPinned }
 
     /// 可见条目集合变化:取其中最靠上的一条。
     /// - Parameter ids: 可见条目 ID(分组的 ID 等于其首个条目的 ID)
@@ -74,9 +98,22 @@ struct StickyUserOverlay: View {
     let maxWidth: CGFloat
 
     var body: some View {
-        // 正在就地编辑的那条不再吸顶,避免与行内编辑卡重复
-        if let target = state.target, target.stickyID != state.editing?.id,
-           let entry = model.timeline.entries.first(where: { $0.id == target.stickyID }) {
+        if let editing = state.editing, state.editorPinned {
+            // 从吸顶卡进入编辑:编辑卡就在当前悬浮位置向下展开,覆盖在会话流之上
+            UserMessageEditor(model: model, entry: editing, maxWidth: .infinity) { state.finishEditing() }
+                .id(editing.id)
+                .frame(maxWidth: maxWidth)
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 16)
+                .frame(maxWidth: .infinity)
+                .background(alignment: .top) {
+                    LinearGradient(colors: [OMColors.surface, OMColors.surface.opacity(0.92), OMColors.surface.opacity(0)], startPoint: .top, endPoint: .bottom)
+                        .allowsHitTesting(false)
+                }
+        } else if let target = state.target, target.stickyID != state.editing?.id,
+                  let entry = model.timeline.entries.first(where: { $0.id == target.stickyID }) {
+            // 正在原位编辑的那条不再吸顶,避免与行内编辑卡重复
             let push = StickyUser.pushOffset(nextMinY: target.nextID.flatMap { state.userMinY[$0] }, cardHeight: state.cardHeight)
             StickyUserCard(entry: entry)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { state.cardHeight = $0 }
@@ -126,7 +163,7 @@ struct StickyUserCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .omGlass(in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(alignment: .bottomTrailing) {
-            Button { sticky?.editing = entry } label: {
+            Button { sticky?.beginEditing(entry, pinned: true) } label: {
                 Image.om("square-pen", size: 12).foregroundStyle(OMColors.secondaryText).frame(width: 24, height: 24).contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -137,7 +174,7 @@ struct StickyUserCard: View {
         }
         .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .onHover { hovering = $0 }
-        .onTapGesture(count: 2) { sticky?.editing = entry }
+        .onTapGesture(count: 2) { sticky?.beginEditing(entry, pinned: true) }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(String(localized: "你:\(entry.text)"))
         .accessibilityHint(String(localized: "双击放大编辑"))

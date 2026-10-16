@@ -40,7 +40,7 @@ final class PickerPanelController {
     private var mouseMonitor: Any?
     private var resignObserver: NSObjectProtocol?
     /// 卡片四周留给阴影的边距
-    private let inset: CGFloat = 14
+    private let inset: CGFloat = 32
 
     /// 弹出浮层。
     /// - Parameters:
@@ -67,7 +67,7 @@ final class PickerPanelController {
             Color.clear
             card
                 .omGlassCard(cornerRadius: 12)
-                .omCardShadow(cornerRadius: 12, yOffset: placement.isAbove ? -2 : 3)
+                .omFloatingShadow(cornerRadius: 12, yOffset: placement.isAbove ? -6 : 6)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
                     PickerPanelController.shared.cardHeightChanged(height)
                 }

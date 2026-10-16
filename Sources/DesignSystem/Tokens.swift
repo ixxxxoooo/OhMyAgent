@@ -214,6 +214,17 @@ public extension View {
         modifier(OMOuterShadow(cornerRadius: cornerRadius, opacity: 0.16, radius: 12, yOffset: yOffset))
     }
 
+    /// 悬浮层(下拉选择、弹出菜单)的自然阴影:仿 macOS 原生菜单,
+    /// 一层贴边的接触阴影(小半径、较实)+ 一层大范围的环境阴影(大半径、很淡),两层都只画在轮廓之外。
+    /// 使用方需给阴影留出至少 `radius + |yOffset|` 的边距(约 32pt),否则会在窗口边缘被硬切。
+    /// - Parameters:
+    ///   - cornerRadius: 与卡片一致的圆角
+    ///   - yOffset: 垂直偏移(向上弹出的浮层传负值,阴影略偏向远离按钮的一侧)
+    func omFloatingShadow(cornerRadius: CGFloat = 12, yOffset: CGFloat = 6) -> some View {
+        modifier(OMOuterShadow(cornerRadius: cornerRadius, opacity: 0.10, radius: 18, yOffset: yOffset))
+            .modifier(OMOuterShadow(cornerRadius: cornerRadius, opacity: 0.14, radius: 3, yOffset: yOffset / 4))
+    }
+
     /// 浮层级外侧阴影(搜索窗、悬浮窗等大块浮层)。
     /// - Parameter cornerRadius: 与浮层一致的圆角
     func omFloatShadow(cornerRadius: CGFloat = 22) -> some View {
