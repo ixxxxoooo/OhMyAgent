@@ -290,3 +290,69 @@ struct MermaidRenderingTests {
         }
     }
 }
+
+@Suite("Mermaid 视口(缩放/平移)")
+struct MermaidViewportTests {
+    private let scene = CGSize(width: 400, height: 200)
+    private let view = CGSize(width: 800, height: 600)
+
+    @Test("适应窗口:居中且不超过最大放大倍数")
+    func fit() {
+        var vp = MermaidViewport()
+        vp.fit(scene: scene, in: view)
+        // 可用 752×552,宽度决定比例 1.88,小于 maxFit=2
+        #expect(abs(vp.scale - 1.88) < 0.001)
+        #expect(abs(vp.offset.x - (800 - 400 * 1.88) / 2) < 0.001)
+        #expect(abs(vp.offset.y - (600 - 200 * 1.88) / 2) < 0.001)
+        // 小图不会被放得过大
+        var small = MermaidViewport()
+        small.fit(scene: CGSize(width: 50, height: 50), in: view)
+        #expect(small.scale == 2)
+    }
+
+    @Test("以锚点缩放:锚点下的场景位置保持不变")
+    func zoomAnchor() {
+        var vp = MermaidViewport()
+        vp.fit(scene: scene, in: view)
+        let anchor = CGPoint(x: 300, y: 250)
+        let before = vp.scenePoint(fromViewport: anchor)
+        vp.zoom(by: 1.7, anchor: anchor)
+        let after = vp.scenePoint(fromViewport: anchor)
+        #expect(abs(before.x - after.x) < 0.0001)
+        #expect(abs(before.y - after.y) < 0.0001)
+    }
+
+    @Test("缩放被限制在 10%~800%,非法输入被忽略")
+    func clampScale() {
+        var vp = MermaidViewport()
+        vp.zoom(by: 1000, anchor: .zero)
+        #expect(vp.scale == MermaidViewport.maxScale)
+        vp.zoom(by: 0.00001, anchor: .zero)
+        #expect(vp.scale == MermaidViewport.minScale)
+        let snapshot = vp
+        vp.zoom(by: .nan, anchor: .zero)
+        vp.zoom(by: -2, anchor: .zero)
+        vp.pan(by: CGPoint(x: Double.infinity, y: 0))
+        #expect(vp == snapshot)
+    }
+
+    @Test("平移与实际大小")
+    func panAndActual() {
+        var vp = MermaidViewport()
+        vp.actualSize(scene: scene, in: view)
+        #expect(vp.scale == 1)
+        #expect(vp.offset == CGPoint(x: 200, y: 200))
+        vp.pan(by: CGPoint(x: -30, y: 12))
+        #expect(vp.offset == CGPoint(x: 170, y: 212))
+        #expect(vp.percentText == "100%")
+    }
+
+    @Test("PDF 导出为非空矢量文档")
+    @MainActor
+    func pdfExport() throws {
+        let scene = try Mermaid.scene(for: "flowchart LR\n A --> B")
+        let data = try #require(MermaidRenderer.pdfData(scene, dark: false))
+        #expect(data.count > 200)
+        #expect(String(decoding: data.prefix(5), as: UTF8.self) == "%PDF-")
+    }
+}

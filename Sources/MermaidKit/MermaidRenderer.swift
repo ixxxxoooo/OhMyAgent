@@ -325,6 +325,36 @@ public enum MermaidRenderer {
         guard let image = renderer.nsImage, let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else { return nil }
         return rep.representation(using: .png, properties: [:])
     }
+
+    /// 导出为矢量 PDF(任意缩放不失真,适合放进文档)。
+    /// - Parameters:
+    ///   - scene: 场景
+    ///   - dark: 是否深色
+    /// - Returns: PDF 数据;渲染失败为 nil
+    @MainActor
+    public static func pdfData(_ scene: MScene, dark: Bool) -> Data? {
+        let palette = MermaidPalette(dark: dark)
+        let content = Canvas { ctx, _ in
+            var c = ctx
+            draw(scene, in: &c, palette: palette)
+        }
+        .frame(width: max(scene.size.width, 1), height: max(scene.size.height, 1))
+        .background(palette.background)
+        let renderer = ImageRenderer(content: content)
+        let data = NSMutableData()
+        var done = false
+        renderer.render { size, render in
+            var box = CGRect(origin: .zero, size: size)
+            guard let consumer = CGDataConsumer(data: data as CFMutableData),
+                  let pdf = CGContext(consumer: consumer, mediaBox: &box, nil) else { return }
+            pdf.beginPDFPage(nil)
+            render(pdf)
+            pdf.endPDFPage()
+            pdf.closePDF()
+            done = true
+        }
+        return done && data.length > 0 ? data as Data : nil
+    }
 }
 
 /// 把场景绘制为 SwiftUI 视图;当可用宽度小于场景宽度时等比缩小。

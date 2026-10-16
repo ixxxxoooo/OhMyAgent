@@ -147,3 +147,12 @@ hand
 arrow-big-up-dash
 terminal
 chevrons-down-up
+zoom-in
+zoom-out
+download
+scan
+fullscreen
+image-down
+arrow-down-to-line
+text-wrap
+move-diagonal-2

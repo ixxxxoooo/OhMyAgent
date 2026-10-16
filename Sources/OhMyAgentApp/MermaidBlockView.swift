@@ -1,5 +1,5 @@
 // @author ixxxxoooo
-// Mermaid 代码块:原生渲染图(MermaidKit),支持复制源码、导出 PNG、在标签中放大;解析失败时回退为源码并提示原因。
+// Mermaid 代码块:原生渲染图(MermaidKit),支持复制源码、下载(PNG/PDF/源码)、点击在悬浮窗中放大;解析失败时回退为源码并提示原因。
 
 import AppKit
 import DesignSystem
@@ -24,13 +24,13 @@ final class MermaidPreviewStore {
 }
 
 /// 渲染结果。
-private enum MermaidResult: Sendable {
+enum MermaidResult: Sendable {
     case scene(MScene, kind: MermaidKind)
     case failure(MermaidError)
 }
 
 /// 离线线程解析与布局。
-private func renderMermaid(_ source: String) async -> MermaidResult {
+func renderMermaid(_ source: String) async -> MermaidResult {
     await Task.detached(priority: .userInitiated) {
         let started = Date()
         do {
@@ -74,8 +74,8 @@ struct MermaidBlockView: View {
             Spacer()
             if case .scene = result {
                 headerButton("code", help: showSource ? "查看图" : "查看源码") { showSource.toggle() }
-                headerButton("image", help: "导出 PNG") { exportPNG() }
-                headerButton("square-arrow-out-up-right", help: "在标签中放大") { openInTab() }
+                downloadMenu
+                headerButton("maximize-2", help: "放大查看(悬浮窗,可拖动缩放)") { openFloating() }
             }
             headerButton(copied ? "checkmark" : "doc.on.doc", help: "复制源码") { copySource() }
         }
@@ -91,6 +91,24 @@ struct MermaidBlockView: View {
             .accessibilityLabel(Text(help))
     }
 
+    /// 下载菜单(PNG / PDF / 源码)。
+    private var downloadMenu: some View {
+        Menu {
+            ForEach(MermaidExportFormat.allCases, id: \.self) { format in
+                Button(format.title) { download(format) }
+            }
+        } label: {
+            Image.om("download", size: 13)
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .foregroundStyle(OMColors.secondaryText)
+        .fixedSize()
+        .help("下载")
+        .accessibilityLabel("下载")
+    }
+
     @ViewBuilder
     private var content: some View {
         switch result {
@@ -102,6 +120,12 @@ struct MermaidBlockView: View {
                     .padding(12)
                     .frame(maxWidth: .infinity)
                     .background(MermaidPalette(dark: scheme == .dark).background)
+                    .contentShape(Rectangle())
+                    .onTapGesture { openFloating() }
+                    .onHover { inside in if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() } }
+                    .help("点击放大查看")
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityLabel("Mermaid 图表,点击放大查看")
             }
         case .failure(let error):
             VStack(alignment: .leading, spacing: 0) {
@@ -128,25 +152,15 @@ struct MermaidBlockView: View {
         Task { try? await Task.sleep(for: .seconds(1.5)); copied = false }
     }
 
-    private func exportPNG() {
+    /// 下载指定格式。
+    private func download(_ format: MermaidExportFormat) {
         guard case .scene(let scene, _) = result else { return }
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.png]
-        panel.nameFieldStringValue = "mermaid.png"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        guard let data = MermaidRenderer.pngData(scene, dark: scheme == .dark) else {
-            Log.ui.warning("Mermaid 导出 PNG 失败:渲染为空", [:])
-            return
-        }
-        Task.detached {
-            do { try data.write(to: url); Log.ui.info("Mermaid 已导出", ["file": url.lastPathComponent, "bytes": "\(data.count)"]) }
-            catch { Log.ui.error("Mermaid 导出写入失败", ["error": error.localizedDescription]) }
-        }
+        MermaidExport.save(format, scene: scene, source: source, dark: scheme == .dark)
     }
 
-    private func openInTab() {
-        let id = MermaidPreviewStore.shared.register(source)
-        AppActions.shared.openPreview(id: id, title: String(localized: "Mermaid 图"))
+    /// 以悬浮窗放大查看(当前页内,不新开标签)。
+    private func openFloating() {
+        MermaidFloatingStore.shared.present(source: source)
     }
 }
 

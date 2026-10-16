@@ -28,6 +28,7 @@ struct WorkbenchView: View {
             }
         }
         .overlay { PaletteOverlay(workbench: workbench) }
+        .overlay { MermaidFloatingOverlay() }
         .tint(appearance.accent.color)
         .frame(minWidth: 860, minHeight: 560)
         .background(WindowFocusReader(onWindow: { window in actions.mainWindow = window; WindowChrome.apply(to: window) }, onChange: { key in
