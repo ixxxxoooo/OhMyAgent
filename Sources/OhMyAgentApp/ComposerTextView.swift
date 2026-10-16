@@ -41,7 +41,7 @@ final class SubmitTextView: NSTextView {
     var onImages: (([ImageAttachment]) -> Void)?
     /// 是否接受图片(Agent 不支持图片时不接管粘贴)
     var acceptsImages: () -> Bool = { false }
-    var placeholder: String = "" { didSet { needsDisplay = true } }
+    var placeholder: String = "" { didSet { refreshPlaceholder() } }
 
     override func keyDown(with event: NSEvent) {
         let isReturn = event.keyCode == 36 || event.keyCode == 76
@@ -112,15 +112,66 @@ final class SubmitTextView: NSTextView {
         return super.performDragOperation(sender)
     }
 
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-        guard string.isEmpty, !hasMarkedText() else { return }
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: font ?? NSFont.systemFont(ofSize: 13.5),
-            .foregroundColor: NSColor.placeholderTextColor,
-        ]
-        let origin = NSPoint(x: textContainerInset.width + (textContainer?.lineFragmentPadding ?? 0), y: textContainerInset.height)
-        (placeholder as NSString).draw(at: origin, withAttributes: attributes)
+    // MARK: 占位文字
+
+    /// 占位文字标签:独立子视图而非在 `draw` 里手绘。
+    /// 手绘方案在输入法组合期间(拼音 `fen` 还是 marked text)只会重绘组合区域,旧占位像素残留,与拼音叠在一起;
+    /// 子视图用 `isHidden` 切换,不依赖脏区重绘。
+    private lazy var placeholderLabel: NSTextField = {
+        let label = NSTextField(labelWithString: "")
+        label.isSelectable = false
+        label.lineBreakMode = .byTruncatingTail
+        label.textColor = .placeholderTextColor
+        label.setAccessibilityElement(false)
+        addSubview(label)
+        return label
+    }()
+
+    /// 占位文字当前是否可见(测试用)。
+    var isPlaceholderVisible: Bool { !placeholderLabel.isHidden }
+
+    /// 按「无文本且无输入法组合文本」刷新占位标签的内容、位置与显隐。
+    func refreshPlaceholder() {
+        let label = placeholderLabel
+        let showing = string.isEmpty && !hasMarkedText() && !placeholder.isEmpty
+        label.isHidden = !showing
+        guard showing else { return }
+        label.stringValue = placeholder
+        label.font = font ?? NSFont.systemFont(ofSize: 13.5)
+        let originX = textContainerInset.width + (textContainer?.lineFragmentPadding ?? 0)
+        let size = label.intrinsicContentSize
+        label.frame = NSRect(x: originX, y: textContainerInset.height, width: max(bounds.width - originX - 4, 0), height: size.height)
+    }
+
+    override func layout() {
+        super.layout()
+        refreshPlaceholder()
+    }
+
+    override func didChangeText() {
+        super.didChangeText()
+        refreshPlaceholder()
+    }
+
+    override func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
+        super.setMarkedText(string, selectedRange: selectedRange, replacementRange: replacementRange)
+        refreshPlaceholder()
+    }
+
+    override func unmarkText() {
+        super.unmarkText()
+        refreshPlaceholder()
+    }
+
+    override func insertText(_ string: Any, replacementRange: NSRange) {
+        super.insertText(string, replacementRange: replacementRange)
+        refreshPlaceholder()
+    }
+
+    /// 命中测试忽略占位标签,点击落到文本视图本身。
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let hit = super.hitTest(point)
+        return hit === placeholderLabel ? self : hit
     }
 }
 
@@ -192,6 +243,7 @@ struct ComposerTextView: NSViewRepresentable {
             textView.setSelectedRange(NSRange(location: (text as NSString).length, length: 0))
         }
         textView.placeholder = placeholder
+        textView.refreshPlaceholder()
         context.coordinator.updateHeight()
     }
 
