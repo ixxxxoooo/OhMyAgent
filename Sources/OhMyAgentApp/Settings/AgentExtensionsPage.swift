@@ -88,6 +88,7 @@ struct AgentExtensionsPage: View {
     var body: some View {
         SettingsForm {
             agentsSection
+            AntigravityInstallSection()
             Section("Agent 通知") {
                 Toggle("显示第三方 Agent 的通知行", isOn: $showAgentNotify)
                 Note("Pi 等适配器会把扩展通知(如 pi-tps 的「TPS …」)混在消息里发出。开启时以淡色小字单独成行,关闭则隐藏;警告与错误级别始终显示。")
@@ -132,7 +133,8 @@ struct AgentExtensionsPage: View {
                     HStack(spacing: 8) {
                         if agent.enabled, registry.data.resolvedDefault.id != agent.id { Button("设为默认") { registry.setDefault(agentId: agent.id) } }
                         if !builtIn {
-                            Button("编辑") { draft = AgentDraft(agent) }
+                            // 一键安装的官方 Agent 由「官方 Agent」分区管理,不提供手工编辑(避免丢失 registryId)
+                            if agent.registryId == nil { Button("编辑") { draft = AgentDraft(agent) } }
                             Button("删除", role: .destructive) { registry.remove(agentId: agent.id) }
                             OMSwitch(String(localized: "启用 \(agent.name)"), isOn: Binding(get: { agent.enabled }, set: { registry.setEnabled($0, agentId: agent.id) }))
                         }

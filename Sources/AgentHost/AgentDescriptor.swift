@@ -24,8 +24,10 @@ public struct AgentDescriptor: Codable, Sendable, Hashable, Identifiable {
     public var enabled: Bool
     /// 说明文字
     public var summary: String?
+    /// ACP Registry 里的标识(非 nil 表示由应用「一键安装」管理,启动时从安装目录解析可执行文件)
+    public var registryId: String?
 
-    public init(id: String, name: String, kind: AgentKind, command: String? = nil, args: [String] = [], env: [String: String] = [:], enabled: Bool = true, summary: String? = nil) {
+    public init(id: String, name: String, kind: AgentKind, command: String? = nil, args: [String] = [], env: [String: String] = [:], enabled: Bool = true, summary: String? = nil, registryId: String? = nil) {
         self.id = id
         self.name = name
         self.kind = kind
@@ -34,7 +36,17 @@ public struct AgentDescriptor: Codable, Sendable, Hashable, Identifiable {
         self.env = env
         self.enabled = enabled
         self.summary = summary
+        self.registryId = registryId
     }
+
+    /// Google Antigravity(官方 `agy_acp_server`):一键安装后使用,可执行文件由安装器管理。
+    public static let antigravity = AgentDescriptor(
+        id: "antigravity", name: "Google Antigravity", kind: .genericACP, command: nil, args: [], env: [:], enabled: true,
+        summary: String(localized: "Google 官方 ACP Server(agy_acp_server),需先在设置里一键安装并登录"), registryId: "antigravity-acp"
+    )
+
+    /// 模型环境变量名:Antigravity 启动时的默认模型。
+    public static let antigravityModelEnv = "AGY_ACP_DEFAULT_MODEL"
 
     /// 内置的 Claude Code 描述符。
     public static let claudeCode = AgentDescriptor(
@@ -52,6 +64,7 @@ public enum AgentLaunchError: Error, LocalizedError, Sendable {
     case missingClaude
     case missingCommand(String)
     case missingHelper(String)
+    case notInstalled(String)
 
     public var errorDescription: String? {
         switch self {
@@ -59,6 +72,7 @@ public enum AgentLaunchError: Error, LocalizedError, Sendable {
         case .missingAdapter: return String(localized: "未找到 claude-agent-acp 适配器。应用会自动安装;如仍失败,请检查网络后重试,或在设置 → 高级中指定路径。")
         case .missingClaude: return String(localized: "未找到 claude 命令行工具。请先安装 Claude Code。")
         case .missingCommand(let name): return String(localized: "Agent「\(name)」未配置可执行文件。")
+        case .notInstalled(let name): return String(localized: "Agent「\(name)」尚未安装。请到设置 → Agent 注册表点击「一键安装」。")
         case .missingHelper(let name): return String(localized: "缺少随应用分发的辅助程序 \(name),请重新安装或运行 Scripts/bundle.sh。")
         }
     }
@@ -115,11 +129,16 @@ public struct GenericACPProvider: AgentProvider {
     }
 
     public func makeLaunch(cwd: String, tools: LocatedTools) throws -> ProcessLaunch {
+        var env = tools.environment
+        for (key, value) in descriptor.env { env[key] = value }
+        // 一键安装的 Agent:可执行文件取自安装目录(升级后路径自动跟随)
+        if let registryId = descriptor.registryId {
+            guard let installed = AgentInstaller().installed(id: registryId) else { throw AgentLaunchError.notInstalled(descriptor.name) }
+            return ProcessLaunch(executable: installed.executable, arguments: installed.args + descriptor.args, environment: env, workingDirectory: cwd)
+        }
         guard let command = descriptor.command, !command.isEmpty else {
             throw AgentLaunchError.missingCommand(descriptor.name)
         }
-        var env = tools.environment
-        for (key, value) in descriptor.env { env[key] = value }
         // 允许写命令名(如 `codex`),在 PATH 中解析
         let resolved = Self.resolve(command, path: env["PATH"] ?? "")
         return ProcessLaunch(executable: resolved ?? command, arguments: descriptor.args, environment: env, workingDirectory: cwd)

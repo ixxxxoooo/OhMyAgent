@@ -43,7 +43,7 @@ public enum BrandIcon: Equatable, Sendable {
 
     /// 提供商预设 ID / 名称关键字 → 厂商图标键(模型无法识别时使用)。
     private static let providerRules: [(needle: String, icon: String)] = [
-        ("anthropic", "anthropic"), ("openrouter", "openrouter"), ("opencode", "opencode"),
+        ("antigravity", "gemini"), ("anthropic", "anthropic"), ("openrouter", "openrouter"), ("opencode", "opencode"),
         ("openai", "openai"), ("gemini", "gemini"), ("google", "google"),
         ("deepseek", "deepseek"), ("glm", "zhipu"), ("zhipu", "zhipu"), ("智谱", "zhipu"),
         ("kimi", "kimi"), ("moonshot", "moonshot"), ("minimax", "minimax"),

@@ -12,6 +12,8 @@ struct BrandIconTests {
     func matchByModel() {
         #expect(BrandIcon.resolve(modelId: "deepseek-chat", providerPreset: "opencode", providerName: "OpenCode Zen") == .vector("deepseek"))
         #expect(BrandIcon.resolve(modelId: "claude-sonnet-4-5", providerPreset: "opencode", providerName: "x") == .vector("claude"))
+        // Antigravity 官方 Agent 使用 Gemini 星形图标
+        #expect(BrandIcon.resolve(providerPreset: nil, providerName: "Google Antigravity") == .vector("gemini"))
         #expect(BrandIcon.resolve(modelId: "gpt-5-codex", providerPreset: nil, providerName: "x") == .vector("openai"))
         #expect(BrandIcon.resolve(modelId: "glm-4.6", providerPreset: nil, providerName: "x") == .vector("zhipu"))
         #expect(BrandIcon.resolve(modelId: "kimi-k2", providerPreset: nil, providerName: "x") == .vector("kimi"))

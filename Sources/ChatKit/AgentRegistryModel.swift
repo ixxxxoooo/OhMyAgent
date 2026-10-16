@@ -47,7 +47,8 @@ public final class AgentRegistryModel {
     public func upsert(_ agent: AgentDescriptor) -> String? {
         if agent.id.trimmingCharacters(in: .whitespaces).isEmpty { return String(localized: "Agent 标识不能为空") }
         if AgentDescriptor.builtIns.contains(where: { $0.id == agent.id }) { return String(localized: "标识 \(agent.id) 已被内置 Agent 占用") }
-        if (agent.command ?? "").trimmingCharacters(in: .whitespaces).isEmpty { return String(localized: "请填写可执行文件或命令名") }
+        // 一键安装的 Agent(registryId)由安装器解析可执行文件,不要求填写命令
+        if agent.registryId == nil, (agent.command ?? "").trimmingCharacters(in: .whitespaces).isEmpty { return String(localized: "请填写可执行文件或命令名") }
         update { value in
             if let index = value.agents.firstIndex(where: { $0.id == agent.id }) { value.agents[index] = agent } else { value.agents.append(agent) }
         }

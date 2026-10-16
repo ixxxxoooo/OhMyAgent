@@ -160,9 +160,10 @@ extension AgentDescriptor {
             args: try c.decodeIfPresent([String].self, forKey: .args) ?? [],
             env: try c.decodeIfPresent([String: String].self, forKey: .env) ?? [:],
             enabled: try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true,
-            summary: try c.decodeIfPresent(String.self, forKey: .summary)
+            summary: try c.decodeIfPresent(String.self, forKey: .summary),
+            registryId: try c.decodeIfPresent(String.self, forKey: .registryId)
         )
     }
 
-    private enum Keys: String, CodingKey { case id, name, kind, command, args, env, enabled, summary }
+    private enum Keys: String, CodingKey { case id, name, kind, command, args, env, enabled, summary, registryId }
 }
