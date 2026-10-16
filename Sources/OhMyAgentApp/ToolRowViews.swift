@@ -186,19 +186,16 @@ struct ToolRowView: View {
         }
     }
 
-    /// 行首图标:读/写/改文件的工具显示该文件的彩色类型图标,其余沿用功能图标。
+    /// 行首图标:固定为工具类型的功能图标;文件的彩色类型图标紧贴文件名(见 `subject`)。
     @ViewBuilder
     private func leadingIcon(_ tool: ToolCall, _ p: ToolPresentation) -> some View {
-        if p.subjectIsPath, !p.subject.isEmpty, [.read, .write, .edit].contains(p.category) {
-            OMFileIcon(name: (p.subject as NSString).lastPathComponent, size: 14)
-                .frame(width: 16)
-                .opacity(tool.status == .failed ? 0.5 : 1)
-        } else {
-            Image.om(ToolIcons.symbol(for: p.category), size: 11.5)
-                .frame(width: 16)
-                .foregroundStyle(tool.status == .failed ? Color.red : OMColors.secondaryText)
-        }
+        Image.om(ToolIcons.symbol(for: p.category), size: 11.5)
+            .frame(width: 16)
+            .foregroundStyle(tool.status == .failed ? Color.red : OMColors.secondaryText)
     }
+
+    /// 这类工具的对象是文件:文件名前显示彩色文件类型图标。
+    private static let fileCategories: Set<ToolPresentation.Category> = [.read, .write, .edit, .delete, .move]
 
     @ViewBuilder
     private func subject(_ p: ToolPresentation, failed: Bool) -> some View {
@@ -206,6 +203,10 @@ struct ToolRowView: View {
             let name = (p.subject as NSString).lastPathComponent
             let dir = ((p.subject as NSString).deletingLastPathComponent as NSString).lastPathComponent
             HStack(spacing: 5) {
+                if !name.isEmpty, Self.fileCategories.contains(p.category) {
+                    OMFileIcon(name: name, size: OMMetrics.fileIconInline)
+                        .opacity(failed ? 0.5 : 1)
+                }
                 Text(name)
                     .font(OMFonts.small.weight(.medium))
                     .foregroundStyle(failed ? Color.red : Color.primary)

@@ -12,6 +12,10 @@ public enum OMMetrics {
     public static let toolbarHeight: CGFloat = 44
     public static let timelineMaxWidth: CGFloat = 820
     public static let spacing: CGFloat = 12
+    /// 文件类型图标尺寸:内联在文字/chip/工具行文件名前
+    public static let fileIconInline: CGFloat = 14
+    /// 文件类型图标尺寸:列表行(资源管理器、搜索结果),与 11.5pt 小字相配,不再偏大
+    public static let fileIconList: CGFloat = 14
 }
 
 /// 颜色令牌。系统主题下全部使用系统语义色;选择主题包后按调色板取色。
