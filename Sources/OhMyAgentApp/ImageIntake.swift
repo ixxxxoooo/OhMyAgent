@@ -13,7 +13,16 @@ enum ImageIntake {
     /// 接受的图片类型。
     static let acceptedTypes: [UTType] = [.png, .jpeg, .gif, .webP, .heic, .tiff, .bmp]
 
-    /// 从粘贴板读取图片:优先文件 URL(Finder 拖拽/复制),其次直接的图片数据(截图)。
+    /// 粘贴板里可直接读取的图片数据类型(按优先级)。
+    private static let dataTypes: [(NSPasteboard.PasteboardType, UTType)] = [
+        (.png, .png), (.tiff, .tiff),
+        (NSPasteboard.PasteboardType("public.jpeg"), .jpeg),
+        (NSPasteboard.PasteboardType("public.heic"), .heic),
+        (NSPasteboard.PasteboardType("com.compuserve.gif"), .gif),
+        (NSPasteboard.PasteboardType("org.webmproject.webp"), .webP),
+    ]
+
+    /// 从粘贴板读取图片:优先文件 URL(Finder 拖拽/复制),其次直接的图片数据(截图、网页、预览),最后用 `NSImage` 兜底。
     /// - Parameter pasteboard: 粘贴板
     /// - Returns: 图片附件(无图片时为空)
     static func attachments(from pasteboard: NSPasteboard) -> [ImageAttachment] {
@@ -23,10 +32,17 @@ enum ImageIntake {
             if let item = attachment(from: url) { result.append(item) }
         }
         if !result.isEmpty { return result }
-        for type in [NSPasteboard.PasteboardType.png, .tiff] {
-            if let data = pasteboard.data(forType: type), let item = attachment(fromData: data, name: String(localized: "粘贴的图片")) {
+        for (type, uti) in dataTypes {
+            if let data = pasteboard.data(forType: type),
+               let item = attachment(fromData: data, name: String(localized: "粘贴的图片"), preferredType: uti) {
                 return [item]
             }
+        }
+        // 兜底:其他应用写入的非常规图片表示(PDF/PICT 等),交给 NSImage 解码后转 PNG
+        if let image = (pasteboard.readObjects(forClasses: [NSImage.self], options: nil) as? [NSImage])?.first,
+           let tiff = image.tiffRepresentation,
+           let item = attachment(fromData: tiff, name: String(localized: "粘贴的图片")) {
+            return [item]
         }
         return []
     }
@@ -37,10 +53,13 @@ enum ImageIntake {
             .urlReadingFileURLsOnly: true,
             .urlReadingContentsConformToTypes: acceptedTypes.map(\.identifier),
         ]) { return true }
-        return pasteboard.data(forType: .png) != nil || pasteboard.data(forType: .tiff) != nil
+        if dataTypes.contains(where: { pasteboard.data(forType: $0.0) != nil }) { return true }
+        return pasteboard.canReadObject(forClasses: [NSImage.self], options: nil)
+            && !hasFileURLs(pasteboard)
     }
 
-    /// 粘贴时是否应由图片接管:图片文件一律接管;只有截图类数据时,若同时带有文本(如从表格复制)则优先粘贴文本。
+    /// 粘贴时是否应由图片接管:图片文件一律接管;只有图片数据时,若同时带有「真正的文字」(如从表格复制)则优先粘贴文字。
+    /// 只带一条链接/空白文字的(网页「复制图片」、聊天软件)仍按图片处理。
     static func prefersImage(_ pasteboard: NSPasteboard) -> Bool {
         guard hasImage(pasteboard) else { return false }
         let hasImageFile = pasteboard.canReadObject(forClasses: [NSURL.self], options: [
@@ -48,7 +67,16 @@ enum ImageIntake {
             .urlReadingContentsConformToTypes: acceptedTypes.map(\.identifier),
         ])
         if hasImageFile { return true }
-        return (pasteboard.string(forType: .string) ?? "").isEmpty
+        return isIncidentalText(pasteboard.string(forType: .string))
+    }
+
+    /// 文字是否只是图片的附带信息:为空、全空白,或只是一条链接。
+    /// - Parameter text: 粘贴板里的纯文本
+    static func isIncidentalText(_ text: String?) -> Bool {
+        let trimmed = (text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return true }
+        guard !trimmed.contains(where: \.isNewline), !trimmed.contains(" ") else { return false }
+        return trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://") || trimmed.hasPrefix("file://")
     }
 
     /// 粘贴板里的文件 URL(不限类型)。

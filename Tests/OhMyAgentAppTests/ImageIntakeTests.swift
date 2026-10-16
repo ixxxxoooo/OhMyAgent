@@ -80,3 +80,86 @@ struct ImagePreviewNamingTests {
         #expect(ImagePreviewNaming.suggestedName("x/y", mimeType: "image/png") == "x-y.png")
     }
 }
+
+@MainActor
+@Suite("输入框粘贴图片")
+struct ComposerPasteTests {
+    private func board() -> NSPasteboard {
+        let board = NSPasteboard(name: NSPasteboard.Name("oma.paste.\(UUID().uuidString)"))
+        board.clearContents()
+        return board
+    }
+
+    private func makeView() -> (SubmitTextView, Box) {
+        let box = Box()
+        let view = SubmitTextView(frame: NSRect(x: 0, y: 0, width: 200, height: 40))
+        view.acceptsImages = { true }
+        view.onImages = { box.images += $0.count }
+        view.onFileURLs = { box.files += $0.count }
+        return (view, box)
+    }
+
+    @MainActor final class Box { var images = 0; var files = 0 }
+
+    @Test("PNG 截图被接管为附件")
+    func pastePNG() {
+        let pb = board()
+        pb.setData(pngData(), forType: .png)
+        let (view, box) = makeView()
+        #expect(view.handlePasteboard(pb))
+        #expect(box.images == 1)
+    }
+
+    @Test("TIFF 与同时带链接文字(网页复制图片)也按图片处理")
+    func pasteTIFFWithURLText() throws {
+        let pb = board()
+        let tiff = try #require(NSBitmapImageRep(data: pngData())?.tiffRepresentation)
+        pb.setData(tiff, forType: .tiff)
+        pb.setString("https://example.com/a.png", forType: .string)
+        let (view, box) = makeView()
+        #expect(view.handlePasteboard(pb))
+        #expect(box.images == 1)
+    }
+
+    @Test("图片数据同时带正文文字(表格复制)时按文字粘贴")
+    func pasteTextWins() throws {
+        let pb = board()
+        pb.setData(pngData(), forType: .png)
+        pb.setString("姓名\t年龄\n张三\t18", forType: .string)
+        let (view, box) = makeView()
+        #expect(!view.handlePasteboard(pb))
+        #expect(box.images == 0)
+    }
+
+    @Test("非图片文件转为文件引用,不当成图片")
+    func pasteFile() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("oma-paste-\(UUID().uuidString).txt")
+        try "x".write(to: url, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let pb = board()
+        pb.writeObjects([url as NSURL])
+        let (view, box) = makeView()
+        #expect(view.handlePasteboard(pb))
+        #expect(box.images == 0)
+        #expect(box.files == 1)
+    }
+
+    @Test("不接受图片时不接管")
+    func disabled() {
+        let pb = board()
+        pb.setData(pngData(), forType: .png)
+        let (view, box) = makeView()
+        view.acceptsImages = { false }
+        #expect(!view.handlePasteboard(pb))
+        #expect(box.images == 0)
+    }
+
+    @Test("附带文字判定:空白与单条链接算附带,正文不算")
+    func incidentalText() {
+        #expect(ImageIntake.isIncidentalText(nil))
+        #expect(ImageIntake.isIncidentalText("  \n"))
+        #expect(ImageIntake.isIncidentalText("https://a.com/x.png"))
+        #expect(!ImageIntake.isIncidentalText("hello world"))
+        #expect(!ImageIntake.isIncidentalText("https://a.com\nmore"))
+    }
+}

@@ -5,6 +5,7 @@
 import AppKit
 import DesignSystem
 import ChatKit
+import OMLog
 import SwiftUI
 
 /// 补全弹层的按键。
@@ -112,22 +113,42 @@ final class SubmitTextView: NSTextView {
 
     /// 粘贴:剪贴板含图片时作为附件,含文件/文件夹时转成 `@路径`,否则按纯文本粘贴。
     override func paste(_ sender: Any?) {
-        if acceptsImages(), ImageIntake.prefersImage(.general) {
-            let images = ImageIntake.attachments(from: .general)
+        if handlePasteboard(.general) { return }
+        super.paste(sender)
+    }
+
+    /// 「粘贴并匹配样式」(⌥⇧⌘V)同样要支持图片与文件,与 `paste(_:)` 共用一套逻辑。
+    override func pasteAsPlainText(_ sender: Any?) {
+        if handlePasteboard(.general) { return }
+        super.pasteAsPlainText(sender)
+    }
+
+    /// 处理粘贴板里的图片/文件。
+    /// - Parameter board: 粘贴板
+    /// - Returns: 已处理返回 true;false 表示交给文本视图按文字粘贴
+    func handlePasteboard(_ board: NSPasteboard) -> Bool {
+        if acceptsImages(), ImageIntake.prefersImage(board) {
+            let images = ImageIntake.attachments(from: board)
             if !images.isEmpty {
                 onImages?(images)
                 // 同一次粘贴里的非图片文件也一并引用
-                let others = ImageIntake.nonImageFileURLs(from: .general)
+                let others = ImageIntake.nonImageFileURLs(from: board)
                 if !others.isEmpty { onFileURLs?(others) }
-                return
+                return true
+            }
+            // 识别为图片却解码失败:不要悄悄粘成空文本,提示并记录
+            Log.ui.warning("粘贴图片失败:无法解码剪贴板里的图片", ["types": board.types?.map(\.rawValue).joined(separator: ",") ?? ""])
+            if (board.string(forType: .string) ?? "").isEmpty {
+                NSSound.beep()
+                return true
             }
         }
-        let files = ImageIntake.nonImageFileURLs(from: .general)
+        let files = ImageIntake.nonImageFileURLs(from: board)
         if !files.isEmpty, onFileURLs != nil {
             onFileURLs?(files)
-            return
+            return true
         }
-        pasteAsPlainText(sender)
+        return false
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
