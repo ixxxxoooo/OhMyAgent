@@ -130,8 +130,6 @@ struct SettingsView: View {
         // 无标题栏窗口:内容铺满到窗口顶部,由侧栏/内容区各自预留标题栏高度,避免系统安全区叠加出多余留白
         .ignoresSafeArea(.container, edges: .top)
         .navigationTitle(router.page.title)
-        .toolbar(removing: .title)
-        .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .tint(appearance.accent.color)
         .onExitCommand { workbench.closeSettings() }
         .task {

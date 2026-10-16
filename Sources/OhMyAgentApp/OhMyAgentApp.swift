@@ -128,7 +128,9 @@ struct OhMyAgentApp: App {
                 .overlay(alignment: .top) { if DemoLaunch.isActive { DemoBadgeView().padding(.top, 6) } }
         }
         .defaultSize(width: 1280, height: 820)
-        .windowToolbarStyle(.unifiedCompact(showsTitle: false))
+        // 不再使用 unifiedCompact 空工具栏:它的 NSTitlebarView 横跨顶部 32pt 并吞掉所有点击,
+        // 导致侧栏开关/标签/设置返回按钮全部点不动;隐藏标题栏后红绿灯仍保留,顶部点击可达 SwiftUI 内容。
+        .windowStyle(.hiddenTitleBar)
         .commands { WorkbenchCommands() }
     }
 }

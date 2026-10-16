@@ -196,4 +196,23 @@ struct SourceGuardTests {
         }
         #expect(offenders.isEmpty, "缺少无障碍声明的点击手势:\(offenders.joined(separator: ", "))")
     }
+
+    @Test("无标题栏窗口:禁止使用 windowToolbarStyle / toolbar 修饰符(它们的 NSTitlebarView 会吞掉顶部 32pt 内所有点击)")
+    func noWindowToolbar() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let sources = root.appendingPathComponent("Sources/OhMyAgentApp")
+        let enumerator = FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil)
+        var offenders: [String] = []
+        while let url = enumerator?.nextObject() as? URL {
+            guard url.pathExtension == "swift" else { continue }
+            let lines = try String(contentsOf: url, encoding: .utf8).split(separator: "\n", omittingEmptySubsequences: false)
+            for (index, line) in lines.enumerated() {
+                let code = line.split(separator: "//", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? ""
+                if code.contains(".windowToolbarStyle(") || code.contains(".toolbar(removing:") || code.contains("for: .windowToolbar") {
+                    offenders.append("\(url.lastPathComponent):\(index + 1)")
+                }
+            }
+        }
+        #expect(offenders.isEmpty, "出现会重新引入标题栏工具栏的用法:\(offenders.joined(separator: ", "))")
+    }
 }

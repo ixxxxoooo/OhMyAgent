@@ -51,7 +51,7 @@ private struct OverlayButton: View {
 
 /// 顶部浮层:左上「回退 / 前进 / 侧栏开关」,右上右栏开关。
 /// 刻意做成整个工作区上的浮层(而不是塞进侧栏或标签栏):面板展开/收起时按钮坐标恒定,
-/// 且不再被 NSSplitView 的列视图抢走点击(旧实现里左栏开关因此点不动)。
+/// 且窗口使用隐藏标题栏(不再有 NSTitlebarView 横跨顶部吞掉点击),按钮可直接点击。
 struct TitlebarOverlay: View {
     @Bindable var workbench: WorkbenchModel
 
@@ -88,13 +88,13 @@ struct WindowDragArea: NSViewRepresentable {
     func updateNSView(_ nsView: NSView, context: Context) {}
 
     private final class DragView: NSView {
-        override var mouseDownCanMoveWindow: Bool { true }
+        override var mouseDownCanMoveWindow: Bool { false }
 
         override func mouseDown(with event: NSEvent) {
             if event.clickCount == 2 {
                 window?.performZoom(nil)
-            } else {
-                super.mouseDown(with: event)
+            } else if let window {
+                window.performDrag(with: event)
             }
         }
     }
