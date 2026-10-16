@@ -913,3 +913,6 @@
 "渲染" = "Rendered";
 "源码" = "Source";
 "演示场景" = "Demo Scenarios";
+"当前 Agent 不支持图片输入,图片未添加。" = "This agent does not support image input; the images were not added.";
+"当前 Agent 不支持图片输入" = "This agent does not support image input";
+"拖入的图片" = "Dropped image";

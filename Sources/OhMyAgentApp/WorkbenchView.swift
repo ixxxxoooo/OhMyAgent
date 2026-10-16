@@ -131,10 +131,19 @@ struct WorkbenchView: View {
         let wantsSession = env["OMA_AUTOSEND"] != nil || env["OMA_DRAFT"] != nil
         for _ in 0..<80 where workbench.activeSession == nil && (wantsSession || !workbench.projects.isEmpty) { try? await Task.sleep(for: .milliseconds(100)) }
         if let draft = env["OMA_DRAFT"], !draft.isEmpty { workbench.activeSession?.draft = draft }
+        // 调试:OMA_ATTACH_IMAGE=图片路径1:图片路径2 给当前会话的输入框添加图片附件(配合 OMA_AUTOSEND 会一并发送)
+        if let list = env["OMA_ATTACH_IMAGE"], !list.isEmpty, let model = workbench.activeSession {
+            for path in list.split(separator: ":") {
+                if let image = ImageIntake.attachment(from: URL(fileURLWithPath: String(path))) { model.addAttachment(image) }
+                else { Log.app.warning("调试钩子:无法读取图片", ["path": String(path)]) }
+            }
+        }
         if let text = env["OMA_AUTOSEND"], !text.isEmpty, let model = workbench.activeSession {
             Log.app.debug("调试钩子:等待就绪后自动发送", ["project": model.workspace.lastPathComponent])
             for _ in 0..<100 where model.phase != .ready { try? await Task.sleep(for: .milliseconds(100)) }
-            model.send(text)
+            let images = model.attachments
+            model.attachments = []
+            model.send(text, images: images)
             if env["OMA_AUTOALLOW"] != nil {
                 // 调试:自动批准本轮第一个权限请求(用于无人值守验证 Agent 编辑联动)
                 for _ in 0..<100 where model.pendingPermissions.isEmpty { try? await Task.sleep(for: .milliseconds(100)) }

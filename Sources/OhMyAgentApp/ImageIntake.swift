@@ -40,6 +40,49 @@ enum ImageIntake {
         return pasteboard.data(forType: .png) != nil || pasteboard.data(forType: .tiff) != nil
     }
 
+    /// 粘贴时是否应由图片接管:图片文件一律接管;只有截图类数据时,若同时带有文本(如从表格复制)则优先粘贴文本。
+    static func prefersImage(_ pasteboard: NSPasteboard) -> Bool {
+        guard hasImage(pasteboard) else { return false }
+        let hasImageFile = pasteboard.canReadObject(forClasses: [NSURL.self], options: [
+            .urlReadingFileURLsOnly: true,
+            .urlReadingContentsConformToTypes: acceptedTypes.map(\.identifier),
+        ])
+        if hasImageFile { return true }
+        return (pasteboard.string(forType: .string) ?? "").isEmpty
+    }
+
+    /// 从拖放/粘贴的 `NSItemProvider` 异步读取图片(文件 URL 或图片数据)。
+    /// - Parameter providers: 提供者
+    /// - Returns: 图片附件
+    static func attachments(from providers: [NSItemProvider]) async -> [ImageAttachment] {
+        var result: [ImageAttachment] = []
+        for provider in providers {
+            if provider.canLoadObject(ofClass: URL.self), let url = await loadURL(provider), let item = attachment(from: url) {
+                result.append(item)
+                continue
+            }
+            for type in [UTType.png, .jpeg, .tiff, .gif, .webP, .heic] where provider.hasItemConformingToTypeIdentifier(type.identifier) {
+                if let data = await loadData(provider, type: type), let item = attachment(fromData: data, name: String(localized: "拖入的图片"), preferredType: type) {
+                    result.append(item)
+                    break
+                }
+            }
+        }
+        return result
+    }
+
+    private static func loadURL(_ provider: NSItemProvider) async -> URL? {
+        await withCheckedContinuation { continuation in
+            _ = provider.loadObject(ofClass: URL.self) { url, _ in continuation.resume(returning: url) }
+        }
+    }
+
+    private static func loadData(_ provider: NSItemProvider, type: UTType) async -> Data? {
+        await withCheckedContinuation { continuation in
+            provider.loadDataRepresentation(forTypeIdentifier: type.identifier) { data, _ in continuation.resume(returning: data) }
+        }
+    }
+
     /// 从文件读取图片;不是图片或读取失败时返回 nil。
     /// - Parameter url: 文件 URL
     static func attachment(from url: URL) -> ImageAttachment? {

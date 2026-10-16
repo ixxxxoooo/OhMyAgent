@@ -2,6 +2,7 @@
 // Claude Code 交互补全:客户端命令、斜杠来源标注、@子 Agent 提及、运行中引导/排队、目标、图片、提示行。
 
 import ACPKit
+import AgentHost
 import Foundation
 import Testing
 @testable import ChatKit
@@ -210,6 +211,17 @@ struct SessionParityTests {
         #expect(model.timeline.entries.first { $0.kind == .user }?.attachments.count == 1)
         #expect(await SessionModelTests.wait { !model.isRunning })
         model.shutdown()
+    }
+
+    @Test("尚未连接时也能添加图片(能力未确定时先允许),不会悄悄丢弃")
+    func imagesBeforeConnect() throws {
+        let ws = try M3ScenarioTests.tempWorkspace()
+        let descriptor = AgentDescriptor(id: "fake", name: "Fake", kind: .genericACP, command: try SessionModelTests.fakeAgentPath())
+        let model = SessionModel(workspace: ws, descriptor: descriptor)
+        #expect(model.phase != .ready)
+        #expect(model.canAttachImages)
+        model.addAttachment(ImageAttachment(data: Data([0x89, 0x50]), mimeType: "image/png", name: "early.png"))
+        #expect(model.attachments.count == 1)
     }
 
     @Test("超大图片被拒绝并提示")

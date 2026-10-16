@@ -86,7 +86,7 @@ final class SubmitTextView: NSTextView {
 
     /// 粘贴:剪贴板含图片时作为附件,否则按纯文本粘贴。
     override func paste(_ sender: Any?) {
-        if acceptsImages(), ImageIntake.hasImage(.general) {
+        if acceptsImages(), ImageIntake.prefersImage(.general) {
             let images = ImageIntake.attachments(from: .general)
             if !images.isEmpty {
                 onImages?(images)

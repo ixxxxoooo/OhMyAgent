@@ -21,6 +21,7 @@ struct ComposerView: View {
     @State private var selected = 0
     @State private var dismissedAt: String?
     @State private var lookup: Task<Void, Never>?
+    @State private var dropTargeted = false
 
     var body: some View {
         VStack(spacing: 6) {
@@ -46,7 +47,8 @@ struct ComposerView: View {
                 onBacktab: { model.cycleMode() },
                 onSubmitAfterTurn: { model.sendDraft(afterTurn: true) },
                 onImages: { images in images.forEach { model.addAttachment($0) } },
-                acceptsImages: { model.canAttachImages },
+                // 不再在这里按能力拦截:不支持图片时由 addAttachment 给出提示,而不是悄悄吞掉粘贴/拖入
+                acceptsImages: { true },
                 onEdit: updateCompletion,
                 onSelectionText: { model.selectedText = $0 }
             )
@@ -56,16 +58,15 @@ struct ComposerView: View {
                 ProviderMenu(model: model)
                 OptionMenu(model: model, category: "model", icon: "cpu")
                 OptionMenu(model: model, category: "thought_level", icon: "brain")
-                if model.canAttachImages {
-                    Button {
-                        ImageIntake.pickImages().forEach { model.addAttachment($0) }
-                    } label: {
-                        Image.om("image-plus", size: 12).foregroundStyle(OMColors.secondaryText)
-                    }
-                    .buttonStyle(.plain)
-                    .help("添加图片(也可粘贴或拖入)")
-                    .accessibilityLabel("添加图片")
+                Button {
+                    ImageIntake.pickImages().forEach { model.addAttachment($0) }
+                } label: {
+                    Image.om("image-plus", size: 12).foregroundStyle(OMColors.secondaryText)
                 }
+                .buttonStyle(.plain)
+                .opacity(model.canAttachImages ? 1 : 0.4)
+                .help(model.canAttachImages ? "添加图片(也可粘贴或拖入)" : "当前 Agent 不支持图片输入")
+                .accessibilityLabel("添加图片")
                 MCPPanelButton(model: model)
                 Spacer(minLength: 8)
                 if let queued = model.queuedPrompt {
@@ -89,6 +90,19 @@ struct ComposerView: View {
             }
         }
         .animation(omShouldReduceMotion() ? nil : .easeOut(duration: 0.12), value: items.isEmpty)
+        // 整张输入卡片都是图片拖放区(不只是文字那一行),拖入时显示高亮边框
+        .overlay {
+            if dropTargeted {
+                RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(OMColors.accent, style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+                    .allowsHitTesting(false)
+            }
+        }
+        .onDrop(of: [.fileURL, .image], isTargeted: $dropTargeted) { providers in
+            Task { @MainActor in
+                for image in await ImageIntake.attachments(from: providers) { model.addAttachment(image) }
+            }
+            return true
+        }
     }
 
     // MARK: - 补全

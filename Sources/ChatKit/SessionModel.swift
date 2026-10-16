@@ -501,12 +501,16 @@ public final class SessionModel {
 
     // MARK: - 图片附件
 
-    /// 是否可以发送图片(Agent 声明支持图片提示)。
-    public var canAttachImages: Bool { capabilities.imagePrompts }
+    /// 是否可以添加图片:Agent 声明支持图片提示;连接中/失败时能力尚未确定,先允许添加(连上后仍不支持则在发送前提示)。
+    public var canAttachImages: Bool { phase != .ready || capabilities.imagePrompts }
 
     /// 添加图片附件;超过大小上限或 Agent 不支持时给出提示。
     /// - Parameter image: 图片
     public func addAttachment(_ image: ImageAttachment) {
+        guard canAttachImages else {
+            timeline.appendNotice(ChatL10n.t("当前 Agent 不支持图片输入,图片未添加。"), severity: "warning")
+            return
+        }
         guard image.data.count <= ImageAttachment.maxBytes else {
             timeline.appendNotice("图片太大(上限 \(ImageAttachment.maxBytes / 1024 / 1024) MB),已忽略:\(image.name)", isError: true)
             return
