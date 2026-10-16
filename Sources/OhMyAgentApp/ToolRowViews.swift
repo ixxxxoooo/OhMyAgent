@@ -256,15 +256,10 @@ struct ToolRowView: View {
         return false
     }
 
-    /// 默认展开:有 Diff、失败、运行中的终端、运行中的子 Agent。
+    /// 默认展开策略:一律折叠(失败、Diff、运行中都不自动展开),由用户点击行自行展开;
+    /// 仅调试开关 `OMA_EXPAND_ALL` 可在脚本化截图时强制展开。
     private func defaultExpanded(_ tool: ToolCall, _ p: ToolPresentation) -> Bool {
-        // 运行中(子 Agent、终端输出等)一律默认折叠,由用户自己展开;
-        // 只有失败(需要看到原因)与已产生的 Diff 结果默认可见。
-        if DebugFlags.expandAll || tool.status == .failed { return true }
-        for content in tool.content {
-            if case .diff = content { return true }
-        }
-        return false
+        DebugFlags.expandAll
     }
 
     static func statusText(_ status: ToolStatus) -> String {
@@ -556,14 +551,14 @@ struct TimelineItemView: View {
     }
 }
 
-/// 连续浏览步骤的折叠分组:默认折叠(运行中也不自动展开),失败时展开以便查看原因。
+/// 连续浏览步骤的折叠分组:默认折叠(运行中、失败时都不自动展开),由用户自行展开。
 struct ExploreGroupView: View {
     let group: ExploreGroup
     @State private var expanded: Bool?
     @State private var hovering = false
 
     var body: some View {
-        let isExpanded = expanded ?? (DebugFlags.expandAll || group.hasFailure)
+        let isExpanded = expanded ?? DebugFlags.expandAll
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 7) {
                 Image.om("text.magnifyingglass", size: 11.5)

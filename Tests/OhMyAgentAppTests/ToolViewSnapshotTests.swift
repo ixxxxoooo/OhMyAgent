@@ -77,13 +77,13 @@ struct ToolViewSnapshotTests {
         export(dark, name: "tool-\(name)-dark")
     }
 
-    @Test("详情展开后的行比折叠行更高(有 Diff 的编辑默认展开)")
-    func editExpandedTaller() throws {
+    @Test("工具行默认一律折叠:带 Diff 的编辑与普通读取行同高")
+    func toolRowsCollapsedByDefault() throws {
         let edit = entry(toolCases[2].1)
         let read = entry(toolCases[0].1)
         let editImage = try #require(render(ToolRowView(entry: edit), dark: false))
         let readImage = try #require(render(ToolRowView(entry: read), dark: false))
-        #expect(editImage.pixelsHigh > readImage.pixelsHigh)
+        #expect(abs(editImage.pixelsHigh - readImage.pixelsHigh) <= 8, "编辑行不应默认展开 Diff 详情")
     }
 
     @Test("ANSI 富文本包含颜色属性且文本被还原")
