@@ -12,6 +12,9 @@ import WorkbenchKit
 struct ComposerView: View {
     @Bindable var model: SessionModel
     @State private var textHeight: CGFloat = 34
+    /// 发送键与运行中发送偏好:仅用于让输入框提示文案随设置刷新
+    @AppStorage(ClientPrefs.Key.sendKey) private var sendKey = SendKey.enter.rawValue
+    @AppStorage(ClientPrefs.Key.runningSend) private var runningSend = RunningSendMode.steer.rawValue
     @State private var controller = ComposerController()
     @State private var completion: CompletionContext?
     @State private var items: [CompletionItem] = []
@@ -133,12 +136,20 @@ struct ComposerView: View {
         case .connecting: return String(localized: "正在连接 Agent,可以先输入…")
         case .failed: return String(localized: "Agent 未连接,发送将尝试重新连接")
         default:
+            let commandToSend = sendKey == SendKey.commandEnter.rawValue
             if model.isRunning {
-                return model.canSteer
+                if commandToSend {
+                    return model.canSteer && runningSend == RunningSendMode.steer.rawValue
+                        ? String(localized: "运行中:⌘Return 引导 \(model.agentName),Return 换行")
+                        : String(localized: "运行中:⌘Return 排到本轮之后发送,Return 换行")
+                }
+                return model.canSteer && runningSend == RunningSendMode.steer.rawValue
                     ? String(localized: "运行中:Return 引导 \(model.agentName),⌘Return 排到本轮之后")
                     : String(localized: "运行中:Return 或 ⌘Return 排到本轮之后发送")
             }
-            return String(localized: "向 \(model.agentName) 提问,Return 发送,Shift+Return 换行,/ 命令,@ 提及")
+            return commandToSend
+                ? String(localized: "向 \(model.agentName) 提问,⌘Return 发送,Return 换行,/ 命令,@ 提及")
+                : String(localized: "向 \(model.agentName) 提问,Return 发送,Shift+Return 换行,/ 命令,@ 提及")
         }
     }
 

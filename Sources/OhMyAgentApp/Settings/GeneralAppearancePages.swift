@@ -12,6 +12,9 @@ struct GeneralPage: View {
     @AppStorage(ClientPrefs.Key.showDock) private var showDock = true
     @AppStorage(ClientPrefs.Key.showMenuBar) private var showMenuBar = true
     @AppStorage(ClientPrefs.Key.notifyFinished) private var notifyFinished = true
+    @AppStorage(ClientPrefs.Key.notifySound) private var notifySound = true
+    @AppStorage(ClientPrefs.Key.sendKey) private var sendKey = SendKey.enter.rawValue
+    @AppStorage(ClientPrefs.Key.runningSend) private var runningSend = RunningSendMode.steer.rawValue
     @AppStorage(ClientPrefs.Key.autoUpdate) private var autoUpdate = true
     @AppStorage(ClientPrefs.Key.updateChannel) private var channel = "stable"
     @AppStorage(ClientPrefs.Key.updateFeedURL) private var feedURL = ""
@@ -52,6 +55,17 @@ struct GeneralPage: View {
                 }
                 if restartHint { Note("语言在重新启动 OhMyAgent 后生效。") }
             }
+            Section("输入") {
+                Picker("发送键", selection: $sendKey) {
+                    Text("Return 发送,Shift+Return 换行").tag(SendKey.enter.rawValue)
+                    Text("⌘Return 发送,Return 换行").tag(SendKey.commandEnter.rawValue)
+                }
+                Picker("Agent 运行中发送消息", selection: $runningSend) {
+                    Text("引导当前轮次").tag(RunningSendMode.steer.rawValue)
+                    Text("排到本轮结束后").tag(RunningSendMode.queue.rawValue)
+                }
+                Note("「引导」会把消息立刻注入正在进行的轮次(Agent 不支持时自动排队);「排队」等本轮结束后再发送。")
+            }
             Section("Dock 与菜单栏") {
                 Toggle("在 Dock 中显示图标", isOn: $showDock)
                     .onChange(of: showDock) { _, value in
@@ -62,6 +76,7 @@ struct GeneralPage: View {
                     .disabled(!showDock)
                 Note("隐藏 Dock 图标时会自动开启菜单栏图标,以便仍可打开窗口。关闭最后一个窗口后,应用会继续在菜单栏中运行(⌘Q 退出)。")
                 Toggle("任务完成时发送系统通知", isOn: $notifyFinished)
+                Toggle("通知带提示音", isOn: $notifySound).disabled(!notifyFinished)
                 Note("运行中的会话在菜单栏图标上显示闪烁的点;完成后点常亮,打开对应会话或点击通知后消失。")
             }
             Section("更新") {
@@ -88,7 +103,7 @@ struct GeneralPage: View {
             Button("重置", role: .destructive) {
                 ClientPrefs.resetAll()
                 AppearanceModel.shared.reset()
-                restoreWindows = true; showDock = true; showMenuBar = true; notifyFinished = true; autoUpdate = true; channel = "stable"
+                restoreWindows = true; showDock = true; showMenuBar = true; notifyFinished = true; notifySound = true; sendKey = SendKey.enter.rawValue; runningSend = RunningSendMode.steer.rawValue; autoUpdate = true; channel = "stable"
                 NSApp.setActivationPolicy(.regular)
             }
         } message: {
@@ -104,6 +119,7 @@ struct GeneralPage: View {
 /// 外观。
 struct AppearancePage: View {
     @Bindable private var appearance = AppearanceModel.shared
+    @AppStorage(ClientPrefs.Key.chatWidth) private var chatWidth = ChatWidth.standard.rawValue
 
     var body: some View {
         SettingsForm {
@@ -118,6 +134,16 @@ struct AppearancePage: View {
                         }.tag(choice)
                     }
                 }
+            }
+            Section("聊天宽度") {
+                Picker("内容宽度", selection: $chatWidth) {
+                    Text("窄").tag(ChatWidth.narrow.rawValue)
+                    Text("标准").tag(ChatWidth.standard.rawValue)
+                    Text("宽").tag(ChatWidth.wide.rawValue)
+                    Text("铺满").tag(ChatWidth.full.rawValue)
+                }
+                .pickerStyle(.segmented)
+                Note("控制会话时间线与输入框的最大宽度;窄屏或分屏时会自动收窄。")
             }
             Section("字号") {
                 LabeledContent("界面字号 \(Int(appearance.uiFontScale * 100))%") {

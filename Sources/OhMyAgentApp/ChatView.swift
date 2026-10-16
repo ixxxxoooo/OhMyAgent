@@ -13,6 +13,10 @@ struct ChatView: View {
     @State private var position = ScrollPosition(edge: .bottom)
     @State private var isPinnedToBottom = true
     @State private var scrollPhase: ScrollPhase = .idle
+    /// 聊天内容宽度档位(设置 → 外观)
+    @AppStorage(ClientPrefs.Key.chatWidth) private var chatWidth = ChatWidth.standard.rawValue
+
+    private var contentMaxWidth: CGFloat { (ChatWidth(rawValue: chatWidth) ?? .standard).points }
 
     var body: some View {
         ZStack {
@@ -39,7 +43,7 @@ struct ChatView: View {
                 ComposerView(model: model)
                 ComposerFooter(model: model)
             }
-            .frame(maxWidth: OMMetrics.timelineMaxWidth)
+            .frame(maxWidth: contentMaxWidth)
             .padding(.horizontal, 16)
             .padding(.bottom, 12)
             .frame(maxWidth: .infinity)
@@ -59,7 +63,7 @@ struct ChatView: View {
                 }
                 Color.clear.frame(height: 24).id("bottom")
             }
-            .frame(maxWidth: OMMetrics.timelineMaxWidth)
+            .frame(maxWidth: contentMaxWidth)
             .padding(.horizontal, 20)
             .padding(.top, 12)
             .frame(maxWidth: .infinity)

@@ -46,7 +46,7 @@ final class AppNotifier: NSObject, UNUserNotificationCenterDelegate, @unchecked 
             content.title = title
             content.body = message
             content.userInfo = userInfo
-            content.sound = userInfo.isEmpty ? nil : .default
+            content.sound = userInfo.isEmpty || !ClientPrefs.notifiesWithSound() ? nil : .default
             center.add(UNNotificationRequest(identifier: userInfo["uid"] ?? UUID().uuidString, content: content, trigger: nil))
         }
     }

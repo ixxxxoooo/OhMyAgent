@@ -318,6 +318,7 @@ struct SubagentTabView: View {
     let workbench: WorkbenchModel
     let projectID: String
     let toolCallID: String
+    @AppStorage(ClientPrefs.Key.chatWidth) private var chatWidth = ChatWidth.standard.rawValue
 
     var body: some View {
         if let model = workbench.sessions[projectID],
@@ -335,7 +336,7 @@ struct SubagentTabView: View {
                             Text("子 Agent 还没有产生内容").font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
                         }
                     }
-                    .frame(maxWidth: OMMetrics.timelineMaxWidth, alignment: .leading)
+                    .frame(maxWidth: (ChatWidth(rawValue: chatWidth) ?? .standard).points, alignment: .leading)
                     .padding(16)
                     .frame(maxWidth: .infinity)
                 }

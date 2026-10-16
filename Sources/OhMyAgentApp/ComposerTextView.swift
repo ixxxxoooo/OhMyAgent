@@ -62,12 +62,14 @@ final class SubmitTextView: NSTextView {
             }
         }
         if isReturn, !hasMarkedText() {
+            // 发送键偏好:⌘Return 发送模式下,Return 换行、⌘Return 正常发送
+            let commandToSend = ClientPrefs.sendKey() == .commandEnter
             if modifiers.isEmpty {
-                onSubmit?()
+                if commandToSend { insertNewlineIgnoringFieldEditor(nil) } else { onSubmit?() }
                 return
             }
             if modifiers == [.command] {
-                onSubmitAfterTurn?()
+                if commandToSend { onSubmit?() } else { onSubmitAfterTurn?() }
                 return
             }
             if modifiers == [.shift] || modifiers == [.option] {
