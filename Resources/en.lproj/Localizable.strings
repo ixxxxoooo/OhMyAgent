@@ -879,3 +879,15 @@
 "macOS 紧凑等宽" = "Compact macOS monospace";
 "微软连字等宽" = "Microsoft monospace with ligatures";
 "Adobe 开源等宽" = "Adobe's open-source monospace";
+
+/* Git 页:本轮 Agent 改动 / 提交图谱分区 */
+"本轮 Agent 改动" = "Agent changes this turn";
+"提交图谱" = "Commit graph";
+"在标签页打开完整历史" = "Open full history in a tab";
+"打开完整提交历史" = "Open full commit history";
+"在标签页打开提交历史" = "Open commit history in a tab";
+"无法读取提交历史" = "Unable to read commit history";
+"打开完整历史" = "Open full history";
+"展开" = "Expand";
+"演示模式" = "Demo Mode";
+"演示模式:数据来自沙盒,Agent 为脚本化演示 Agent,不会触碰真实项目与账号" = "Demo mode: data comes from a sandbox and the agent is a scripted demo agent; real projects and accounts are untouched";

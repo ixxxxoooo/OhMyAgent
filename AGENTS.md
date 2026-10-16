@@ -19,7 +19,7 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 - `GitKit`:`git` 命令的类型化封装与输出解析(状态、暂存、提交、分支、历史、blame、stash、冲突;无 UI)。
 - `LSPKit`:LSP 客户端(Content-Length 分帧、`LSPClient` actor、服务器定位、`LSPManager` 懒启动/复用/空闲回收;复用 ACPKit 的 JSON-RPC 连接,无视图)。
 - `MermaidKit`:Mermaid 原生渲染(纯 Swift):解析 → 分层布局 → 场景(`MScene`)→ SwiftUI Canvas/PNG;支持 flowchart/graph、sequenceDiagram、stateDiagram-v2、classDiagram、pie、gantt。
-- `IconKit`:Lucide 图标(生成数据 + SVG path 解析 + `Image.om`);界面禁止再用 SF Symbol(`Scripts/gen-icons.py` 重新生成)。
+- `IconKit`:Lucide 功能图标(生成数据 + SVG path 解析 + `Image.om`)与彩色文件类型图标(`OMFileIcon`,Material Icon Theme);界面禁止再用 SF Symbol(`Scripts/gen-icons.py`、`Scripts/gen-file-icons.py` 重新生成)。
 - `DesignSystem`:设计令牌(含 `OMDiffPalette` 不透明 Diff 配色)、玻璃材质、标签活动状态(`TabActivity`)。
 - `OhMyAgentApp`:应用本体(SwiftUI/AppKit 视图)。
 - `FakeAgent` / `OhMyAgentBridge`:辅助可执行文件。
