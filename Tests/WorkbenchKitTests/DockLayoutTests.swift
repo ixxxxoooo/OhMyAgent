@@ -203,22 +203,21 @@ struct DockLayoutTests {
         #expect(dock.allTabs.map(\.title) == ["c2"])
     }
 
-    @Test("在右侧打开:单组时向右分屏,多组时进最后一组,已存在则只激活")
-    func openToSide() {
+    @Test("子 Agent / Agent 终端以新标签页打开:进入当前聚焦组,不分屏,已存在则只激活")
+    func openAsTabInFocusedGroup() {
         var dock = DockLayout()
+        dock.open(file("x"), title: "x")
         dock.open(.chat(projectID: "p"), title: "chat")
         let term = TabKind.agentTerminal(projectID: "p", terminalID: "t1")
-        let a = dock.openToSide(term, title: "ls")
-        #expect(dock.groups.count == 2)
-        #expect(dock.groups.last?.tabs.map(\.id) == [a])
-        #expect(dock.groups.first?.tabs.count == 1)
-        // 再开一个:进入最右一组,不再分屏
-        let sub = dock.openToSide(.subagent(projectID: "p", toolCallID: "c1"), title: "sub")
-        #expect(dock.groups.count == 2)
-        #expect(dock.groups.last?.tabs.count == 2 && dock.groups.last?.activeID == sub)
-        // 已存在:不重复
-        let again = dock.openToSide(term, title: "ls")
-        #expect(again == a && dock.allTabs.count == 3)
+        let a = dock.open(term, title: "ls")
+        #expect(dock.groups.count == 1)
+        #expect(dock.groups.first?.tabs.count == 3 && dock.groups.first?.activeID == a)
+        let sub = dock.open(.subagent(projectID: "p", toolCallID: "c1"), title: "sub")
+        #expect(dock.groups.count == 1)
+        #expect(dock.groups.first?.tabs.count == 4 && dock.groups.first?.activeID == sub)
+        // 已存在:不重复,只激活
+        let again = dock.open(term, title: "ls")
+        #expect(again == a && dock.allTabs.count == 4 && dock.groups.first?.activeID == a)
     }
 
     @Test("重启恢复时 Agent 终端标签被剔除")
