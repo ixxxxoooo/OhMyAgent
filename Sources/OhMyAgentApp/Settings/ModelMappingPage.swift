@@ -151,6 +151,8 @@ private struct SlotPickerButton<Label: View>: View {
     let onPick: (String) -> Void
     @State private var shown = false
 
+    private var flattened: [ModelPickerRow] { ModelPickerSection.flatten(sections) }
+
     var body: some View {
         Button { shown.toggle() } label: {
             HStack(spacing: 6) {
@@ -160,11 +162,7 @@ private struct SlotPickerButton<Label: View>: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .popover(isPresented: $shown, arrowEdge: .bottom) {
-            ModelPickerList(sections: sections, searchable: true) { id in
-                shown = false
-                onPick(id)
-            }
-        }
+        .omPicker(isPresented: $shown, items: flattened, selectedID: flattened.first(where: \.isSelected)?.id, placeholder: String(localized: "搜索模型"),
+                  placement: .below, width: 300, row: { ModelPickRowContent(row: $0) }, onSelect: { row in onPick(row.id) })
     }
 }

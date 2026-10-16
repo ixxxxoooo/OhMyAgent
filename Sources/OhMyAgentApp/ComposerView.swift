@@ -262,27 +262,17 @@ struct OptionMenu: View {
         let current = option.currentValue.stringValue ?? ""
         let tint = category == "mode" ? Self.color(for: ModeTone.tone(forMode: current)) : OMColors.secondaryText
         if category == "model" { return AnyView(modelPicker(option: option, rows: rows, current: current, tint: tint)) }
-        return AnyView(Menu {
-            ForEach(rows) { row in
-                Button {
-                    model.setConfigOption(option.id, value: row.value)
-                } label: {
-                    HStack {
-                        if let mapped = row.mapped { Image(nsImage: Self.menuImage(for: mapped)) }
-                        Text(row.title)
-                        if current == row.value { Image.om("checkmark") }
-                    }
+        let entries = rows.map { PickEntry(id: $0.value, title: $0.title) }
+        return AnyView(
+            Button { pickerShown.toggle() } label: { label(option: option, rows: rows, current: current) }
+                .buttonStyle(.plain)
+                .foregroundStyle(tint)
+                .help(option.name)
+                .accessibilityLabel(option.name)
+                .omPicker(isPresented: $pickerShown, entries: entries, selectedID: current, placeholder: String(localized: "搜索"), width: 200) { entry in
+                    model.setConfigOption(option.id, value: entry.id)
                 }
-            }
-        } label: {
-            label(option: option, rows: rows, current: current)
-        }
-        .fixedSize()
-        .menuStyle(.button)
-        .buttonStyle(.plain)
-        .foregroundStyle(tint)
-        .help(option.name)
-        .accessibilityLabel(option.name))
+        )
     }
 
     /// 模型选择列表的行(输入区与「编辑并重新发送」共用):映射启用时只列已映射槽位,否则沿用 Agent 自带列表。
@@ -301,7 +291,7 @@ struct OptionMenu: View {
         }
     }
 
-    /// 模型选择:点击弹出列表,每行厂商图标 + 模型名 + 复制按钮(NSMenu 项无法放按钮,故用弹层)。
+    /// 模型选择:点击弹出列表,每行厂商图标 + 模型名 + 复制按钮(NSMenu 项无法放按钮,故用浮层)。
     private func modelPicker(option: SessionConfigOption, rows: [Row], current: String, tint: Color) -> some View {
         let pickerRows = Self.modelPickerRows(model: model, option: option)
         return Button { pickerShown.toggle() } label: {
@@ -311,12 +301,10 @@ struct OptionMenu: View {
         .foregroundStyle(tint)
         .help(option.name)
         .accessibilityLabel(option.name)
-        .popover(isPresented: $pickerShown, arrowEdge: .top) {
-            ModelPickerList(sections: [ModelPickerSection(id: "models", title: nil, rows: pickerRows)], searchable: pickerRows.count > 8) { value in
-                pickerShown = false
-                model.setConfigOption(option.id, value: value)
-            }
-        }
+        .omPicker(isPresented: $pickerShown, items: pickerRows, selectedID: current, placeholder: String(localized: "搜索模型"), width: 300,
+                  row: { ModelPickRowContent(row: $0) }, onSelect: { row in
+            model.setConfigOption(option.id, value: row.id)
+        })
     }
 
     @ViewBuilder

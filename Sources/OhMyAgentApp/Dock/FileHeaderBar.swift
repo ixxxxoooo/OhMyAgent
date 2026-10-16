@@ -2,6 +2,7 @@
 // 文件标签页顶部的面包屑工具条(参考 kuku 的 FileViewer 与 Cursor 的 breadcrumbs):
 // 左侧是相对项目根的路径(目录弱化、文件名突出),右侧依次是显示模式切换(仅可渲染的类型)、在 Finder 中显示、复制内容。
 
+import ChatKit
 import DesignSystem
 import IconKit
 import SwiftUI
@@ -150,85 +151,80 @@ private struct BreadcrumbButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .popover(isPresented: $isOpen, arrowEdge: .bottom) {
-            BreadcrumbMenu(startDirectory: segment.parentDirectory, current: segment.path, onOpen: onOpen)
+        .omCustomPicker(isPresented: $isOpen, placement: .below, width: 280) {
+            BreadcrumbMenu(startDirectory: segment.parentDirectory, current: segment.path, onOpen: { path in
+                isOpen = false
+                onOpen(path)
+            }, onDismiss: { isOpen = false })
         }
         .accessibilityLabel(segment.name)
         .accessibilityHint(String(localized: "显示同级文件"))
     }
 }
 
-/// 面包屑下拉:列出目录内容;点目录进入,点文件打开,当前项打勾,顶部「返回」回到上一级。
+/// 面包屑下拉的一项:目录/文件,或顶部的「返回上一级」。
+private struct CrumbItem: PickListItem {
+    var id: String
+    var name: String
+    var isDirectory: Bool
+    var isBack = false
+
+    var searchText: String { name }
+}
+
+/// 面包屑下拉:列出目录内容并支持搜索;点目录(或回车)进入,点文件打开,当前项打勾,顶部「返回」回到上一级;↑↓ 切换、Esc 关闭。
 private struct BreadcrumbMenu: View {
     let startDirectory: String
     let current: String
     let onOpen: (String) -> Void
+    let onDismiss: () -> Void
     @State private var directory: String
     @State private var entries: [FileEntry] = []
+    @State private var loaded = false
 
-    init(startDirectory: String, current: String, onOpen: @escaping (String) -> Void) {
+    init(startDirectory: String, current: String, onOpen: @escaping (String) -> Void, onDismiss: @escaping () -> Void) {
         self.startDirectory = startDirectory
         self.current = current
         self.onOpen = onOpen
+        self.onDismiss = onDismiss
         _directory = State(initialValue: startDirectory)
     }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if directory != startDirectory {
-                Button { directory = (directory as NSString).deletingLastPathComponent } label: {
-                    HStack(spacing: 6) {
-                        Image.om("chevron-left", size: 11)
-                        Text((directory as NSString).lastPathComponent).font(OMFonts.small).lineLimit(1)
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.horizontal, 10).frame(height: 26).contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("返回上一级")
-                Divider()
-            }
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    ForEach(entries) { entry in
-                        BreadcrumbRow(entry: entry, isCurrent: entry.path == current) {
-                            if entry.isDirectory { directory = entry.path } else { onOpen(entry.path) }
-                        }
-                    }
-                    if entries.isEmpty { Text("空文件夹").font(OMFonts.small).foregroundStyle(OMColors.secondaryText).padding(10) }
-                }
-                .padding(4)
-            }
+    private var items: [CrumbItem] {
+        var result: [CrumbItem] = []
+        if directory != startDirectory {
+            result.append(CrumbItem(id: "..", name: String(localized: "返回上一级"), isDirectory: true, isBack: true))
         }
-        .frame(width: 260, height: min(max(CGFloat(entries.count), 1) * 24 + 16 + (directory != startDirectory ? 27 : 0), 340))
+        result += entries.map { CrumbItem(id: $0.path, name: $0.name, isDirectory: $0.isDirectory) }
+        return result
+    }
+
+    var body: some View {
+        PickListContent(
+            items: items, selectedID: current, placeholder: String(localized: "搜索当前目录"), maxListHeight: 320,
+            emptyText: loaded ? String(localized: "空文件夹") : String(localized: "正在读取…"),
+            row: { item in
+                HStack(spacing: 6) {
+                    if item.isBack { Image.om("chevron-left", size: 12).foregroundStyle(OMColors.secondaryText).frame(width: 15) }
+                    else { OMFileIcon(name: item.name, isDirectory: item.isDirectory, expanded: false, size: 15) }
+                    Text(item.name).font(OMFonts.small).lineLimit(1).truncationMode(.middle)
+                    if item.isDirectory, !item.isBack { Image.om("chevron-right", size: 10).foregroundStyle(OMColors.tertiaryText) }
+                }
+            },
+            onSelect: { item in
+                if item.isBack { directory = (directory as NSString).deletingLastPathComponent }
+                else if item.isDirectory { directory = item.id }
+                else { onOpen(item.id) }
+            },
+            onDismiss: onDismiss
+        )
+        .id("\(directory)|\(loaded)")
         .task(id: directory) {
             let target = directory
+            loaded = false
             entries = await Task.detached(priority: .userInitiated) { WorkspaceFiles.list(directory: target) }.value
+            loaded = true
         }
-    }
-}
-
-private struct BreadcrumbRow: View {
-    let entry: FileEntry
-    let isCurrent: Bool
-    let action: () -> Void
-    @State private var hovering = false
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                OMFileIcon(name: entry.name, isDirectory: entry.isDirectory, expanded: false, size: 15)
-                Text(entry.name).font(OMFonts.small).lineLimit(1).truncationMode(.middle)
-                Spacer(minLength: 0)
-                if isCurrent { Image.om("check", size: 11).foregroundStyle(OMColors.accent) }
-                else if entry.isDirectory { Image.om("chevron-right", size: 10).foregroundStyle(OMColors.tertiaryText) }
-            }
-            .padding(.horizontal, 8).frame(height: 24)
-            .background(RoundedRectangle(cornerRadius: 5, style: .continuous).fill(hovering ? Color.primary.opacity(0.08) : .clear))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
     }
 }
 

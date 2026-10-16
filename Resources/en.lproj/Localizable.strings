@@ -1752,3 +1752,8 @@
 "时间线字号" = "Timeline font size";
 "选择上方的提供商进行配置" = "Select a provider above to configure it";
 "复制本轮输出" = "Copy this turn's output";
+"正在读取分支…" = "Reading branches…";
+"搜索当前目录" = "Search this folder";
+"更多" = "More";
+"搜索分支" = "Search branches";
+"搜索 Agent" = "Search agents";

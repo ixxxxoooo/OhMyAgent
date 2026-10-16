@@ -255,12 +255,10 @@ struct UserMessageEditor: View {
                 .buttonStyle(.plain)
                 .help("切换模型")
                 .accessibilityLabel("切换模型")
-                .popover(isPresented: $modelPickerShown, arrowEdge: .bottom) {
-                    ModelPickerList(sections: [ModelPickerSection(id: "m", title: nil, rows: rows)], searchable: rows.count > 8) { value in
-                        modelPickerShown = false
-                        model.setConfigOption(option.id, value: value)
-                    }
-                }
+                .omPicker(isPresented: $modelPickerShown, items: rows, selectedID: shown.id, placeholder: String(localized: "搜索模型"),
+                          placement: .below, width: 300, row: { ModelPickRowContent(row: $0) }, onSelect: { row in
+                    model.setConfigOption(option.id, value: row.id)
+                })
             }
         }
     }

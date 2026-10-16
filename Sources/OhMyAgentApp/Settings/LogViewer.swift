@@ -63,16 +63,16 @@ struct LogViewerView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 Picker("级别", selection: $model.minLevel) {
                     ForEach(LogLevel.allCases, id: \.self) { Text($0.label.trimmingCharacters(in: .whitespaces)).tag($0) }
                 }
-                .frame(width: 110)
+                .frame(width: 84)
                 Picker("分类", selection: $model.category) {
                     Text("全部分类").tag(LogCategory?.none)
                     ForEach(LogCategory.allCases, id: \.self) { Text($0.rawValue).tag(LogCategory?.some($0)) }
                 }
-                .frame(width: 130)
+                .frame(width: 104)
                 TextField("搜索", text: $model.search).textFieldStyle(.roundedBorder)
                 Toggle("跟随", isOn: $model.follow).toggleStyle(.checkbox)
                 Button { model.copyFiltered() } label: { Image.om("copy", size: 13) }
@@ -80,7 +80,9 @@ struct LogViewerView: View {
                     .accessibilityLabel("复制日志")
             }
             .labelsHidden()
-            .padding(8)
+            .controlSize(.small)
+            .font(OMFonts.small)
+            .padding(.horizontal, 8).padding(.vertical, 4)
             Divider()
             ScrollViewReader { proxy in
                 let rows = model.filtered

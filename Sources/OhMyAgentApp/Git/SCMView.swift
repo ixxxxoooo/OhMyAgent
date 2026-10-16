@@ -25,6 +25,7 @@ struct SCMView: View {
 private struct SCMContent: View {
     let workbench: WorkbenchModel
     @Bindable var model: GitModel
+    @State private var branchShown = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -73,56 +74,60 @@ private struct SCMContent: View {
         .padding(.horizontal, 10).padding(.vertical, 6)
     }
 
+    private var branchEntries: [PickEntry] {
+        let locals = model.branches.filter { !$0.isRemote }
+        let remotes = model.branches.filter { $0.isRemote && !$0.name.hasSuffix("/HEAD") }
+        var result = locals.map { PickEntry(id: "local:\($0.name)", title: $0.name, icon: "git-branch") }
+        result += remotes.map { PickEntry(id: "remote:\($0.name)", title: $0.name, group: String(localized: "远程分支"), icon: "git-branch") }
+        result.append(PickEntry(id: "__create__", title: String(localized: "新建分支…"), group: String(localized: "更多"), icon: "plus"))
+        return result
+    }
+
     private var branchMenu: some View {
-        Menu {
-            let locals = model.branches.filter { !$0.isRemote }
-            let remotes = model.branches.filter(\.isRemote)
-            ForEach(locals) { branch in
-                Button {
-                    if !branch.isCurrent { Task { await model.checkout(branch.name) } }
-                } label: {
-                    if branch.isCurrent { Label(branch.name, om: "check", size: 12) } else { Text(branch.name) }
-                }
-            }
-            if !remotes.isEmpty {
-                Menu("远程分支") {
-                    ForEach(remotes) { branch in
-                        Button(branch.name) {
-                            // 远程 origin/x → 切换同名本地分支(git switch 会自动跟踪)
-                            let local = branch.name.split(separator: "/", maxSplits: 1).last.map(String.init) ?? branch.name
-                            Task { await model.checkout(local) }
-                        }
-                    }
-                }
-            }
-            Divider()
-            Button("新建分支…") {
-                if let name = GitDialogs.prompt(title: String(localized: "新建分支"), message: String(localized: "基于当前提交创建并切换到新分支。"), placeholder: "feature/xxx", confirm: String(localized: "创建")) {
-                    Task { await model.createBranch(name) }
-                }
-            }
-            let deletable = locals.filter { !$0.isCurrent }
-            if !deletable.isEmpty {
-                Menu("删除分支") {
-                    ForEach(deletable) { branch in
-                        Button(branch.name, role: .destructive) {
-                            if GitDialogs.confirmDestructive(title: String(localized: "删除分支 \(branch.name)?"), message: String(localized: "未合并的提交可能丢失。"), button: String(localized: "删除")) {
-                                Task { await model.deleteBranch(branch.name) }
-                            }
-                        }
-                    }
-                }
-            }
-        } label: {
+        Button { branchShown.toggle() } label: {
             HStack(spacing: 4) {
                 Image.om("git-branch", size: 12)
                 Text(branchTitle).font(OMFonts.small.weight(.semibold)).lineLimit(1)
+                Image.om("chevron-down", size: 10).foregroundStyle(OMColors.tertiaryText)
             }
+            .contentShape(Rectangle())
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.visible)
+        .buttonStyle(.plain)
         .fixedSize()
         .accessibilityLabel("切换分支")
+        .omPicker(isPresented: $branchShown, entries: branchEntries, selectedID: model.status.branch.map { "local:\($0)" },
+                  placeholder: String(localized: "搜索分支"), placement: .below, width: 260, showsSearch: true) { entry in
+            if entry.id == "__create__" {
+                if let name = GitDialogs.prompt(title: String(localized: "新建分支"), message: String(localized: "基于当前提交创建并切换到新分支。"), placeholder: "feature/xxx", confirm: String(localized: "创建")) {
+                    Task { await model.createBranch(name) }
+                }
+            } else if entry.id.hasPrefix("local:") {
+                let name = String(entry.id.dropFirst(6))
+                if name != model.status.branch { Task { await model.checkout(name) } }
+            } else if entry.id.hasPrefix("remote:") {
+                // 远程 origin/x → 切换同名本地分支(git switch 会自动跟踪)
+                let remote = String(entry.id.dropFirst(7))
+                let local = remote.split(separator: "/", maxSplits: 1).last.map(String.init) ?? remote
+                Task { await model.checkout(local) }
+            }
+        }
+    }
+
+    /// 「删除分支」子菜单(从分支选择器移出,放在更多菜单里)。
+    @ViewBuilder
+    private var deleteBranchMenu: some View {
+        let deletable = model.branches.filter { !$0.isRemote && !$0.isCurrent }
+        if !deletable.isEmpty {
+            Menu("删除分支") {
+                ForEach(deletable) { branch in
+                    Button(branch.name, role: .destructive) {
+                        if GitDialogs.confirmDestructive(title: String(localized: "删除分支 \(branch.name)?"), message: String(localized: "未合并的提交可能丢失。"), button: String(localized: "删除")) {
+                            Task { await model.deleteBranch(branch.name) }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private var branchTitle: String {
@@ -159,6 +164,7 @@ private struct SCMContent: View {
             }
             Button("刷新") { Task { await model.refresh() } }
             Button("在标签页打开提交历史") { workbench.openHistory(project: model.projectPath) }
+            deleteBranchMenu
             Divider()
             Button("暂存当前更改到 stash…") {
                 if let message = GitDialogs.prompt(title: String(localized: "暂存到 stash"), message: String(localized: "包含未跟踪文件。可留空使用默认说明。"), placeholder: String(localized: "说明(可选)"), confirm: String(localized: "暂存")) {

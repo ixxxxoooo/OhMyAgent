@@ -15,20 +15,17 @@ struct AgentMenu: View {
     let model: SessionModel
     private let registry = AgentRegistryModel.shared
 
+    @State private var shown = false
+
+    private var entries: [PickEntry] {
+        registry.data.enabledAgents.map { PickEntry(id: $0.id, title: $0.name, icon: "bot") }
+            + [PickEntry(id: Self.manageID, title: String(localized: "管理 Agent…"), group: String(localized: "更多"), icon: "settings")]
+    }
+
+    private static let manageID = "__manage__"
+
     var body: some View {
-        Menu {
-            ForEach(registry.data.enabledAgents) { agent in
-                Button {
-                    Self.switchAgent(to: agent)
-                } label: {
-                    if agent.id == model.descriptor.id { Label(agent.name, om: "checkmark") } else { Text(agent.name) }
-                }
-            }
-            Divider()
-            Button("管理 Agent…") {
-                AppActions.shared.openSettings(page: .agentExtensions)
-            }
-        } label: {
+        Button { shown.toggle() } label: {
             HStack(spacing: 4) {
                 Image.om("bot", size: 12)
                 Text(model.descriptor.name).lineLimit(1)
@@ -36,12 +33,17 @@ struct AgentMenu: View {
             .frame(height: 18)
             .contentShape(Rectangle())
         }
-        .menuStyle(.button)
         .buttonStyle(.plain)
-        .menuIndicator(.hidden)
         .fixedSize()
         .help("切换 Agent(会在当前项目开始新会话),当前:\(model.descriptor.name)")
         .accessibilityLabel("切换 Agent")
+        .omPicker(isPresented: $shown, entries: entries, selectedID: model.descriptor.id, placeholder: String(localized: "搜索 Agent"), width: 220) { entry in
+            if entry.id == Self.manageID {
+                AppActions.shared.openSettings(page: .agentExtensions)
+            } else if let agent = registry.data.enabledAgents.first(where: { $0.id == entry.id }) {
+                Self.switchAgent(to: agent)
+            }
+        }
     }
 
     /// 当前项目内切换 Agent:结束旧会话进程,用新描述符开始新会话。

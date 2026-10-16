@@ -103,7 +103,7 @@ struct TabBarView: View {
         .padding(.trailing, 4)
         .help("全部标签")
         .accessibilityLabel("全部标签")
-        .popover(isPresented: $showOverflow, arrowEdge: .bottom) {
+        .omCustomPicker(isPresented: $showOverflow, placement: .below, width: 350) {
             TabOverflowList(workbench: workbench, group: group) { showOverflow = false }
         }
     }
@@ -319,68 +319,36 @@ struct TabOverflowList: View {
         }
     }
 
-    private var filtered: [Item] {
-        let key = filter.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !key.isEmpty else { return items }
-        return items.filter { $0.title.localizedCaseInsensitiveContains(key) || $0.subtitle.localizedCaseInsensitiveContains(key) }
-    }
-
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 6) {
-                Text("全部标签")
-                Text("\(group.tabs.count)")
-                    .font(OMFonts.caption.monospacedDigit())
-                    .padding(.horizontal, 6)
-                    .background(Color.primary.opacity(0.08), in: Capsule())
-                Spacer()
-                Text("点击切换 · 悬停关闭").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
-            }
-            .font(OMFonts.small.weight(.medium))
-            .foregroundStyle(OMColors.secondaryText)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            Divider()
-            if group.tabs.count >= Self.searchThreshold {
-                HStack(spacing: 6) {
-                    Image.om("search", size: 12).foregroundStyle(OMColors.tertiaryText)
-                    TextField("搜索标签名称或路径…", text: $filter)
-                        .textFieldStyle(.plain)
-                        .font(OMFonts.small)
-                }
-                .padding(.horizontal, 10)
-                .frame(height: 28)
-                .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                Divider()
-            }
-            ScrollView {
-                LazyVStack(spacing: 2) {
-                    if filtered.isEmpty {
-                        Text("未找到匹配的标签")
-                            .font(OMFonts.small)
-                            .foregroundStyle(OMColors.tertiaryText)
-                            .padding(.vertical, 20)
-                    }
-                    ForEach(filtered) { item in
-                        TabOverflowRow(workbench: workbench, item: item, isActive: item.tab.id == group.activeID, dismiss: dismiss)
-                    }
-                }
-                .padding(6)
-            }
-            .frame(maxHeight: 380)
-        }
-        .frame(width: 350)
+        PickListContent(
+            items: items.map { TabPick(id: $0.tab.id.uuidString, item: $0) },
+            selectedID: group.activeID?.uuidString,
+            placeholder: String(localized: "搜索标签名称或路径…"),
+            showsSearch: group.tabs.count >= Self.searchThreshold,
+            maxListHeight: 380,
+            emptyText: String(localized: "未找到匹配的标签"),
+            row: { TabOverflowRow(workbench: workbench, item: $0.item) },
+            onSelect: { pick in
+                workbench.activateTab(pick.item.tab.id)
+                dismiss()
+            },
+            onDismiss: dismiss
+        )
     }
+}
+
+/// 「全部标签」的一项(包装展示信息以满足选择列表协议)。
+private struct TabPick: PickListItem {
+    let id: String
+    fileprivate let item: TabOverflowList.Item
+
+    var searchText: String { "\(item.title) \(item.subtitle)" }
 }
 
 /// 下拉中的一行:图标 + 标题(含同名序号)+ 路径摘要;右侧运行/未保存点,悬停时出现关闭按钮。
 private struct TabOverflowRow: View {
     let workbench: WorkbenchModel
     let item: TabOverflowList.Item
-    let isActive: Bool
-    let dismiss: () -> Void
     @State private var hovering = false
 
     var body: some View {
@@ -389,7 +357,7 @@ private struct TabOverflowRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(item.title)
-                        .font(OMFonts.small.weight(isActive ? .semibold : .regular))
+                        .font(OMFonts.small)
                         .lineLimit(1)
                     if let duplicate = item.duplicate {
                         Text("#\(duplicate)")
@@ -419,25 +387,10 @@ private struct TabOverflowRow: View {
             .help("关闭标签")
             .accessibilityLabel("关闭标签")
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(isActive ? Color.primary.opacity(0.07) : (hovering ? Color.primary.opacity(0.045) : Color.clear))
-        )
-        .overlay(alignment: .leading) {
-            if isActive { Capsule().fill(OMColors.accent).frame(width: 3).padding(.vertical, 8).padding(.leading, 2) }
-        }
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
-        .onTapGesture {
-            workbench.activateTab(item.tab.id)
-            dismiss()
-        }
         .background(MiddleClickCatcher { if !item.tab.isPinned { AppActions.shared.requestCloseTab(item.tab.id) } })
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
     }
 
     @ViewBuilder

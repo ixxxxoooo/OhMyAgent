@@ -2,6 +2,7 @@
 // 输入区页脚的分支切换器(参考 kuku 的 GitBranchMenu):点击当前分支展开弹层,
 // 支持搜索、切换本地/远程分支、基于当前提交新建分支。切换失败(如有冲突的未提交修改)时在弹层内给出原因。
 
+import ChatKit
 import DesignSystem
 import GitKit
 import IconKit
@@ -41,11 +42,11 @@ struct BranchSwitcher: View {
         .help(isBusy ? LocalizedStringKey("Agent 运行中,暂不能切换分支") : LocalizedStringKey("切换分支"))
         .accessibilityLabel("切换分支")
         .accessibilityValue(head.displayName)
-        .popover(isPresented: $shown, arrowEdge: .top) {
+        .omCustomPicker(isPresented: $shown, width: 280) {
             BranchPicker(workspace: workspace, current: head) {
                 shown = false
                 onChanged()
-            }
+            } onDismiss: { shown = false }
         }
     }
 }
@@ -67,51 +68,41 @@ private struct ClampedWidth: Layout {
     }
 }
 
-/// 分支弹层:搜索框 + 分支列表 + 新建。
+/// 分支选择器的一项。
+private struct BranchPick: PickListItem {
+    enum Kind { case local, remote, create }
+    var id: String
+    var name: String
+    var kind: Kind
+    var isCurrent = false
+
+    var searchText: String { kind == .create ? "\(name) \(String(localized: "新建分支"))" : name }
+    var group: String? { kind == .remote ? String(localized: "远程分支") : nil }
+}
+
+/// 分支弹层:搜索(可直接输入新分支名)+ 本地/远程分支列表 + 新建;↑↓ 切换、回车选中、Esc 关闭。
 private struct BranchPicker: View {
     let workspace: URL
     let current: GitHead
     let onDone: () -> Void
+    let onDismiss: () -> Void
 
     @State private var branches: [GitBranch] = []
-    @State private var query = ""
     @State private var loaded = false
     @State private var working = false
     @State private var errorText: String?
-    @FocusState private var searchFocused: Bool
-
-    private var trimmed: String { query.trimmingCharacters(in: .whitespaces) }
-
-    /// 过滤后的本地分支(当前分支在前)。
-    private var locals: [GitBranch] {
-        BranchListing.filter(branches.filter { !$0.isRemote }, query: trimmed)
-    }
-
-    /// 没有同名本地分支的远程分支(切换时会创建并跟踪同名本地分支)。
-    private var remotes: [GitBranch] {
-        let localNames = Set(branches.filter { !$0.isRemote }.map(\.name))
-        let candidates = branches.filter { $0.isRemote && !$0.name.hasSuffix("/HEAD") && !localNames.contains(BranchListing.localName(of: $0.name)) }
-        return BranchListing.filter(candidates, query: trimmed)
-    }
-
-    private var canCreate: Bool {
-        !trimmed.isEmpty && !branches.contains { $0.name == trimmed }
-    }
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 6) {
-                Image.om("search", size: 12).foregroundStyle(OMColors.secondaryText)
-                TextField("搜索或输入新分支名", text: $query)
-                    .textFieldStyle(.plain)
-                    .font(OMFonts.small)
-                    .focused($searchFocused)
-                    .onSubmit(submit)
-                if working { ProgressView().controlSize(.mini) }
-            }
-            .padding(.horizontal, 10).frame(height: 32)
-            Divider()
-            list
+            PickListContent(
+                items: items(for: ""), selectedID: branches.first(where: \.isCurrent).map { "local:\($0.name)" },
+                placeholder: String(localized: "搜索或输入新分支名"), maxListHeight: 240,
+                emptyText: loaded ? String(localized: "没有匹配的分支") : String(localized: "正在读取分支…"),
+                itemsForQuery: { items(for: $0) },
+                row: { rowContent($0) }, onSelect: { pick in Task { await run(pick) } }, onDismiss: onDismiss
+            )
+            .id(loaded)
+            .disabled(working)
             if let errorText {
                 Divider()
                 Text(errorText)
@@ -121,46 +112,39 @@ private struct BranchPicker: View {
                     .padding(.horizontal, 10).padding(.vertical, 6)
             }
         }
-        .frame(width: 260)
         .task { await load() }
-        .onAppear { searchFocused = true }
     }
 
-    private var list: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                ForEach(locals) { branch in
-                    row(branch.name, isCurrent: branch.isCurrent, subtitle: nil) { await switchTo(branch.name) }
-                }
-                if !remotes.isEmpty {
-                    Text("远程分支").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
-                        .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 10).padding(.top, 8).padding(.bottom, 2)
-                    ForEach(remotes) { branch in
-                        row(branch.name, isCurrent: false, subtitle: nil) { await switchTo(BranchListing.localName(of: branch.name)) }
-                    }
-                }
-                if canCreate {
-                    row(String(localized: "新建分支 \(trimmed)"), isCurrent: false, subtitle: nil, icon: "plus", mono: false) { await create(trimmed) }
-                } else if loaded, locals.isEmpty, remotes.isEmpty {
-                    Text("没有匹配的分支").font(OMFonts.small).foregroundStyle(OMColors.secondaryText).padding(10)
-                }
-            }
-            .padding(.vertical, 4)
+    /// 按查询词生成条目:本地分支 → 没有同名本地分支的远程分支 → 「新建分支」。
+    private func items(for query: String) -> [BranchPick] {
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        let locals = branches.filter { !$0.isRemote }.map { BranchPick(id: "local:\($0.name)", name: $0.name, kind: .local, isCurrent: $0.isCurrent) }
+        let localNames = Set(branches.filter { !$0.isRemote }.map(\.name))
+        let remotes = branches
+            .filter { $0.isRemote && !$0.name.hasSuffix("/HEAD") && !localNames.contains(BranchListing.localName(of: $0.name)) }
+            .map { BranchPick(id: "remote:\($0.name)", name: $0.name, kind: .remote) }
+        var all = locals + remotes
+        if !trimmed.isEmpty, !branches.contains(where: { $0.name == trimmed }) {
+            all.append(BranchPick(id: "create:\(trimmed)", name: trimmed, kind: .create))
         }
-        .frame(height: min(CGFloat(max(locals.count + remotes.count + (canCreate ? 1 : 0), 1)) * 28 + (remotes.isEmpty ? 8 : 34), 240))
+        return all
     }
 
-    private func row(_ title: String, isCurrent: Bool, subtitle: String?, icon: String = "git-branch", mono: Bool = true, action: @escaping () async -> Void) -> some View {
-        BranchRow(title: title, isCurrent: isCurrent, icon: icon, mono: mono) { Task { await action() } }
-            .disabled(working)
+    private func rowContent(_ pick: BranchPick) -> some View {
+        HStack(spacing: 8) {
+            Image.om(pick.kind == .create ? "plus" : "git-branch", size: 12).foregroundStyle(OMColors.secondaryText).frame(width: 14)
+            Text(pick.kind == .create ? String(localized: "新建分支 \(pick.name)") : pick.name)
+                .font(pick.kind == .create ? OMFonts.small : OMFonts.monoSmall)
+                .lineLimit(1).truncationMode(.middle)
+        }
     }
 
-    /// 回车:仅一个匹配时切换,没有匹配时新建。
-    private func submit() {
-        if canCreate, locals.isEmpty, remotes.isEmpty {
-            Task { await create(trimmed) }
-        } else if locals.count == 1, remotes.isEmpty, let only = locals.first, !only.isCurrent {
-            Task { await switchTo(only.name) }
+    private func run(_ pick: BranchPick) async {
+        switch pick.kind {
+        case .local:
+            if pick.isCurrent { onDismiss() } else { await switchTo(pick.name) }
+        case .remote: await switchTo(BranchListing.localName(of: pick.name))
+        case .create: await create(pick.name)
         }
     }
 
@@ -202,37 +186,6 @@ private struct BranchPicker: View {
             Log.git.error("\(title)失败", ["error": "\(error)"])
             errorText = (error as? LocalizedError)?.errorDescription ?? "\(error)"
         }
-    }
-}
-
-/// 分支列表行:图标 + 名称 + 当前分支对勾,悬停高亮。
-private struct BranchRow: View {
-    let title: String
-    let isCurrent: Bool
-    let icon: String
-    let mono: Bool
-    let action: () -> Void
-    @State private var hovering = false
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                Image.om(icon, size: 12).foregroundStyle(OMColors.secondaryText).frame(width: 14)
-                Text(title)
-                    .font(mono ? OMFonts.monoSmall : OMFonts.small)
-                    .lineLimit(1).truncationMode(.middle)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                if isCurrent { Image.om("check", size: 12) }
-            }
-            .padding(.horizontal, 10)
-            .frame(height: 28)
-            .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(hovering ? Color.primary.opacity(0.07) : .clear).padding(.horizontal, 4))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .accessibilityLabel(title)
-        .accessibilityAddTraits(isCurrent ? [.isButton, .isSelected] : .isButton)
     }
 }
 
