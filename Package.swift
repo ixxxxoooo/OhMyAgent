@@ -40,8 +40,10 @@ let package = Package(
         .target(name: "DemoKit", dependencies: ["ACPKit", "OMLog", "WorkbenchKit"]),
         // Liquid Glass 设计系统
         .target(name: "DesignSystem", dependencies: ["IconKit"]),
+        // 模型协议代理:本地回环 HTTP,把 Anthropic /v1/messages 转换为 OpenAI /chat/completions(无视图)
+        .target(name: "ProviderProxyKit", dependencies: ["OMLog"]),
         // 聊天核心:时间线模型、事件合并、Markdown 解析、会话模型(不含视图)
-        .target(name: "ChatKit", dependencies: ["ACPKit", "AgentHost", "DiffKit", "OMLog"]),
+        .target(name: "ChatKit", dependencies: ["ACPKit", "AgentHost", "DiffKit", "OMLog", "ProviderProxyKit"]),
         // 工作台:项目/会话树、布局、持久化(不含视图)
         .target(name: "WorkbenchKit", dependencies: ["ACPKit", "AgentHost", "ChatKit", "OMLog"]),
         // 应用本体
@@ -58,6 +60,7 @@ let package = Package(
         .executableTarget(name: "ACPSpike", dependencies: ["ACPKit", "AgentHost"]),
         .executableTarget(name: "EditorSpike", dependencies: ["EditorKit"]),
         // 测试
+        .testTarget(name: "ProviderProxyKitTests", dependencies: ["ProviderProxyKit"]),
         .testTarget(name: "OMLogTests", dependencies: ["OMLog"]),
         .testTarget(name: "ACPKitTests", dependencies: ["ACPKit"]),
         .testTarget(name: "AgentHostTests", dependencies: ["AgentHost", "ACPKit", "FakeAgent"]),

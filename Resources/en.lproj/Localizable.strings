@@ -1489,3 +1489,4 @@
 "整个文件采用对方的版本?" = "Use their version of the whole file?";
 "%@ 中另一方的修改会被丢弃。" = "Changes from the other side in %@ will be discarded.";
 "确认" = "Confirm";
+"该免费模型仅限 OpenCode 官方客户端使用(FreeTierError)。请改用 OpenCode Go 或自己的付费 API Key。" = "This free model is only available to the official OpenCode client (FreeTierError). Use OpenCode Go or your own paid API key instead.";
