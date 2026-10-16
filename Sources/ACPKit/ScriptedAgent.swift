@@ -433,6 +433,7 @@ public actor ScriptedAgent: ACPRequestHandler {
             await update(sessionId, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": .string("(已收到引导:\(extra))")]])
         }
         if defaultUsage { await update(sessionId, ["sessionUpdate": "usage_update", "used": 1200, "size": 200_000, "cost": ["amount": 0.0123, "currency": "USD"]]) }
-        return ["stopReason": "end_turn"]
+        // 与真实适配器一致:响应里带本轮 token 用量(回合结束摘要据此显示 token 与 tps)
+        return ["stopReason": "end_turn", "usage": ["inputTokens": 1200, "outputTokens": 360, "cachedReadTokens": 0, "cachedWriteTokens": 0, "totalTokens": 1560]]
     }
 }

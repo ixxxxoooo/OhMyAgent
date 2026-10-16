@@ -387,11 +387,20 @@ public actor ACPClient {
     ///   - content: 内容块
     /// - Returns: 停止原因
     public func prompt(sessionId: String, content: [ContentBlock]) async throws -> StopReason {
+        try await promptWithUsage(sessionId: sessionId, content: content).reason
+    }
+
+    /// 发送提示并等待本轮结束,同时返回本轮 token 用量(适配器未提供时为 nil)。
+    /// - Parameters:
+    ///   - sessionId: 会话 id
+    ///   - content: 内容块
+    /// - Returns: 停止原因与用量
+    public func promptWithUsage(sessionId: String, content: [ContentBlock]) async throws -> (reason: StopReason, usage: TurnUsage?) {
         let result = try await connection.request("session/prompt", params: [
             "sessionId": .string(sessionId),
             "prompt": .array(content.map(\.json)),
         ])
-        return StopReason(rawValue: result["stopReason"]?.stringValue ?? "") ?? .other
+        return (StopReason(rawValue: result["stopReason"]?.stringValue ?? "") ?? .other, TurnUsage(json: result))
     }
 
     /// 引导(steering):把追加消息注入正在运行的轮次(`_session/steering`)。

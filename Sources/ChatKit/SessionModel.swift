@@ -874,10 +874,10 @@ public final class SessionModel {
         startWatchdog()
         promptTask = Task { [weak self] in
             do {
-                let reason = try await client.prompt(sessionId: sessionId, content: blocks)
-                self?.finishTurn(reason: reason, error: nil)
+                let result = try await client.promptWithUsage(sessionId: sessionId, content: blocks)
+                self?.finishTurn(reason: result.reason, usage: result.usage, error: nil)
             } catch {
-                self?.finishTurn(reason: nil, error: error)
+                self?.finishTurn(reason: nil, usage: nil, error: error)
             }
         }
     }
@@ -913,12 +913,13 @@ public final class SessionModel {
     /// 看门狗判定卡死时待展示的提示(轮次结束时输出)。
     @ObservationIgnored private var stallMessage: String?
 
-    private func finishTurn(reason: StopReason?, error: Error?) {
+    private func finishTurn(reason: StopReason?, usage: TurnUsage?, error: Error?) {
         // 先把已合并但尚未应用的事件落入时间线,再结束轮次
         watchdogTask?.cancel()
         watchdogTask = nil
         coalescer?.flush()
         let turnMs = turnStart.map { OMLogger.milliseconds(since: $0) } ?? 0
+        let summaryModel = currentMappedModel?.displayName ?? option(category: "model")?.currentDisplayName ?? ""
         if let error {
             log.error("轮次失败", error: error, ["turn": "\(turnNumber)", "ms": "\(turnMs)"])
         } else {
@@ -953,6 +954,10 @@ public final class SessionModel {
                 self.timeline.appendNotice(ChatL10n.t("已达到单轮请求上限。"))
             }
             self.publishTurnChanges()
+            // 回合正常结束:追加结束语(模型、耗时、token、tps);取消或失败不显示
+            if error == nil, self.stallMessage == nil, let reason, reason != .cancelled {
+                self.timeline.appendTurnSummary(TurnSummary(model: summaryModel, durationSeconds: Double(turnMs) / 1000, usage: usage))
+            }
             self.isRunning = false
             self.turnStartedAt = nil
             self.promptTask = nil

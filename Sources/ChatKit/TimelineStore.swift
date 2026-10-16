@@ -16,6 +16,8 @@ public final class TimelineEntry: Identifiable {
         case user, assistant, thought, tool, plan, notice, changes
         /// 计划模式批准后的 Markdown 计划文档
         case planDoc
+        /// 回合结束语:模型、耗时、token、tps
+        case turnSummary
     }
 
     public nonisolated let id = UUID()
@@ -48,6 +50,8 @@ public final class TimelineEntry: Identifiable {
     public var changes: [FileChange] = []
     /// 改动所属轮次
     public var turn = 0
+    /// 回合结束语(`kind == .turnSummary`)
+    public var summary: TurnSummary?
 
     /// 创建条目。
     /// - Parameters:
@@ -301,6 +305,16 @@ public final class TimelineStore {
         child.onToolChange = { [weak self] call in self?.onToolChange?(call) }
         entry.childStore = child
         return child
+    }
+
+    /// 追加回合结束语条目。
+    /// - Parameter summary: 本轮摘要
+    public func appendTurnSummary(_ summary: TurnSummary) {
+        finishStreaming()
+        let entry = TimelineEntry(kind: .turnSummary, text: summary.copyText)
+        entry.summary = summary
+        entries.append(entry)
+        revision += 1
     }
 
     /// 追加“本轮改动”汇总条目。

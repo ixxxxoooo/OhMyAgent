@@ -47,7 +47,7 @@ struct DemoCoverageTests {
         // 时间线条目类型(changes 需要真实改文件,在下一个测试里覆盖)
         var kinds = Set(model.timeline.entries.map(\.kind))
         for entry in model.timeline.entries { if let child = entry.childStore { kinds.formUnion(child.entries.map(\.kind)) } }
-        for kind in [TimelineEntry.Kind.user, .assistant, .thought, .tool, .plan, .notice, .planDoc] {
+        for kind in [TimelineEntry.Kind.user, .assistant, .thought, .tool, .plan, .notice, .planDoc, .turnSummary] {
             #expect(kinds.contains(kind), "演示场景缺少条目类型:\(kind)")
         }
         // 子 Agent:嵌套与多种类型

@@ -447,6 +447,35 @@ public enum PermissionOutcome: Sendable {
 
 // MARK: - 会话信息
 
+/// 一轮提示的 token 用量(`session/prompt` 响应里的 `usage`,适配器按轮累计)。
+public struct TurnUsage: Sendable, Equatable {
+    public var inputTokens: Int
+    public var outputTokens: Int
+    public var cachedReadTokens: Int
+    public var cachedWriteTokens: Int
+    public var totalTokens: Int
+
+    public init(inputTokens: Int = 0, outputTokens: Int = 0, cachedReadTokens: Int = 0, cachedWriteTokens: Int = 0, totalTokens: Int? = nil) {
+        self.inputTokens = inputTokens
+        self.outputTokens = outputTokens
+        self.cachedReadTokens = cachedReadTokens
+        self.cachedWriteTokens = cachedWriteTokens
+        self.totalTokens = totalTokens ?? (inputTokens + outputTokens + cachedReadTokens + cachedWriteTokens)
+    }
+
+    /// 从响应 JSON 解析;缺少 `usage` 或所有计数都为 0 时返回 nil。
+    /// - Parameter json: `session/prompt` 的 result 或其 `usage` 字段
+    public init?(json: JSONValue?) {
+        let node = json?["usage"] ?? json
+        guard let node, node.objectValue != nil else { return nil }
+        func count(_ key: String) -> Int { node[key]?.intValue ?? Int(node[key]?.doubleValue ?? 0) }
+        let value = TurnUsage(inputTokens: count("inputTokens"), outputTokens: count("outputTokens"), cachedReadTokens: count("cachedReadTokens"),
+                              cachedWriteTokens: count("cachedWriteTokens"), totalTokens: node["totalTokens"] != nil ? count("totalTokens") : nil)
+        guard value.totalTokens > 0 || value.outputTokens > 0 else { return nil }
+        self = value
+    }
+}
+
 /// 停止原因。
 public enum StopReason: String, Sendable {
     case endTurn = "end_turn"

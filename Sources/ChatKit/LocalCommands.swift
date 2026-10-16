@@ -159,6 +159,8 @@ public enum TranscriptExporter {
                 out += [String(localized: "### 改动"), ""] + entry.changes.map { "- `\($0.path)`" } + [""]
             case .planDoc:
                 out += [String(localized: "### 计划"), "", entry.text, ""]
+            case .turnSummary:
+                out += ["> \(entry.text)", ""]
             }
         }
         return out.joined(separator: "\n")
