@@ -58,6 +58,8 @@ struct FileTabView: View {
     let tab: WorkbenchTab
     let path: String
     private let store = FileDocumentStore.shared
+    /// 标签是否可见(保活的后台标签不做轮询)
+    @Environment(\.tabIsActive) private var isActive
     @AppStorage(ClientPrefs.Key.editorLSP) private var lspEnabled = true
     @State private var lsp: EditorLSPController?
     /// 最近一次 Agent 改动在新文件中新增的行(仅当文本仍等于 Agent 写入的内容时显示)
@@ -111,8 +113,10 @@ struct FileTabView: View {
             lsp?.detach()
             lsp = nil
         }
-        .task(id: path) {
-            // 轮询磁盘修改时间:Agent 或其它程序改动文件后,未编辑的标签自动刷新
+        .task(id: "\(path)|\(isActive)") {
+            // 轮询磁盘修改时间:Agent 或其它程序改动文件后,未编辑的标签自动刷新;后台标签暂停,切回时立即补一次
+            guard isActive else { return }
+            await store.checkExternalChange(path)
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1))
                 await store.checkExternalChange(path)

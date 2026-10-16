@@ -3,6 +3,7 @@
 // 自动增高与占位文字。比 SwiftUI TextEditor 更可控,且不会在输入法组合期间误触发发送。
 
 import AppKit
+import DesignSystem
 import ChatKit
 import SwiftUI
 
@@ -183,6 +184,7 @@ struct ComposerTextView: NSViewRepresentable {
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         context.coordinator.parent = self
         guard let textView = context.coordinator.textView else { return }
+        scrollView.syncTabActive(context.environment.tabIsActive)
         if textView.string != text, !textView.hasMarkedText() {
             textView.string = text
             textView.setSelectedRange(NSRange(location: (text as NSString).length, length: 0))

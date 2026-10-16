@@ -13,6 +13,7 @@ struct GitFileDiffView: View {
     /// 文件绝对路径
     let path: String
     @AppStorage("diff.sideBySide") private var sideBySide = true
+    @Environment(\.tabIsActive) private var isActive
     @State private var scope: GitDiffScope = .workingTree
     @State private var result: Loaded = .loading
 
@@ -30,8 +31,9 @@ struct GitFileDiffView: View {
             content
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .task(id: "\(path)#\(scopeKey)") {
-            // 打开期间每 2 秒重算一次,保存/暂存后差异自动更新
+        .task(id: "\(path)#\(scopeKey)#\(isActive)") {
+            // 打开期间每 2 秒重算一次,保存/暂存后差异自动更新;后台标签暂停
+            guard isActive else { return }
             while !Task.isCancelled {
                 await load()
                 try? await Task.sleep(for: .seconds(2))

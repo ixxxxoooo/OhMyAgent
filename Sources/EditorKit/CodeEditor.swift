@@ -1,6 +1,7 @@
 // @author ygw
 // SwiftUI 封装:将 AppKit 编辑器嵌入 SwiftUI 视图层级。
 
+import DesignSystem
 import SwiftUI
 
 /// SwiftUI 版代码编辑器。
@@ -70,6 +71,7 @@ public struct CodeEditor: NSViewRepresentable {
     }
 
     public func updateNSView(_ view: CodeEditorView, context: Context) {
+        view.syncTabActive(context.environment.tabIsActive)
         context.coordinator.onChange = onChange
         wire(view, context.coordinator)
         if context.coordinator.loadedText != text || context.coordinator.loadedLanguage != language {

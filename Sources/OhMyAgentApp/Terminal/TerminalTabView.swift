@@ -20,7 +20,9 @@ private struct TerminalHostView: NSViewRepresentable {
         return view
     }
 
-    func updateNSView(_ nsView: TerminalView, context: Context) {}
+    func updateNSView(_ nsView: TerminalView, context: Context) {
+        nsView.syncTabActive(context.environment.tabIsActive)
+    }
 
     static func dismantleNSView(_ nsView: TerminalView, coordinator: ()) {
         if nsView.superview != nil { nsView.removeFromSuperview() }

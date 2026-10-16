@@ -56,6 +56,8 @@ struct TabGroupView: View {
     let workbench: WorkbenchModel
     let group: TabGroup
     @State private var zone: DockDropZone?
+    /// 保活的标签(最近使用的若干个视图保持挂载,切换时不重建)
+    @State private var keepAlive = TabKeepAlive()
 
     private var isFocused: Bool { workbench.dock.focusedGroupID == group.id }
 
@@ -78,11 +80,27 @@ struct TabGroupView: View {
         })
     }
 
+    /// 内容区:当前标签 + 最近使用的标签都保持挂载,非激活的隐藏(隐藏会让 AppKit 视图让出键盘焦点),
+    /// 因此切换标签不再重建编辑器、重新高亮或重新连接语言服务器。
     @ViewBuilder
     private var content: some View {
-        if let tab = group.active {
-            TabContentView(workbench: workbench, tab: tab)
-                .id(tab.id)
+        if group.active != nil {
+            ZStack {
+                ForEach(keepAlive.mounted(in: group.tabs, active: group.activeID)) { tab in
+                    let isActive = tab.id == group.activeID
+                    TabContentView(workbench: workbench, tab: tab)
+                        .environment(\.tabIsActive, isActive)
+                        .opacity(isActive ? 1 : 0)
+                        .allowsHitTesting(isActive)
+                        .accessibilityHidden(!isActive)
+                }
+            }
+            .onChange(of: group.activeID, initial: true) {
+                keepAlive.activate(group.activeID, in: group.tabs)
+            }
+            .onChange(of: group.tabs.map(\.id)) {
+                keepAlive.activate(group.activeID, in: group.tabs)
+            }
         } else {
             WelcomeView(workbench: workbench)
         }

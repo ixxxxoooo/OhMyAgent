@@ -27,7 +27,7 @@ let package = Package(
         // Diff 与检查点
         .target(name: "DiffKit"),
         // AppKit TextKit 2 编辑器
-        .target(name: "EditorKit", dependencies: ["DiffKit"]),
+        .target(name: "EditorKit", dependencies: ["DiffKit", "DesignSystem"]),
         // Lucide 原生图标:SVG path 解析 + 模板图像渲染
         .target(name: "IconKit", dependencies: ["OMLog"]),
         // Mermaid 原生渲染:解析 → 分层布局 → 绘制场景(纯 Swift,无 WebView)
