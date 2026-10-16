@@ -31,9 +31,7 @@ struct UsagePage: View {
                 } else {
                     Text("当前没有用量数据").foregroundStyle(OMColors.secondaryText)
                 }
-                LabeledContent("预算提醒(USD)") {
-                    TextField("0 表示关闭", value: $budget, format: .number).frame(width: 150).multilineTextAlignment(.trailing)
-                }
+                SettingsNumericField(title: "预算提醒", value: $budget, format: FloatingPointFormatStyle<Double>(), unit: "USD", prompt: "0 表示关闭")
                 Note("预算提醒只在客户端侧判断:会话费用超过阈值时在用量弹层中高亮。订阅账号通常不上报费用。")
             }
             Section("最近活动(来自 claude 的统计缓存)") {

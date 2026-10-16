@@ -78,6 +78,32 @@ extension View {
     }
 }
 
+/// 设置页统一的「标签 + 右对齐数字输入 + 可选单位」行,所有数字输入行(超时、预算、行数、缓冲上限)共用,
+/// 输入框固定宽度、右对齐,单位占位固定,避免各页错位。
+struct SettingsNumericField<Value: Equatable, Format: ParseableFormatStyle>: View where Format.FormatInput == Value, Format.FormatOutput == String {
+    let title: LocalizedStringKey
+    @Binding var value: Value
+    var format: Format
+    var unit: String?
+    var prompt: String?
+    var fieldWidth: CGFloat = 90
+
+    var body: some View {
+        LabeledContent(title) {
+            HStack(spacing: 6) {
+                TextField("", value: $value, format: format, prompt: prompt.map { Text(verbatim: omLocalized($0)) })
+                    .labelsHidden()
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: fieldWidth)
+                    .accessibilityLabel(title)
+                if let unit {
+                    Text(verbatim: omLocalized(unit)).font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
+                }
+            }
+        }
+    }
+}
+
 /// 灰色说明文字。
 struct Note: View {
     let text: String

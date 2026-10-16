@@ -1695,3 +1695,9 @@
 "显示第三方 Agent 的通知行" = "Show third-party agent notification lines";
 "Pi 等适配器会把扩展通知(如 pi-tps 的「TPS …」)混在消息里发出。开启时以淡色小字单独成行,关闭则隐藏;警告与错误级别始终显示。" = "Adapters such as Pi send extension notifications (e.g. pi-tps's \"TPS …\") mixed into messages. When on, they appear as separate muted lines; when off they are hidden. Warnings and errors are always shown.";
 "回合可能被提前结束(适配器把中断当作了正常结束)。发送「继续」即可接着往下做;反复出现时请到 设置 → 诊断 查看适配器输出。" = "The turn may have ended early (the adapter reported an interruption as a normal end). Send \"continue\" to resume; if it keeps happening, check the adapter output in Settings → Diagnostics.";
+"预算提醒" = "Budget alert";
+"大文件模式起点" = "Large-file mode threshold";
+"输出缓冲上限" = "Output buffer limit";
+"秒" = "sec";
+"行" = "lines";
+"0 表示使用默认值。对应 API_TIMEOUT_MS;网络较慢或模型响应久时可适当调大。" = "0 uses the default. Maps to API_TIMEOUT_MS; raise it on slow networks or when the model responds slowly.";

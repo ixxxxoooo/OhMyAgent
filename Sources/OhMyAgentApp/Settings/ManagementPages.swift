@@ -64,9 +64,7 @@ struct EditorPage: View {
                     Slider(value: $fontSize, in: EditorFontPrefs.sizeRange, step: 1).frame(width: 220)
                 }
                 Toggle("自动换行", isOn: $wrap)
-                LabeledContent("大文件模式起点(行)") {
-                    TextField("", value: $largeFileLines, format: .number).frame(width: 100).multilineTextAlignment(.trailing)
-                }
+                SettingsNumericField(title: "大文件模式起点", value: $largeFileLines, format: IntegerFormatStyle<Int>(), unit: "行")
                 Note("超过该行数的文件会强制换行并关闭复杂高亮以保持流畅(范围 2,000–200,000)。新打开的文件立即生效。")
             }
             Section("Agent 联动") {
@@ -111,9 +109,7 @@ struct TerminalPage: View {
                 LabeledContent("输出字号 \(String(format: "%.1f", fontSize)) pt") {
                     Slider(value: $fontSize, in: 9...20, step: 0.5).frame(width: 220)
                 }
-                LabeledContent("输出缓冲上限(KB)") {
-                    TextField("", value: $outputKB, format: .number).frame(width: 100).multilineTextAlignment(.trailing)
-                }
+                SettingsNumericField(title: "输出缓冲上限", value: $outputKB, format: IntegerFormatStyle<Int>(), unit: "KB")
                 Note("超出上限时丢弃最早的输出(在字符边界截断)。范围 64–16,384 KB。")
                 Toggle("继承完整的登录 Shell 环境变量", isOn: $inheritEnv)
                 Note("关闭后只保留 PATH、HOME、USER、SHELL、LANG、TERM 等基础变量,可避免把令牌等敏感变量暴露给命令。")

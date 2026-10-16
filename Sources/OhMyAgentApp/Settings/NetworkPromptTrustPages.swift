@@ -33,16 +33,8 @@ struct NetworkPage: View {
                 Note("代理通过环境变量(HTTP_PROXY / HTTPS_PROXY / ALL_PROXY)注入 Claude 进程;「跟随系统」不注入任何变量,「直连」会清空已有代理变量。")
             }
             Section("超时") {
-                LabeledContent("请求超时") {
-                    HStack {
-                        TextField("", value: $timeout, format: .number)
-                            .frame(width: 70)
-                            .multilineTextAlignment(.trailing)
-                        Text("秒(0 = 使用默认值)")
-                            .foregroundStyle(OMColors.secondaryText)
-                    }
-                }
-                Note("对应 API_TIMEOUT_MS;网络较慢或模型响应久时可适当调大。")
+                SettingsNumericField(title: "请求超时", value: $timeout, format: IntegerFormatStyle<Int>(), unit: "秒")
+                Note("0 表示使用默认值。对应 API_TIMEOUT_MS;网络较慢或模型响应久时可适当调大。")
             }
             Section {
                 Note("以上设置对新建或恢复的会话生效,已在运行的会话需要重新开始。")
