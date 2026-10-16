@@ -5,11 +5,14 @@ import AppKit
 import IconKit
 import ChatKit
 import DesignSystem
+import GitKit
 import SwiftUI
 import WorkbenchKit
 
 struct RightPaneView: View {
     @Bindable var workbench: WorkbenchModel
+    /// 当前项目的 Git 模型(只读状态,用于图标圆点)
+    private var gitModel: GitModel? { workbench.selectedProjectID.map { GitStore.shared.model(for: $0) } }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -22,6 +25,7 @@ struct RightPaneView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .task(id: workbench.selectedProjectID) { await pollGitBadge() }
         // 与左侧栏同一材质(侧栏材质),不再使用正文白底
         .background(SidebarBackground())
     }
@@ -35,11 +39,12 @@ struct RightPaneView: View {
                     Image.om(Self.icon(pane), size: 14)
                         .frame(width: 28, height: 24)
                         .background(selected ? OMColors.accent.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 6))
+                        .overlay(alignment: .topTrailing) { if pane == .git { gitDot } }
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(selected ? OMColors.accent : OMColors.secondaryText)
-                .help(Self.title(pane))
+                .help(pane == .git ? (gitBadge?.tooltip.map { Self.title(pane) + ":" + $0 } ?? Self.title(pane)) : Self.title(pane))
                 .accessibilityLabel(Self.title(pane))
                 .accessibilityAddTraits(selected ? .isSelected : [])
             }
@@ -54,6 +59,41 @@ struct RightPaneView: View {
         .padding(.trailing, TitlebarMetrics.trailingInset)
         .frame(height: TitlebarMetrics.height)
         .background(WindowDragArea())
+    }
+
+    /// 非 Git 视图时的轻量轮询(应用在前台才刷新,状态不变时退避):保证圆点及时出现。
+    private func pollGitBadge() async {
+        guard let model = gitModel else { return }
+        var delay = 6.0
+        while !Task.isCancelled {
+            if workbench.layout.rightPane != .git, NSApp.isActive {
+                let before = model.status
+                let started = ContinuousClock.now
+                await model.refresh(full: false)
+                let took = (ContinuousClock.now - started).seconds
+                delay = PollBackoff.next(previous: delay, changed: model.status != before, duration: took, base: 6, maximum: 60)
+            }
+            try? await Task.sleep(for: .seconds(delay))
+        }
+    }
+
+    private var gitBadge: GitBadge? {
+        guard let model = gitModel, model.phase == .ready else { return nil }
+        let badge = GitBadge(status: model.status)
+        return badge.isVisible ? badge : nil
+    }
+
+    /// Git 图标右上角的状态圆点:有未提交/未推送为强调色,仅待拉取为次要色。
+    @ViewBuilder
+    private var gitDot: some View {
+        if let badge = gitBadge {
+            Circle()
+                .fill(badge.isOnlyBehind ? OMColors.accent2 : OMColors.accent)
+                .frame(width: 7, height: 7)
+                .overlay(Circle().strokeBorder(Color(nsColor: .windowBackgroundColor), lineWidth: 1))
+                .offset(x: -2, y: 2)
+                .accessibilityHidden(true)
+        }
     }
 
     /// 右栏视图对应的图标(Lucide 名)。
