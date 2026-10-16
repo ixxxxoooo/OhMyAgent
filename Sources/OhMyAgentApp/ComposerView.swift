@@ -332,9 +332,17 @@ struct OptionMenu: View {
                 Text(shown?.displayName ?? option.currentDisplayName).font(OMFonts.small).lineLimit(1)
             }
         } else {
-            Label(option.currentDisplayName, om: icon)
-                .font(OMFonts.small)
-                .lineLimit(1)
+            if category == "model" {
+                // 未启用映射(如官方 Claude):按模型名匹配厂商 logo,不再显示通用芯片图标
+                HStack(spacing: 5) {
+                    BrandIconView(BrandIcon.resolve(modelId: option.currentDisplayName, providerPreset: nil, providerName: option.currentDisplayName), size: 13)
+                    Text(option.currentDisplayName).font(OMFonts.small).lineLimit(1)
+                }
+            } else {
+                Label(option.currentDisplayName, om: icon)
+                    .font(OMFonts.small)
+                    .lineLimit(1)
+            }
         }
     }
 

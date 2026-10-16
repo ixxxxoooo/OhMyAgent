@@ -33,6 +33,9 @@ struct TurnSummaryView: View {
     var body: some View {
         if let summary = entry.summary {
             HStack(spacing: 6) {
+                if let hint = summary.brand {
+                    BrandIconView(BrandIcon.resolve(modelId: hint.modelId, providerPreset: hint.providerPreset, providerName: hint.providerName), size: 13)
+                }
                 Text(verbatim: summary.parts.joined(separator: "  ·  "))
                     .font(OMFonts.caption)
                     .foregroundStyle(OMColors.tertiaryText)

@@ -46,6 +46,7 @@ struct TurnSummaryTests {
         #expect(await SessionModelTests.wait { !model.isRunning && model.timeline.entries.contains { $0.kind == .turnSummary } })
         let summary = try #require(model.timeline.entries.last { $0.kind == .turnSummary }?.summary)
         #expect(summary.usage?.outputTokens == 360)
+        #expect((summary.brand != nil) == !summary.model.isEmpty, "有模型名就带厂商图标线索")
         #expect(model.timeline.entries.last?.kind == .turnSummary, "结束语是本轮最后一条")
         model.shutdown()
     }
@@ -62,5 +63,14 @@ struct TurnSummaryTests {
         #expect(await SessionModelTests.wait { !model.isRunning })
         #expect(!model.timeline.entries.contains { $0.kind == .turnSummary })
         model.shutdown()
+    }
+
+    @Test("厂商线索默认用模型 ID 兜底提供商名")
+    func brandHintDefaults() {
+        let hint = ModelBrandHint(modelId: "glm-5")
+        #expect(hint.providerName == "glm-5")
+        #expect(hint.providerPreset == nil)
+        let summary = TurnSummary(model: "GLM 5", durationSeconds: 1, brand: hint)
+        #expect(summary.brand == hint)
     }
 }

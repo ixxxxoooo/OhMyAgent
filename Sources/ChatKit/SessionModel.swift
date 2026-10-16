@@ -955,6 +955,9 @@ public final class SessionModel {
         coalescer?.flush()
         let turnMs = turnStart.map { OMLogger.milliseconds(since: $0) } ?? 0
         let summaryModel = currentMappedModel?.displayName ?? option(category: "model")?.currentDisplayName ?? ""
+        let summaryBrand: ModelBrandHint? = currentMappedModel.map {
+            ModelBrandHint(modelId: $0.modelId, providerPreset: $0.presetId, providerName: $0.providerName)
+        } ?? (summaryModel.isEmpty ? nil : ModelBrandHint(modelId: summaryModel))
         if let error {
             log.error("轮次失败", error: error, ["turn": "\(turnNumber)", "ms": "\(turnMs)"])
         } else {
@@ -993,7 +996,7 @@ public final class SessionModel {
             self.publishTurnChanges()
             // 回合正常结束:追加结束语(模型、耗时、token、tps);取消或失败不显示
             if error == nil, self.stallMessage == nil, let reason, reason != .cancelled {
-                self.timeline.appendTurnSummary(TurnSummary(model: summaryModel, durationSeconds: Double(turnMs) / 1000, usage: usage))
+                self.timeline.appendTurnSummary(TurnSummary(model: summaryModel, durationSeconds: Double(turnMs) / 1000, usage: usage, brand: summaryBrand))
             }
             self.isRunning = false
             self.turnStartedAt = nil
