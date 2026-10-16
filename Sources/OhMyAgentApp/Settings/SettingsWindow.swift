@@ -11,7 +11,7 @@ import WorkbenchKit
 /// 设置页。
 enum SettingsPage: String, CaseIterable, Identifiable {
     case general, appearance, shortcuts
-    case agent, providers, prompts, network, permissions, trust, tools, agentExtensions
+    case agent, providers, modelMapping, prompts, network, permissions, trust, tools, agentExtensions
     case editor, terminal
     case usage, privacy, advanced, diagnostics
     var id: String { rawValue }
@@ -19,7 +19,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
     /// 侧栏分组(从上到下)。
     static let groups: [(title: String, pages: [SettingsPage])] = [
         (String(localized: "客户端"), [.general, .appearance, .shortcuts]),
-        ("Agent", [.agent, .providers, .prompts, .network, .permissions, .trust, .tools, .agentExtensions]),
+        ("Agent", [.agent, .providers, .modelMapping, .prompts, .network, .permissions, .trust, .tools, .agentExtensions]),
         (String(localized: "工作台"), [.editor, .terminal]),
         (String(localized: "其他"), [.usage, .privacy, .advanced, .diagnostics]),
     ]
@@ -31,6 +31,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .shortcuts: return String(localized: "快捷键")
         case .agent: return String(localized: "Agent 与模型")
         case .providers: return String(localized: "模型提供商")
+        case .modelMapping: return String(localized: "Claude Code 模型映射")
         case .prompts: return String(localized: "提示词")
         case .network: return String(localized: "网络")
         case .permissions: return String(localized: "权限")
@@ -53,6 +54,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .shortcuts: return "keyboard"
         case .agent: return "cpu"
         case .providers: return "server.rack"
+        case .modelMapping: return "arrow.triangle.swap"
         case .prompts: return "doc.text"
         case .network: return "network"
         case .permissions: return "lock.shield"
@@ -144,7 +146,10 @@ struct SettingsView: View {
     /// 左侧导航:返回、搜索、分组页面列表。
     private var sidebar: some View {
         VStack(spacing: 0) {
-            // 返回按钮与红绿灯同一行(让开红绿灯),整行可拖动窗口,顶部不再有额外留白
+            // 第一行留给红绿灯(整行可拖动窗口);「返回」放在红绿灯下面一行,不与红绿灯并排
+            Color.clear
+                .frame(height: TitlebarMetrics.height)
+                .background(WindowDragArea())
             HStack {
                 Button { workbench.closeSettings() } label: {
                     Label("返回", om: "arrow.left")
@@ -157,10 +162,8 @@ struct SettingsView: View {
                 .help("返回工作台 (Esc)")
                 Spacer(minLength: 0)
             }
-            .padding(.leading, TitlebarMetrics.trafficLightInset)
-            .padding(.trailing, 14)
-            .frame(height: TitlebarMetrics.height)
-            .background(WindowDragArea())
+            .padding(.horizontal, 14)
+            .padding(.bottom, 4)
             HStack(spacing: 6) {
                 Image.om("magnifyingglass", size: 12).foregroundStyle(OMColors.tertiaryText)
                 TextField("搜索设置", text: $query)
@@ -204,6 +207,7 @@ struct SettingsView: View {
         case .appearance: AppearancePage()
         case .agent: AgentModelPage(model: model)
         case .providers: ModelProvidersPage()
+        case .modelMapping: ModelMappingPage()
         case .prompts: PromptsPage()
         case .network: NetworkPage()
         case .permissions: PermissionsPage(model: model)

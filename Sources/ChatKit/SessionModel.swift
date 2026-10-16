@@ -232,7 +232,13 @@ public final class SessionModel {
     public private(set) var phase: SessionPhase = .idle
     /// 连接过程中的补充说明(如「正在安装适配器」);连接结束后为 nil
     public private(set) var connectNote: String?
-    public private(set) var isRunning = false { didSet { if isRunning != oldValue { publishAttention() } } }
+    public private(set) var isRunning = false {
+        didSet {
+            guard isRunning != oldValue else { return }
+            publishAttention()
+            if !isRunning, pendingMappingRefresh { refreshModelMapping() }
+        }
+    }
     /// 当前轮次开始时间(用于等待文案的计时;不运行时为空)。
     public private(set) var turnStartedAt: Date?
     /// 输入栏上方任务坞:用户选中的分区与是否收起面板(按会话保存)。
@@ -391,6 +397,7 @@ public final class SessionModel {
                 self.sessionId = setup.sessionId
                 self.configOptions = setup.configOptions
                 self.phase = .ready
+                self.startMappingObserver()
                 self.connectDuration = connectStart.duration(to: .now)
                 self.log.info("Agent 已就绪", ["agent": result.agentName, "ms": "\(OMLogger.milliseconds(since: connectStart))", "mcpServers": "\(prepared.servers.count)", "bridge": prepared.bridge == nil ? "off" : "on"])
                 self.connectTask = nil
@@ -694,7 +701,7 @@ public final class SessionModel {
         if let mode = option(category: "mode") {
             lines.append(String(localized: "- 权限模式:\(mode.options.first { $0.value == mode.currentValue.stringValue }?.name ?? mode.currentValue.stringValue ?? "-")"))
         }
-        if let providerName { lines.append(String(localized: "- 模型提供商:\(providerName)")) }
+        if let main = mappedModels[.main] { lines.append(String(localized: "- 模型映射:\(main.providerName) · \(main.displayName)")) }
         lines.append(String(localized: "- 通告命令:\(availableCommands.count) 个"))
         lines.append(String(localized: "- 运行中引导:\(capabilities.canSteer ? String(localized: "支持") : String(localized: "不支持"));图片输入:\(capabilities.imagePrompts ? String(localized: "支持") : String(localized: "不支持"))"))
         if let goal { lines.append(String(localized: "- 目标:\(goal.objective)\(goal.isActive ? String(localized: "(进行中)") : String(localized: "(已结束)"))")) }
@@ -733,14 +740,14 @@ public final class SessionModel {
         return blocks
     }
 
-    /// 当前会话使用的模型提供商名称(未启用提供商时为 nil,即沿用 ~/.claude 配置)
-    public private(set) var providerName: String?
-    /// 当前会话使用的提供商 ID 与主模型(未启用提供商时为 nil)
-    public private(set) var providerID: String?
-    public private(set) var providerModel: String?
-    /// 会话级提供商覆盖(输入框菜单设置;nil 表示跟随设置里的全局启用项)
-    public private(set) var providerOverride: ProviderOverride?
-    /// 提供商的会话 `_meta`(含密钥,仅内存持有,禁止记录)
+    /// 当前会话生效的模型映射(槽位 → 提供商模型);为空表示使用 ~/.claude 的系统默认配置
+    public private(set) var mappedModels: [ModelSlot: MappedModel] = [:]
+    /// 网关路由键(同一会话重连沿用同一路由令牌)
+    @ObservationIgnored private let gatewayKey = "session-\(UUID().uuidString.prefix(8).lowercased())"
+    /// 模型映射在运行中被修改:本轮结束后再刷新
+    @ObservationIgnored private var pendingMappingRefresh = false
+    @ObservationIgnored private var mappingObserver: Task<Void, Never>?
+    /// 映射的会话 `_meta`(只含本机网关地址与占位令牌)
     @ObservationIgnored private var providerMeta: JSONValue?
     /// 会话 `_meta`:提供商元数据 + 客户端选项(代理/超时/追加提示词/CLAUDE.md);仅对真实 Claude 通道合并。
     private func effectiveMeta() -> JSONValue? {
@@ -749,7 +756,7 @@ public final class SessionModel {
     }
     /// 未启用提供商、但 ~/.claude 配置了第三方网关时,仅含「关闭服务端 auto 分类器探测」开关的 `_meta`
     @ObservationIgnored private var defaultGatewayMeta: JSONValue?
-    /// 提供商地址(发送前探测用)
+    /// 本机网关地址(发送前探测用)
     @ObservationIgnored private var providerURL: URL?
     /// 提供商目录(测试可注入;默认 Application Support)
     @ObservationIgnored public var providerDirectory: URL = ProviderStorage.defaultDirectory
@@ -772,47 +779,57 @@ public final class SessionModel {
         return await ModelGateway.check()
     }
 
-    /// 解析启用的模型提供商(后台读盘);缺密钥/配置无效时提示并回退到 ~/.claude 默认配置。
+    /// 解析模型映射(后台读盘)并注册到本机网关;缺密钥/配置无效时提示并回退到 ~/.claude 默认配置。
     private func resolveProvider(for descriptor: AgentDescriptor) async {
-        providerName = nil
-        providerID = nil
-        providerModel = nil
-        providerMeta = nil
-        providerURL = nil
-        defaultGatewayMeta = nil
-        guard descriptor.kind == .claudeACP else { return }
+        guard descriptor.kind == .claudeACP else {
+            mappedModels = [:]
+            providerMeta = nil
+            providerURL = nil
+            defaultGatewayMeta = nil
+            return
+        }
         let directory = providerDirectory
         let environment = providerEnvironment
-        let override = providerOverride
-        let initial = await Task.detached(priority: .userInitiated) { () -> Result<ResolvedProvider?, ProviderStorage.ResolveError> in
-            do { return .success(try ProviderStorage.resolveActive(directory: directory, environment: environment, override: override)) }
+        let initial = await Task.detached(priority: .userInitiated) { () -> Result<ResolvedMapping?, ProviderStorage.ResolveError> in
+            do { return .success(try ProviderStorage.resolveMapping(directory: directory, environment: environment)) }
             catch let error as ProviderStorage.ResolveError { return .failure(error) }
             catch { return .success(nil) }
         }.value
-        // OpenAI 协议的提供商先注册到本地协议代理(改写 `_meta`);失败时回退默认配置并提示
-        var outcome = initial
-        if case .success(let resolved?) = outcome {
-            do { outcome = .success(try await ProviderBridge.activate(resolved)) } catch {
-                log.error("协议代理不可用", error: error)
-                outcome = .failure(.invalid(resolved.provider.name, error.localizedDescription))
+        // 注册到本机网关(改写 `_meta`);失败时回退默认配置并提示
+        var outcome: Result<ActivatedMapping?, ProviderStorage.ResolveError>
+        switch initial {
+        case .success(let resolved?):
+            do { outcome = .success(try await ProviderBridge.activate(resolved, sessionKey: gatewayKey)) } catch {
+                log.error("本机网关不可用", error: error)
+                outcome = .failure(.invalid(resolved.main.provider.name, error.localizedDescription))
             }
+        case .success(nil): outcome = .success(nil)
+        case .failure(let error): outcome = .failure(error)
         }
         switch outcome {
-        case .success(let resolved?):
-            providerName = resolved.provider.name
-            providerID = resolved.provider.id
-            providerModel = resolved.provider.model
-            providerMeta = resolved.meta
-            providerURL = resolved.provider.url
-            log.info("使用模型提供商", ["provider": resolved.provider.id, "model": resolved.provider.model, "baseURL": ModelGateway.origin(of: resolved.provider.url ?? workspace)])
+        case .success(let activated?):
+            mappedModels = activated.infos
+            providerMeta = activated.meta
+            providerURL = activated.gatewayURL
+            defaultGatewayMeta = nil
+            log.info("使用模型映射", ["provider": activated.mainProviderId, "model": activated.mainModel, "slots": "\(activated.infos.count)"])
+            for warning in activated.warnings { timeline.appendNotice(warning, severity: "warning") }
         case .success(nil):
+            mappedModels = [:]
+            providerMeta = nil
+            providerURL = nil
+            await ProviderBridge.deactivate(sessionKey: gatewayKey)
             // 默认配置:若 ~/.claude/settings.json 里走第三方网关,同样关闭服务端 auto 分类器探测(后台读盘)
             defaultGatewayMeta = await Task.detached(priority: .utility) { () -> JSONValue? in
                 let settingsEnv = ModelGateway.loadSettingsEnv()
                 return NoticeFilter.gatewayMeta(gateway: ModelGateway.baseURL(settingsEnv: settingsEnv, processEnv: environment), settingsEnv: settingsEnv, processEnv: environment)
             }.value
         case .failure(let error):
-            log.warning("模型提供商不可用,回退默认配置", ["reason": error.localizedDescription])
+            log.warning("模型映射不可用,回退默认配置", ["reason": error.localizedDescription])
+            mappedModels = [:]
+            providerMeta = nil
+            providerURL = nil
+            defaultGatewayMeta = nil
             timeline.appendNotice(error.localizedDescription, isError: true)
         }
     }
@@ -918,7 +935,12 @@ public final class SessionModel {
             } else if let error {
                 if !self.isShuttingDown {
                     if let rpc = error as? JSONRPCError, rpc.code == -32000 {
-                        self.timeline.appendNotice(ChatL10n.t("Claude Code 尚未登录或登录已失效:请在终端运行 claude 完成登录后重试。"), isError: true)
+                        if let mapped = self.currentMappedModel {
+                            // 映射模式下 Claude Code 把上游 401/403 都报成「需要认证」,这里指向真正的原因,而不是让用户去登录 claude
+                            self.timeline.appendNotice(String(localized: "「\(mapped.providerName)」拒绝了请求(鉴权或权限):请检查 设置 → 模型提供商 里的 API Key,以及该账号是否有权使用 \(mapped.displayName)。"), isError: true)
+                        } else {
+                            self.timeline.appendNotice(ChatL10n.t("Claude Code 尚未登录或登录已失效:请在终端运行 claude 完成登录后重试。"), isError: true)
+                        }
                     } else {
                         self.timeline.appendNotice(String(localized: "请求失败:\(error.localizedDescription)"), isError: true)
                     }
@@ -1148,45 +1170,67 @@ public final class SessionModel {
         }
     }
 
-    // MARK: - 模型提供商(会话级切换)
+    // MARK: - 模型映射刷新
 
-    /// 切换当前会话使用的模型提供商/主模型。
-    ///
-    /// 有对话内容且 Agent 支持恢复时,用新的 `_meta` 恢复同一会话(保留上下文);否则新建会话。
+    /// 当前选中的模型槽位对应的映射模型(未启用映射时为 nil)。
+    var currentMappedModel: MappedModel? {
+        guard !mappedModels.isEmpty else { return nil }
+        let value = option(category: "model")?.currentValue.stringValue ?? "default"
+        return ModelSlot(optionValue: value).flatMap { mappedModels[$0] } ?? mappedModels[.main]
+    }
+
+    /// 开始监听设置页的模型映射变化(幂等,连接成功后调用)。
+    private func startMappingObserver() {
+        guard mappingObserver == nil else { return }
+        mappingObserver = Task { [weak self] in
+            for await _ in NotificationCenter.default.notifications(named: .omModelMappingChanged) {
+                guard let self else { return }
+                self.mappingChanged()
+            }
+        }
+    }
+
+    /// 设置页修改了映射:空闲时立即刷新,运行中等本轮结束。
+    func mappingChanged() {
+        guard activeDescriptor.kind == .claudeACP, phase == .ready else { return }
+        if isRunning { pendingMappingRefresh = true } else { refreshModelMapping() }
+    }
+
+    /// 重新解析映射;结果有变化时用新的 `_meta` 恢复同一会话(保留上下文),无法恢复则新建会话。
     /// 运行中、未连接或非 Claude 通道时忽略。
-    /// - Parameter override: 新的覆盖;`ProviderOverride(providerId: nil)` 表示系统默认;传 nil 表示跟随全局设置
-    public func switchProvider(_ override: ProviderOverride?) {
+    func refreshModelMapping() {
         guard activeDescriptor.kind == .claudeACP, phase == .ready, !isRunning, let client, let sessionId else { return }
+        pendingMappingRefresh = false
         let hadConversation = !timeline.entries.isEmpty
         let canResume = capabilities.canResume
         let cwd = workspace.path
         let servers = mcpServers
         let started = ContinuousClock.now
-        providerOverride = override
+        let previous = mappedModels
         Task { [weak self] in
             guard let self else { return }
             await self.resolveProvider(for: self.activeDescriptor)
+            guard self.mappedModels != previous else { return }
             let meta = self.effectiveMeta()
-            let label = self.providerName ?? ChatL10n.t("系统默认")
-            let target = self.providerModel.map { "\(label) · \($0)" } ?? label
+            let target = self.mappedModels[.main].map { "\($0.providerName) · \($0.displayName)" } ?? ChatL10n.t("系统默认")
             do {
                 if hadConversation, canResume {
                     let setup = try await client.resumeSession(sessionId: sessionId, cwd: cwd, mcpServers: servers, meta: meta)
                     if !setup.configOptions.isEmpty { self.configOptions = setup.configOptions }
-                    self.timeline.appendNotice(String(localized: "已切换到 \(target),对话上下文已保留。"))
+                    self.timeline.appendNotice(String(localized: "模型映射已更新为 \(target),对话上下文已保留。"))
                 } else {
                     try await self.startFreshSession(client: client, cwd: cwd, servers: servers, meta: meta)
-                    self.timeline.appendNotice(String(localized: "已切换到 \(target)。"))
+                    self.timeline.appendNotice(String(localized: "模型映射已更新为 \(target)。"))
                 }
-                self.log.info("会话切换提供商", ["provider": self.providerID ?? "default", "ms": "\(OMLogger.milliseconds(since: started))"])
+                self.log.info("会话刷新模型映射", ["ms": "\(OMLogger.milliseconds(since: started))"])
             } catch {
                 // 恢复失败:退回到新会话,避免卡在半切换状态
                 self.log.warning("恢复会话失败,改为新建会话", ["error": "\(error)"])
                 do {
                     try await self.startFreshSession(client: client, cwd: cwd, servers: servers, meta: meta)
-                    self.timeline.appendNotice(String(localized: "已切换到 \(target),但之前的对话上下文无法沿用,已开始新会话。"), severity: "warning")
+                    self.timeline.appendNotice(String(localized: "模型映射已更新为 \(target),但之前的对话上下文无法沿用,已开始新会话。"), severity: "warning")
                 } catch {
-                    self.timeline.appendNotice(String(localized: "切换失败:\(error.localizedDescription)"), isError: true)
+                    self.timeline.appendNotice(String(localized: "刷新模型映射失败:\(error.localizedDescription)"), isError: true)
                 }
             }
         }
@@ -1469,6 +1513,10 @@ public final class SessionModel {
         watchdogTask = nil
         bridge?.stop()
         bridge = nil
+        mappingObserver?.cancel()
+        mappingObserver = nil
+        let key = gatewayKey
+        Task { await ProviderBridge.deactivate(sessionKey: key) }
         let supervisor = supervisor
         self.supervisor = nil
         client = nil

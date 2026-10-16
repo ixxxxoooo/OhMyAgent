@@ -26,6 +26,15 @@ final class StubURLProtocol: URLProtocol, @unchecked Sendable {
 struct ModelProviderTests {
     static let deepseek = ModelProvider(id: "deepseek", name: "DeepSeek", baseURL: "https://api.deepseek.com/anthropic/", model: "deepseek-chat", haikuModel: "deepseek-lite")
 
+    /// 构造只含默认槽位的已解析映射(测试用)。
+    static func mapping(_ provider: ModelProvider, _ model: String, key: String = "k") -> ResolvedMapping {
+        ResolvedMapping(main: target(provider, model, .main, key: key), others: [:], warnings: [])
+    }
+
+    static func target(_ provider: ModelProvider, _ model: String, _ slot: ModelSlot, key: String = "k") -> ResolvedTarget {
+        ResolvedTarget(slot: slot, provider: provider, model: model, key: key)
+    }
+
     static func tempDirectory() throws -> URL {
         let url = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("oma-prov-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
@@ -42,35 +51,44 @@ struct ModelProviderTests {
         #expect(Self.deepseek.normalizedBaseURL == "https://api.deepseek.com/anthropic")
     }
 
-    @Test("非密钥环境:设置地址与各角色模型并清空用户侧变量")
-    func publicEnvironment() {
-        let env = ProviderLaunch.publicEnvironment(Self.deepseek)
-        #expect(env["ANTHROPIC_BASE_URL"] == "https://api.deepseek.com/anthropic")
-        #expect(env["ANTHROPIC_MODEL"] == "deepseek-chat")
-        #expect(env["ANTHROPIC_DEFAULT_OPUS_MODEL"] == "deepseek-chat")
-        #expect(env["ANTHROPIC_DEFAULT_HAIKU_MODEL"] == "deepseek-lite")
-        #expect(env["ANTHROPIC_API_KEY"] == "")
+    @Test("非密钥环境:经本机网关,槽位用别名,清空用户侧变量")
+    func publicEnvironment() throws {
+        let gateway = try #require(URL(string: "http://127.0.0.1:9/tok"))
+        var mapping = Self.mapping(Self.deepseek, "deepseek-chat")
+        mapping.others[.haiku] = Self.target(Self.deepseek, "deepseek-lite", .haiku)
+        let env = ProviderLaunch.publicEnvironment(mapping, gateway: gateway)
+        #expect(env["ANTHROPIC_BASE_URL"] == "http://127.0.0.1:9/tok")
+        #expect(env["ANTHROPIC_MODEL"] == "oma-main")
+        #expect(env["ANTHROPIC_DEFAULT_OPUS_MODEL"] == "oma-main", "未设置的槽位沿用默认槽位")
+        #expect(env["ANTHROPIC_DEFAULT_HAIKU_MODEL"] == "oma-small")
+        #expect(env["ANTHROPIC_DEFAULT_HAIKU_MODEL_NAME"] == "deepseek-lite")
+        #expect(env["ANTHROPIC_DEFAULT_OPUS_MODEL_NAME"] == "deepseek-chat")
+        #expect(env["CLAUDE_CODE_SUBAGENT_MODEL"] == "")
         for name in ProviderLaunch.clearedVariables { #expect(env[name] == "") }
         #expect(env["ANTHROPIC_AUTH_TOKEN"] == nil)
+        for alias in ModelSlot.allCases.map(\.alias) { for word in ["opus", "sonnet", "haiku"] { #expect(!alias.contains(word)) } }
     }
 
-    @Test("_meta:密钥只在进程 env,不在 settings")
+    @Test("_meta:只含占位令牌与本机地址,真实密钥与上游地址都不出现")
     func metaKeepsKeyOutOfSettings() throws {
-        let meta = ProviderLaunch.sessionMeta(Self.deepseek, key: "sk-test-secret-123456789012345")
+        let gateway = try #require(URL(string: "http://127.0.0.1:9/tok"))
+        let meta = ProviderLaunch.sessionMeta(Self.mapping(Self.deepseek, "deepseek-chat", key: "sk-test-secret-123456789012345"), gateway: gateway)
         let options = try #require(meta["claudeCode"]?["options"])
         let settings = try #require(options["settings"])
-        #expect(settings["model"]?.stringValue == "deepseek-chat")
+        #expect(settings["model"]?.stringValue == "oma-main")
         #expect(settings["apiKeyHelper"]?.stringValue == "")
-        #expect(options["env"]?["ANTHROPIC_AUTH_TOKEN"]?.stringValue == "sk-test-secret-123456789012345")
-        let settingsText = String(describing: settings)
-        #expect(!settingsText.contains("sk-test-secret"))
+        #expect(options["env"]?["ANTHROPIC_AUTH_TOKEN"]?.stringValue == ProviderLaunch.placeholderToken)
+        let text = String(describing: meta)
+        #expect(!text.contains("sk-test-secret"))
+        #expect(!text.contains("deepseek.com"))
     }
 
     @Test("存储往返、密钥权限 0600、删除密钥")
     func storageRoundTrip() throws {
         let dir = try Self.tempDirectory()
         defer { try? FileManager.default.removeItem(at: dir) }
-        try ProviderStorage.save(ProviderSnapshot(active: "deepseek", providers: [Self.deepseek]), directory: dir)
+        try ProviderStorage.save(ProviderSnapshot(mapping: ModelMapping(slots: [.main: ModelTarget(providerId: "deepseek", model: "deepseek-chat")]), providers: [Self.deepseek]), directory: dir)
+        #expect(ProviderStorage.load(directory: dir).mapping[.main]?.model == "deepseek-chat")
         #expect(ProviderStorage.load(directory: dir).providers == [Self.deepseek])
         try ProviderStorage.setKey("  sk-abc  ", for: "deepseek", directory: dir)
         #expect(ProviderStorage.key(for: "deepseek", directory: dir, environment: [:]) == "sk-abc")
@@ -89,21 +107,64 @@ struct ModelProviderTests {
         #expect(ProviderStorage.load(directory: dir) == ProviderSnapshot())
     }
 
-    @Test("resolveActive:未启用返回 nil;缺密钥与配置无效抛错;齐全时返回 meta")
-    func resolveActive() throws {
+    @Test("resolveMapping:未设置返回 nil;缺密钥/停用/配置无效抛错;齐全时解析各槽位")
+    func resolveMapping() throws {
         let dir = try Self.tempDirectory()
         defer { try? FileManager.default.removeItem(at: dir) }
-        #expect(try ProviderStorage.resolveActive(directory: dir, environment: [:]) == nil)
-        try ProviderStorage.save(ProviderSnapshot(active: "deepseek", providers: [Self.deepseek]), directory: dir)
-        #expect(throws: ProviderStorage.ResolveError.missingKey("DeepSeek")) { try ProviderStorage.resolveActive(directory: dir, environment: [:]) }
+        #expect(try ProviderStorage.resolveMapping(directory: dir, environment: [:]) == nil)
+        let mapping = ModelMapping(slots: [.main: ModelTarget(providerId: "deepseek", model: "deepseek-chat")])
+        try ProviderStorage.save(ProviderSnapshot(mapping: mapping, providers: [Self.deepseek]), directory: dir)
+        #expect(throws: ProviderStorage.ResolveError.missingKey("DeepSeek")) { try ProviderStorage.resolveMapping(directory: dir, environment: [:]) }
         try ProviderStorage.setKey("sk-ok", for: "deepseek", directory: dir)
-        let resolved = try #require(try ProviderStorage.resolveActive(directory: dir, environment: [:]))
-        #expect(resolved.provider.id == "deepseek")
-        #expect(resolved.meta["claudeCode"]?["options"]?["env"]?["ANTHROPIC_AUTH_TOKEN"]?.stringValue == "sk-ok")
+        let resolved = try #require(try ProviderStorage.resolveMapping(directory: dir, environment: [:]))
+        #expect(resolved.main.provider.id == "deepseek" && resolved.main.key == "sk-ok" && resolved.warnings.isEmpty)
         var bad = Self.deepseek
         bad.baseURL = "bad"
-        try ProviderStorage.save(ProviderSnapshot(active: "deepseek", providers: [bad]), directory: dir)
-        #expect(throws: (any Error).self) { try ProviderStorage.resolveActive(directory: dir, environment: [:]) }
+        try ProviderStorage.save(ProviderSnapshot(mapping: mapping, providers: [bad]), directory: dir)
+        #expect(throws: (any Error).self) { try ProviderStorage.resolveMapping(directory: dir, environment: [:]) }
+        var off = Self.deepseek
+        off.enabled = false
+        try ProviderStorage.save(ProviderSnapshot(mapping: mapping, providers: [off]), directory: dir)
+        #expect(throws: ProviderStorage.ResolveError.disabled("DeepSeek")) { try ProviderStorage.resolveMapping(directory: dir, environment: [:]) }
+    }
+
+    @Test("非默认槽位的提供商不可用时只产生警告并退回默认槽位")
+    func slotFallbackWarning() throws {
+        let dir = try Self.tempDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let other = ModelProvider(id: "other", name: "Other", baseURL: "https://o.com/anthropic", model: "o1")
+        let mapping = ModelMapping(slots: [.main: ModelTarget(providerId: "deepseek", model: "deepseek-chat"),
+                                           .haiku: ModelTarget(providerId: "other", model: "o1")])
+        try ProviderStorage.save(ProviderSnapshot(mapping: mapping, providers: [Self.deepseek, other]), directory: dir)
+        try ProviderStorage.setKey("sk-ok", for: "deepseek", directory: dir)
+        let resolved = try #require(try ProviderStorage.resolveMapping(directory: dir, environment: [:]))
+        #expect(resolved.others.isEmpty && resolved.warnings.count == 1)
+        #expect(resolved.infos.keys.sorted { $0.rawValue < $1.rawValue } == [.main])
+    }
+
+    @Test("旧版 active + Opus/Sonnet/Haiku 角色模型迁移为映射")
+    func migrateLegacyActive() throws {
+        let dir = try Self.tempDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let json = #"{"active":"deepseek","providers":[{"id":"deepseek","name":"DeepSeek","baseURL":"https://api.deepseek.com/anthropic","model":"deepseek-chat","haikuModel":"deepseek-lite"}]}"#
+        try json.write(to: dir.appendingPathComponent("providers.json"), atomically: true, encoding: .utf8)
+        let snapshot = ProviderStorage.load(directory: dir)
+        #expect(snapshot.mapping[.main] == ModelTarget(providerId: "deepseek", model: "deepseek-chat"))
+        #expect(snapshot.mapping[.haiku] == ModelTarget(providerId: "deepseek", model: "deepseek-lite"))
+        #expect(snapshot.mapping[.opus] == nil)
+        // 迁移结果落盘后不再含旧的 active 字段
+        try ProviderStorage.save(snapshot, directory: dir)
+        let text = try String(contentsOf: dir.appendingPathComponent("providers.json"), encoding: .utf8)
+        #expect(!text.contains("\"active\""))
+    }
+
+    @Test("槽位别名与选项值互相映射;删除提供商会清除指向它的映射")
+    func slotsAndRemoval() {
+        #expect(ModelSlot(optionValue: "opus") == .opus && ModelSlot(optionValue: "default") == .main && ModelSlot(optionValue: "fable") == nil)
+        #expect(Set(ModelSlot.allCases.map(\.alias)).count == ModelSlot.allCases.count)
+        var mapping = ModelMapping(slots: [.main: ModelTarget(providerId: "a", model: "m"), .haiku: ModelTarget(providerId: "b", model: "n")])
+        mapping.removeTargets(of: "a")
+        #expect(mapping[.main] == nil && mapping[.haiku] != nil)
     }
 
     @Test("预设:DeepSeek 使用 /anthropic 端点")

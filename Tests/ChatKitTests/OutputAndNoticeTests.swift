@@ -64,12 +64,11 @@ struct GatewayNoticeTests {
         #expect(!NoticeFilter.isThirdPartyGateway("https://eu.api.anthropic.com/v1"))
     }
 
-    @Test("提供商会话环境:第三方网关关闭服务端分类器探测,官方 API 不改动")
-    func providerEnvironment() {
+    @Test("映射会话环境:经网关的第三方模型关闭服务端分类器探测")
+    func providerEnvironment() throws {
+        let gateway = try #require(URL(string: "http://127.0.0.1:9/t"))
         let deepseek = ModelProvider(id: "deepseek", name: "DeepSeek", baseURL: "https://api.deepseek.com/anthropic", model: "deepseek-chat")
-        #expect(ProviderLaunch.publicEnvironment(deepseek)[NoticeFilter.autoModeServerKey] == "0")
-        let official = ModelProvider(id: "anthropic", name: "Anthropic", baseURL: "https://api.anthropic.com", model: "claude-sonnet-4-5", usesAPIKeyHeader: true)
-        #expect(ProviderLaunch.publicEnvironment(official)[NoticeFilter.autoModeServerKey] == nil)
+        #expect(ProviderLaunch.publicEnvironment(ModelProviderTests.mapping(deepseek, "deepseek-chat"), gateway: gateway)[NoticeFilter.autoModeServerKey] == "0")
     }
 
     @Test("默认配置走第三方网关时注入开关,用户已显式设置则尊重")

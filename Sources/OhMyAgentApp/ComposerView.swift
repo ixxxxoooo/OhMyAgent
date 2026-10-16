@@ -56,7 +56,6 @@ struct ComposerView: View {
             .frame(height: textHeight)
             HStack(spacing: 6) {
                 OptionMenu(model: model, category: "mode", icon: "slider.horizontal.3")
-                ProviderMenu(model: model)
                 OptionMenu(model: model, category: "model", icon: "cpu")
                 OptionMenu(model: model, category: "thought_level", icon: "brain")
                 MCPPanelButton(model: model)
@@ -175,10 +174,18 @@ struct ComposerView: View {
                     ? String(localized: "运行中:Return 引导 \(model.agentName),⌘Return 排到本轮之后")
                     : String(localized: "运行中:Return 或 ⌘Return 排到本轮之后发送")
             }
-            return commandToSend
-                ? String(localized: "向 \(model.agentName) 提问,⌘Return 发送,Return 换行,/ 命令,@ 提及")
-                : String(localized: "向 \(model.agentName) 提问,Return 发送,Shift+Return 换行,/ 命令,@ 提及")
+            // 常见输入框做法:占位只提示能做什么,发送键写在发送按钮的提示里
+            return String(localized: "输入消息,@ 引用文件,/ 使用命令")
         }
+    }
+
+    /// 发送按钮的提示:写明当前的发送键与换行键。
+    private var sendHelp: String {
+        let commandToSend = sendKey == SendKey.commandEnter.rawValue
+        if model.isRunning {
+            return commandToSend ? String(localized: "引导当前轮次 (⌘Return);Return 换行") : String(localized: "引导当前轮次 (Return);⌘Return 排到本轮之后")
+        }
+        return commandToSend ? String(localized: "发送 (⌘Return),Return 换行") : String(localized: "发送 (Return),Shift+Return 换行")
     }
 
     private var hasContent: Bool {
@@ -205,7 +212,7 @@ struct ComposerView: View {
                 .buttonBorderShape(.circle)
                 .disabled(!hasContent)
                 .keyboardShortcut(ShortcutStore.shared.shortcut(for: .send))
-                .help(model.isRunning ? String(localized: "引导当前轮次 (Return);⌘Return 排到本轮之后") : String(localized: "发送 (Return)"))
+                .help(sendHelp)
                 .accessibilityLabel(model.isRunning ? String(localized: "引导当前轮次") : String(localized: "发送"))
             }
         }
@@ -213,170 +220,102 @@ struct ComposerView: View {
 }
 
 /// 配置选项菜单(模式 / 模型 / 思考强度),取自会话的 configOptions。
+/// - 模式:每种模式使用不同的强调色(见 `ModeTone`);
+/// - 模型:启用了「Claude Code 模型映射」时,只列出已映射的槽位,显示真实模型名与厂商图标;否则沿用 Claude Code 自带列表。
 struct OptionMenu: View {
     let model: SessionModel
     let category: String
     let icon: String
 
     var body: some View {
-        if let option = model.option(category: category), !option.options.isEmpty {
-            Menu {
-                ForEach(option.options, id: \.value) { item in
-                    Button {
-                        model.setConfigOption(option.id, value: item.value)
-                    } label: {
-                        if option.currentValue.stringValue == item.value {
-                            Label(item.name, om: "checkmark")
-                        } else {
-                            Text(item.name)
-                        }
-                    }
-                }
-            } label: {
-                Label(option.currentDisplayName, om: icon)
-                    .font(OMFonts.small)
-                    .lineLimit(1)
-            }
-            .fixedSize()
-            .menuStyle(.button)
-            .buttonStyle(.plain)
-            .foregroundStyle(OMColors.secondaryText)
-            .help(option.name)
+        if let option = model.option(category: category) {
+            let rows = rows(for: option)
+            if !rows.isEmpty { menu(option: option, rows: rows) }
         }
     }
-}
 
-/// 模型提供商菜单:跨提供商的模型列表(按厂商分组、可搜索),选择后只影响当前会话。
-/// 只列出已启用且已配置密钥的提供商;设置 → 模型提供商 里配置过提供商时才显示。
-struct ProviderMenu: View {
-    let model: SessionModel
-    @State private var snapshot = ProviderSnapshot()
-    @State private var keyed: Set<String> = []
-    @State private var open = false
+    /// 菜单里的一行。
+    private struct Row: Identifiable {
+        var value: String
+        var title: String
+        var mapped: MappedModel?
+        var id: String { value }
+    }
 
-    var body: some View {
-        // 内容可能为空(尚无提供商),空视图上的 .task 不会触发,因此挂在一个零尺寸占位上
-        ZStack {
-            Color.clear.frame(width: 0, height: 0)
-                .task(id: model.providerID) { await reload() }
-            content
+    /// 计算要展示的行。
+    private func rows(for option: SessionConfigOption) -> [Row] {
+        guard category == "model", !model.mappedModels.isEmpty else {
+            return option.options.map { Row(value: $0.value, title: $0.name, mapped: nil) }
         }
-        .onChange(of: open) { _, isOpen in if isOpen { Task { await reload() } } }
+        // 映射已启用:未映射的槽位(以及映射之外的选项)不出现
+        return option.options.compactMap { item in
+            guard let slot = ModelSlot(optionValue: item.value), let mapped = model.mappedModels[slot] else { return nil }
+            return Row(value: item.value, title: "\(mapped.displayName) · \(slot.title)", mapped: mapped)
+        }
+    }
+
+    private func menu(option: SessionConfigOption, rows: [Row]) -> some View {
+        let current = option.currentValue.stringValue ?? ""
+        let tint = category == "mode" ? Self.color(for: ModeTone.tone(forMode: current)) : OMColors.secondaryText
+        return Menu {
+            ForEach(rows) { row in
+                Button {
+                    model.setConfigOption(option.id, value: row.value)
+                } label: {
+                    HStack {
+                        if let mapped = row.mapped { Image(nsImage: Self.menuImage(for: mapped)) }
+                        Text(row.title)
+                        if current == row.value { Image.om("checkmark") }
+                    }
+                }
+            }
+        } label: {
+            label(option: option, rows: rows, current: current)
+        }
+        .fixedSize()
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .foregroundStyle(tint)
+        .help(option.name)
+        .accessibilityLabel(option.name)
     }
 
     @ViewBuilder
-    private var content: some View {
-        if !snapshot.providers.isEmpty, model.descriptor.kind == .claudeACP {
-            Button { open.toggle() } label: {
-                Label(title, om: "server")
-                    .font(OMFonts.small)
-                    .lineLimit(1)
+    private func label(option: SessionConfigOption, rows: [Row], current: String) -> some View {
+        if category == "model", !model.mappedModels.isEmpty {
+            let shown = rows.first { $0.value == current }?.mapped ?? model.mappedModels[.main]
+            HStack(spacing: 5) {
+                if let shown { BrandIconView(Self.brand(for: shown), size: 13) } else { Image.om(icon) }
+                Text(shown?.displayName ?? option.currentDisplayName).font(OMFonts.small).lineLimit(1)
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(OMColors.secondaryText)
-            .fixedSize()
-            .disabled(model.isRunning || model.phase != .ready)
-            .help("切换模型提供商与模型(仅影响当前会话)")
-            .accessibilityLabel("模型提供商")
-            .popover(isPresented: $open, arrowEdge: .top) {
-                ProviderPickerPopover(model: model, snapshot: snapshot, keyed: keyed) { open = false }
-            }
+        } else {
+            Label(option.currentDisplayName, om: icon)
+                .font(OMFonts.small)
+                .lineLimit(1)
         }
     }
 
-    /// 菜单标题:提供商名 · 模型展示名;未使用提供商时显示「系统默认」。
-    private var title: String {
-        guard let name = model.providerName else { return String(localized: "系统默认") }
-        guard let id = model.providerModel else { return name }
-        let display = snapshot.providers.first(where: { $0.id == model.providerID })?.displayName(forModel: id) ?? id
-        return "\(name) · \(display)"
-    }
-
-    private func reload() async {
-        let result = await Task.detached { (ProviderStorage.load(), ProviderStorage.keyedIds()) }.value
-        snapshot = result.0
-        keyed = result.1
-    }
-}
-
-/// 模型选择弹层:搜索 + 按厂商分组的模型列表。
-private struct ProviderPickerPopover: View {
-    let model: SessionModel
-    let snapshot: ProviderSnapshot
-    let keyed: Set<String>
-    let onClose: () -> Void
-    @State private var query = ""
-
-    private var sections: [ProviderMenuSection] {
-        ProviderMenuBuilder.sections(snapshot: snapshot, hasKey: { keyed.contains($0) || ProviderStorage.hasEnvironmentKey }, query: query)
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 6) {
-                Image.om("search", size: 12).foregroundStyle(OMColors.tertiaryText)
-                TextField("搜索模型", text: $query).textFieldStyle(.plain).font(OMFonts.body)
-            }
-            .padding(.horizontal, 10).frame(height: 30)
-            Divider()
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    if query.isEmpty {
-                        row(title: String(localized: "系统默认(~/.claude)"), subtitle: nil, selected: model.providerID == nil) {
-                            model.switchProvider(ProviderOverride(providerId: nil))
-                        }
-                    }
-                    ForEach(sections) { section in
-                        Text(section.providerName)
-                            .font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
-                            .padding(.horizontal, 12).padding(.top, 8).padding(.bottom, 2)
-                        ForEach(section.models) { item in
-                            row(title: item.name, subtitle: item.name == item.id ? nil : item.id,
-                                selected: model.providerID == section.providerId && (model.providerModel ?? "") == item.id) {
-                                model.switchProvider(ProviderOverride(providerId: section.providerId, model: item.id))
-                            }
-                        }
-                    }
-                    if sections.isEmpty && !query.isEmpty {
-                        Text("没有匹配的模型").font(OMFonts.small).foregroundStyle(OMColors.secondaryText).padding(12)
-                    }
-                }
-                .padding(.vertical, 4)
-            }
-            .frame(maxHeight: 320)
-            Divider()
-            HStack {
-                Text("仅当前会话生效").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
-                Spacer()
-                Button("管理提供商…") {
-                    onClose()
-                    AppActions.shared.openSettings(page: .providers)
-                }
-                .buttonStyle(.plain).font(OMFonts.caption).foregroundStyle(OMColors.secondaryText)
-            }
-            .padding(.horizontal, 12).padding(.vertical, 8)
+    /// 模式色调 → 颜色(中性为次要文字色)。
+    static func color(for tone: ModeTone) -> Color {
+        switch tone {
+        case .neutral: OMColors.secondaryText
+        case .green: OMColors.success
+        case .blue: Color(nsColor: .systemBlue)
+        case .purple: Color(nsColor: .systemPurple)
+        case .amber: OMColors.warning
+        case .red: OMColors.danger
         }
-        .frame(width: 300)
     }
 
-    private func row(title: String, subtitle: String?, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button {
-            action()
-            onClose()
-        } label: {
-            HStack(spacing: 8) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(title).font(OMFonts.body).lineLimit(1)
-                    if let subtitle { Text(subtitle).font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText).lineLimit(1) }
-                }
-                Spacer(minLength: 4)
-                if selected { Image.om("check", size: 12) }
-            }
-            .padding(.horizontal, 12).padding(.vertical, 5)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
+    /// 映射模型的厂商图标匹配结果。
+    static func brand(for mapped: MappedModel) -> BrandIcon {
+        BrandIcon.resolve(modelId: mapped.modelId, providerPreset: mapped.presetId, providerName: mapped.providerName)
+    }
+
+    /// 菜单项里的小图标(厂商矢量图标;无匹配时用通用芯片图标)。
+    static func menuImage(for mapped: MappedModel) -> NSImage {
+        if case .vector(let name) = brand(for: mapped), let image = BrandIconRenderer.nsImage(name, size: 14) { return image }
+        return OMIconRenderer.nsImage("cpu", size: 14)
     }
 }
 

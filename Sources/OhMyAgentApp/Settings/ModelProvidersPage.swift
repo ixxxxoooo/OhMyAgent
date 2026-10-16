@@ -1,7 +1,7 @@
 // @author ixxxxoooo
 // 设置页:模型提供商。左侧提供商列表(搜索、启用开关、密钥状态、添加/导入),右侧详情(连接、模型、高级)。
-// 不改动 ~/.claude/settings.json;提供商经 ACP `_meta` 在会话启动时交给 Claude Code,
-// OpenAI 协议的提供商经本机内置协议代理转换。
+// 这里只管「提供商」本身(地址、协议、密钥、模型清单);哪个 Claude Code 槽位用哪个模型,
+// 在「Claude Code 模型映射」页配置。不改动 ~/.claude/settings.json。
 
 import ChatKit
 import DesignSystem
@@ -11,7 +11,7 @@ import SwiftUI
 /// 模型提供商页。
 struct ModelProvidersPage: View {
     @State private var model = ProviderSettingsModel()
-    /// 选中的提供商 ID;空串表示「系统默认」,nil 表示未选择
+    /// 选中的提供商 ID,nil 表示未选择
     @State private var selection: String?
     @State private var query = ""
     @State private var importing = false
@@ -50,7 +50,6 @@ struct ModelProvidersPage: View {
             .padding(10)
             ScrollView {
                 LazyVStack(spacing: 2) {
-                    systemRow
                     ForEach(filtered) { provider in row(provider) }
                     if let pending, !model.snapshot.providers.contains(where: { $0.id == pending.id }) { draftRow(pending) }
                 }
@@ -83,31 +82,23 @@ struct ModelProvidersPage: View {
         .background(Color.primary.opacity(0.03))
     }
 
-    private var systemRow: some View {
-        listRow(selected: selection == "") {
-            select("")
-        } content: {
-            HStack(spacing: 8) {
-                Image.om("server", size: 13).foregroundStyle(OMColors.secondaryText)
-                Text("系统默认").font(OMFonts.body)
-                Spacer()
-                if model.snapshot.active == nil { OMTag(String(localized: "默认")) }
-            }
-        }
-    }
-
     private func row(_ provider: ModelProvider) -> some View {
         listRow(selected: selection == provider.id) {
             select(provider.id)
         } content: {
             HStack(spacing: 8) {
-                Circle().fill(statusColor(provider)).frame(width: 7, height: 7)
+                BrandIconView(BrandIcon.resolve(providerPreset: provider.presetId, providerName: provider.name), size: 15)
+                    .foregroundStyle(OMColors.secondaryText)
+                    .overlay(alignment: .bottomTrailing) {
+                        Circle().fill(statusColor(provider)).frame(width: 6, height: 6)
+                            .overlay(Circle().stroke(OMColors.opaqueChrome, lineWidth: 1))
+                            .offset(x: 2, y: 2)
+                    }
                 VStack(alignment: .leading, spacing: 1) {
                     Text(provider.name).font(OMFonts.body).lineLimit(1)
                     Text(provider.model).font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText).lineLimit(1)
                 }
                 Spacer(minLength: 4)
-                if model.snapshot.active == provider.id { OMTag(String(localized: "默认")) }
                 Toggle("", isOn: Binding(get: { provider.isEnabled }, set: { model.setEnabled(provider.id, $0) }))
                     .toggleStyle(.switch)
                     .controlSize(.mini)
@@ -153,9 +144,7 @@ struct ModelProvidersPage: View {
 
     @ViewBuilder
     private var detail: some View {
-        if selection == "" {
-            SystemDefaultDetail(model: model)
-        } else if let id = selection, let provider = pending?.id == id ? pending : model.snapshot.providers.first(where: { $0.id == id }) {
+        if let id = selection, let provider = pending?.id == id ? pending : model.snapshot.providers.first(where: { $0.id == id }) {
             ProviderDetailView(model: model, initial: provider, isNew: !model.snapshot.providers.contains(where: { $0.id == id })) { savedId in
                 pending = nil
                 selection = savedId
@@ -168,7 +157,7 @@ struct ModelProvidersPage: View {
             VStack(spacing: 8) {
                 Image.om("server", size: 28).foregroundStyle(OMColors.tertiaryText)
                 Text("选择左侧的提供商进行配置").font(OMFonts.body).foregroundStyle(OMColors.secondaryText)
-                Text("「默认」用于新建会话;已启用且配置了密钥的提供商都会出现在输入框的模型菜单里,在菜单里切换只影响当前会话。")
+                Text("这里只配置提供商本身;让 Claude Code 的默认/Opus/Sonnet/Haiku 使用哪个模型,请到「Claude Code 模型映射」页选择。")
                     .font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
                     .multilineTextAlignment(.center).frame(maxWidth: 360)
             }
@@ -193,25 +182,5 @@ struct ModelProvidersPage: View {
     static func customDraft(_ kind: ProviderProtocol) -> ModelProvider {
         ModelProvider(id: "custom-\(UUID().uuidString.prefix(6).lowercased())", name: String(localized: "自定义"), baseURL: "https://", model: "",
                       protocolKind: kind == .openai ? .openai : nil)
-    }
-}
-
-/// 「系统默认」详情。
-private struct SystemDefaultDetail: View {
-    let model: ProviderSettingsModel
-
-    var body: some View {
-        Form {
-            Section("系统默认") {
-                Note("沿用 ~/.claude 里的配置(含你在终端里使用的模型与登录凭据)。OhMyAgent 不会改动该文件,也不影响终端里的 claude。")
-                if model.snapshot.active == nil {
-                    Label("当前全局默认", om: "check").foregroundStyle(OMColors.secondaryText)
-                } else {
-                    Button("设为全局默认") { model.setActive(nil) }
-                }
-                Note("全局默认对「新建会话与重新连接」生效;已打开的会话可以在输入框的模型菜单里单独切换,只影响当前会话。")
-            }
-        }
-        .formStyle(.grouped)
     }
 }

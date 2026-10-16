@@ -13,44 +13,32 @@ struct ProviderAdvancedTests {
     }
 
     @Test("高级参数映射为环境变量")
-    func advancedEnv() {
+    func advancedEnv() throws {
+        let gateway = try #require(URL(string: "http://127.0.0.1:9/t"))
         var provider = base()
         provider.maxOutputTokens = 8192
         provider.contextWindow = 200_000
         provider.effort = "high"
-        let env = ProviderLaunch.publicEnvironment(provider)
+        let env = ProviderLaunch.publicEnvironment(ModelProviderTests.mapping(provider, "m1"), gateway: gateway)
         #expect(env["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] == "8192")
         #expect(env["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] == "200000")
         #expect(env["CLAUDE_CODE_EFFORT_LEVEL"] == "high")
-        #expect(ProviderLaunch.publicEnvironment(base())["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] == nil)
+        #expect(ProviderLaunch.publicEnvironment(ModelProviderTests.mapping(base(), "m1"), gateway: gateway)["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] == nil)
     }
 
-    @Test("x-api-key 鉴权:密钥进 ANTHROPIC_API_KEY,清空 AUTH_TOKEN")
-    func apiKeyScheme() throws {
+    @Test("鉴权与自定义头进入网关路由,而不是 Claude 进程")
+    func routeCarriesAuth() throws {
         var provider = base()
         provider.usesAPIKeyHeader = true
-        let env = ProviderLaunch.publicEnvironment(provider)
-        #expect(env["ANTHROPIC_AUTH_TOKEN"] == "")
-        #expect(env["ANTHROPIC_API_KEY"] == nil)
-        let meta = ProviderLaunch.sessionMeta(provider, key: "sk-1")
-        let secret = try #require(meta["claudeCode"]?["options"]?["env"])
-        #expect(secret["ANTHROPIC_API_KEY"]?.stringValue == "sk-1")
-        #expect(secret["ANTHROPIC_AUTH_TOKEN"] == nil)
-    }
-
-    @Test("自定义请求头只进进程 env,且不再被清空")
-    func headersInSecretEnv() throws {
-        var provider = base()
         provider.customHeaders = "X-Org: abc\n\n X-Token : t "
-        let env = ProviderLaunch.publicEnvironment(provider)
-        #expect(env["ANTHROPIC_CUSTOM_HEADERS"] == nil)
-        let meta = ProviderLaunch.sessionMeta(provider, key: "k")
-        let secret = try #require(meta["claudeCode"]?["options"]?["env"])
-        #expect(secret["ANTHROPIC_CUSTOM_HEADERS"]?.stringValue == "X-Org: abc\nX-Token : t")
-        let settingsText = String(describing: meta["claudeCode"]?["options"]?["settings"] as Any)
-        #expect(!settingsText.contains("X-Org"))
-        // 无自定义头时仍清空用户侧变量
-        #expect(ProviderLaunch.publicEnvironment(base())["ANTHROPIC_CUSTOM_HEADERS"] == "")
+        let route = try #require(ProviderBridge.route(for: provider, key: "sk-1"))
+        #expect(route.usesAPIKeyHeader && route.apiKey == "sk-1")
+        #expect(route.extraHeaders["X-Org"] == "abc" && route.extraHeaders["X-Token"] == "t")
+        let gateway = try #require(URL(string: "http://127.0.0.1:9/t"))
+        let meta = ProviderLaunch.sessionMeta(ModelProviderTests.mapping(provider, "m1", key: "sk-1"), gateway: gateway)
+        let text = String(describing: meta)
+        #expect(!text.contains("sk-1") && !text.contains("X-Org"))
+        #expect(meta["claudeCode"]?["options"]?["env"]?["ANTHROPIC_API_KEY"] == nil)
     }
 
     @Test("校验:非法数值、强度与请求头")
@@ -68,7 +56,7 @@ struct ProviderAdvancedTests {
         #expect(throws: Never.self) { try provider.validate() }
     }
 
-    @Test("旧版 providers.json(无新字段)仍可解码")
+    @Test("旧版 providers.json(无新字段、含 active)仍可解码")
     func backwardCompatible() throws {
         let json = #"{"active":"p","providers":[{"id":"p","name":"P","baseURL":"https://x.com","model":"m"}]}"#
         let snapshot = try JSONDecoder().decode(ProviderSnapshot.self, from: Data(json.utf8))
@@ -76,24 +64,37 @@ struct ProviderAdvancedTests {
         #expect(snapshot.providers.first?.availableModels == nil)
     }
 
-    @Test("会话级覆盖:切换提供商、换主模型、强制系统默认")
-    func sessionOverride() throws {
+    @Test("OpenCode Zen 预设使用 x-api-key 并带兼容头;旧数据加载时补齐")
+    func opencodePreset() throws {
+        let fresh = try #require(ProviderPreset.all.first { $0.id == "opencode" }).makeProvider()
+        #expect(fresh.usesAPIKeyHeader == true && fresh.opencodeCompat == true)
+        let old = ModelProvider(id: "opencode", name: "OpenCode Zen", baseURL: "https://opencode.ai/zen", model: "m", presetId: "opencode")
+        let migrated = old.migrated()
+        #expect(migrated.usesAPIKeyHeader == true && migrated.opencodeCompat == true)
+        let route = try #require(ProviderBridge.route(for: migrated, key: "k"))
+        #expect(route.usesAPIKeyHeader && route.extraHeaders["User-Agent"]?.hasPrefix("opencode/") == true)
+        // 用户显式关闭过的不覆盖
+        var custom = old
+        custom.usesAPIKeyHeader = false
+        #expect(custom.migrated().usesAPIKeyHeader == false)
+    }
+
+    @Test("映射解析:不同提供商可混用到不同槽位")
+    func mixedProviders() throws {
         let dir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("oma-prov-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: dir) }
         var a = base(); a.id = "a"; a.name = "A"
         var b = base(); b.id = "b"; b.name = "B"; b.model = "bm"
-        try ProviderStorage.save(ProviderSnapshot(active: "a", providers: [a, b]), directory: dir)
+        let mapping = ModelMapping(slots: [.main: ModelTarget(providerId: "a", model: "m1"), .opus: ModelTarget(providerId: "b", model: "bm"), .subagent: ModelTarget(providerId: "b", model: "bs")])
+        try ProviderStorage.save(ProviderSnapshot(mapping: mapping, providers: [a, b]), directory: dir)
         try ProviderStorage.setKey("ka", for: "a", directory: dir)
         try ProviderStorage.setKey("kb", for: "b", directory: dir)
-
-        let global = try #require(try ProviderStorage.resolveActive(directory: dir, environment: [:]))
-        #expect(global.provider.id == "a")
-        let viaB = try #require(try ProviderStorage.resolveActive(directory: dir, environment: [:], override: ProviderOverride(providerId: "b")))
-        #expect(viaB.provider.id == "b" && viaB.provider.model == "bm")
-        let model = try #require(try ProviderStorage.resolveActive(directory: dir, environment: [:], override: ProviderOverride(providerId: "b", model: "other")))
-        #expect(model.provider.model == "other")
-        #expect(model.meta["claudeCode"]?["options"]?["settings"]?["model"]?.stringValue == "other")
-        #expect(try ProviderStorage.resolveActive(directory: dir, environment: [:], override: ProviderOverride(providerId: nil)) == nil)
+        let resolved = try #require(try ProviderStorage.resolveMapping(directory: dir, environment: [:]))
+        #expect(resolved.main.provider.id == "a" && resolved.others[.opus]?.provider.id == "b")
+        #expect(resolved.infos[.subagent]?.modelId == "bs")
+        let gateway = try #require(URL(string: "http://127.0.0.1:9/t"))
+        let env = ProviderLaunch.publicEnvironment(resolved, gateway: gateway)
+        #expect(env["ANTHROPIC_DEFAULT_OPUS_MODEL"] == "oma-large" && env["CLAUDE_CODE_SUBAGENT_MODEL"] == "oma-sub")
     }
 
     @Test("模型列表解析:data / models / 字符串数组,去重保序")

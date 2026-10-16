@@ -85,10 +85,15 @@ extension ModelProvider {
     /// 旧数据迁移:把 `availableModels` 并入 `models` 并清除旧字段。
     /// - Returns: 迁移后的副本
     public func migrated() -> ModelProvider {
-        guard models == nil, availableModels != nil else { return self }
         var copy = self
-        copy.models = modelList
-        copy.availableModels = nil
+        if models == nil, availableModels != nil {
+            copy.models = modelList
+            copy.availableModels = nil
+        }
+        // OpenCode Zen 的 Anthropic 端点:必须 x-api-key 鉴权,且 Cloudflare 会拦截没有 OpenCode 标识的请求
+        // (旧版预设没有这两项,导致 401 / 1010)
+        if presetId == "opencode", usesAPIKeyHeader == nil { copy.usesAPIKeyHeader = true }
+        if presetId == "opencode", opencodeCompat == nil { copy.opencodeCompat = true }
         return copy
     }
 

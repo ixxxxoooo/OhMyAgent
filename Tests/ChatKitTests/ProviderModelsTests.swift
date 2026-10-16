@@ -45,7 +45,8 @@ struct ProviderModelListTests {
         #expect(provider.effectiveContextWindow == 100)
         provider.models = [ProviderModel(id: "a", contextWindow: 500)]
         #expect(provider.effectiveContextWindow == 500)
-        #expect(ProviderLaunch.publicEnvironment(provider)["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] == "500")
+        let gateway = URL(string: "http://127.0.0.1:9/t")!
+        #expect(ProviderLaunch.publicEnvironment(ModelProviderTests.mapping(provider, "a"), gateway: gateway)["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] == "500")
     }
 
     @Test("旧文件无新字段:协议默认 Anthropic、默认启用;protocol 键往返")
@@ -78,7 +79,7 @@ struct ProviderMenuBuilderTests {
         let c = ModelProvider(id: "c", name: "本地", baseURL: "http://localhost:1/v1", model: "m", protocolKind: .openai, keyOptional: true)
         let d = ModelProvider(id: "d", name: "Delta", baseURL: "https://d.com", model: "d1")
         a.models?[0].displayName = "A 一"
-        return ProviderSnapshot(active: nil, providers: [a, b, c, d])
+        return ProviderSnapshot(providers: [a, b, c, d])
     }
 
     @Test("只含已启用且已配置密钥(或无需密钥)的提供商")
@@ -102,28 +103,28 @@ struct ProviderMenuBuilderTests {
 struct ProviderBridgeTests {
     private let provider = ModelProvider(id: "oa", name: "OA", baseURL: "https://api.example.com/v1", model: "gpt", protocolKind: .openai, opencodeCompat: true)
 
-    @Test("OpenAI 协议:meta 指向本地代理,真实密钥不进入 meta")
+    @Test("meta 指向本机网关,真实密钥与上游地址都不进入 meta")
     func activate() async throws {
         let proxy = ProviderProxy()
-        let meta = ProviderLaunch.sessionMeta(provider, key: "sk-real-secret")
-        let resolved = ResolvedProvider(provider: provider, meta: meta, key: "sk-real-secret")
-        let active = try await ProviderBridge.activate(resolved, proxy: proxy)
+        let resolved = ModelProviderTests.mapping(provider, "gpt", key: "sk-real-secret")
+        let active = try await ProviderBridge.activate(resolved, sessionKey: "t1", proxy: proxy)
         let text = String(describing: active.meta)
         #expect(!text.contains("sk-real-secret"))
         #expect(text.contains("127.0.0.1"))
-        #expect(text.contains(ProviderBridge.placeholderToken))
+        #expect(text.contains(ProviderLaunch.placeholderToken))
         #expect(!text.contains("api.example.com"))
-        #expect(active.provider.baseURL == provider.baseURL, "展示用的提供商仍是真实上游")
+        #expect(active.infos[.main]?.providerName == "OA" && active.mainModel == "gpt")
         await proxy.shutdown()
     }
 
-    @Test("Anthropic 协议原样返回")
+    @Test("Anthropic 协议同样经网关(透传),meta 不含上游地址")
     func passthrough() async throws {
         let direct = ModelProvider(id: "d", name: "D", baseURL: "https://x.com/anthropic", model: "m")
-        let resolved = ResolvedProvider(provider: direct, meta: ProviderLaunch.sessionMeta(direct, key: "k"), key: "k")
         let proxy = ProviderProxy()
-        let active = try await ProviderBridge.activate(resolved, proxy: proxy)
-        #expect(String(describing: active.meta).contains("x.com"))
+        let active = try await ProviderBridge.activate(ModelProviderTests.mapping(direct, "m"), sessionKey: "t2", proxy: proxy)
+        #expect(!String(describing: active.meta).contains("x.com"))
+        await ProviderBridge.deactivate(sessionKey: "t2", proxy: proxy)
+        await proxy.shutdown()
     }
 
     @Test("路由携带 OpenCode 兼容头与自定义头")
@@ -136,17 +137,18 @@ struct ProviderBridgeTests {
         #expect(route.apiKey == "k")
     }
 
-    @Test("停用的提供商不解析;无需密钥的提供商缺密钥也能解析")
+    @Test("停用的提供商不能作默认槽位;无需密钥的提供商缺密钥也能解析")
     func resolveRules() throws {
         let dir = tempDirectory()
         defer { try? FileManager.default.removeItem(at: dir) }
         var off = ModelProvider(id: "off", name: "Off", baseURL: "https://x.com", model: "m")
         off.enabled = false
         let local = ModelProvider(id: "local", name: "Local", baseURL: "http://localhost:11434/v1", model: "m", protocolKind: .openai, keyOptional: true)
-        try ProviderStorage.save(ProviderSnapshot(active: "off", providers: [off, local]), directory: dir)
-        #expect(try ProviderStorage.resolveActive(directory: dir, environment: [:]) == nil)
-        let resolved = try #require(try ProviderStorage.resolveActive(directory: dir, environment: [:], override: ProviderOverride(providerId: "local")))
-        #expect(resolved.provider.id == "local")
+        try ProviderStorage.save(ProviderSnapshot(mapping: ModelMapping(slots: [.main: ModelTarget(providerId: "off", model: "m")]), providers: [off, local]), directory: dir)
+        #expect(throws: ProviderStorage.ResolveError.disabled("Off")) { try ProviderStorage.resolveMapping(directory: dir, environment: [:]) }
+        try ProviderStorage.save(ProviderSnapshot(mapping: ModelMapping(slots: [.main: ModelTarget(providerId: "local", model: "m")]), providers: [off, local]), directory: dir)
+        let resolved = try #require(try ProviderStorage.resolveMapping(directory: dir, environment: [:]))
+        #expect(resolved.main.provider.id == "local")
     }
 }
 
@@ -248,7 +250,7 @@ extension ProviderTesterTests {
 @MainActor
 @Suite("提供商设置模型")
 struct ProviderSettingsModelTests {
-    @Test("同名保存自动加序号;停用默认提供商回到系统默认;密钥缓存随增删更新")
+    @Test("同名保存自动加序号;删除提供商清除映射;密钥缓存随增删更新")
     func settingsModel() {
         let dir = tempDirectory()
         defer { try? FileManager.default.removeItem(at: dir) }
@@ -264,14 +266,28 @@ struct ProviderSettingsModelTests {
 
         model.setKey("sk-1", id: "a")
         #expect(model.hasKey(id: "a") && model.keyedIds == ["a"])
-        model.setActive("a")
+        model.setMapping(.main, ModelTarget(providerId: "a", model: "m"))
+        model.setMapping(.haiku, ModelTarget(providerId: "b", model: "m"))
         model.setEnabled("a", false)
-        #expect(model.snapshot.active == nil)
         #expect(model.snapshot.providers.first { $0.id == "a" }?.isEnabled == false)
         model.setEnabled("a", true)
         #expect(model.snapshot.providers.first { $0.id == "a" }?.enabled == nil, "启用状态不落盘,保持文件干净")
         model.setKey("", id: "a")
         #expect(!model.hasKey(id: "a"))
         #expect(ProviderStorage.keyedIds(directory: dir).isEmpty)
+        model.remove(id: "a")
+        #expect(model.snapshot.mapping[.main] == nil && model.snapshot.mapping[.haiku] != nil)
+    }
+}
+
+@Suite("模式色调")
+struct ModeToneTests {
+    @Test("Claude Code 的全部模式都有各自不同的色调;未知模式回退中性")
+    func allModes() {
+        let tones = ["default", "acceptEdits", "plan", "auto", "dontAsk", "bypassPermissions"].map { ModeTone.tone(forMode: $0) }
+        #expect(Set(tones).count == tones.count, "每种模式的色调互不相同")
+        #expect(ModeTone.tone(forMode: "default") == .neutral)
+        #expect(ModeTone.tone(forMode: "bypassPermissions") == .red)
+        #expect(ModeTone.tone(forMode: "不存在") == .neutral)
     }
 }

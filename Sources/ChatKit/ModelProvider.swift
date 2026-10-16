@@ -1,13 +1,12 @@
 // @author ixxxxoooo
-// 模型提供商:每个会话启动时,经 ACP 的 `_meta.claudeCode.options` 把「上游地址 + 模型 + 密钥」
-// 交给 Claude Code,不改动用户的 `~/.claude/settings.json`(做法参考 baocode 的 launchEnvironment)。
+// 模型提供商:提供商只负责「地址 + 协议 + 密钥 + 模型清单」;哪个 Claude Code 槽位用哪个模型由
+// `ModelMapping`(见 ModelMapping.swift)决定。会话启动时经 ACP 的 `_meta.claudeCode.options`
+// 把本机网关地址与槽位别名交给 Claude Code,不改动用户的 `~/.claude/settings.json`。
 //
 // 要点:
-// - 非密钥部分(地址、模型、清空用户自己的 Bedrock/网关变量)放进 `settings.env`(程序化设置层,
-//   优先于用户/项目设置);
-// - 密钥(ANTHROPIC_AUTH_TOKEN)只放进进程 `env`:适配器会把 `--settings` 打到 stderr/命令行,
-//   密钥放那里会泄露;
-// - 仅支持 Anthropic 协议直连(DeepSeek/GLM/Kimi/MiniMax/Qwen 等官方 Anthropic 兼容端点)。
+// - 非密钥部分放进 `settings.env`(程序化设置层,优先于用户/项目设置);
+// - 真实密钥只在应用内网关的内存里,Claude Code 只拿到占位令牌;
+// - Anthropic 协议厂商由网关透传,OpenAI 协议厂商由网关转换。
 
 import ACPKit
 import Foundation
@@ -19,9 +18,9 @@ public struct ModelProvider: Codable, Identifiable, Hashable, Sendable {
     public var name: String
     /// Anthropic 协议端点(如 `https://api.deepseek.com/anthropic`)
     public var baseURL: String
-    /// 主模型
+    /// 默认模型(新建映射、测试连接时的缺省模型)
     public var model: String
-    /// 各角色模型(留空则都用主模型)
+    /// 旧版各角色模型(仅用于迁移到「模型映射」,界面不再编辑)
     public var opusModel: String?
     public var sonnetModel: String?
     public var haikuModel: String?
@@ -115,14 +114,6 @@ public struct ModelProvider: Codable, Identifiable, Hashable, Sendable {
         text.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
     }
 
-    /// 返回把主模型换成 `model` 的副本(会话级切换,不落盘)。
-    /// - Parameter model: 新的主模型
-    public func with(model: String) -> ModelProvider {
-        var copy = self
-        copy.model = model
-        return copy
-    }
-
     /// 规范化后的地址(去空白与末尾斜杠)。
     public var normalizedBaseURL: String {
         var text = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -147,19 +138,21 @@ public struct ProviderPreset: Identifiable, Sendable {
     public var keyOptional = false
     /// 需要 OpenCode 兼容请求头
     public var opencodeCompat = false
+    /// 使用 x-api-key 头鉴权(Anthropic 官方、OpenCode Zen 的 Anthropic 端点)
+    public var apiKeyHeader = false
 
     /// 默认模型(列表第一个)。
     public var defaultModel: String { models.first ?? "" }
 
     /// 预设列表。
     public static let all: [ProviderPreset] = [
-        ProviderPreset(id: "anthropic", name: String(localized: "Anthropic 官方"), baseURL: "https://api.anthropic.com", models: ["claude-sonnet-4-5", "claude-opus-4-1", "claude-haiku-4-5"], hint: String(localized: "官方 API(按量计费),使用 x-api-key 鉴权;需要自己的 API Key,不使用 claude 登录凭据。")),
+        ProviderPreset(id: "anthropic", name: String(localized: "Anthropic 官方"), baseURL: "https://api.anthropic.com", models: ["claude-sonnet-4-5", "claude-opus-4-1", "claude-haiku-4-5"], hint: String(localized: "官方 API(按量计费),使用 x-api-key 鉴权;需要自己的 API Key,不使用 claude 登录凭据。"), apiKeyHeader: true),
         ProviderPreset(id: "deepseek", name: "DeepSeek", baseURL: "https://api.deepseek.com/anthropic", models: ["deepseek-chat", "deepseek-reasoner"], hint: String(localized: "官方原生兼容 Anthropic 协议,国内直连。注意 `/v1` 是 OpenAI 协议端点,这里必须用 `/anthropic`。")),
         ProviderPreset(id: "glm", name: String(localized: "智谱 GLM"), baseURL: "https://open.bigmodel.cn/api/anthropic", models: ["glm-4.6", "glm-4.5", "glm-4.5-air"], hint: String(localized: "智谱开放平台 Claude API 兼容端点")),
         ProviderPreset(id: "kimi", name: "Kimi(Moonshot)", baseURL: "https://api.moonshot.cn/anthropic", models: ["kimi-k2-turbo-preview", "kimi-k2-0905-preview"], hint: String(localized: "海外可改用 api.moonshot.ai/anthropic")),
         ProviderPreset(id: "minimax", name: "MiniMax", baseURL: "https://api.minimaxi.com/anthropic", models: ["MiniMax-M2"], hint: String(localized: "海外可改用 api.minimax.io/anthropic")),
         ProviderPreset(id: "qwen", name: String(localized: "阿里云百炼(Qwen)"), baseURL: "https://dashscope.aliyuncs.com/apps/anthropic", models: ["qwen3-coder-plus", "qwen3-coder-flash"], hint: String(localized: "Coding Plan 用户端点略有不同,可手动修改")),
-        ProviderPreset(id: "opencode", name: "OpenCode Zen", baseURL: "https://opencode.ai/zen", models: ["claude-sonnet-4-5", "qwen3-coder", "kimi-k2"], hint: String(localized: "OpenCode Zen 网关的 Anthropic 兼容端点;模型名以其控制台为准,可用「获取模型列表」同步。")),
+        ProviderPreset(id: "opencode", name: "OpenCode Zen", baseURL: "https://opencode.ai/zen", models: ["claude-sonnet-4-5", "qwen3-coder", "kimi-k2"], hint: String(localized: "OpenCode Zen 网关的 Anthropic 兼容端点;模型名以其控制台为准,可用「获取模型列表」同步。"), opencodeCompat: true, apiKeyHeader: true),
         ProviderPreset(id: "openai", name: "OpenAI", baseURL: "https://api.openai.com/v1", models: ["gpt-4.1", "gpt-4o", "o4-mini"], hint: String(localized: "OpenAI 协议:经本机内置的协议代理转换后交给 Claude Code。"), protocolKind: .openai),
         ProviderPreset(id: "openrouter", name: "OpenRouter", baseURL: "https://openrouter.ai/api/v1", models: ["anthropic/claude-sonnet-4.5", "openai/gpt-4.1", "google/gemini-2.5-pro"], hint: String(localized: "聚合多家模型的 OpenAI 协议网关;模型名形如 厂商/模型。"), protocolKind: .openai),
         ProviderPreset(id: "gemini", name: "Google Gemini", baseURL: "https://generativelanguage.googleapis.com/v1beta/openai", models: ["gemini-2.5-pro", "gemini-2.5-flash"], hint: String(localized: "Gemini 的 OpenAI 兼容端点,使用 Google AI Studio 的 API Key。"), protocolKind: .openai),
@@ -171,101 +164,52 @@ public struct ProviderPreset: Identifiable, Sendable {
 
     /// 由预设生成提供商。
     public func makeProvider() -> ModelProvider {
-        ModelProvider(id: id, name: name, baseURL: baseURL, model: defaultModel, presetId: id, usesAPIKeyHeader: id == "anthropic" ? true : nil,
+        ModelProvider(id: id, name: name, baseURL: baseURL, model: defaultModel, presetId: id, usesAPIKeyHeader: apiKeyHeader ? true : nil,
                       protocolKind: protocolKind == .openai ? .openai : nil, models: models.map { ProviderModel(id: $0) },
                       keyOptional: keyOptional ? true : nil, opencodeCompat: opencodeCompat ? true : nil)
     }
 }
 
-/// 生成 Claude Code 的会话级模型环境。
-public enum ProviderLaunch {
-    /// 提供商会话必须清空的用户侧变量(其他后端、网关、旧模型名)。
-    public static let clearedVariables = [
-        "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY",
-        "ANTHROPIC_SMALL_FAST_MODEL", "ANTHROPIC_CUSTOM_HEADERS",
-        "ANTHROPIC_API_BASE_URL", "CLAUDE_AGENT_API_BASE_URL",
-        "ANTHROPIC_CUSTOM_MODEL_OPTION", "ANTHROPIC_CUSTOM_MODEL_OPTION_NAME", "ANTHROPIC_CUSTOM_MODEL_OPTION_DESCRIPTION",
-        "ANTHROPIC_DEFAULT_FABLE_MODEL", "CLAUDE_CODE_SUBAGENT_MODEL", "CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY",
-    ]
-
-    /// 非密钥环境(放进 `settings.env`)。
-    /// - Parameter provider: 提供商
-    /// - Returns: 环境字典
-    public static func publicEnvironment(_ provider: ModelProvider) -> [String: String] {
-        var env: [String: String] = [:]
-        let hasHeaders = !headerLines(provider.customHeaders).isEmpty
-        // 自定义请求头改由进程 env 提供,此处不能再清空(程序化设置层优先于进程 env)
-        for name in clearedVariables where !(hasHeaders && name == "ANTHROPIC_CUSTOM_HEADERS") { env[name] = "" }
-        env["ANTHROPIC_BASE_URL"] = provider.normalizedBaseURL
-        // 两种鉴权头互斥:未使用的那个在程序化设置层清空,避免用户自己的凭据串进来
-        if provider.usesAPIKeyHeader == true { env["ANTHROPIC_AUTH_TOKEN"] = "" } else { env["ANTHROPIC_API_KEY"] = "" }
-        env["ANTHROPIC_MODEL"] = provider.model
-        env["ANTHROPIC_DEFAULT_OPUS_MODEL"] = nonEmpty(provider.opusModel) ?? provider.model
-        env["ANTHROPIC_DEFAULT_SONNET_MODEL"] = nonEmpty(provider.sonnetModel) ?? provider.model
-        env["ANTHROPIC_DEFAULT_HAIKU_MODEL"] = nonEmpty(provider.haikuModel) ?? provider.model
-        if let value = provider.maxOutputTokens, value > 0 { env["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] = String(value) }
-        if let value = provider.effectiveContextWindow, value > 0 { env["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] = String(value) }
-        if let value = nonEmpty(provider.effort) { env["CLAUDE_CODE_EFFORT_LEVEL"] = value }
-        // 第三方网关(DeepSeek/GLM/Kimi 等)不会返回服务端 auto 模式检查结果,关闭探测以免出现「分类器计费」警告
-        if NoticeFilter.isThirdPartyGateway(provider.normalizedBaseURL) { env[NoticeFilter.autoModeServerKey] = "0" }
-        return env
-    }
-
-    /// 生成 `session/new|load|resume|fork` 的 `_meta`。
-    /// - Parameters:
-    ///   - provider: 提供商
-    ///   - key: API 密钥(只进进程 env)
-    /// - Returns: `_meta` JSON
-    public static func sessionMeta(_ provider: ModelProvider, key: String) -> JSONValue {
-        let publicEnv = publicEnvironment(provider).mapValues(JSONValue.string)
-        let settings: JSONValue = .object(["model": .string(provider.model), "apiKeyHelper": .string(""), "env": .object(publicEnv)])
-        // 密钥与可能含密钥的自定义请求头只进进程 env
-        var secret: [String: JSONValue] = [provider.usesAPIKeyHeader == true ? "ANTHROPIC_API_KEY" : "ANTHROPIC_AUTH_TOKEN": .string(key)]
-        let headers = headerLines(provider.customHeaders)
-        if !headers.isEmpty { secret["ANTHROPIC_CUSTOM_HEADERS"] = .string(headers.joined(separator: "\n")) }
-        let secretEnv: JSONValue = .object(secret)
-        return .object(["claudeCode": .object(["options": .object(["settings": settings, "env": secretEnv])])])
-    }
-
-    private static func headerLines(_ text: String?) -> [String] {
-        ModelProvider.headerLines(text ?? "")
-    }
-
-    private static func nonEmpty(_ text: String?) -> String? {
-        guard let text = text?.trimmingCharacters(in: .whitespaces), !text.isEmpty else { return nil }
-        return text
-    }
-}
-
-/// 会话级提供商覆盖(输入框的模型菜单设置,不落盘)。
-public struct ProviderOverride: Equatable, Sendable {
-    /// 提供商 ID;nil 表示强制使用系统默认(~/.claude 配置)
-    public var providerId: String?
-    /// 覆盖主模型(nil 沿用提供商配置)
-    public var model: String?
-
-    public init(providerId: String?, model: String? = nil) {
-        self.providerId = providerId
-        self.model = model
-    }
-}
-
-/// 已解析、可直接用于启动会话的提供商。
-public struct ResolvedProvider: Sendable {
-    public var provider: ModelProvider
-    /// 会话 `_meta`(含密钥,不可记录)
-    public var meta: JSONValue
-    /// 密钥(不可记录;OpenAI 协议只交给本地代理,不进入 Claude Code 进程)
-    var key: String
-}
-
 /// 提供商文件快照(磁盘格式)。
 public struct ProviderSnapshot: Codable, Sendable, Equatable {
-    public var active: String?
+    /// Claude Code 槽位 → 提供商模型 的映射
+    public var mapping: ModelMapping
     public var providers: [ModelProvider]
-    public init(active: String? = nil, providers: [ModelProvider] = []) {
-        self.active = active
+    /// 旧版「全局默认提供商」(只读取用于迁移,不再写出)
+    var legacyActive: String?
+
+    public init(mapping: ModelMapping = ModelMapping(), providers: [ModelProvider] = []) {
+        self.mapping = mapping
         self.providers = providers
+    }
+
+    private enum CodingKeys: String, CodingKey { case mapping, providers, active }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        mapping = try container.decodeIfPresent(ModelMapping.self, forKey: .mapping) ?? ModelMapping()
+        providers = try container.decodeIfPresent([ModelProvider].self, forKey: .providers) ?? []
+        legacyActive = try container.decodeIfPresent(String.self, forKey: .active)
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(mapping, forKey: .mapping)
+        try container.encode(providers, forKey: .providers)
+    }
+
+    /// 旧数据迁移:映射为空且存在旧的全局默认提供商时,把它(及其 Opus/Sonnet/Haiku 角色模型)转成映射。
+    /// - Returns: 迁移后的副本
+    func migratedMapping() -> ProviderSnapshot {
+        var copy = self
+        defer { copy.legacyActive = nil }
+        guard copy.mapping.isEmpty, let id = legacyActive,
+              let provider = copy.providers.first(where: { $0.id == id }), provider.isEnabled, !provider.model.isEmpty else { return copy }
+        copy.mapping[.main] = ModelTarget(providerId: id, model: provider.model)
+        for (slot, role) in [(ModelSlot.opus, provider.opusModel), (.sonnet, provider.sonnetModel), (.haiku, provider.haikuModel)] {
+            if let role = ProviderLaunch.nonEmpty(role), role != provider.model { copy.mapping[slot] = ModelTarget(providerId: id, model: role) }
+        }
+        return copy
     }
 }
 
@@ -287,7 +231,7 @@ public enum ProviderStorage {
         do {
             var snapshot = try JSONDecoder().decode(ProviderSnapshot.self, from: data)
             snapshot.providers = snapshot.providers.map { $0.migrated() }
-            return snapshot
+            return snapshot.migratedMapping()
         } catch {
             Log.agent.error("providers.json 解析失败", error: error)
             return ProviderSnapshot()
@@ -301,6 +245,20 @@ public enum ProviderStorage {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try encoder.encode(snapshot).write(to: providersURL(directory), options: .atomic)
+    }
+
+    /// 读取整个密钥文件(缺失或损坏返回空)。
+    static func loadKeys(directory: URL) -> [String: String] {
+        guard let data = try? Data(contentsOf: keysURL(directory)),
+              let map = try? JSONDecoder().decode([String: String].self, from: data) else { return [:] }
+        return map
+    }
+
+    /// 从已读入的密钥表取某提供商的密钥(环境变量 `OMA_PROVIDER_KEY` 优先)。
+    static func key(for id: String, keys: [String: String], environment: [String: String]) -> String? {
+        if let value = environment["OMA_PROVIDER_KEY"]?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty { return value }
+        guard let value = keys[id]?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else { return nil }
+        return value
     }
 
     /// 读取密钥:环境变量 `OMA_PROVIDER_KEY` 优先(调试用),其次密钥文件。
@@ -341,34 +299,46 @@ public enum ProviderStorage {
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }
 
-    /// 解析当前启用的提供商。
-    /// - Returns: 配置齐全返回 `ResolvedProvider`;未启用返回 nil;缺密钥时抛 `missingKey`
-    /// - Throws: `ResolveError`
-    public static func resolveActive(directory: URL = defaultDirectory, environment: [String: String] = ProcessInfo.processInfo.environment, override: ProviderOverride? = nil) throws -> ResolvedProvider? {
+    /// 解析当前的模型映射。
+    /// - Returns: 默认槽位已设置且有效返回 `ResolvedMapping`;未设置映射返回 nil(使用 ~/.claude 的系统默认)
+    /// - Throws: 默认槽位的提供商缺密钥/已停用/配置无效时抛 `ResolveError`(其他槽位的问题只产生警告并退回默认槽位)
+    static func resolveMapping(directory: URL = defaultDirectory, environment: [String: String] = ProcessInfo.processInfo.environment) throws -> ResolvedMapping? {
         let snapshot = load(directory: directory)
-        var activeId = snapshot.active
-        var modelOverride: String?
-        if let override {
-            // 会话级覆盖:`providerId` 为 nil 表示强制使用系统默认
-            activeId = override.providerId
-            modelOverride = override.model
+        guard let mainTarget = snapshot.mapping[.main] else { return nil }
+        let keys = loadKeys(directory: directory)
+
+        func resolve(_ slot: ModelSlot, _ target: ModelTarget) throws -> ResolvedTarget {
+            guard let provider = snapshot.providers.first(where: { $0.id == target.providerId }) else {
+                throw ResolveError.invalid(target.providerId, String(localized: "提供商已被删除"))
+            }
+            guard provider.isEnabled else { throw ResolveError.disabled(provider.name) }
+            guard !target.model.trimmingCharacters(in: .whitespaces).isEmpty else { throw ResolveError.invalid(provider.name, String(localized: "模型不能为空")) }
+            do { try provider.validate() } catch { throw ResolveError.invalid(provider.name, error.localizedDescription) }
+            let secret = key(for: provider.id, keys: keys, environment: environment)
+            if secret == nil, provider.requiresKey { throw ResolveError.missingKey(provider.name) }
+            return ResolvedTarget(slot: slot, provider: provider, model: target.model, key: secret ?? "")
         }
-        guard let activeId, var provider = snapshot.providers.first(where: { $0.id == activeId }), provider.isEnabled else { return nil }
-        if let modelOverride, !modelOverride.isEmpty { provider = provider.with(model: modelOverride) }
-        do { try provider.validate() } catch { throw ResolveError.invalid(provider.name, error.localizedDescription) }
-        var secret = key(for: provider.id, directory: directory, environment: environment)
-        if secret == nil, provider.requiresKey { throw ResolveError.missingKey(provider.name) }
-        if secret == nil { secret = "" }
-        let resolvedKey = secret ?? ""
-        return ResolvedProvider(provider: provider, meta: ProviderLaunch.sessionMeta(provider, key: resolvedKey), key: resolvedKey)
+
+        let main = try resolve(.main, mainTarget)
+        var others: [ModelSlot: ResolvedTarget] = [:]
+        var warnings: [String] = []
+        for slot in ModelSlot.allCases where slot != .main {
+            guard let target = snapshot.mapping[slot] else { continue }
+            do { others[slot] = try resolve(slot, target) } catch {
+                warnings.append(String(localized: "「\(slot.title)」槽位不可用,已改用默认槽位:\(error.localizedDescription)"))
+            }
+        }
+        return ResolvedMapping(main: main, others: others, warnings: warnings)
     }
 
     /// 解析错误(会话会据此提示并回退到系统默认)。
     public enum ResolveError: Error, LocalizedError, Equatable {
         case missingKey(String)
         case invalid(String, String)
+        case disabled(String)
         public var errorDescription: String? {
             switch self {
+            case .disabled(let name): String(localized: "模型提供商「\(name)」已停用:请在 设置 → 模型提供商 中启用,或调整 Claude Code 模型映射。已暂时使用 ~/.claude 的默认配置。")
             case .missingKey(let name): String(localized: "模型提供商「\(name)」未设置 API Key:请在 设置 → 模型提供商 中填写。已暂时使用 ~/.claude 的默认配置。")
             case .invalid(let name, let reason): String(localized: "模型提供商「\(name)」配置无效(\(reason)),已暂时使用 ~/.claude 的默认配置。")
             }
@@ -575,13 +545,13 @@ public final class ProviderSettingsModel {
     public func remove(id: String) {
         var next = snapshot
         next.providers.removeAll { $0.id == id }
-        if next.active == id { next.active = nil }
+        next.mapping.removeTargets(of: id)
         persist(next)
         try? ProviderStorage.setKey("", for: id, directory: directory)
         keyedIds.remove(id)
     }
 
-    /// 启用或停用某个提供商(停用后不出现在输入框菜单;若它是全局默认则回到系统默认)。
+    /// 启用或停用某个提供商(停用后不能被选为映射目标;已有的映射在会话启动时会给出提示)。
     /// - Parameters:
     ///   - id: 提供商 ID
     ///   - enabled: 是否启用
@@ -589,7 +559,6 @@ public final class ProviderSettingsModel {
         var next = snapshot
         guard let index = next.providers.firstIndex(where: { $0.id == id }) else { return }
         next.providers[index].enabled = enabled ? nil : false
-        if !enabled, next.active == id { next.active = nil }
         persist(next)
     }
 
@@ -603,11 +572,15 @@ public final class ProviderSettingsModel {
         return copy
     }
 
-    /// 设置启用项(nil 表示沿用 ~/.claude 默认配置)。新建会话与重连后生效。
-    public func setActive(_ id: String?) {
+    /// 设置某个槽位的映射目标(nil 清除;清除默认槽位即整体回到系统默认)。新建会话与重连后生效,空闲的会话会即时刷新。
+    /// - Parameters:
+    ///   - slot: 槽位
+    ///   - target: 目标
+    public func setMapping(_ slot: ModelSlot, _ target: ModelTarget?) {
         var next = snapshot
-        next.active = id
+        next.mapping[slot] = target
         persist(next)
+        NotificationCenter.default.post(name: .omModelMappingChanged, object: nil)
     }
 
     /// 是否已保存密钥(含 `OMA_PROVIDER_KEY` 环境变量)。
@@ -638,4 +611,9 @@ public final class ProviderSettingsModel {
             Log.agent.error("保存模型提供商失败", error: error)
         }
     }
+}
+
+extension Notification.Name {
+    /// 模型映射发生变化(设置页写入后发出,空闲会话据此刷新)。
+    public static let omModelMappingChanged = Notification.Name("com.ixxxxoooo.OhMyAgent.modelMappingChanged")
 }

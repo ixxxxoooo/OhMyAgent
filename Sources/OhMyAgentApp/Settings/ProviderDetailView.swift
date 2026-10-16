@@ -86,12 +86,8 @@ struct ProviderDetailView: View {
                 Button("测试连接") { Task { await test() } }.disabled(testing)
                 if testing { ProgressView().controlSize(.small) }
                 Spacer()
-                if model.snapshot.active == draft.id && !isNew {
-                    Label("当前全局默认", om: "check").font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
-                } else {
-                    Button("设为全局默认") { if save() { model.setActive(draft.id) } }
-                        .help("新建会话与重新连接时使用;已打开的会话请在输入框的模型菜单里切换")
-                }
+                Button("去模型映射中使用…") { if save() { SettingsRouter.shared.go(.modelMapping) } }
+                    .help("把这个提供商的模型映射到 Claude Code 的默认/Opus/Sonnet/Haiku 槽位")
             }
             if let testResult { resultView(testResult) }
         }
@@ -101,7 +97,7 @@ struct ProviderDetailView: View {
 
     private var modelsSection: some View {
         Section("模型") {
-            LabeledContent("主模型") {
+            LabeledContent("默认模型") {
                 TextField("", text: $draft.model, prompt: Text("模型 ID")).labelsHidden().textFieldStyle(.roundedBorder).multilineTextAlignment(.trailing)
             }
             ForEach(draft.modelList) { item in modelRow(item) }
@@ -113,20 +109,14 @@ struct ProviderDetailView: View {
                 Button { showFetch = true } label: { Label("获取模型列表", om: "cloud-download") }
                 Spacer()
             }
-            Note("勾选的模型会出现在输入框的模型菜单;名称可直接修改,仅影响显示。")
-            DisclosureGroup("按角色指定模型(可选)") {
-                TextField("Opus", text: optional($draft.opusModel)).textFieldStyle(.roundedBorder)
-                TextField("Sonnet", text: optional($draft.sonnetModel)).textFieldStyle(.roundedBorder)
-                TextField("Haiku(后台任务)", text: optional($draft.haikuModel)).textFieldStyle(.roundedBorder)
-                Note("留空则都使用主模型。")
-            }
+            Note("勾选的模型可在「Claude Code 模型映射」里选择;名称可直接修改,仅影响显示。")
         }
     }
 
     private func modelRow(_ item: ProviderModel) -> some View {
         HStack(spacing: 8) {
             Toggle("", isOn: modelBinding(item.id, \.enabled)).labelsHidden().toggleStyle(.checkbox)
-                .accessibilityLabel(String(localized: "在模型菜单中显示 \(item.id)"))
+                .accessibilityLabel(String(localized: "可用于模型映射 \(item.id)"))
             VStack(alignment: .leading, spacing: 1) {
                 TextField("", text: Binding(
                     get: { draft.modelList.first { $0.id == item.id }?.displayName ?? "" },
@@ -142,8 +132,8 @@ struct ProviderDetailView: View {
                     .frame(width: 22, height: 22)
             }
             .buttonStyle(.plain)
-            .help(draft.model == item.id ? "当前主模型" : "设为主模型")
-            .accessibilityLabel(String(localized: "设为主模型"))
+            .help(draft.model == item.id ? "当前默认模型" : "设为默认模型")
+            .accessibilityLabel(String(localized: "设为默认模型"))
             Button { removeModel(item.id) } label: {
                 Image.om("trash", size: 13).foregroundStyle(OMColors.tertiaryText).frame(width: 22, height: 22)
             }
@@ -161,9 +151,9 @@ struct ProviderDetailView: View {
                 if !draft.isOpenAIProtocol {
                     Toggle("使用 x-api-key 鉴权(Anthropic 官方 API)", isOn: Binding(get: { draft.usesAPIKeyHeader == true }, set: { draft.usesAPIKeyHeader = $0 ? true : nil }))
                 } else {
-                    Toggle("OpenCode 兼容请求头", isOn: Binding(get: { draft.opencodeCompat == true }, set: { draft.opencodeCompat = $0 ? true : nil }))
                     Toggle("无需 API Key", isOn: Binding(get: { draft.keyOptional == true }, set: { draft.keyOptional = $0 ? true : nil }))
                 }
+                Toggle("OpenCode 兼容请求头", isOn: Binding(get: { draft.opencodeCompat == true }, set: { draft.opencodeCompat = $0 ? true : nil }))
                 LabeledContent("最大输出 token") {
                     TextField("默认", value: $draft.maxOutputTokens, format: .number).frame(width: 100).multilineTextAlignment(.trailing)
                 }
@@ -256,7 +246,10 @@ struct ProviderDetailView: View {
         if !provider.model.isEmpty, !provider.modelList.contains(where: { $0.id == provider.model }) { provider.mergeModels([provider.model]) }
         guard model.upsert(provider) else { return false }
         model.setKey(keyText, id: provider.id)
-        if model.snapshot.active == nil, isNew { model.setActive(provider.id) }
+        // 第一次添加的可用提供商:自动成为默认槽位,免得用户还得再去映射页点一遍
+        if isNew, model.snapshot.mapping.isEmpty, !provider.model.isEmpty, !provider.requiresKey || model.hasKey(id: provider.id) {
+            model.setMapping(.main, ModelTarget(providerId: provider.id, model: provider.model))
+        }
         draft = model.snapshot.providers.first { $0.id == provider.id } ?? provider
         saved = true
         onSaved(provider.id)
