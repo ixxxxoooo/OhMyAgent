@@ -29,7 +29,7 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 ## 2. 常用命令
 - 构建并组装应用:`Scripts/bundle.sh [debug|release]`
 - 重启应用(结束旧进程 → 构建 → 启动):`Scripts/restart.sh`(`OMA_AGENT=fake` 使用脚本化 Agent;`OMA_DEMO=1` 进入演示模式)
-- 演示模式(隔离沙盒 + 脚本化 Agent,测试会话流/工具卡/子 Agent/Git 的首选方式):`Scripts/demo.sh [--reset] [--scenario <名>]`
+- 演示模式(隔离沙盒 + 脚本化 Agent,测试会话流/工具卡/子 Agent/Git 的首选方式):`Scripts/demo.sh [--reset] [--scenario <名>]`(自动转发全部 `OMA_*` 变量);无人值守导览截图:`Scripts/demo-tour.sh [步骤前缀...]`;完整指南 `.specstory/history/docs/20261016_演示模式自动化演示指南.md`
 - 本地 CI(零警告构建 + 全部测试):`Scripts/ci.sh`
 - 性能门槛:`Scripts/perf.sh`;发布:`Scripts/release.sh`
 - 日志:`Scripts/logs.sh`(P1 之后可用)
@@ -68,7 +68,7 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 ## 6. UI 验证约定(不抢焦点)
 - 启动:`open -g -n build/OhMyAgent.app --env OMA_AGENT=fake --env OMA_PROJECT_ROOT=$PWD`。
 - 演示模式:`OMA_DEMO=1`、`OMA_DEMO_ROOT`、`OMA_DEMO_RESET=1`、`OMA_DEMO_SCENARIO=<场景名>`;输入框 `/demo-<场景名>` 或命令面板「演示场景」运行场景;新增工具卡/条目类型必须补演示场景(覆盖守卫测试会失败提醒)。
-- 调试钩子:`OMA_DRAFT`、`OMA_OPEN_SETTINGS`、`OMA_SETTINGS_PAGE`、`OMA_AGENT=fake|direct`、`OMA_LSP_PROBE=行:列`、`OMA_AUTOALLOW`(自动批准权限)、`OMA_USAGE_PANEL`(展开上下文用量面板)、`OMA_BRANCH_MENU`(展开分支切换弹层)、`OMA_PERF_OUT`。
+- 调试钩子:`OMA_DRAFT`、`OMA_OPEN_SETTINGS`、`OMA_SETTINGS_PAGE`、`OMA_AGENT=fake|direct`、`OMA_LSP_PROBE=行:列`、`OMA_AUTOALLOW`(自动批准权限)、`OMA_USAGE_PANEL`(展开上下文用量面板)、`OMA_BRANCH_MENU`(展开分支切换弹层)、`OMA_ATTACH_IMAGE=路径1:路径2`(给输入框添加图片附件)、`OMA_PERF_OUT`。
 - 截图用 `screencapture -x -o -l<windowId>`;禁止用 osascript 发送按键;验证后删除截图。
 - 每次改动后重启应用与适配器子进程,确认修改在运行时真实生效。
 
