@@ -65,6 +65,8 @@ struct FileTabView: View {
     @State private var lsp: EditorLSPController?
     /// 最近一次 Agent 改动在新文件中新增的行(仅当文本仍等于 Agent 写入的内容时显示)
     @State private var agentMarks: AgentMarks?
+    /// 是否在编辑区叠加显示「对比 HEAD」的 Git 差异(编辑器保持挂载,切回不丢状态)
+    @State private var comparing = false
 
     /// Agent 改动的行标记快照。
     struct AgentMarks: Equatable {
@@ -100,7 +102,9 @@ struct FileTabView: View {
                 mode: mode,
                 onMode: { FileViewModeStore.shared.set($0, for: path) },
                 currentText: { doc.text },
-                onOpen: { workbench.openFile($0, preview: true) }
+                onOpen: { workbench.openFile($0, preview: true) },
+                isComparing: comparing,
+                onToggleCompare: { comparing.toggle() }
             )
             banner(doc)
             Group {
@@ -123,6 +127,12 @@ struct FileTabView: View {
                     Text(failure).foregroundStyle(OMColors.secondaryText).frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+            .overlay {
+                if comparing {
+                    GitFileDiffView(workbench: workbench, path: path, embedded: true)
+                        .background(OMColors.surface)
                 }
             }
         }

@@ -6,11 +6,20 @@ import DesignSystem
 import DiffKit
 import SwiftUI
 
+/// 块级附加操作(如「暂存此块」):按钮标题 + 以块 ID 为参数的回调。
+struct DiffHunkAction: Identifiable {
+    let title: String
+    let perform: (Int) -> Void
+    var id: String { title }
+}
+
 /// 渲染一份已计算好的 FileDiff。
 struct DiffView: View {
     let diff: FileDiff
     /// 提供时每个块显示“撤销此块”按钮
     var onRevertHunk: ((Int) -> Void)?
+    /// 额外的块级操作(显示在「撤销此块」之前)
+    var extraActions: [DiffHunkAction] = []
     /// 单次最多渲染的行数,超出需手动展开
     private let softLimit = 300
     @State private var showAll = false
@@ -19,7 +28,8 @@ struct DiffView: View {
         let total = diff.hunks.reduce(0) { $0 + $1.lines.count }
         VStack(alignment: .leading, spacing: 8) {
             ForEach(visibleHunks(total: total)) { hunk in
-                HunkView(hunk: hunk, onRevert: onRevertHunk.map { callback in { callback(hunk.id) } })
+                HunkView(hunk: hunk, onRevert: onRevertHunk.map { callback in { callback(hunk.id) } },
+                         extraActions: extraActions.map { action in (action.title, { action.perform(hunk.id) }) })
             }
             if total > softLimit, !showAll {
                 Button("显示全部 \(total) 行") { showAll = true }
@@ -45,6 +55,7 @@ struct DiffView: View {
 struct HunkView: View {
     let hunk: DiffHunk
     var onRevert: (() -> Void)?
+    var extraActions: [(title: String, action: () -> Void)] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -53,6 +64,12 @@ struct HunkView: View {
                     .font(OMFonts.monoSmall)
                     .foregroundStyle(OMColors.secondaryText)
                 Spacer()
+                ForEach(Array(extraActions.enumerated()), id: \.offset) { _, extra in
+                    Button(extra.title, action: extra.action)
+                        .buttonStyle(.plain)
+                        .font(OMFonts.caption)
+                        .foregroundStyle(OMColors.accent)
+                }
                 if let onRevert {
                     Button("撤销此块", action: onRevert)
                         .buttonStyle(.plain)

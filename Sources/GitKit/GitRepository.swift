@@ -75,6 +75,11 @@ public struct GitRepository: Sendable {
         return output
     }
 
+    /// 以标准输入喂补丁执行 `git apply`(块级暂存/放弃用)。
+    func runApply(_ arguments: [String], patch: Data) async throws {
+        try await git(arguments, input: patch, lockFree: false)
+    }
+
     /// 校验分支/引用名:非空、不以 `-` 开头、不含空白与控制字符。
     private func validateRef(_ name: String) throws {
         let trimmed = name.trimmingCharacters(in: .whitespaces)

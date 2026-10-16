@@ -9,6 +9,7 @@ import SwiftUI
 struct SideBySideDiffView: View {
     let diff: FileDiff
     var onRevertHunk: ((Int) -> Void)?
+    var extraActions: [DiffHunkAction] = []
     private let softLimit = 300
     @State private var showAll = false
 
@@ -16,7 +17,8 @@ struct SideBySideDiffView: View {
         let total = diff.hunks.reduce(0) { $0 + $1.lines.count }
         VStack(alignment: .leading, spacing: 8) {
             ForEach(visibleHunks(total: total)) { hunk in
-                SideBySideHunkView(hunk: hunk, onRevert: onRevertHunk.map { callback in { callback(hunk.id) } })
+                SideBySideHunkView(hunk: hunk, onRevert: onRevertHunk.map { callback in { callback(hunk.id) } },
+                                   extraActions: extraActions.map { action in (action.title, { action.perform(hunk.id) }) })
             }
             if total > softLimit, !showAll {
                 Button("显示全部 \(total) 行") { showAll = true }
@@ -42,6 +44,7 @@ struct SideBySideDiffView: View {
 private struct SideBySideHunkView: View {
     let hunk: DiffHunk
     var onRevert: (() -> Void)?
+    var extraActions: [(title: String, action: () -> Void)] = []
 
     var body: some View {
         let rows = SideBySide.rows(for: hunk)
@@ -50,6 +53,12 @@ private struct SideBySideHunkView: View {
             HStack {
                 Text(hunk.header).font(OMFonts.monoSmall).foregroundStyle(OMColors.secondaryText)
                 Spacer()
+                ForEach(Array(extraActions.enumerated()), id: \.offset) { _, extra in
+                    Button(extra.title, action: extra.action)
+                        .buttonStyle(.plain)
+                        .font(OMFonts.caption)
+                        .foregroundStyle(OMColors.accent)
+                }
                 if let onRevert {
                     Button("撤销此块", action: onRevert)
                         .buttonStyle(.plain)

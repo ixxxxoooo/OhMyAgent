@@ -21,6 +21,9 @@ struct FileHeaderBar: View {
     let currentText: () -> String?
     /// 在面包屑下拉里点选文件时打开
     var onOpen: (String) -> Void = { _ in }
+    /// 是否正在「对比 HEAD」;`onToggleCompare` 为 nil 时不显示该按钮
+    var isComparing = false
+    var onToggleCompare: (() -> Void)?
 
     @State private var copied = false
     /// 当前展开下拉的面包屑段(绝对路径)
@@ -31,6 +34,9 @@ struct FileHeaderBar: View {
             breadcrumb
             Spacer(minLength: 8)
             if modes.count > 1 { ModeSwitch(modes: modes, mode: mode, onMode: onMode) }
+            if let onToggleCompare {
+                HeaderIconButton(icon: "file-diff", help: isComparing ? "返回编辑器" : "对比 HEAD(Git 差异)", tint: isComparing ? OMColors.accent : nil, action: onToggleCompare)
+            }
             iconButton(copied ? "check" : "copy", help: copied ? "已复制" : "复制内容", tint: copied ? Color.green : nil) { copy() }
             iconButton("folder-open", help: "在 Finder 中显示") {
                 NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
