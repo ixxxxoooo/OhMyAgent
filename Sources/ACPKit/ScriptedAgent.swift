@@ -6,20 +6,20 @@ import Foundation
 /// 脚本化 Agent。支持流式文本、思维、工具调用 + 权限审批 + Diff、计划、取消。
 public actor ScriptedAgent: ACPRequestHandler {
     public let connection: ACPConnection
-    private var cancelled: Set<String> = []
-    private var sessions: [String: String] = [:]
-    private var modes: [String: String] = [:]
-    private var models: [String: String] = [:]
-    private var sessionCounter = 0
-    private var editCounter = 0
+    var cancelled: Set<String> = []
+    var sessions: [String: String] = [:]
+    var modes: [String: String] = [:]
+    var models: [String: String] = [:]
+    var sessionCounter = 0
+    var editCounter = 0
     /// 正在处理提示的会话
-    private var running: Set<String> = []
+    var running: Set<String> = []
     /// 各会话收到的引导消息
-    private var steered: [String: [String]] = [:]
-    private var clientTerminal = false
+    var steered: [String: [String]] = [:]
+    var clientTerminal = false
     private var pump: Task<Void, Never>?
     /// 每个文本分片之间的停顿(毫秒),便于测试取消与流式合并。
-    private let chunkDelayMillis: Int
+    let chunkDelayMillis: Int
     private let onClose: (@Sendable () -> Void)?
 
     /// 创建脚本化 Agent。
@@ -173,18 +173,18 @@ public actor ScriptedAgent: ACPRequestHandler {
 
     // MARK: 提示轮次
 
-    private func update(_ sessionId: String, _ update: JSONValue) async {
+    func update(_ sessionId: String, _ update: JSONValue) async {
         await connection.notify("session/update", params: ["sessionId": .string(sessionId), "update": update])
     }
 
-    private func pause() async {
+    func pause() async {
         try? await Task.sleep(for: .milliseconds(chunkDelayMillis))
     }
 
     // MARK: 扩展场景(真实写文件、提问、终端、子 Agent)
 
     /// 真实修改工作区内的 `oma-demo.txt`,用于验证检查点与改动汇总。
-    private func runEdit(sessionId: String) async throws {
+    func runEdit(sessionId: String) async throws {
         let cwd = sessions[sessionId] ?? NSTemporaryDirectory()
         let path = (cwd as NSString).appendingPathComponent("oma-demo.txt")
         editCounter += 1
@@ -222,7 +222,7 @@ public actor ScriptedAgent: ACPRequestHandler {
     }
 
     /// 发起 `elicitation/create` 表单(结构与 Claude 的 AskUserQuestion 一致)并回显答案。
-    private func runAsk(sessionId: String) async throws {
+    func runAsk(sessionId: String) async throws {
         let answer = try await connection.request("elicitation/create", params: [
             "mode": "form",
             "sessionId": .string(sessionId),
@@ -250,7 +250,7 @@ public actor ScriptedAgent: ACPRequestHandler {
     }
 
     /// 通过客户端终端执行命令(仅当客户端声明了 terminal 能力)。
-    private func runTerminal(sessionId: String) async throws {
+    func runTerminal(sessionId: String) async throws {
         guard clientTerminal else {
             await update(sessionId, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": "客户端未声明 terminal 能力。\n\n"]])
             return
@@ -268,7 +268,7 @@ public actor ScriptedAgent: ACPRequestHandler {
     }
 
     /// 长时间占用场景(`#hold`):同时挂起一个运行约 20 秒的终端与一个未完成的子 Agent,用于验证输入栏任务坞。
-    private func runHold(sessionId: String) async throws {
+    func runHold(sessionId: String) async throws {
         let meta: JSONValue = ["claudeCode": ["parentToolUseId": "hold_sub"]]
         await update(sessionId, ["sessionUpdate": "tool_call", "toolCallId": "hold_sub", "title": "子任务:长时间调研", "kind": "other", "status": "in_progress"])
         await update(sessionId, ["sessionUpdate": "tool_call", "toolCallId": "hold_read", "title": "读取 Package.swift", "kind": "read", "status": "completed", "_meta": meta])
@@ -286,93 +286,6 @@ public actor ScriptedAgent: ACPRequestHandler {
             await update(sessionId, ["sessionUpdate": "tool_call_update", "toolCallId": "hold_term", "status": "completed"])
         }
         await update(sessionId, ["sessionUpdate": "tool_call_update", "toolCallId": "hold_sub", "status": "completed"])
-    }
-
-    /// Mermaid 场景:依次输出流程图、时序图、状态图、类图、饼图、甘特图与一个不支持的类型(验证回退)。
-    private func runMermaid(sessionId: String) async {
-        let blocks = [
-            "```mermaid\nflowchart TD\n  A[用户请求] --> B{已登录?}\n  B -->|是| C[读取数据]\n  B -->|否| D[跳转登录]\n  D --> A\n  C --> E([完成])\n  subgraph 后端\n    C --> F[(数据库)]\n  end\n```\n\n",
-            "```mermaid\nsequenceDiagram\n  autonumber\n  participant U as 用户\n  participant S as 服务\n  U->>+S: 发起请求\n  S-->>-U: 返回结果\n  Note over U,S: 完成\n  loop 每分钟\n    U->>U: 自检\n  end\n```\n\n",
-            "```mermaid\nstateDiagram-v2\n  [*] --> Idle\n  Idle --> Running : start\n  Running --> Idle : stop\n  Running --> [*]\n```\n\n",
-            "```mermaid\nclassDiagram\n  class Animal {\n    +String name\n    +eat() void\n  }\n  Animal <|-- Dog\n  Animal <|-- Cat\n```\n\n",
-            "```mermaid\npie showData title 占比\n  \"甲\" : 30\n  \"乙\" : 50\n  \"丙\" : 20\n```\n\n",
-            "```mermaid\ngantt\n  title 计划\n  dateFormat YYYY-MM-DD\n  section 设计\n  调研 :done, a1, 2026-01-01, 5d\n  方案 :a2, after a1, 3d\n  section 开发\n  实现 :crit, 2026-01-10, 2026-01-20\n```\n\n",
-            "```mermaid\nerDiagram\n  A ||--o{ B : has\n```\n\n",
-        ]
-        for block in blocks {
-            await update(sessionId, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": .string(block)]])
-        }
-    }
-
-    /// 子 Agent:父工具调用 + 带 `parentToolUseId` 的内部更新;`#sub2` 额外产生第二层子 Agent。
-    private func runSubagent(sessionId: String, nested: Bool = false) async {
-        let meta: JSONValue = ["claudeCode": ["parentToolUseId": "sub_1"]]
-        await update(sessionId, ["sessionUpdate": "tool_call", "toolCallId": "sub_1", "title": "子任务:调研代码", "kind": "other", "status": "in_progress"])
-        await update(sessionId, ["sessionUpdate": "tool_call", "toolCallId": "sub_read", "title": "读取 README.md", "kind": "read", "status": "completed", "_meta": meta])
-        await update(sessionId, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": "子 Agent 的中间结论。"], "_meta": meta])
-        if nested {
-            let inner: JSONValue = ["claudeCode": ["parentToolUseId": "sub_2"]]
-            await update(sessionId, ["sessionUpdate": "tool_call", "toolCallId": "sub_2", "title": "子任务:分析依赖", "kind": "other", "status": "in_progress", "_meta": meta])
-            await update(sessionId, ["sessionUpdate": "tool_call", "toolCallId": "sub2_grep", "title": "搜索 import", "kind": "search", "status": "completed", "_meta": inner])
-            await update(sessionId, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": "第二层子 Agent 的结论。"], "_meta": inner])
-            await update(sessionId, ["sessionUpdate": "tool_call_update", "toolCallId": "sub_2", "status": "completed", "_meta": meta])
-        }
-        await update(sessionId, ["sessionUpdate": "tool_call_update", "toolCallId": "sub_1", "status": "completed"])
-    }
-
-    // MARK: 工具展示场景(`#showcase`:覆盖读/搜/写/改/终端/MCP/联网/失败,无需权限)
-
-    /// 发送一次完整的工具调用:进行中 → 完成(或失败)。
-    private func emitTool(
-        _ sessionId: String, id: String, title: String, kind: String, name: String,
-        input: JSONValue, output: String? = nil, extra: [JSONValue] = [], fail: Bool = false,
-        locations: JSONValue = .array([])
-    ) async {
-        await update(sessionId, [
-            "sessionUpdate": "tool_call", "toolCallId": .string(id), "title": .string(title), "kind": .string(kind),
-            "name": .string(name), "status": "in_progress", "rawInput": input, "locations": locations,
-        ])
-        await pause()
-        var content = extra
-        if let output { content.append(["type": "content", "content": ["type": "text", "text": .string(output)]]) }
-        await update(sessionId, [
-            "sessionUpdate": "tool_call_update", "toolCallId": .string(id),
-            "status": fail ? "failed" : "completed", "content": .array(content),
-        ])
-        await pause()
-    }
-
-    /// 覆盖各类工具的展示场景。
-    private func runToolsShowcase(sessionId: String) async {
-        let cwd = sessions[sessionId] ?? "/tmp"
-        let main = cwd + "/Sources/App/main.swift"
-        await emitTool(sessionId, id: "t_read1", title: "读取 main.swift", kind: "read", name: "Read",
-                       input: ["file_path": .string(main), "offset": 10, "limit": 50],
-                       output: "let app = App()\napp.run()", locations: [["path": .string(main), "line": 10]])
-        await emitTool(sessionId, id: "t_read2", title: "读取 Package.swift", kind: "read", name: "Read",
-                       input: ["file_path": .string(cwd + "/Package.swift")], output: "// swift-tools-version: 6.4")
-        await emitTool(sessionId, id: "t_grep", title: "搜索 TODO", kind: "search", name: "Grep",
-                       input: ["pattern": "TODO", "path": .string(cwd + "/Sources")],
-                       output: "\(main):12:    // TODO: 处理错误\n\(cwd)/Sources/App/Util.swift:40:    // TODO: 缓存\n\(cwd)/Sources/App/Model.swift:7:// TODO(ygw): 拆分")
-        await emitTool(sessionId, id: "t_glob", title: "查找 *.swift", kind: "search", name: "Glob",
-                       input: ["pattern": "**/*.swift"], output: "\(main)\n\(cwd)/Sources/App/Util.swift\n\(cwd)/Package.swift")
-        await emitTool(sessionId, id: "t_write", title: "写入 NOTES.md", kind: "edit", name: "Write",
-                       input: ["file_path": .string(cwd + "/NOTES.md")],
-                       extra: [["type": "diff", "path": .string(cwd + "/NOTES.md"), "newText": "# 笔记\n\n- 第一条\n- 第二条\n"]],
-                       locations: [["path": .string(cwd + "/NOTES.md")]])
-        await emitTool(sessionId, id: "t_edit", title: "编辑 main.swift", kind: "edit", name: "Edit",
-                       input: ["file_path": .string(main)],
-                       extra: [["type": "diff", "path": .string(main), "oldText": "let app = App(debug: false)\napp.run()\n", "newText": "let app = App(debug: true)\napp.configure()\napp.run()\n"]],
-                       locations: [["path": .string(main), "line": 1]])
-        await emitTool(sessionId, id: "t_bash", title: "运行 swift test", kind: "execute", name: "Bash",
-                       input: ["command": "swift test --filter Tool", "description": "运行工具相关测试"],
-                       output: "\u{1B}[32m✔\u{1B}[0m Test one passed\n\u{1B}[31m✘\u{1B}[0m Test two failed\n\u{1B}[1;33mwarning:\u{1B}[0m something\nexit 1")
-        await emitTool(sessionId, id: "t_mcp", title: "mcp__github__create_issue", kind: "other", name: "mcp__github__create_issue",
-                       input: ["title": "修复崩溃", "repo": "ygw/demo"], output: "{\"number\": 42}")
-        await emitTool(sessionId, id: "t_fetch", title: "获取 example.com", kind: "fetch", name: "WebFetch",
-                       input: ["url": "https://example.com/docs"], output: "Example Domain")
-        await emitTool(sessionId, id: "t_fail", title: "运行 false", kind: "execute", name: "Bash",
-                       input: ["command": "false"], output: "command failed with exit code 1", fail: true)
     }
 
     private func runPrompt(_ p: JSONValue) async throws -> JSONValue {
@@ -394,7 +307,11 @@ public actor ScriptedAgent: ACPRequestHandler {
             if cancelled.contains(sessionId) { return ["stopReason": "cancelled"] }
         }
 
-        if text.contains("tool") || text.contains("工具") {
+        // 场景目录:旧关键字(#sub / #showcase / #mermaid)与 `#demo-<场景名>`
+        let matches = DemoScenarios.matching(prompt: text)
+        let isDemo = matches.contains { $0.isDemo }
+
+        if !isDemo, text.contains("tool") || text.contains("工具") {
             // 工具调用 + 权限 + Diff
             await update(sessionId, [
                 "sessionUpdate": "tool_call", "toolCallId": "call_1", "title": "修改 config.json", "kind": "edit", "status": "pending",
@@ -432,11 +349,14 @@ public actor ScriptedAgent: ACPRequestHandler {
         if text.contains("#ask") { try await runAsk(sessionId: sessionId) }
         if text.contains("#term") { try await runTerminal(sessionId: sessionId) }
         if text.contains("#hold") { try await runHold(sessionId: sessionId) }
-        if text.contains("#sub") { await runSubagent(sessionId: sessionId, nested: text.contains("#sub2")) }
-        if text.contains("#showcase") { await runToolsShowcase(sessionId: sessionId) }
-        if text.contains("#mermaid") { await runMermaid(sessionId: sessionId) }
+        let context = ScenarioContext(cwd: sessions[sessionId] ?? "/tmp", sessionId: sessionId)
+        for match in matches {
+            let outcome = try await runSteps(match.scenario.build(context), ctx: context)
+            if outcome == .cancelled { return ["stopReason": "cancelled"] }
+            if outcome == .rejected { return ["stopReason": "end_turn"] }
+        }
 
-        if text.contains("plan") || text.contains("计划") {
+        if !isDemo, text.contains("plan") || text.contains("计划") {
             await update(sessionId, [
                 "sessionUpdate": "plan",
                 "entries": [
@@ -447,6 +367,9 @@ public actor ScriptedAgent: ACPRequestHandler {
             ])
         }
 
+        // 演示场景自带回复文本,不再追加默认回显
+        if isDemo { return await finishTurn(sessionId: sessionId) }
+
         // 文本流
         let reply = text.contains("slow")
             ? Array(repeating: "慢速输出分片。", count: text.contains("#long") ? 400 : 60)
@@ -456,6 +379,11 @@ public actor ScriptedAgent: ACPRequestHandler {
             await update(sessionId, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": .string(piece)]])
             try? await Task.sleep(for: .milliseconds(max(chunkDelayMillis, text.contains("slow") ? 40 : 0)))
         }
+        return await finishTurn(sessionId: sessionId)
+    }
+
+    /// 轮次收尾:补发已收到的引导回显与用量,返回正常结束。
+    private func finishTurn(sessionId: String) async -> JSONValue {
         for extra in steered.removeValue(forKey: sessionId) ?? [] {
             await update(sessionId, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": .string("(已收到引导:\(extra))")]])
         }
