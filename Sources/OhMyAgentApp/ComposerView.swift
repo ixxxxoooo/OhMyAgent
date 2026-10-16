@@ -22,19 +22,14 @@ struct ComposerView: View {
     @State private var dismissedAt: String?
     @State private var lookup: Task<Void, Never>?
     @State private var dropTargeted = false
-    /// 草稿里已识别的文件/文件夹提及(以 chip 展示在输入框上方)
-    @State private var mentions: [FileMention] = []
 
     var body: some View {
         VStack(spacing: 6) {
-            if !model.attachments.isEmpty || !mentions.isEmpty {
+            if !model.attachments.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(model.attachments) { item in
                             AttachmentThumbnail(attachment: item, size: 56) { model.removeAttachment(item.id) }
-                        }
-                        ForEach(mentions) { mention in
-                            FileMentionChip(mention: mention) { model.draft = FileMentions.remove(mention, from: model.draft) }
                         }
                     }
                     .padding(.top, 2)
@@ -56,7 +51,9 @@ struct ComposerView: View {
                 acceptsImages: { true },
                 onFileURLs: { urls in insertMentions(for: urls) },
                 onEdit: updateCompletion,
-                onSelectionText: { model.selectedText = $0 }
+                onSelectionText: { model.selectedText = $0 },
+                // 文件提及内联成 chip,跟在文字后面
+                mentionWorkspace: model.workspace
             )
             .frame(height: textHeight)
             HStack(spacing: 6) {
@@ -86,7 +83,6 @@ struct ComposerView: View {
             }
         }
         .animation(omShouldReduceMotion() ? nil : .easeOut(duration: 0.12), value: items.isEmpty)
-        .onChange(of: model.draft, initial: true) { _, draft in mentions = FileMentions.parse(draft, workspace: model.workspace) }
         // 整张输入卡片都是图片拖放区(不只是文字那一行),拖入时显示高亮边框
         .overlay {
             if dropTargeted {

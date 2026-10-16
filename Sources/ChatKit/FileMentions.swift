@@ -42,6 +42,37 @@ public enum FileMentions {
         return result
     }
 
+    /// 一次提及在草稿中的出现位置(含重复出现)。
+    public struct Occurrence: Equatable, Sendable {
+        /// 提及信息
+        public let mention: FileMention
+        /// 记号在草稿中的范围
+        public let range: Range<String.Index>
+    }
+
+    /// 解析草稿里**所有**文件提及的出现位置(不去重,按出现顺序),供输入框内联 chip 使用。
+    /// - Parameters:
+    ///   - text: 草稿文本
+    ///   - workspace: 工作区目录
+    ///   - exists: 路径存在性判断(默认查文件系统)
+    /// - Returns: 每处存在的提及及其范围
+    public static func occurrences(
+        in text: String,
+        workspace: URL,
+        exists: (String) -> Bool? = FileMentions.fileSystemExists
+    ) -> [Occurrence] {
+        var result: [Occurrence] = []
+        for token in tokens(in: text) {
+            let absolute = resolve(token.value, workspace: workspace)
+            guard let isDirectory = exists(absolute) else { continue }
+            result.append(Occurrence(
+                mention: FileMention(token: token.raw, path: absolute, isDirectory: isDirectory),
+                range: token.range
+            ))
+        }
+        return result
+    }
+
     /// 从草稿中移除某个提及(连同其后紧跟的一个空格)。
     /// - Parameters:
     ///   - mention: 要移除的提及

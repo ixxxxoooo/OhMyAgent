@@ -9,20 +9,23 @@ import SwiftUI
 /// 单个文件提及 chip。
 struct FileMentionChip: View {
     let mention: FileMention
-    let onRemove: () -> Void
+    /// 点击右侧 × 的回调;为 nil 时不显示移除按钮(输入框内联 chip 用退格整颗删除)
+    var onRemove: (() -> Void)?
+    /// 内联在文字里时使用更矮的高度
+    var compact = false
     @State private var hovering = false
 
-    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: 8, style: .continuous) }
+    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: compact ? 7 : 8, style: .continuous) }
 
     var body: some View {
         HStack(spacing: 5) {
             OMFileIcon(name: mention.name, isDirectory: mention.isDirectory, size: 14)
             nameText
-            removeButton
+            if onRemove != nil { removeButton }
         }
         .padding(.leading, 8)
-        .padding(.trailing, 4)
-        .frame(height: 26)
+        .padding(.trailing, onRemove == nil ? 8 : 4)
+        .frame(height: compact ? 22 : 26)
         .background(OMColors.card, in: shape)
         .overlay(shape.strokeBorder(hovering ? OMColors.accent.opacity(0.6) : OMColors.hairline))
         .contentShape(shape)
@@ -43,7 +46,7 @@ struct FileMentionChip: View {
     }
 
     private var removeButton: some View {
-        Button(action: onRemove) {
+        Button(action: { onRemove?() }) {
             Image.om("x", size: 10)
                 .foregroundStyle(OMColors.secondaryText)
                 .frame(width: 16, height: 16)

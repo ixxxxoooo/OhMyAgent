@@ -45,9 +45,12 @@ final class ComposerController {
     ///   - range: UTF-16 范围
     ///   - string: 新文本
     func replace(range: NSRange, with string: String) {
-        guard let textView, NSMaxRange(range) <= (textView.string as NSString).length else { return }
+        guard let textView else { return }
+        // 补全上下文基于纯文本坐标(提及按 `@路径` 全长计),这里换算到文本存储坐标
+        let storage = textView.storageRange(forPlain: range)
+        guard NSMaxRange(storage) <= (textView.string as NSString).length else { return }
         textView.window?.makeFirstResponder(textView)
-        textView.insertText(string, replacementRange: range)
+        textView.insertText(string, replacementRange: storage)
     }
 }
 
@@ -69,6 +72,21 @@ final class SubmitTextView: NSTextView {
     /// 粘贴/拖入非图片文件或文件夹:由外部转成 `@路径` 提及
     var onFileURLs: (([URL]) -> Void)?
     var placeholder: String = "" { didSet { refreshPlaceholder() } }
+    /// 工作区目录:非 nil 时,草稿里已存在的 `@路径` 会显示成内联 chip
+    var mentionWorkspace: URL?
+
+    /// 只接受纯文字(附件由我们自己管理),避免粘贴/拖入富文本。
+    override var readablePasteboardTypes: [NSPasteboard.PasteboardType] { [.string] }
+
+    /// 复制:附件还原成 `@路径` 纯文本。
+    override func copy(_ sender: Any?) { writePlainSelection() }
+
+    /// 剪切:同复制,再删除选区。
+    override func cut(_ sender: Any?) {
+        guard selectedRange().length > 0 else { return }
+        writePlainSelection()
+        insertText("", replacementRange: selectedRange())
+    }
 
     override func keyDown(with event: NSEvent) {
         let isReturn = event.keyCode == 36 || event.keyCode == 76
@@ -114,7 +132,7 @@ final class SubmitTextView: NSTextView {
     /// 粘贴:剪贴板含图片时作为附件,含文件/文件夹时转成 `@路径`,否则按纯文本粘贴。
     override func paste(_ sender: Any?) {
         if handlePasteboard(.general) { return }
-        super.paste(sender)
+        super.pasteAsPlainText(sender)
     }
 
     /// 「粘贴并匹配样式」(⌥⇧⌘V)同样要支持图片与文件,与 `paste(_:)` 共用一套逻辑。
@@ -261,6 +279,8 @@ struct ComposerTextView: NSViewRepresentable {
     var onEdit: ((String, Int) -> Void)?
     /// 选中文字变化(无选中为 nil)
     var onSelectionText: ((String?) -> Void)?
+    /// 工作区目录:传入后,草稿里已存在的 `@路径` 显示为内联 chip
+    var mentionWorkspace: URL?
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -269,7 +289,12 @@ struct ComposerTextView: NSViewRepresentable {
         textView.delegate = context.coordinator
         textView.font = .systemFont(ofSize: 13.5)
         textView.drawsBackground = false
-        textView.isRichText = false
+        // 富文本模式只为容纳内联 chip 附件;粘贴/复制都已改成纯文本,见 SubmitTextView
+        textView.isRichText = true
+        textView.importsGraphics = false
+        textView.allowsImageEditing = false
+        textView.usesFontPanel = false
+        textView.usesRuler = false
         textView.allowsUndo = true
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
@@ -306,9 +331,11 @@ struct ComposerTextView: NSViewRepresentable {
         context.coordinator.parent = self
         guard let textView = context.coordinator.textView else { return }
         scrollView.syncTabActive(context.environment.tabIsActive)
-        if textView.string != text, !textView.hasMarkedText() {
-            textView.string = text
-            textView.setSelectedRange(NSRange(location: (text as NSString).length, length: 0))
+        textView.mentionWorkspace = mentionWorkspace
+        if textView.plainText != text, !textView.hasMarkedText() {
+            // 外部整体赋值(发送清空、补全、引用选区、重新编辑):按纯文本重建,光标落到末尾
+            let end = (text as NSString).length
+            textView.setContent(plain: text, allowTrailingEnd: true, selection: NSRange(location: end, length: 0))
         }
         textView.placeholder = placeholder
         textView.refreshPlaceholder()
@@ -325,14 +352,30 @@ struct ComposerTextView: NSViewRepresentable {
         func textViewDidChangeSelection(_ notification: Notification) {
             guard let textView, !textView.hasMarkedText() else { return }
             let range = textView.selectedRange()
-            parent.onSelectionText?(range.length > 0 ? (textView.string as NSString).substring(with: range) : nil)
-            parent.onEdit?(textView.string, textView.selectedRange().location)
+            parent.onSelectionText?(range.length > 0 ? textView.plainText(in: range) : nil)
+            parent.onEdit?(textView.plainText, textView.plainSelection.location)
         }
 
         func textDidChange(_ notification: Notification) {
             guard let textView else { return }
-            if parent.text != textView.string { parent.text = textView.string }
+            // 先把「后面已跟空白」的提及换成 chip,再回写纯文本
+            textView.reconcileMentions()
+            let plain = textView.plainText
+            if parent.text != plain { parent.text = plain }
             updateHeight()
+        }
+
+        /// chip 与相邻文字之间自动补空格:否则紧贴 chip 输入会让记号变形(`@a.swiftx`),chip 被打回文字。
+        func textView(_ textView: NSTextView, shouldChangeTextIn affectedCharRange: NSRange, replacementString: String?) -> Bool {
+            guard let box = textView as? SubmitTextView, let replacement = replacementString, !replacement.isEmpty,
+                  !box.hasMarkedText(), let first = replacement.first, let last = replacement.last else { return true }
+            let length = (box.string as NSString).length
+            var text = replacement
+            if affectedCharRange.location > 0, box.isMention(at: affectedCharRange.location - 1), !first.isWhitespace { text = " " + text }
+            if NSMaxRange(affectedCharRange) < length, box.isMention(at: NSMaxRange(affectedCharRange)), !last.isWhitespace { text += " " }
+            guard text != replacement else { return true }
+            box.insertText(text, replacementRange: affectedCharRange)
+            return false
         }
 
         /// 根据内容计算高度并回写。
