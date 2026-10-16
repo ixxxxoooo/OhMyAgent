@@ -27,10 +27,7 @@ struct PermissionCard: View {
                     .textSelection(.enabled)
             }
             if let command = prompt.tool.rawInput?["command"]?.stringValue, command != prompt.title {
-                Text(command)
-                    .font(OMFonts.monoSmall)
-                    .lineLimit(6)
-                    .textSelection(.enabled)
+                ShellCommandText(command: command, lineLimit: 6)
                     .padding(8)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color.black.opacity(0.06), in: RoundedRectangle(cornerRadius: 6, style: .continuous))

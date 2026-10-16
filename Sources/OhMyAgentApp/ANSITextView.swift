@@ -9,17 +9,23 @@ import SwiftUI
 struct ANSITextView: View {
     let raw: String
     var fontSize: CGFloat = 11.5
+    /// 最多渲染的末尾行数(默认沿用解析器上限 400)
+    var maxLines = 400
 
     var body: some View {
-        Text(Self.attributed(raw, fontSize: fontSize))
+        Text(Self.attributed(raw, fontSize: fontSize, maxLines: maxLines))
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// 构造富文本(静态方法便于测试)。
-    static func attributed(_ raw: String, fontSize: CGFloat) -> AttributedString {
+    /// - Parameters:
+    ///   - raw: 原始输出
+    ///   - fontSize: 字号
+    ///   - maxLines: 只保留末尾的行数
+    static func attributed(_ raw: String, fontSize: CGFloat, maxLines: Int = 400) -> AttributedString {
         var result = AttributedString()
-        for span in ANSIParser.parse(raw) {
+        for span in ANSIParser.parse(raw, maxLines: maxLines) {
             var piece = AttributedString(span.text)
             piece.font = .system(size: fontSize, weight: span.bold ? .semibold : .regular, design: .monospaced)
             if let color = span.foreground { piece.foregroundColor = Self.color(color, dim: span.dim) }

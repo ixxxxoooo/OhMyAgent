@@ -199,7 +199,10 @@ struct ToolRowView: View {
             }
             .lineLimit(1)
             .help(p.subject)
-        } else if p.category == .terminal || p.category == .search {
+        } else if p.category == .terminal {
+            // 命令按 shell 语法高亮;只取第一行作摘要
+            ShellCommandText(command: p.subject.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? p.subject, lineLimit: 1, failed: failed)
+        } else if p.category == .search {
             Text(p.subject)
                 .font(OMFonts.monoSmall)
                 .foregroundStyle(failed ? Color.red : Color.primary)
@@ -295,7 +298,7 @@ struct ToolDetailsView: View {
             }
             if presentation.category == .terminal, !hasTerminalContent,
                let command = tool.rawInput?["command"]?.stringValue {
-                CommandBox(command: command, output: plainOutput, status: tool.status, copyText: command + (plainOutput.isEmpty ? "" : "\n" + plainOutput))
+                CommandBox(command: command, output: plainOutput, status: tool.status, copyText: command + (plainOutput.isEmpty ? "" : "\n" + ToolOutputText.stripFence(plainOutput)))
             }
             ForEach(Array(tool.content.enumerated()), id: \.offset) { _, content in
                 contentView(content)
@@ -355,36 +358,16 @@ struct ToolDetailsView: View {
     }
 }
 
-/// 可折叠的文本输出框。
+/// 文本输出框:长输出限高滚动,可展开(见 `CollapsibleOutput`)。
 struct TextOutputBox: View {
     let text: String
     var ansi = true
-    var lineLimit = 14
-    @State private var showAll = false
 
     var body: some View {
-        let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
-        let clipped = !showAll && lines.count > lineLimit
-        VStack(alignment: .leading, spacing: 4) {
-            Group {
-                if ansi {
-                    ANSITextView(raw: clipped ? lines.prefix(lineLimit).joined(separator: "\n") : text)
-                } else {
-                    Text(clipped ? lines.prefix(lineLimit).joined(separator: "\n") : text)
-                        .font(OMFonts.monoSmall)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-            if lines.count > lineLimit {
-                Button(showAll ? String(localized: "收起") : String(localized: "显示全部 \(lines.count) 行")) { showAll.toggle() }
-                    .buttonStyle(.link)
-                    .font(OMFonts.caption)
-            }
-        }
-        .padding(8)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        CollapsibleOutput(raw: ToolOutputText.stripFence(text), ansi: ansi)
+            .padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
     }
 }
 
@@ -395,18 +378,31 @@ struct CommandBox: View {
     let status: ToolStatus
     let copyText: String
     @State private var copied = false
+    @State private var commandExpanded = false
+    /// 命令超过该行数时默认折叠
+    private static let commandLineLimit = 6
 
     var body: some View {
+        let cleaned = ToolOutputText.stripFence(output)
+        let commandLines = command.split(separator: "\n", omittingEmptySubsequences: false).count
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text("$").foregroundStyle(OMColors.tertiaryText)
-                Text(command).textSelection(.enabled)
+                Text("$").font(OMFonts.monoSmall).foregroundStyle(OMColors.tertiaryText)
+                ShellCommandText(command: command, lineLimit: commandExpanded ? nil : Self.commandLineLimit)
                 Spacer(minLength: 8)
+                if commandLines > Self.commandLineLimit {
+                    Button { omWithAnimation(.snappy(duration: 0.2)) { commandExpanded.toggle() } } label: {
+                        Image.om(commandExpanded ? "chevrons-down-up" : "chevrons-up-down", size: 11)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(OMColors.secondaryText)
+                    .help(commandExpanded ? String(localized: "收起命令") : String(localized: "展开完整命令"))
+                    .accessibilityLabel(commandExpanded ? String(localized: "收起命令") : String(localized: "展开完整命令"))
+                }
                 CopyButton(text: copyText, copied: $copied)
             }
-            .font(OMFonts.monoSmall)
-            if !output.isEmpty {
-                ANSITextView(raw: output)
+            if !cleaned.isEmpty {
+                CollapsibleOutput(raw: cleaned, followTail: status == .inProgress)
                     .foregroundStyle(status == .failed ? Color.red : Color.primary)
             }
         }
@@ -612,7 +608,7 @@ struct TerminalOutputView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Text("$").foregroundStyle(OMColors.tertiaryText)
-                Text(session.command).lineLimit(1).truncationMode(.middle).textSelection(.enabled)
+                ShellCommandText(command: session.command, lineLimit: 1)
                 Spacer()
                 if session.isRunning {
                     ProgressView().controlSize(.mini)
