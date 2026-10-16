@@ -94,8 +94,14 @@ struct FileTabView: View {
             return Dictionary(uniqueKeysWithValues: marks.lines.map { ($0 - 1, LineMarker.agent) })
         }()
         VStack(spacing: 0) {
+            FileHeaderBar(
+                path: path, projectRoot: projectRoot(),
+                modes: previewKind.map { FileViewMode.available(for: $0) } ?? [],
+                mode: mode,
+                onMode: { FileViewModeStore.shared.set($0, for: path) },
+                currentText: { doc.text }
+            )
             banner(doc)
-            if let previewKind { modeBar(mode: mode, modes: FileViewMode.available(for: previewKind)) }
             Group {
                 if let text = doc.text {
                     CodeEditor(text: text, language: SyntaxLanguage.detect(path: path), isEditable: !doc.isReadOnly, revealLine: tab.line, markers: markers,
@@ -187,23 +193,6 @@ struct FileTabView: View {
             .filter { path == $0 || path.hasPrefix($0 + "/") }
             .max { $0.count < $1.count }
         return match ?? (path as NSString).deletingLastPathComponent
-    }
-
-    /// 「源码 / 预览」切换条(可渲染的文件类型才显示)。
-    private func modeBar(mode: FileViewMode, modes: [FileViewMode]) -> some View {
-        HStack(spacing: 8) {
-            Picker("显示模式", selection: Binding(get: { mode }, set: { FileViewModeStore.shared.set($0, for: path) })) {
-                ForEach(modes) { Text($0.title).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(width: CGFloat(modes.count) * 58)
-            .accessibilityLabel("文件显示模式")
-            Spacer()
-        }
-        .padding(.horizontal, 12).padding(.vertical, 5)
-        .background(.bar)
-        .overlay(alignment: .bottom) { Divider() }
     }
 
     /// 只读与外部修改提示条。
