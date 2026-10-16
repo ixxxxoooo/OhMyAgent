@@ -143,3 +143,24 @@ struct ChatWidthTests {
         #expect(ChatWidth.clampedCustom(.infinity) == ChatWidth.customDefault)
     }
 }
+
+@Suite("设置页内容宽度档位")
+struct SettingsContentWidthTests {
+    @Test("档位单调递增,铺满不限制,未知值回退标准")
+    func presets() {
+        let presets: [SettingsContentWidth] = [.compact, .standard, .wide]
+        let points = presets.map(\.points)
+        #expect(points == points.sorted())
+        #expect(Set(points).count == points.count)
+        #expect(SettingsContentWidth.full.points == .infinity)
+        #expect(SettingsContentWidth.resolve(raw: "乱写", custom: 900) == SettingsContentWidth.standard.points)
+    }
+
+    @Test("自定义宽度夹到范围并对齐步长,非有限值回退默认")
+    func custom() {
+        #expect(SettingsContentWidth.resolve(raw: "custom", custom: 905) == 900)
+        #expect(SettingsContentWidth.resolve(raw: "custom", custom: 10) == 560)
+        #expect(SettingsContentWidth.resolve(raw: "custom", custom: 99_999) == 1600)
+        #expect(SettingsContentWidth.clampedCustom(.nan) == SettingsContentWidth.customDefault)
+    }
+}

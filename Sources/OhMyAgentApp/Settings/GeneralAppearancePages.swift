@@ -122,6 +122,8 @@ struct AppearancePage: View {
     @Bindable private var appearance = AppearanceModel.shared
     @AppStorage(ClientPrefs.Key.chatWidth) private var chatWidth = ChatWidth.standard.rawValue
     @AppStorage(ClientPrefs.Key.chatWidthCustom) private var chatWidthCustom = ChatWidth.customDefault
+    @AppStorage(ClientPrefs.Key.settingsWidth) private var settingsWidth = SettingsContentWidth.standard.rawValue
+    @AppStorage(ClientPrefs.Key.settingsWidthCustom) private var settingsWidthCustom = SettingsContentWidth.customDefault
     @Bindable private var workbench = AppEnvironment.shared.workbench
 
     var body: some View {
@@ -164,6 +166,21 @@ struct AppearancePage: View {
                     LabeledContent("当前宽度", value: "\(Int(ChatWidth.resolve(raw: chatWidth, custom: chatWidthCustom))) pt")
                 }
                 Note("控制会话时间线与输入框的最大宽度;窄屏或分屏时会自动收窄。")
+            }
+            Section("设置页宽度") {
+                Picker("内容宽度", selection: $settingsWidth) {
+                    ForEach(SettingsContentWidth.allCases) { width in
+                        Text(width.displayName).tag(width.rawValue)
+                    }
+                }
+                if settingsWidth == SettingsContentWidth.custom.rawValue {
+                    LabeledContent("自定义宽度 \(Int(SettingsContentWidth.clampedCustom(settingsWidthCustom))) pt") {
+                        Slider(value: $settingsWidthCustom, in: SettingsContentWidth.customRange, step: SettingsContentWidth.customStep).frame(width: 220)
+                    }
+                } else if SettingsContentWidth(rawValue: settingsWidth) != .full {
+                    LabeledContent("当前宽度", value: "\(Int(SettingsContentWidth.resolve(raw: settingsWidth, custom: settingsWidthCustom))) pt")
+                }
+                Note("统一控制所有设置页右侧内容的最大宽度;窗口较窄时自动收窄。")
             }
             Section("字号") {
                 LabeledContent("界面字号 \(Int(appearance.uiFontScale * 100))%") {

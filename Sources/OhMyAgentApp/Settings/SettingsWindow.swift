@@ -147,8 +147,11 @@ struct SettingsView: View {
     @State private var query = ""
     private let appearance = AppearanceModel.shared
 
-    /// 需要全宽布局的页面(主从列表/大表格),其余页面内容限宽居中。
-    private var usesFullWidth: Bool { [.mcp, .skills, .subagents, .hooks, .plugins, .memory, .agentExtensions, .diagnostics, .usage, .providers].contains(router.page) }
+    @AppStorage(ClientPrefs.Key.settingsWidth) private var widthRaw = SettingsContentWidth.standard.rawValue
+    @AppStorage(ClientPrefs.Key.settingsWidthCustom) private var widthCustom = SettingsContentWidth.customDefault
+
+    /// 所有设置页统一的内容最大宽度(外观页可配置)。
+    private var contentWidth: CGFloat { SettingsContentWidth.resolve(raw: widthRaw, custom: widthCustom) }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -166,7 +169,7 @@ struct SettingsView: View {
                 }
                 page
                     .id(appearance.renderKey)
-                    .frame(maxWidth: usesFullWidth ? .infinity : 720)
+                    .frame(maxWidth: contentWidth)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(OMColors.surface)
             }

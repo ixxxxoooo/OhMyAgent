@@ -95,6 +95,58 @@ public enum ChatWidth: String, Sendable, CaseIterable, Identifiable {
     }
 }
 
+/// 设置页内容宽度档位(所有设置页统一使用,外观页可配置)。`custom` 使用 `settings.widthCustom`(点数)。
+public enum SettingsContentWidth: String, Sendable, CaseIterable, Identifiable {
+    case compact, standard, wide, full, custom
+
+    public var id: String { rawValue }
+
+    /// 自定义宽度的范围与步长(点)。
+    public static let customRange: ClosedRange<Double> = 560...1600
+    public static let customStep: Double = 20
+    public static let customDefault: Double = 900
+
+    /// 预设档位的最大宽度(点);`full` 为不限制;`custom` 取默认自定义值。
+    public var points: CGFloat {
+        switch self {
+        case .compact: return 680
+        case .standard: return 860
+        case .wide: return 1040
+        case .full: return .infinity
+        case .custom: return CGFloat(Self.customDefault)
+        }
+    }
+
+    /// 由持久化值解析最终宽度:未知回退标准档;自定义值夹到范围内并对齐步长。
+    /// - Parameters:
+    ///   - raw: `settings.width` 存储的档位原始值
+    ///   - custom: `settings.widthCustom` 存储的自定义点数
+    /// - Returns: 最大宽度(点)
+    public static func resolve(raw: String, custom: Double) -> CGFloat {
+        let width = SettingsContentWidth(rawValue: raw) ?? .standard
+        guard width == .custom else { return width.points }
+        return CGFloat(clampedCustom(custom))
+    }
+
+    /// 把自定义宽度夹到范围并对齐步长;非有限值回退默认。
+    public static func clampedCustom(_ value: Double) -> Double {
+        guard value.isFinite else { return customDefault }
+        let clamped = min(max(value, customRange.lowerBound), customRange.upperBound)
+        return (clamped / customStep).rounded() * customStep
+    }
+
+    /// 外观页显示的档位名。
+    public var displayName: String {
+        switch self {
+        case .compact: return String(localized: "紧凑")
+        case .standard: return String(localized: "标准")
+        case .wide: return String(localized: "宽")
+        case .full: return String(localized: "铺满")
+        case .custom: return String(localized: "自定义")
+        }
+    }
+}
+
 /// 一次会话创建所需的客户端选项快照。
 public struct SessionOptions: Equatable, Sendable {
     public var proxyMode: ProxyMode = .system

@@ -68,8 +68,7 @@ struct ExtensionPage<Actions: View, Content: View>: View {
             }
             .padding(.horizontal, 28)
             .padding(.vertical, 22)
-            .frame(maxWidth: 860, alignment: .leading)
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollContentBackground(.hidden)
         .background(OMColors.surface)
@@ -99,7 +98,6 @@ struct ExtensionFixedPage<Actions: View, Content: View>: View {
                 .padding(.horizontal, 28)
                 .padding(.bottom, 22)
         }
-        .frame(maxWidth: 980)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(OMColors.surface)
     }
