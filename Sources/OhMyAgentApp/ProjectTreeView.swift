@@ -25,40 +25,38 @@ struct SidebarSession: Identifiable, Equatable {
 }
 
 extension WorkbenchModel {
-    /// 项目的全部会话行:当前会话在前,其后为历史(按缓存顺序)。
+    /// 项目的全部会话行(对齐 kuku:按「首次出现时间」倒序,会话有新活动时顺序不跳动;
+    /// 尚未产生消息的新对话没有协议会话 ID,固定排在最前)。
     @MainActor
     func sidebarSessions(for project: ProjectEntry) -> [SidebarSession] {
         let model = sessions[project.id]
-        var rows: [SidebarSession] = []
-        if let model, selectedProjectID == project.id || model.sessionId != nil || model.isRunning {
-            rows.append(SidebarSession(
-                projectID: project.id, sessionId: model.sessionId, uid: model.uid,
-                title: model.sessionTitle ?? String(localized: "新对话"),
-                updatedAt: nil, isCurrent: true, isRunning: model.isRunning
-            ))
-        }
+        let cache = Dictionary(project.sessions.map { ($0.sessionId, $0) }, uniquingKeysWith: { first, _ in first })
         let source: [CachedSession] = {
             if let live = model?.history, !live.isEmpty {
-                return live.map { CachedSession(sessionId: $0.sessionId, title: $0.title, updatedAt: $0.updatedAt) }
+                return live.map { CachedSession(sessionId: $0.sessionId, title: $0.title, updatedAt: $0.updatedAt, firstSeenAt: cache[$0.sessionId]?.firstSeenAt) }
             }
             return project.sessions
         }()
-        for item in source where item.sessionId != model?.sessionId {
-            rows.append(SidebarSession(
+        var rows: [(key: Date, row: SidebarSession)] = source.compactMap { item in
+            guard item.sessionId != model?.sessionId else { return nil }
+            return (item.stableKey, SidebarSession(
                 projectID: project.id, sessionId: item.sessionId, uid: nil,
                 title: item.title ?? String(localized: "未命名对话"),
                 updatedAt: Self.parseDate(item.updatedAt), isCurrent: false, isRunning: false
             ))
         }
-        return rows
-    }
-
-    /// 解析 ISO8601(含/不含毫秒)时间。
-    static func parseDate(_ text: String?) -> Date? {
-        guard let text else { return nil }
-        let fractional = ISO8601DateFormatter()
-        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return fractional.date(from: text) ?? ISO8601DateFormatter().date(from: text)
+        if let model, selectedProjectID == project.id || model.sessionId != nil || model.isRunning {
+            let key = model.sessionId.flatMap { cache[$0]?.stableKey } ?? .distantFuture
+            rows.append((key, SidebarSession(
+                projectID: project.id, sessionId: model.sessionId, uid: model.uid,
+                title: model.sessionTitle ?? String(localized: "新对话"),
+                updatedAt: nil, isCurrent: true, isRunning: model.isRunning
+            )))
+        }
+        // 稳定排序:键倒序,同键按会话 ID 兜底(全序)
+        return rows.sorted { lhs, rhs in
+            lhs.key != rhs.key ? lhs.key > rhs.key : (lhs.row.sessionId ?? "") < (rhs.row.sessionId ?? "")
+        }.map(\.row)
     }
 }
 
@@ -102,6 +100,13 @@ struct ProjectTreeView: View {
                         }
                     }
                     SectionTitle(title: "工作区") {
+                        if !workbench.projects.isEmpty {
+                            let collapsed = workbench.allProjectsCollapsed
+                            SectionIconButton(
+                                icon: collapsed ? "chevrons-up-down" : "chevrons-down-up",
+                                label: collapsed ? String(localized: "展开全部项目") : String(localized: "折叠全部项目")
+                            ) { workbench.setAllProjectsCollapsed(!collapsed) }
+                        }
                         filterMenu
                         SectionIconButton(icon: "folder.badge.plus", label: String(localized: "添加项目…")) {
                             if let url = WorkspaceStore.chooseDirectory() { AppActions.shared.openWorkspace(url) }
@@ -132,9 +137,6 @@ struct ProjectTreeView: View {
                 added = workbench.openProject(url) != nil || added
             }
             return added
-        }
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
-            if width > 0 { workbench.layout.leftWidth = Double(width) }
         }
     }
 
@@ -465,7 +467,8 @@ private struct SessionLine: View {
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
                 .foregroundStyle(isArchived ? OMColors.tertiaryText : Color.primary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                // minWidth: 0 允许收缩到小于文字自然宽度(否则长标题会把整行撑出侧栏)
+                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                 .clipped()
                 .mask(
                     HStack(spacing: 0) {

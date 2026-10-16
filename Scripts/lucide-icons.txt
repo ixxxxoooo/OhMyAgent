@@ -142,8 +142,8 @@ image-plus
 flag
 hourglass
 timer
-chevrons-up-down
 circle-dot-dashed
 hand
 arrow-big-up-dash
 terminal
+chevrons-down-up

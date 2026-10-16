@@ -27,6 +27,7 @@ enum LucideData {
         "chevron-left": ["m15 18-6-6 6-6"],
         "chevron-right": ["m9 18 6-6-6-6"],
         "chevron-up": ["m18 15-6-6-6 6"],
+        "chevrons-down-up": ["m7 20 5-5 5 5", "m7 4 5 5 5-5"],
         "chevrons-up-down": ["m7 15 5 5 5-5", "m7 9 5-5 5 5"],
         "circle": ["M2 12a10 10 0 1 0 20 0a10 10 0 1 0 -20 0Z"],
         "circle-alert": ["M2 12a10 10 0 1 0 20 0a10 10 0 1 0 -20 0Z", "M12 8L12 12", "M12 16L12.01 16"],

@@ -66,11 +66,19 @@ public struct CachedSession: Codable, Equatable, Sendable, Identifiable {
     public var sessionId: String
     public var title: String?
     public var updatedAt: String?
+    /// 首次被侧栏看到的时间(ISO8601):用作稳定排序键,会话有新活动时顺序不跳动(对齐 kuku 的「按创建时间」)。
+    public var firstSeenAt: String?
 
-    public init(sessionId: String, title: String?, updatedAt: String?) {
+    public init(sessionId: String, title: String?, updatedAt: String?, firstSeenAt: String? = nil) {
         self.sessionId = sessionId
         self.title = title
         self.updatedAt = updatedAt
+        self.firstSeenAt = firstSeenAt
+    }
+
+    /// 侧栏稳定排序键:首次出现时间,缺失时回退到更新时间。
+    public var stableKey: Date {
+        WorkbenchModel.parseDate(firstSeenAt) ?? WorkbenchModel.parseDate(updatedAt) ?? .distantPast
     }
 }
 

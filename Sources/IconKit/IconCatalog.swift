@@ -9,6 +9,7 @@ public enum IconCatalog {
     /// 语义名 → Lucide 名。
     public static let symbolToLucide: [String: String] = [
         "arrow.clockwise": "rotate-cw",
+        "arrow.left": "arrow-left",
         "arrow.right.doc.on.clipboard": "clipboard-paste",
         "arrow.triangle.merge": "git-merge",
         "arrow.triangle.swap": "arrow-left-right",

@@ -40,7 +40,11 @@ final class WorkspaceIndexModel {
 final class ExplorerModel {
     static let shared = ExplorerModel()
     private(set) var revision = 0
+    /// 「折叠全部文件夹」信号:递增后所有已展开的文件夹行收起。
+    private(set) var collapseRevision = 0
     func bump() { revision += 1 }
+    /// 一键折叠资源管理器中所有已展开的文件夹。
+    func collapseAll() { collapseRevision += 1 }
 }
 
 /// 全局搜索状态。

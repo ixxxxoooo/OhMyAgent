@@ -84,47 +84,7 @@ struct RightPaneView: View {
     }
 }
 
-/// 右栏收起时贴在窗口右缘的快捷列表:一键展开右栏并切换到对应视图,或打开底部面板。
-struct RightRail: View {
-    @Bindable var workbench: WorkbenchModel
-
-    var body: some View {
-        VStack(spacing: 6) {
-            ForEach(RightPane.available, id: \.self) { pane in
-                railButton(title: RightPaneView.title(pane), icon: RightPaneView.icon(pane)) {
-                    workbench.showRight(pane)
-                }
-            }
-            Divider().frame(width: 16).padding(.vertical, 2)
-            railButton(title: String(localized: "底部面板"), icon: "panel-bottom") {
-                workbench.toggleBottom()
-            }
-            railButton(title: String(localized: "工具与扩展"), icon: "puzzlepiece.extension") {
-                AppActions.shared.openSettings(page: .tools)
-            }
-            Spacer()
-        }
-        .padding(.top, TitlebarMetrics.height + 6)
-        .frame(width: TitlebarMetrics.trailingInset)
-        .frame(maxHeight: .infinity)
-        .background(SidebarBackground())
-        .overlay(alignment: .leading) { Divider() }
-    }
-
-    private func railButton(title: String, icon: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image.om(icon, size: 15)
-                .frame(width: 26, height: 26)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(OMColors.secondaryText)
-        .help(title)
-        .accessibilityLabel(title)
-    }
-}
-
-/// 侧栏材质背景:与左侧栏(系统侧栏)同一视觉效果,供右栏与右栏快捷列使用。
+/// 侧栏材质背景:左右栏共用的同一视觉效果。
 struct SidebarBackground: NSViewRepresentable {
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = NSVisualEffectView()

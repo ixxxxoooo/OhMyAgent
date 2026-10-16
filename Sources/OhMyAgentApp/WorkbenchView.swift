@@ -49,59 +49,50 @@ struct WorkbenchView: View {
         .task { await runDebugHooks() }
     }
 
-    /// 工作台主体:左栏 + 中栏 + 右栏(无状态栏,原状态栏功能收纳到输入区页脚与右栏快捷列)。
+    /// 工作台主体:左栏 + 中栏 + 右栏(自绘布局,无原生 NavigationSplitView);
+    /// 顶部浮层(回退/前进/侧栏开关/右栏开关)盖在整个工作区之上,按钮位置恒定且可点击。
     private var workspaceBody: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 0) {
-                NavigationSplitView(columnVisibility: columnVisibility) {
-                    ProjectTreeView(workbench: workbench)
-                        .id(appearance.fontRevision)
-                        .ignoresSafeArea(.container, edges: .top)
-                        .toolbar(removing: .sidebarToggle)
-                        .navigationSplitViewColumnWidth(min: CGFloat(PanelMetrics.leftRange.lowerBound), ideal: CGFloat(workbench.layout.leftWidth), max: CGFloat(PanelMetrics.leftRange.upperBound))
-                } detail: {
-                    CenterColumn(workbench: workbench)
-                        .ignoresSafeArea(.container, edges: .top)
-                        // 无标题栏窗口:不再有工具栏与标题行,窗口标题仅保留给系统(Mission Control/辅助功能)。
-                        .navigationTitle(title)
-                        .toolbar(removing: .title)
-                }
-                .toolbar(removing: .sidebarToggle)
-                .inspector(isPresented: $workbench.layout.rightVisible) {
-                    RightPaneView(workbench: workbench)
-                        .ignoresSafeArea(.container, edges: .top)
-                        .inspectorColumnWidth(min: CGFloat(PanelMetrics.rightRange.lowerBound), ideal: CGFloat(workbench.layout.rightWidth), max: CGFloat(PanelMetrics.rightRange.upperBound))
-                        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
-                            if width > 0 { workbench.layout.rightWidth = Double(width) }
-                        }
-                }
-                if !workbench.layout.rightVisible { RightRail(workbench: workbench) }
+        HStack(spacing: 0) {
+            if workbench.layout.leftVisible {
+                ProjectTreeView(workbench: workbench)
+                    .id(appearance.fontRevision)
+                    .frame(width: CGFloat(workbench.layout.leftWidth))
+                    .clipped()
+                    .background(SidebarBackground())
+                PanelResizer(width: $workbench.layout.leftWidth, side: .left)
+            }
+            CenterColumn(workbench: workbench)
+                .frame(minWidth: 320, maxWidth: .infinity)
+            if workbench.layout.rightVisible {
+                PanelResizer(width: $workbench.layout.rightWidth, side: .right)
+                RightPaneView(workbench: workbench)
+                    .frame(width: CGFloat(workbench.layout.rightWidth))
+                    .clipped()
             }
         }
-        .background(PanelDividerReset(onReset: resetPanelWidth, visibility: { (left: workbench.layout.leftVisible, right: workbench.layout.rightVisible) }))
         .overlay(alignment: .top) { TitlebarOverlay(workbench: workbench) }
         .ignoresSafeArea(.container, edges: .top)
+        // 无标题栏窗口:窗口标题仅保留给系统(Mission Control/辅助功能)。
+        .navigationTitle(title)
+        .onAppear { workbench.recordNavigation() }
+        .onChange(of: navigationSignature) { _, _ in workbench.recordNavigation() }
     }
 
-    /// 双击分隔条:把对应侧栏宽度恢复默认并持久化。
-    private func resetPanelWidth(_ side: PanelSide) {
-        switch side {
-        case .left: workbench.layout.leftWidth = PanelMetrics.leftDefault
-        case .right: workbench.layout.rightWidth = PanelMetrics.rightDefault
-        }
+    /// 导航历史的触发信号:聚焦组的激活标签与标签总数(关闭标签时需要清理历史)。
+    private var navigationSignature: NavigationSignature {
+        NavigationSignature(active: workbench.dock.focusedGroup?.activeID, tabCount: workbench.dock.allTabs.count)
+    }
+
+    /// 导航历史触发信号。
+    private struct NavigationSignature: Equatable {
+        let active: UUID?
+        let tabCount: Int
     }
 
     // MARK: 标题与布局
 
     private var title: String {
         workbench.activeSession?.sessionTitle ?? workbench.selectedProject?.name ?? "OhMyAgent"
-    }
-
-    private var columnVisibility: Binding<NavigationSplitViewVisibility> {
-        Binding(
-            get: { workbench.layout.leftVisible ? .all : .detailOnly },
-            set: { workbench.layout.leftVisible = $0 != .detailOnly }
-        )
     }
 
     // MARK: 行为
@@ -126,6 +117,11 @@ struct WorkbenchView: View {
     /// 调试钩子(脚本化界面验证用,不影响正常使用)。
     private func runDebugHooks() async {
         var env = ProcessInfo.processInfo.environment
+        // 调试:OMA_TOGGLE_LEFT=秒 延迟后切换左栏显隐(不依赖鼠标点击,用于脚本化验证左栏收起/展开)
+        if let delay = env["OMA_TOGGLE_LEFT"], let seconds = Double(delay) {
+            try? await Task.sleep(for: .seconds(seconds))
+            workbench.toggleLeft()
+        }
         // 演示模式:OMA_DEMO_SCENARIO=<场景名> 等价于 OMA_AUTOSEND="/demo-<场景名>"
         if let scenario = DemoLaunch.environment?.scenario, env["OMA_AUTOSEND"] == nil { env["OMA_AUTOSEND"] = "/demo-" + scenario }
         let wantsSession = env["OMA_AUTOSEND"] != nil || env["OMA_DRAFT"] != nil

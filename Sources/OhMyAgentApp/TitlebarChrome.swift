@@ -15,46 +15,58 @@ enum TitlebarMetrics {
     static let height: CGFloat = 35
     /// 让开红绿灯的安全边距。
     static let trafficLightInset: CGFloat = 88
-    /// 侧栏收起时,标签栏左侧需为浮层按钮预留的宽度(红绿灯边距 + 按钮 + 间隙)。
-    static let collapsedLeadingInset: CGFloat = 124
-    /// 右栏开关占用的宽度(右栏头部与折叠条为其预留)。
+    /// 浮层图标按钮的边长与按钮间距。
+    static let buttonSize: CGFloat = 26
+    static let buttonSpacing: CGFloat = 2
+    /// 侧栏收起时,标签栏左侧需为浮层(回退/前进/侧栏开关 3 个按钮)预留的宽度:88 + 26×3 + 2×2 = 170(对齐 kuku)。
+    /// 修改浮层按钮构成时必须同步此值。
+    static let collapsedLeadingInset: CGFloat = trafficLightInset + buttonSize * 3 + buttonSpacing * 2
+    /// 右栏开关占用的宽度(右栏头部与标签栏为其预留)。
     static let trailingInset: CGFloat = 34
 }
 
-/// 浮层按钮:图标 + 悬停底色。
+/// 浮层按钮:图标 + 悬停底色;不可用时弱化且不响应。
 private struct OverlayButton: View {
     let icon: String
     let label: String
+    var enabled = true
     let action: () -> Void
     @State private var hovering = false
 
     var body: some View {
         Button(action: action) {
             Image.om(icon, size: 14)
-                .frame(width: 26, height: 26)
-                .background(hovering ? Color.primary.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .frame(width: TitlebarMetrics.buttonSize, height: TitlebarMetrics.buttonSize)
+                .background(hovering && enabled ? Color.primary.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .foregroundStyle(OMColors.secondaryText)
+        .disabled(!enabled)
+        .foregroundStyle(enabled ? OMColors.secondaryText : OMColors.tertiaryText.opacity(0.6))
         .onHover { hovering = $0 }
         .help(label)
         .accessibilityLabel(label)
     }
 }
 
-/// 顶部浮层:左上侧栏开关、右上右栏开关。
+/// 顶部浮层:左上「回退 / 前进 / 侧栏开关」,右上右栏开关。
+/// 刻意做成整个工作区上的浮层(而不是塞进侧栏或标签栏):面板展开/收起时按钮坐标恒定,
+/// 且不再被 NSSplitView 的列视图抢走点击(旧实现里左栏开关因此点不动)。
 struct TitlebarOverlay: View {
     @Bindable var workbench: WorkbenchModel
 
     var body: some View {
         HStack(spacing: 0) {
-            OverlayButton(
-                icon: "panel-left",
-                label: workbench.layout.leftVisible
-                    ? String(localized: "隐藏左栏") + " (\(ShortcutStore.shared.binding(for: .toggleSidebar).display))"
-                    : String(localized: "显示左栏") + " (\(ShortcutStore.shared.binding(for: .toggleSidebar).display))"
-            ) { workbench.toggleLeft() }
+            HStack(spacing: TitlebarMetrics.buttonSpacing) {
+                OverlayButton(icon: "arrow-left", label: String(localized: "回退"), enabled: workbench.nav.canGoBack) { workbench.goBack() }
+                OverlayButton(icon: "arrow-right", label: String(localized: "前进"), enabled: workbench.nav.canGoForward) { workbench.goForward() }
+                OverlayButton(
+                    icon: "panel-left",
+                    label: workbench.layout.leftVisible
+                        ? String(localized: "隐藏左栏") + " (\(ShortcutStore.shared.binding(for: .toggleSidebar).display))"
+                        : String(localized: "显示左栏") + " (\(ShortcutStore.shared.binding(for: .toggleSidebar).display))"
+                ) { workbench.toggleLeft() }
+            }
             .padding(.leading, TitlebarMetrics.trafficLightInset)
             Spacer(minLength: 0)
             OverlayButton(

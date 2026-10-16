@@ -57,12 +57,32 @@ public final class WorkbenchModel {
     /// 当前项目的会话模型(尚未创建时为 nil)。
     public var activeSession: SessionModel? { selectedProjectID.flatMap { sessions[$0] } }
 
-    /// 置顶项目在前,其余按最近打开时间排序后的项目列表。
+    /// 项目排序(对齐 kuku):置顶优先 → 添加时间倒序 → 路径兜底。
+    /// 不再按「最近打开」排序:选中/切换项目不会让左栏项目换位。
     public var orderedProjects: [ProjectEntry] {
         projects.sorted { lhs, rhs in
             if lhs.pinned != rhs.pinned { return lhs.pinned }
-            return lhs.lastOpenedAt > rhs.lastOpenedAt
+            if lhs.addedAt != rhs.addedAt { return lhs.addedAt > rhs.addedAt }
+            return lhs.id < rhs.id
         }
+    }
+
+    /// 所有项目是否都已折叠(无项目时为 false)。
+    public var allProjectsCollapsed: Bool { !projects.isEmpty && projects.allSatisfy(\.collapsed) }
+
+    /// 一键折叠/展开左栏里的所有项目分组。
+    /// - Parameter collapsed: true 折叠全部;false 展开全部
+    public func setAllProjectsCollapsed(_ collapsed: Bool) {
+        guard projects.contains(where: { $0.collapsed != collapsed }) else { return }
+        for index in projects.indices { projects[index].collapsed = collapsed }
+        scheduleSave()
+    }
+
+    /// 解析 ISO8601(含/不含毫秒)时间;使用值类型解析策略,可在任意线程高频调用。
+    public nonisolated static func parseDate(_ text: String?) -> Date? {
+        guard let text else { return nil }
+        return (try? Date(text, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)))
+            ?? (try? Date(text, strategy: Date.ISO8601FormatStyle()))
     }
 
     // MARK: 项目
@@ -347,10 +367,17 @@ public final class WorkbenchModel {
         if autoConnect { model.connect() }
     }
 
-    /// 缓存历史会话摘要(每项目最多 30 条)。
-    func cacheHistory(_ history: [SessionSummary], for id: String) {
+    /// 缓存历史会话摘要(每项目最多 30 条);为每条会话保留/生成「首次出现时间」作为稳定排序键。
+    func cacheHistory(_ history: [SessionSummary], for id: String, now: Date = Date()) {
         guard let index = projects.firstIndex(where: { $0.id == id }) else { return }
-        let cached = history.prefix(30).map { CachedSession(sessionId: $0.sessionId, title: $0.title, updatedAt: $0.updatedAt) }
+        let previous = Dictionary(projects[index].sessions.map { ($0.sessionId, $0) }, uniquingKeysWith: { first, _ in first })
+        let hadCache = !projects[index].sessions.isEmpty
+        let nowText = now.formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true))
+        let cached = history.prefix(30).map { item -> CachedSession in
+            // 首次填充时冻结为更新时间;之后新出现的会话以出现时刻为准(排在最前)
+            let first = previous[item.sessionId]?.firstSeenAt ?? (hadCache ? nowText : item.updatedAt)
+            return CachedSession(sessionId: item.sessionId, title: item.title, updatedAt: item.updatedAt, firstSeenAt: first)
+        }
         guard projects[index].sessions != cached else { return }
         projects[index].sessions = cached
         scheduleSave()
@@ -363,6 +390,32 @@ public final class WorkbenchModel {
     }
 
     // MARK: 布局
+
+    // MARK: 标签导航历史(回退/前进)
+
+    /// 标签导航历史(不持久化)。
+    public private(set) var nav = NavHistory()
+
+    /// 记录当前聚焦组的激活标签,并清理已关闭标签。视图在激活标签或标签集合变化时调用。
+    public func recordNavigation() {
+        let alive = Set(dock.allTabs.map(\.id))
+        nav.prune(alive: alive)
+        if let id = dock.focusedGroup?.activeID, alive.contains(id) { nav.push(id) }
+    }
+
+    /// 回退到上一个激活过的标签。
+    public func goBack() {
+        recordNavigation()
+        guard let id = nav.back() else { return }
+        activateTab(id)
+    }
+
+    /// 前进到下一个标签。
+    public func goForward() {
+        recordNavigation()
+        guard let id = nav.forward() else { return }
+        activateTab(id)
+    }
 
     public func toggleLeft() { layout.leftVisible.toggle() }
     public func toggleRight() { layout.rightVisible.toggle() }

@@ -20,6 +20,7 @@ struct ExplorerView: View {
                     Spacer()
                     toolButton("file-plus", "新建文件") { ExplorerActions.create(in: project.id, directory: false, workbench: workbench) }
                     toolButton("folder-plus", "新建文件夹") { ExplorerActions.create(in: project.id, directory: true, workbench: workbench) }
+                    toolButton("chevrons-down-up", "折叠全部文件夹") { model.collapseAll() }
                     toolButton("refresh-cw", "刷新") { model.bump(); WorkspaceIndexModel.shared.refresh(root: project.id) }
                 }
                 .padding(.horizontal, 10).padding(.vertical, 6)
@@ -75,6 +76,7 @@ private struct FolderRow: View {
     let workbench: WorkbenchModel
     let root: String
     @State private var expanded = false
+    private let model = ExplorerModel.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -86,6 +88,7 @@ private struct FolderRow: View {
                 DirectoryChildren(path: entry.path, depth: depth + 1, workbench: workbench, root: root)
             }
         }
+        .onChange(of: model.collapseRevision) { _, _ in expanded = false }
     }
 }
 

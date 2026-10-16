@@ -1349,3 +1349,16 @@
 "适配器安装完成但未找到入口文件,请点击「重试」或在设置 → 高级中指定路径。" = "The adapter was installed but its entry file was not found. Click Retry or set the path in Settings → Advanced.";
 "正在安装 Claude Code 适配器(仅首次需要,约几十秒)…" = "Installing the Claude Code adapter (first run only, takes a few dozen seconds)…";
 "正在安装适配器…" = "Installing adapter…";
+"全部标签" = "All Tabs";
+"有未保存修改" = "Unsaved changes";
+"子 Agent 会话" = "Subagent Session";
+"点击切换 · 悬停关闭" = "Click to switch · hover to close";
+"搜索标签名称或路径…" = "Search tab name or path…";
+"未找到匹配的标签" = "No matching tabs";
+"折叠全部文件夹" = "Collapse All Folders";
+"调整左栏宽度" = "Resize Left Sidebar";
+"调整右栏宽度" = "Resize Right Sidebar";
+"展开全部项目" = "Expand All Projects";
+"折叠全部项目" = "Collapse All Projects";
+"回退" = "Back";
+"前进" = "Forward";
