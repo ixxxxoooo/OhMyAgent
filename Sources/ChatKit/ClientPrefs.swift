@@ -58,6 +58,10 @@ public enum ClientPrefs {
         public static let loadClaudeMemory = "prompt.loadClaudeMemory"
         /// 是否显示第三方 Agent 的扩展通知行(如 pi-tps 的「TPS …」),默认显示为淡色小字
         public static let showAgentNotify = "agent.showNotify"
+        /// 等待动词风格(`WorkingVerbStyle`):classic / playful / claudeCode / poetic / geek / minimal
+        public static let workingVerbStyle = "appearance.workingVerbStyle"
+        /// 滚动条显示方式(`ScrollbarVisibility`):system / autoHide / always
+        public static let scrollbarVisibility = "appearance.scrollbarVisibility"
     }
 
     /// 托盘图标是否启用:菜单栏开关打开,或 Dock 图标被隐藏(此时必须有托盘才能打开窗口)。默认开启。

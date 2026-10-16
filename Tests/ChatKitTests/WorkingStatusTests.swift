@@ -1,6 +1,7 @@
 // @author ixxxxoooo
 // 等待文案:动词稳定挑选、耗时格式化、整行文案。
 
+import Foundation
 import Testing
 @testable import ChatKit
 
@@ -46,5 +47,43 @@ struct ComposerDockSectionTests {
         #expect(ComposerDockSection.effective(selection: nil, hidden: false, counts: counts) == .subagents)
         #expect(ComposerDockSection.effective(selection: .terminals, hidden: true, counts: counts) == nil)
         #expect(ComposerDockSection.effective(selection: nil, hidden: false, counts: [:]) == nil)
+    }
+}
+
+@Suite("等待动词风格与滚动条设置")
+struct WorkingVerbStyleTests {
+    @Test("每种风格都有动词与动画帧,动词互不重复,极简只有一个")
+    func catalog() {
+        for style in WorkingVerbStyle.allCases {
+            #expect(!style.verbs.isEmpty && !style.glyphFrames.isEmpty && !style.restingGlyph.isEmpty)
+            #expect(Set(style.verbs).count == style.verbs.count, "\(style.rawValue) 动词重复")
+        }
+        #expect(WorkingVerbStyle.minimal.verbs.count == 1)
+        #expect(WorkingVerbStyle.classic.verbs == WorkingStatus.verbs)
+    }
+
+    @Test("按风格挑选动词:同种子稳定,且来自该风格的动词表")
+    func verbForStyle() {
+        for style in WorkingVerbStyle.allCases {
+            let verb = WorkingStatus.verb(seed: 5, style: style)
+            #expect(verb == WorkingStatus.verb(seed: 5, style: style))
+            #expect(style.verbs.contains(verb))
+        }
+        #expect(WorkingStatus.glyph(tick: 0, style: .geek) == WorkingVerbStyle.geek.glyphFrames[0])
+    }
+
+    @Test("存储值解析:未知或缺省回退经典/跟随系统")
+    func resolve() {
+        #expect(WorkingVerbStyle.resolve("poetic") == .poetic)
+        #expect(WorkingVerbStyle.resolve("???") == .classic)
+        #expect(WorkingVerbStyle.resolve(nil) == .classic)
+        #expect(ScrollbarVisibility.resolve("autoHide") == .autoHide)
+        #expect(ScrollbarVisibility.resolve("x") == .system)
+        let defaults = UserDefaults(suiteName: "WorkingVerbStyleTests")!
+        defer { defaults.removePersistentDomain(forName: "WorkingVerbStyleTests") }
+        defaults.set("geek", forKey: ClientPrefs.Key.workingVerbStyle)
+        #expect(WorkingVerbStyle.current(defaults) == .geek)
+        defaults.set("always", forKey: ClientPrefs.Key.scrollbarVisibility)
+        #expect(ScrollbarVisibility.current(defaults) == .always)
     }
 }

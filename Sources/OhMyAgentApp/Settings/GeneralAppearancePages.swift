@@ -124,6 +124,8 @@ struct AppearancePage: View {
     @AppStorage(ClientPrefs.Key.chatWidthCustom) private var chatWidthCustom = ChatWidth.customDefault
     @AppStorage(ClientPrefs.Key.settingsWidth) private var settingsWidth = SettingsContentWidth.standard.rawValue
     @AppStorage(ClientPrefs.Key.settingsWidthCustom) private var settingsWidthCustom = SettingsContentWidth.customDefault
+    @AppStorage(ClientPrefs.Key.workingVerbStyle) private var verbStyle = WorkingVerbStyle.classic.rawValue
+    @AppStorage(ClientPrefs.Key.scrollbarVisibility) private var scrollbar = ScrollbarVisibility.system.rawValue
     @Bindable private var workbench = AppEnvironment.shared.workbench
 
     var body: some View {
@@ -193,6 +195,19 @@ struct AppearancePage: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(OMColors.card, in: RoundedRectangle(cornerRadius: 8))
             }
+            Section("等待动画(Spinner Verbs)") {
+                ForEach(WorkingVerbStyle.allCases) { style in
+                    VerbStyleRow(style: style, selected: WorkingVerbStyle.resolve(verbStyle) == style) { verbStyle = style.rawValue }
+                }
+                Note("运行中会话流末尾的「✻ 思考中…」会按所选风格显示动词与动画字符;颜色跟随主题强调色。")
+            }
+            Section("滚动条") {
+                Picker("显示方式", selection: $scrollbar) {
+                    ForEach(ScrollbarVisibility.allCases) { Text(LocalizedStringKey($0.title)).tag($0.rawValue) }
+                }
+                .pickerStyle(.segmented)
+                Note("「跟随系统」沿用 macOS「显示滚动条」设置;「自动隐藏」仅在滚动时出现;「始终显示」常驻。")
+            }
             Section("材质与动效") {
                 Toggle("始终使用不透明材质", isOn: $appearance.alwaysOpaque)
                 Toggle("低电量模式自动改用不透明材质", isOn: $appearance.fallbackOnLowPower)
@@ -244,6 +259,38 @@ extension AppearancePage {
             Note("把「项目栏 / 文件 / Git / 终端 / 输出」的卡片拖到想要的位置;终端和输出的标题条也可以直接拖到窗口的左侧、右侧、底部或中间。换位置不会中断终端里正在运行的进程。")
             Button("恢复默认布局") { workbench.resetLayout() }
         }
+    }
+}
+
+/// 等待动词风格行:风格名 + 示例动词 + 动画字符预览,选中时打勾。
+private struct VerbStyleRow: View {
+    let style: WorkingVerbStyle
+    let selected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                ActiveTimeline(interval: 0.15, start: Date(timeIntervalSince1970: 0)) { date in
+                    Text(WorkingStatus.glyph(tick: Int(date.timeIntervalSinceReferenceDate / 0.15), style: style))
+                        .font(OMFonts.body.weight(.medium))
+                        .foregroundStyle(OMColors.accent)
+                        .frame(width: 18)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(LocalizedStringKey(style.title)).font(OMFonts.body)
+                    Text(LocalizedStringKey(style.summary)).font(OMFonts.caption).foregroundStyle(OMColors.secondaryText)
+                }
+                Spacer(minLength: 0)
+                if selected { Image.om("check", size: 12).foregroundStyle(OMColors.accent) }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(selected ? OMColors.selectedFill : OMColors.subtleFill, in: RoundedRectangle(cornerRadius: OMMetrics.controlRadius, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 }
 

@@ -10,19 +10,22 @@ import SwiftUI
 struct WorkingIndicatorView: View {
     let model: SessionModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// 外观里选择的等待动词风格(变化时自动刷新)
+    @AppStorage(ClientPrefs.Key.workingVerbStyle) private var verbStyleRaw = WorkingVerbStyle.classic.rawValue
 
     var body: some View {
         if model.isRunning, let start = model.turnStartedAt {
+            let style = WorkingVerbStyle.resolve(verbStyleRaw)
             let waitingForUser = !model.pendingPermissions.isEmpty || !model.pendingElicitations.isEmpty
             ActiveTimeline(interval: reduceMotion || waitingForUser ? 1 : 0.15, start: start) { date in
                 let seconds = Int(date.timeIntervalSince(start))
                 let tick = Int(date.timeIntervalSinceReferenceDate / 0.15)
                 HStack(spacing: 8) {
-                    Text(waitingForUser || reduceMotion ? "✻" : WorkingStatus.glyph(tick: tick))
-                        .font(OMFonts.custom(13, weight: .medium))
+                    Text(waitingForUser || reduceMotion ? style.restingGlyph : WorkingStatus.glyph(tick: tick, style: style))
+                        .font(OMFonts.body.weight(.medium))
                         .foregroundStyle(waitingForUser ? OMColors.tertiaryText : OMColors.accent)
                         .frame(width: 16)
-                    Text(label(seconds: seconds, start: start, waitingForUser: waitingForUser))
+                    Text(label(seconds: seconds, start: start, waitingForUser: waitingForUser, style: style))
                         .font(OMFonts.small)
                         .foregroundStyle(OMColors.secondaryText)
                         .monospacedDigit()
@@ -35,11 +38,11 @@ struct WorkingIndicatorView: View {
     }
 
     /// 文案:等待用户时提示「等待你的确认」,否则为「动词… (耗时 · 中断提示)」。
-    private func label(seconds: Int, start: Date, waitingForUser: Bool) -> String {
+    private func label(seconds: Int, start: Date, waitingForUser: Bool, style: WorkingVerbStyle) -> String {
         if waitingForUser {
             return "\(String(localized: "等待你的回复"))… (\(WorkingStatus.elapsed(seconds)))"
         }
-        let verb = WorkingStatus.verb(seed: Int(start.timeIntervalSince1970))
+        let verb = WorkingStatus.verb(seed: Int(start.timeIntervalSince1970), style: style)
         return WorkingStatus.line(verb: verb, seconds: seconds, canInterrupt: true)
     }
 }

@@ -38,6 +38,27 @@ final class AppActions {
         showMainWindow()
     }
 
+    /// 重新启动应用:先拉起一个等待当前进程退出后再打开应用包的后台 shell,然后正常退出
+    /// (退出流程会清理 Agent 子进程与持久化状态)。非 `.app` 包形态(如 `swift run`)下无法重启,仅记录日志。
+    func relaunch() {
+        let bundleURL = Bundle.main.bundleURL
+        guard bundleURL.pathExtension == "app" else {
+            Log.ui.warning("非应用包形态,无法重启", ["path": bundleURL.lastPathComponent])
+            return
+        }
+        let script = "while kill -0 \"$1\" 2>/dev/null; do sleep 0.2; done; /usr/bin/open -n \"$2\""
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-c", script, "sh", String(ProcessInfo.processInfo.processIdentifier), bundleURL.path]
+        do {
+            try process.run()
+            Log.ui.info("应用重启已安排")
+            NSApp.terminate(nil)
+        } catch {
+            Log.ui.error("拉起重启脚本失败", ["error": "\(error)"])
+        }
+    }
+
     /// 打开设置整页(并入主窗口,可深链到某页)。
     func openSettings(page: SettingsPage? = nil) {
         if let page { SettingsRouter.shared.go(page) }

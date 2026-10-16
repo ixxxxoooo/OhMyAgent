@@ -229,6 +229,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.addItem(.separator())
         menu.addItem(item(String(localized: "设置…"), key: ",") { AppActions.shared.openSettings() })
         menu.addItem(item(String(localized: "检查更新…")) { UpdateModel.shared.checkInteractively() })
+        menu.addItem(item(String(localized: "重新启动 OhMyAgent"), key: "r") { AppActions.shared.relaunch() })
         menu.addItem(.separator())
         menu.addItem(item(String(localized: "退出 OhMyAgent"), key: "q") { NSApp.terminate(nil) })
         Log.perf.debug("托盘菜单构建", ["ms": "\(Int(started.duration(to: .now) / .milliseconds(1)))", "sessions": "\(count)"])

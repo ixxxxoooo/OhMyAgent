@@ -28,6 +28,7 @@ struct WorkbenchView: View {
             }
         }
         .overlay { HubOverlay(workbench: workbench) }
+        .omScrollbarPolicy()
         .overlay { MermaidFloatingOverlay() }
         .overlay { ImagePreviewOverlay() }
         .tint(appearance.tint)
