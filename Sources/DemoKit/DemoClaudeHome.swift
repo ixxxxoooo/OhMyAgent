@@ -19,6 +19,45 @@ public enum DemoClaudeHome {
         for (name, text) in commands { try put(claude.appendingPathComponent("commands/\(name).md"), text) }
         for (name, text) in agents { try put(claude.appendingPathComponent("agents/\(name).md"), text) }
         try writePlugins(claude: claude)
+        try writeJSON(claude.appendingPathComponent("stats-cache.json"), statsCache)
+    }
+
+    /// 演示用统计缓存(`stats-cache.json`):固定截止日期与确定性公式生成 30 天活动、每日按模型 token 与按模型累计,
+    /// 让「用量与成本」页的图表在演示模式下稳定可见(不依赖真实使用记录)。
+    static var statsCache: [String: Any] {
+        let models = ["claude-sonnet-4-5", "claude-opus-4-1", "claude-haiku-4-5"]
+        var activity: [[String: Any]] = []
+        var tokens: [[String: Any]] = []
+        // 日期:2026-09-16 起连续 30 天
+        let start = [2026, 9, 16]
+        let monthLengths = [9: 30, 10: 31]
+        var year = start[0], month = start[1], dayOfMonth = start[2]
+        for index in 0..<30 {
+            let date = String(format: "%04d-%02d-%02d", year, month, dayOfMonth)
+            let weekendDip = (index % 7 == 5 || index % 7 == 6) ? 0.4 : 1.0
+            let wave = 0.6 + 0.4 * abs(sin(Double(index) * 0.7))
+            let messages = Int((120 * wave * weekendDip).rounded()) + (index * 7) % 23
+            activity.append(["date": date, "messageCount": messages, "sessionCount": max(1, messages / 40), "toolCallCount": messages * 2 / 3])
+            var byModel: [String: Int] = [:]
+            for (modelIndex, model) in models.enumerated() {
+                let share = [0.62, 0.28, 0.10][modelIndex]
+                byModel[model] = Int(Double(messages) * 5200 * share)
+            }
+            tokens.append(["date": date, "tokensByModel": byModel])
+            dayOfMonth += 1
+            if dayOfMonth > (monthLengths[month] ?? 30) { dayOfMonth = 1; month += 1; if month > 12 { month = 1; year += 1 } }
+        }
+        return [
+            "version": 2,
+            "lastComputedDate": "2026-10-15",
+            "dailyActivity": activity,
+            "dailyModelTokens": tokens,
+            "modelUsage": [
+                "claude-sonnet-4-5": ["inputTokens": 1_820_000, "outputTokens": 640_000, "cacheReadInputTokens": 9_400_000, "cacheCreationInputTokens": 1_100_000, "costUSD": 18.42],
+                "claude-opus-4-1": ["inputTokens": 520_000, "outputTokens": 210_000, "cacheReadInputTokens": 2_900_000, "cacheCreationInputTokens": 480_000, "costUSD": 31.7],
+                "claude-haiku-4-5": ["inputTokens": 260_000, "outputTokens": 90_000, "cacheReadInputTokens": 700_000, "cacheCreationInputTokens": 90_000, "costUSD": 0.9],
+            ],
+        ]
     }
 
     // MARK: 内容

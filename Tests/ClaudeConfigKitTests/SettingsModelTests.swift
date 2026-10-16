@@ -74,6 +74,30 @@ struct UsageStatsTests {
         #expect(stats.models.first?.costUSD == 1.5)
     }
 
+    @Test("逐日窗口补零、跨月连续;缓存命中率与累计汇总")
+    func analysis() throws {
+        let box = try Sandbox(); defer { box.cleanup() }
+        try box.write("""
+        {"lastComputedDate":"2026-03-02","dailyActivity":[
+          {"date":"2026-02-27","messageCount":4,"sessionCount":1,"toolCallCount":2},
+          {"date":"2026-03-02","messageCount":6,"sessionCount":2,"toolCallCount":5}],
+         "dailyModelTokens":[{"date":"2026-03-02","tokensByModel":{"a":100,"b":50}}],
+         "modelUsage":{"a":{"inputTokens":100,"outputTokens":40,"cacheReadInputTokens":300,"cacheCreationInputTokens":100,"costUSD":0.5},
+                       "b":{"inputTokens":0,"outputTokens":10,"costUSD":0.25}}}
+        """, to: ".claude/stats-cache.json", base: box.home)
+        let stats = UsageStats.load(paths: box.paths)
+        let window = stats.dailyWindow(days: 5)
+        #expect(window.map(\.date) == ["2026-02-26", "2026-02-27", "2026-02-28", "2026-03-01", "2026-03-02"])
+        #expect(window.map(\.messageCount) == [0, 4, 0, 0, 6])
+        #expect(stats.dailyWindow(days: 0).isEmpty)
+        #expect(stats.dailyTokenWindow(days: 2).map(\.total) == [0, 150])
+        #expect(stats.totalTokens == 150)
+        #expect(stats.totalCostUSD == 0.75)
+        // 300 / (100 + 100 + 300)
+        #expect(stats.cacheHitRatio == 0.6)
+        #expect(UsageStatsSnapshot.empty.cacheHitRatio == nil)
+    }
+
     @Test("文件缺失或损坏时返回空快照")
     func missingOrCorrupt() throws {
         let box = try Sandbox(); defer { box.cleanup() }
