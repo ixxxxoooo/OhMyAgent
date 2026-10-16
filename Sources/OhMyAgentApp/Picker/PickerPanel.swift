@@ -193,6 +193,12 @@ private struct PickerPresenter<Item: PickListItem, Row: View>: ViewModifier {
             .onChange(of: isPresented) { _, shown in
                 if shown { present() } else { PickerPanelController.shared.dismiss() }
             }
+            .task {
+                // 初始即为展开(调试钩子)时,等锚点视图入窗后再弹出
+                guard isPresented else { return }
+                try? await Task.sleep(for: .milliseconds(300))
+                if isPresented { present() }
+            }
             .onDisappear { if isPresented { isPresented = false } }
     }
 
@@ -262,6 +268,12 @@ private struct CustomPickerPresenter<Panel: View>: ViewModifier {
             .background(PickerAnchor(box: box))
             .onChange(of: isPresented) { _, shown in
                 if shown { present() } else { PickerPanelController.shared.dismiss() }
+            }
+            .task {
+                // 初始即为展开(调试钩子)时,等锚点视图入窗后再弹出
+                guard isPresented else { return }
+                try? await Task.sleep(for: .milliseconds(300))
+                if isPresented { present() }
             }
             .onDisappear { if isPresented { isPresented = false } }
     }
