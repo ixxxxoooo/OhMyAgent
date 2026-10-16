@@ -244,3 +244,34 @@ extension ProviderTesterTests {
         } else { Issue.record("应失败") }
     }
 }
+
+@MainActor
+@Suite("提供商设置模型")
+struct ProviderSettingsModelTests {
+    @Test("同名保存自动加序号;停用默认提供商回到系统默认;密钥缓存随增删更新")
+    func settingsModel() {
+        let dir = tempDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let model = ProviderSettingsModel(directory: dir)
+        #expect(model.upsert(ModelProvider(id: "a", name: "自定义", baseURL: "https://a.com", model: "m")))
+        #expect(model.upsert(ModelProvider(id: "b", name: "自定义", baseURL: "https://b.com", model: "m")))
+        #expect(model.snapshot.providers.map(\.name) == ["自定义", "自定义 2"])
+        // 重复保存同一个不应再被改名
+        #expect(model.upsert(model.snapshot.providers[1]))
+        #expect(model.snapshot.providers.map(\.name) == ["自定义", "自定义 2"])
+        let clone = model.makeUnique(ModelProvider(id: "a", name: "自定义", baseURL: "https://c.com", model: "m"))
+        #expect(clone.id != "a" && clone.name == "自定义 3")
+
+        model.setKey("sk-1", id: "a")
+        #expect(model.hasKey(id: "a") && model.keyedIds == ["a"])
+        model.setActive("a")
+        model.setEnabled("a", false)
+        #expect(model.snapshot.active == nil)
+        #expect(model.snapshot.providers.first { $0.id == "a" }?.isEnabled == false)
+        model.setEnabled("a", true)
+        #expect(model.snapshot.providers.first { $0.id == "a" }?.enabled == nil, "启用状态不落盘,保持文件干净")
+        model.setKey("", id: "a")
+        #expect(!model.hasKey(id: "a"))
+        #expect(ProviderStorage.keyedIds(directory: dir).isEmpty)
+    }
+}

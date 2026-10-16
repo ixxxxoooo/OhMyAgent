@@ -105,7 +105,7 @@ struct SettingsView: View {
     private let appearance = AppearanceModel.shared
 
     /// 需要全宽布局的页面(主从列表/大表格),其余页面内容限宽居中。
-    private var usesFullWidth: Bool { [.tools, .agentExtensions, .diagnostics, .usage].contains(router.page) }
+    private var usesFullWidth: Bool { [.tools, .agentExtensions, .diagnostics, .usage, .providers].contains(router.page) }
 
     var body: some View {
         HStack(spacing: 0) {

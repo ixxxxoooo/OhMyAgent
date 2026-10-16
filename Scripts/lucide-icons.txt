@@ -156,3 +156,7 @@ image-down
 arrow-down-to-line
 text-wrap
 move-diagonal-2
+eye-off
+star
+import
+cloud-download

@@ -1,195 +1,217 @@
 // @author ixxxxoooo
-// 设置页:模型提供商(会话级 Anthropic 协议上游 + 模型 + 密钥)。不改动 ~/.claude/settings.json。
+// 设置页:模型提供商。左侧提供商列表(搜索、启用开关、密钥状态、添加/导入),右侧详情(连接、模型、高级)。
+// 不改动 ~/.claude/settings.json;提供商经 ACP `_meta` 在会话启动时交给 Claude Code,
+// OpenAI 协议的提供商经本机内置协议代理转换。
 
-import IconKit
 import ChatKit
 import DesignSystem
+import IconKit
 import SwiftUI
 
 /// 模型提供商页。
 struct ModelProvidersPage: View {
     @State private var model = ProviderSettingsModel()
+    /// 选中的提供商 ID;空串表示「系统默认」,nil 表示未选择
     @State private var selection: String?
-    @State private var draft = ModelProvider(id: "", name: "", baseURL: "", model: "")
-    @State private var keyText = ""
-    @State private var testing = false
-    @State private var testResult: ProviderTestResult?
-    @State private var saved = false
-    @State private var fetching = false
-    @State private var fetchMessage: String?
+    @State private var query = ""
+    @State private var importing = false
+    /// 新建但尚未保存的草稿
+    @State private var pending: ModelProvider?
 
     var body: some View {
-        SettingsForm {
-            Section("当前使用") {
-                Picker("模型来源", selection: Binding(get: { model.snapshot.active ?? "" }, set: { model.setActive($0.isEmpty ? nil : $0) })) {
-                    Text("系统默认(~/.claude 的配置)").tag("")
-                    ForEach(model.snapshot.providers) { provider in Text(provider.name).tag(provider.id) }
-                }
-                Note("选中的提供商对「新建会话与重新连接」生效。每个会话启动时由 OhMyAgent 把地址、模型与密钥交给 Claude Code,不会改动 ~/.claude/settings.json,也不影响终端里的 claude。")
-            }
-            Section("提供商") {
-                ForEach(model.snapshot.providers) { provider in
-                    Button { select(provider) } label: {
-                        HStack {
-                            Text(provider.name)
-                            Text(provider.model).font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
-                            Spacer()
-                            if model.snapshot.active == provider.id { OMTag(String(localized: "使用中")) }
-                            if !model.hasKey(id: provider.id) { OMTag(String(localized: "缺少 Key")) }
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .listRowBackground(selection == provider.id ? Color.accentColor.opacity(0.12) : Color.clear)
-                }
-                Menu("添加预设…") {
-                    ForEach(ProviderPreset.all) { preset in
-                        Button(preset.name) { select(preset.makeProvider(), isNew: true) }
-                    }
-                    Divider()
-                    Button("自定义(Anthropic 兼容端点)") { select(ModelProvider(id: "custom-\(UUID().uuidString.prefix(6))", name: String(localized: "自定义"), baseURL: "https://", model: ""), isNew: true) }
-                }
-            }
-            if selection != nil { editor }
-            if let error = model.lastError { Label(error, om: "exclamationmark.triangle").foregroundStyle(OMColors.warning) }
+        HStack(spacing: 0) {
+            sidebar
+                .frame(width: 236)
+            Divider()
+            detail
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .onAppear { model.reload() }
+        .sheet(isPresented: $importing) { OpenCodeImportSheet(model: model) { importing = false } }
     }
 
-    // MARK: - 编辑区
+    // MARK: - 左侧列表
 
-    @ViewBuilder
-    private var editor: some View {
-        Section("编辑「\(draft.name)」") {
-            TextField("名称", text: $draft.name)
-            TextField("Anthropic 协议地址", text: $draft.baseURL).textFieldStyle(.roundedBorder)
-            TextField("主模型", text: $draft.model).textFieldStyle(.roundedBorder)
-            if let preset = ProviderPreset.all.first(where: { $0.id == draft.presetId }) {
-                if preset.models.count > 1 {
-                    Picker("常用模型", selection: Binding(get: { preset.models.contains(draft.model) ? draft.model : "" }, set: { if !$0.isEmpty { draft.model = $0 } })) {
-                        Text("手动输入").tag("")
-                        ForEach(preset.models, id: \.self) { Text($0).tag($0) }
+    private var filtered: [ModelProvider] {
+        let needle = query.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !needle.isEmpty else { return model.snapshot.providers }
+        return model.snapshot.providers.filter { $0.name.lowercased().contains(needle) || $0.model.lowercased().contains(needle) }
+    }
+
+    private var sidebar: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 6) {
+                Image.om("search", size: 12).foregroundStyle(OMColors.tertiaryText)
+                TextField("搜索提供商", text: $query).textFieldStyle(.plain).font(OMFonts.body)
+            }
+            .padding(.horizontal, 8)
+            .frame(height: 26)
+            .background(RoundedRectangle(cornerRadius: 7).fill(Color.primary.opacity(0.06)))
+            .padding(10)
+            ScrollView {
+                LazyVStack(spacing: 2) {
+                    systemRow
+                    ForEach(filtered) { provider in row(provider) }
+                    if let pending, !model.snapshot.providers.contains(where: { $0.id == pending.id }) { draftRow(pending) }
+                }
+                .padding(.horizontal, 8)
+            }
+            Divider()
+            HStack(spacing: 8) {
+                Menu {
+                    ForEach(ProviderPreset.all) { preset in
+                        Button(preset.name) { startNew(preset.makeProvider()) }
                     }
+                    Divider()
+                    Button("自定义(Anthropic 协议)") { startNew(Self.customDraft(.anthropic)) }
+                    Button("自定义(OpenAI 协议)") { startNew(Self.customDraft(.openai)) }
+                } label: {
+                    Label("添加", om: "plus").font(OMFonts.small)
                 }
-                Note(preset.hint)
-            }
-            DisclosureGroup("按角色指定模型(可选)") {
-                TextField("Opus", text: optional($draft.opusModel)).textFieldStyle(.roundedBorder)
-                TextField("Sonnet", text: optional($draft.sonnetModel)).textFieldStyle(.roundedBorder)
-                TextField("Haiku(后台任务)", text: optional($draft.haikuModel)).textFieldStyle(.roundedBorder)
-                Note("留空则都使用主模型。")
-            }
-            DisclosureGroup("高级参数(可选)") {
-                Toggle("使用 x-api-key 鉴权(Anthropic 官方 API)", isOn: Binding(get: { draft.usesAPIKeyHeader == true }, set: { draft.usesAPIKeyHeader = $0 ? true : nil }))
-                LabeledContent("最大输出 token") {
-                    TextField("默认", value: $draft.maxOutputTokens, format: .number).frame(width: 100).multilineTextAlignment(.trailing)
-                }
-                LabeledContent("上下文窗口(token)") {
-                    TextField("默认", value: $draft.contextWindow, format: .number).frame(width: 100).multilineTextAlignment(.trailing)
-                }
-                Picker("思考强度", selection: Binding(get: { draft.effort ?? "" }, set: { draft.effort = $0.isEmpty ? nil : $0 })) {
-                    Text("默认").tag("")
-                    Text("低").tag("low")
-                    Text("中").tag("medium")
-                    Text("高").tag("high")
-                }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("自定义请求头").font(OMFonts.small)
-                    TextEditor(text: optional($draft.customHeaders))
-                        .font(OMFonts.monoSmall)
-                        .frame(height: 60)
-                        .scrollContentBackground(.hidden)
-                        .padding(4)
-                        .background(OMColors.card, in: RoundedRectangle(cornerRadius: 6))
-                    Note("每行一个「Name: Value」,对应 ANTHROPIC_CUSTOM_HEADERS;只放进进程环境变量,不写入设置文件。")
-                }
-                Note("这些参数通过环境变量交给 Claude Code(CLAUDE_CODE_MAX_OUTPUT_TOKENS / CLAUDE_CODE_AUTO_COMPACT_WINDOW / CLAUDE_CODE_EFFORT_LEVEL),留空使用默认值;Claude Code 不支持自定义 temperature。")
-            }
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text("可选模型").font(OMFonts.small)
-                    Spacer()
-                    Button("获取模型列表") { Task { await fetchModels() } }.disabled(fetching)
-                    if fetching { ProgressView().controlSize(.small) }
-                }
-                Text((draft.availableModels ?? []).isEmpty ? String(localized: "尚未获取;输入框的模型菜单将只显示主模型。") : (draft.availableModels ?? []).joined(separator: String(localized: "、")))
-                    .font(OMFonts.caption).foregroundStyle(OMColors.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-                if let fetchMessage { Text(fetchMessage).font(OMFonts.caption).foregroundStyle(OMColors.secondaryText) }
-            }
-            SecureField(model.hasKey(id: draft.id) ? String(localized: "API Key(已保存,留空表示不修改)") : "API Key", text: $keyText).textFieldStyle(.roundedBorder)
-            Note("密钥保存在 ~/Library/Application Support/OhMyAgent/provider-keys.json(权限 0600),只在启动会话时放进 Claude Code 进程的环境变量,不写入日志。")
-            HStack {
-                Button("保存") { save() }.keyboardShortcut(.defaultAction)
-                Button("测试连接") { Task { await test() } }.disabled(testing)
-                if testing { ProgressView().controlSize(.small) }
-                if saved { Label("已保存", om: "checkmark.circle").foregroundStyle(OMColors.secondaryText).font(OMFonts.small) }
+                .menuStyle(.button)
+                .fixedSize()
                 Spacer()
-                Button("删除", role: .destructive) { remove() }
+                Button { importing = true } label: {
+                    Label("导入", om: "import").font(OMFonts.small)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(OMColors.secondaryText)
+                .help("读取本机 OpenCode 的配置,确认后导入提供商与密钥")
             }
-            if let testResult { resultView(testResult) }
+            .padding(10)
+        }
+        .background(Color.primary.opacity(0.03))
+    }
+
+    private var systemRow: some View {
+        listRow(selected: selection == "") {
+            select("")
+        } content: {
+            HStack(spacing: 8) {
+                Image.om("server", size: 13).foregroundStyle(OMColors.secondaryText)
+                Text("系统默认").font(OMFonts.body)
+                Spacer()
+                if model.snapshot.active == nil { OMTag(String(localized: "默认")) }
+            }
         }
     }
 
+    private func row(_ provider: ModelProvider) -> some View {
+        listRow(selected: selection == provider.id) {
+            select(provider.id)
+        } content: {
+            HStack(spacing: 8) {
+                Circle().fill(statusColor(provider)).frame(width: 7, height: 7)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(provider.name).font(OMFonts.body).lineLimit(1)
+                    Text(provider.model).font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText).lineLimit(1)
+                }
+                Spacer(minLength: 4)
+                if model.snapshot.active == provider.id { OMTag(String(localized: "默认")) }
+                Toggle("", isOn: Binding(get: { provider.isEnabled }, set: { model.setEnabled(provider.id, $0) }))
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+                    .labelsHidden()
+                    .accessibilityLabel(String(localized: "启用 \(provider.name)"))
+            }
+            .opacity(provider.isEnabled ? 1 : 0.55)
+        }
+    }
+
+    private func draftRow(_ provider: ModelProvider) -> some View {
+        listRow(selected: selection == provider.id) {
+            selection = provider.id
+        } content: {
+            HStack(spacing: 8) {
+                Circle().strokeBorder(OMColors.tertiaryText, lineWidth: 1).frame(width: 7, height: 7)
+                Text(provider.name).font(OMFonts.body).lineLimit(1)
+                Spacer()
+                OMTag(String(localized: "未保存"))
+            }
+        }
+    }
+
+    private func listRow<Content: View>(selected: Bool, action: @escaping () -> Void, @ViewBuilder content: () -> Content) -> some View {
+        Button(action: action) {
+            content()
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 7).fill(selected ? Color.accentColor.opacity(0.14) : Color.clear))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// 状态点颜色:停用灰、缺密钥橙、可用绿。
+    private func statusColor(_ provider: ModelProvider) -> Color {
+        if !provider.isEnabled { return OMColors.tertiaryText }
+        return (!provider.requiresKey || model.hasKey(id: provider.id)) ? .green : OMColors.warning
+    }
+
+    // MARK: - 右侧详情
+
     @ViewBuilder
-    private func resultView(_ result: ProviderTestResult) -> some View {
-        switch result {
-        case .ok(let ms, let reply):
-            Label("连接成功(\(ms) ms)\(reply.isEmpty ? "" : ":\(reply)")", om: "checkmark.circle.fill").foregroundStyle(.green)
-        case .failed(let message):
-            Label(message, om: "xmark.octagon.fill").foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+    private var detail: some View {
+        if selection == "" {
+            SystemDefaultDetail(model: model)
+        } else if let id = selection, let provider = pending?.id == id ? pending : model.snapshot.providers.first(where: { $0.id == id }) {
+            ProviderDetailView(model: model, initial: provider, isNew: !model.snapshot.providers.contains(where: { $0.id == id })) { savedId in
+                pending = nil
+                selection = savedId
+            } onDelete: {
+                pending = nil
+                selection = nil
+            }
+            .id(id)
+        } else {
+            VStack(spacing: 8) {
+                Image.om("server", size: 28).foregroundStyle(OMColors.tertiaryText)
+                Text("选择左侧的提供商进行配置").font(OMFonts.body).foregroundStyle(OMColors.secondaryText)
+                Text("「默认」用于新建会话;已启用且配置了密钥的提供商都会出现在输入框的模型菜单里,在菜单里切换只影响当前会话。")
+                    .font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
+                    .multilineTextAlignment(.center).frame(maxWidth: 360)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
     // MARK: - 操作
 
-    private func optional(_ binding: Binding<String?>) -> Binding<String> {
-        Binding(get: { binding.wrappedValue ?? "" }, set: { binding.wrappedValue = $0.isEmpty ? nil : $0 })
+    private func select(_ id: String) {
+        pending = nil
+        selection = id
     }
 
-    private func select(_ provider: ModelProvider, isNew: Bool = false) {
-        var provider = provider
-        if isNew, model.snapshot.providers.contains(where: { $0.id == provider.id }) { provider.id = "\(provider.id)-\(UUID().uuidString.prefix(4))" }
-        draft = provider
-        selection = provider.id
-        keyText = ""
-        testResult = nil
-        saved = false
-        fetchMessage = nil
+    private func startNew(_ provider: ModelProvider) {
+        let unique = model.makeUnique(provider)
+        pending = unique
+        selection = unique.id
     }
 
-    private func save() {
-        guard model.upsert(draft) else { return }
-        if !keyText.trimmingCharacters(in: .whitespaces).isEmpty { model.setKey(keyText, id: draft.id); keyText = "" }
-        if model.snapshot.active == nil { model.setActive(draft.id) }
-        saved = true
+    /// 自定义提供商草稿。
+    static func customDraft(_ kind: ProviderProtocol) -> ModelProvider {
+        ModelProvider(id: "custom-\(UUID().uuidString.prefix(6).lowercased())", name: String(localized: "自定义"), baseURL: "https://", model: "",
+                      protocolKind: kind == .openai ? .openai : nil)
     }
+}
 
-    private func test() async {
-        testing = true
-        testResult = nil
-        let key = keyText.trimmingCharacters(in: .whitespaces).isEmpty ? (model.key(id: draft.id) ?? "") : keyText
-        testResult = await ProviderTester.test(draft, key: key)
-        testing = false
-    }
+/// 「系统默认」详情。
+private struct SystemDefaultDetail: View {
+    let model: ProviderSettingsModel
 
-    /// 从 `/v1/models` 获取模型列表并写入草稿(保存后生效)。
-    private func fetchModels() async {
-        fetching = true
-        fetchMessage = nil
-        let key = keyText.trimmingCharacters(in: .whitespaces).isEmpty ? (model.key(id: draft.id) ?? "") : keyText
-        switch await ProviderModelFetcher.fetch(draft, key: key) {
-        case .success(let ids):
-            draft.availableModels = ids
-            fetchMessage = String(localized: "已获取 \(ids.count) 个模型,点「保存」后生效。")
-        case .failure(let error):
-            fetchMessage = error.message
+    var body: some View {
+        Form {
+            Section("系统默认") {
+                Note("沿用 ~/.claude 里的配置(含你在终端里使用的模型与登录凭据)。OhMyAgent 不会改动该文件,也不影响终端里的 claude。")
+                if model.snapshot.active == nil {
+                    Label("当前全局默认", om: "check").foregroundStyle(OMColors.secondaryText)
+                } else {
+                    Button("设为全局默认") { model.setActive(nil) }
+                }
+                Note("全局默认对「新建会话与重新连接」生效;已打开的会话可以在输入框的模型菜单里单独切换,只影响当前会话。")
+            }
         }
-        fetching = false
-    }
-
-    private func remove() {
-        model.remove(id: draft.id)
-        selection = nil
+        .formStyle(.grouped)
     }
 }

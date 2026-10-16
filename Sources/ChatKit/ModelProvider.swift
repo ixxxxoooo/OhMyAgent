@@ -312,6 +312,20 @@ public enum ProviderStorage {
         return value
     }
 
+    /// 是否设置了调试用的 `OMA_PROVIDER_KEY` 环境变量(对所有提供商生效)。
+    public static var hasEnvironmentKey: Bool {
+        !(ProcessInfo.processInfo.environment["OMA_PROVIDER_KEY"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "").isEmpty
+    }
+
+    /// 已保存密钥的提供商 ID 集合(只读一次密钥文件,不返回密钥本身)。
+    /// - Parameter directory: 存储目录
+    /// - Returns: 有非空密钥的提供商 ID
+    public static func keyedIds(directory: URL = defaultDirectory) -> Set<String> {
+        guard let data = try? Data(contentsOf: keysURL(directory)),
+              let map = try? JSONDecoder().decode([String: String].self, from: data) else { return [] }
+        return Set(map.compactMap { $0.value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0.key })
+    }
+
     /// 写入或删除密钥(权限 0600)。
     /// - Parameters:
     ///   - key: 密钥,空串表示删除
@@ -515,6 +529,8 @@ public struct ModelFetchError: Error, Equatable, Sendable {
 @Observable
 public final class ProviderSettingsModel {
     public private(set) var snapshot = ProviderSnapshot()
+    /// 已保存密钥的提供商 ID(缓存,避免界面刷新时反复读盘)
+    public private(set) var keyedIds: Set<String> = []
     /// 最近一次错误(展示用)
     public private(set) var lastError: String?
     private let directory: URL
@@ -527,7 +543,10 @@ public final class ProviderSettingsModel {
     }
 
     /// 重新读取磁盘。
-    public func reload() { snapshot = ProviderStorage.load(directory: directory) }
+    public func reload() {
+        snapshot = ProviderStorage.load(directory: directory)
+        keyedIds = ProviderStorage.keyedIds(directory: directory)
+    }
 
     /// 新增或更新提供商。
     /// - Parameter provider: 提供商
@@ -559,6 +578,7 @@ public final class ProviderSettingsModel {
         if next.active == id { next.active = nil }
         persist(next)
         try? ProviderStorage.setKey("", for: id, directory: directory)
+        keyedIds.remove(id)
     }
 
     /// 启用或停用某个提供商(停用后不出现在输入框菜单;若它是全局默认则回到系统默认)。
@@ -591,7 +611,7 @@ public final class ProviderSettingsModel {
     }
 
     /// 是否已保存密钥(含 `OMA_PROVIDER_KEY` 环境变量)。
-    public func hasKey(id: String) -> Bool { ProviderStorage.key(for: id, directory: directory) != nil }
+    public func hasKey(id: String) -> Bool { keyedIds.contains(id) || ProviderStorage.hasEnvironmentKey }
 
     /// 读取密钥(仅用于「测试连接」)。
     public func key(id: String) -> String? { ProviderStorage.key(for: id, directory: directory) }
@@ -600,6 +620,7 @@ public final class ProviderSettingsModel {
     public func setKey(_ key: String, id: String) {
         do {
             try ProviderStorage.setKey(key, for: id, directory: directory)
+            if key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { keyedIds.remove(id) } else { keyedIds.insert(id) }
             lastError = nil
         } catch {
             lastError = error.localizedDescription
