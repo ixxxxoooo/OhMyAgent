@@ -369,8 +369,9 @@ struct ComposerFooter: View {
     var body: some View {
         HStack(spacing: 14) {
             if let head {
-                Label(head.displayName, om: "git-branch")
-                    .help("当前分支")
+                BranchSwitcher(workspace: model.workspace, head: head, isBusy: model.isRunning) {
+                    Task { await refresh() }
+                }
             }
             Spacer()
             footerStatus

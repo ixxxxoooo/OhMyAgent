@@ -101,6 +101,15 @@ public struct GitBranch: Sendable, Hashable, Identifiable {
     public var upstream: String?
     public var hash: String
     public var subject: String
+
+    public init(name: String, isCurrent: Bool, isRemote: Bool, upstream: String?, hash: String, subject: String) {
+        self.name = name
+        self.isCurrent = isCurrent
+        self.isRemote = isRemote
+        self.upstream = upstream
+        self.hash = hash
+        self.subject = subject
+    }
 }
 
 /// 提交。
