@@ -37,7 +37,7 @@ struct TabBarView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            if leadingInset > 0 { Color.clear.frame(width: leadingInset) }
+            if leadingInset > 0 { Color.clear.frame(width: leadingInset).background(WindowDragArea()) }
             ScrollViewReader { proxy in
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: TabMetrics.spacing) {
@@ -50,6 +50,7 @@ struct TabBarView: View {
                         Color.clear
                             .frame(minWidth: 24, maxWidth: .infinity)
                             .contentShape(Rectangle())
+                            .background(WindowDragArea())
                             .onDrop(of: [.plainText, .fileURL], delegate: TabStripDropDelegate(workbench: workbench, groupID: group.id, index: nil))
                     }
                     .padding(.horizontal, 8)
@@ -70,10 +71,9 @@ struct TabBarView: View {
                 }
             }
             if overflowing { overflowButton }
-            if trailingInset > 0 { Color.clear.frame(width: trailingInset) }
+            if trailingInset > 0 { Color.clear.frame(width: trailingInset).background(WindowDragArea()) }
         }
         .frame(height: TitlebarMetrics.height)
-        .background(WindowDragArea())
         .background(OMColors.surface)
     }
 
@@ -165,9 +165,13 @@ struct TabItemView: View {
         .background(MiddleClickCatcher {
             if !tab.isPinned { AppActions.shared.requestCloseTab(tab.id) }
         })
+        // 拖拽时源标签隐藏、只显示自定义拖影,避免原位与拖影叠成重影
+        .opacity(DockDrag.shared.tabID == tab.id ? 0 : 1)
         .onDrag {
-            DockDrag.shared.tabID = tab.id
+            DockDrag.shared.begin(tab.id)
             return NSItemProvider(object: (DockDrag.prefix + tab.id.uuidString) as NSString)
+        } preview: {
+            TabDragPreview(title: workbench.displayTitle(tab), tab: tab)
         }
         .contextMenu { menu }
         .help(helpText)
@@ -244,6 +248,27 @@ struct TabItemView: View {
                 NSPasteboard.general.setString(path, forType: .string)
             }
         }
+    }
+}
+
+/// 标签拖影:只含图标与标题的胶囊(不带窗口标题或标签栏背景)。
+private struct TabDragPreview: View {
+    let title: String
+    let tab: WorkbenchTab
+
+    var body: some View {
+        HStack(spacing: 5) {
+            if case .file(let path) = tab.kind {
+                OMFileIcon(name: (path as NSString).lastPathComponent, size: 14)
+            } else {
+                Image.om(tabIcon(tab.kind), size: 12).foregroundStyle(OMColors.secondaryText)
+            }
+            Text(title).font(OMFonts.small).lineLimit(1)
+        }
+        .padding(.horizontal, 10)
+        .frame(height: TabMetrics.height)
+        .background(OMColors.surface, in: RoundedRectangle(cornerRadius: TabMetrics.radius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: TabMetrics.radius, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
     }
 }
 

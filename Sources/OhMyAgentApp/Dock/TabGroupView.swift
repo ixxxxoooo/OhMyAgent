@@ -10,9 +10,29 @@ import WorkbenchKit
 
 /// 应用内标签拖拽状态:拖拽开始时记录,落下时与剪贴板中的载荷核对后才生效。
 @MainActor
+@Observable
 final class DockDrag {
     static let shared = DockDrag()
+    /// 正在被拖拽的标签(源标签据此隐藏,避免与拖影重叠成「重影」)
     var tabID: UUID?
+    @ObservationIgnored private var watcher: Task<Void, Never>?
+
+    /// 拖拽开始:记录标签,并监视鼠标左键抬起。SwiftUI 没有「拖拽结束」回调,
+    /// 拖到无效区域松手时必须靠这里复位,否则源标签会一直隐藏。
+    func begin(_ id: UUID) {
+        tabID = id
+        watcher?.cancel()
+        watcher = Task { @MainActor [weak self] in
+            // 先等拖拽真正开始(按键仍按下)
+            while !Task.isCancelled, NSEvent.pressedMouseButtons & 1 != 0 {
+                try? await Task.sleep(for: .milliseconds(60))
+            }
+            // 给落点回调留出读取 tabID 的时间
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            self?.tabID = nil
+        }
+    }
     nonisolated static let prefix = "oma-tab:"
 
     /// 由拖拽载荷字符串解析标签 ID。
