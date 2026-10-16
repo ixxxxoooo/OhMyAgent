@@ -23,8 +23,6 @@ struct WorkbenchView: View {
         Group {
             if workbench.mode == .settings {
                 SettingsView(workbench: workbench)
-                    // 无标题栏:给红绿灯让出顶部位置
-                    .safeAreaInset(edge: .top, spacing: 0) { Color.clear.frame(height: 28) }
             } else {
                 workspaceBody
             }

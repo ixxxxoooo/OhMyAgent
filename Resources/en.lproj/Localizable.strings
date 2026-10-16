@@ -862,7 +862,7 @@
 "收起任务面板" = "Collapse task panel";
 "终止" = "Terminate";
 "引导" = "Steer";
-"在右侧打开" = "Open on the right";
+"在新标签页打开" = "Open in new tab";
 "%lld 条排队,本轮结束后发送" = "%lld queued, sent after this turn";
 "%lld 个终端运行中" = "%lld terminals running";
 "这个终端已不可用" = "This terminal is no longer available";

@@ -1,7 +1,7 @@
 // @author ygw
 // 输入栏上方的任务坞(参考 Cursor):排队消息 / 后台子 Agent / 运行中的终端三类,
 // 底部是胶囊标签(点击切换面板,再点当前标签收起),上方是对应面板;
-// 每行悬停有底色与操作按钮,点击行会在右侧打开详情(子 Agent 的只读会话、终端的只读输出)。
+// 每行悬停有底色与操作按钮,点击行会以新标签页在主内容区打开详情(子 Agent 的只读会话、终端的只读输出)。
 
 import ACPKit
 import ChatKit
@@ -273,7 +273,7 @@ private struct QueuedRow: View {
     }
 }
 
-/// 后台子 Agent 行:点击在右侧打开其只读会话。
+/// 后台子 Agent 行:点击以新标签页打开其只读会话。
 private struct SubagentDockRow: View {
     let entry: TimelineEntry
     let depth: Int
@@ -287,8 +287,8 @@ private struct SubagentDockRow: View {
                 ProgressView().controlSize(.mini).scaleEffect(0.8)
             } actions: {
                 HStack(spacing: 4) {
-                    Text("在右侧打开").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
-                    RowIconButton(icon: "panel-right", label: String(localized: "在右侧打开")) { open(tool) }
+                    Text("在新标签页打开").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
+                    RowIconButton(icon: "external-link", label: String(localized: "在新标签页打开")) { open(tool) }
                 }
             }
             .padding(.leading, CGFloat(depth * 12))
@@ -306,11 +306,11 @@ private struct SubagentDockRow: View {
 
     private func open(_ tool: ToolCall) {
         guard let project = workbench.projectID(of: model) else { return }
-        workbench.openSubagentToSide(project: project, toolCallID: tool.toolCallId, title: tool.title)
+        workbench.openSubagent(project: project, toolCallID: tool.toolCallId, title: tool.title)
     }
 }
 
-/// 运行中的终端行:点击在右侧只读查看输出,悬停出现「终止」。
+/// 运行中的终端行:点击以新标签页只读查看输出,悬停出现「终止」。
 private struct TerminalDockRow: View {
     let session: TerminalSession
     let model: SessionModel
@@ -321,7 +321,7 @@ private struct TerminalDockRow: View {
             Image.om("terminal", size: 12).foregroundStyle(OMColors.secondaryText)
         } actions: {
             HStack(spacing: 2) {
-                RowIconButton(icon: "panel-right", label: String(localized: "在右侧打开")) { open() }
+                RowIconButton(icon: "external-link", label: String(localized: "在新标签页打开")) { open() }
                 RowIconButton(icon: "square", label: String(localized: "终止")) { model.interruptTerminal(session.id) }
             }
         }
@@ -329,6 +329,6 @@ private struct TerminalDockRow: View {
 
     private func open() {
         guard let project = workbench.projectID(of: model) else { return }
-        workbench.openAgentTerminalToSide(project: project, terminalID: session.id, title: session.command)
+        workbench.openAgentTerminal(project: project, terminalID: session.id, title: session.command)
     }
 }

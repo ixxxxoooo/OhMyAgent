@@ -113,6 +113,8 @@ struct SettingsView: View {
                 .frame(width: 232)
             Divider()
             VStack(spacing: 0) {
+                // 顶部标题栏高度的可拖动区域:内容不会顶到红绿灯所在行
+                Color.clear.frame(height: TitlebarMetrics.height).background(WindowDragArea())
                 if let error = model.lastError {
                     Label(error, om: "xmark.octagon.fill")
                         .font(OMFonts.small).foregroundStyle(.red)
@@ -125,7 +127,11 @@ struct SettingsView: View {
                     .frame(maxWidth: .infinity)
             }
         }
+        // 无标题栏窗口:内容铺满到窗口顶部,由侧栏/内容区各自预留标题栏高度,避免系统安全区叠加出多余留白
+        .ignoresSafeArea(.container, edges: .top)
         .navigationTitle(router.page.title)
+        .toolbar(removing: .title)
+        .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .tint(appearance.accent.color)
         .onExitCommand { workbench.closeSettings() }
         .task {
@@ -140,18 +146,23 @@ struct SettingsView: View {
     /// 左侧导航:返回、搜索、分组页面列表。
     private var sidebar: some View {
         VStack(spacing: 0) {
+            // 返回按钮与红绿灯同一行(让开红绿灯),整行可拖动窗口,顶部不再有额外留白
             HStack {
                 Button { workbench.closeSettings() } label: {
                     Label("返回", om: "arrow.left")
                         .font(OMFonts.body)
+                        .frame(height: 26)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(OMColors.secondaryText)
                 .help("返回工作台 (Esc)")
-                Spacer()
+                Spacer(minLength: 0)
             }
-            .padding(.horizontal, 14)
-            .padding(.top, 10)
+            .padding(.leading, TitlebarMetrics.trafficLightInset)
+            .padding(.trailing, 14)
+            .frame(height: TitlebarMetrics.height)
+            .background(WindowDragArea())
             HStack(spacing: 6) {
                 Image.om("magnifyingglass", size: 12).foregroundStyle(OMColors.tertiaryText)
                 TextField("搜索设置", text: $query)
@@ -162,7 +173,7 @@ struct SettingsView: View {
             .frame(height: 26)
             .background(RoundedRectangle(cornerRadius: 7).fill(Color.primary.opacity(0.06)))
             .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.bottom, 8)
             List(selection: $router.page) {
                 ForEach(filteredGroups, id: \.title) { group in
                     Section(LocalizedStringKey(group.title)) {

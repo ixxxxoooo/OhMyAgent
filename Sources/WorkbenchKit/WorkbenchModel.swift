@@ -160,22 +160,15 @@ public final class WorkbenchModel {
         return dock.open(.subagent(projectID: projectID, toolCallID: toolCallID), title: title)
     }
 
-    /// 在右侧打开子 Agent 的只读会话(任务坞点击行时使用)。
-    @discardableResult
-    public func openSubagentToSide(project projectID: String, toolCallID: String, title: String) -> UUID {
-        mode = .workspace
-        return dock.openToSide(.subagent(projectID: projectID, toolCallID: toolCallID), title: title)
-    }
-
-    /// 在右侧打开 Agent 终端的只读输出(任务坞点击行时使用)。
+    /// 以新标签页打开 Agent 终端的只读输出(任务坞点击行时使用,与普通标签一致进入聚焦组)。
     /// - Parameters:
     ///   - projectID: 项目
     ///   - terminalID: Agent 终端 ID
     ///   - title: 标签标题(通常为命令)
     @discardableResult
-    public func openAgentTerminalToSide(project projectID: String, terminalID: String, title: String) -> UUID {
+    public func openAgentTerminal(project projectID: String, terminalID: String, title: String) -> UUID {
         mode = .workspace
-        return dock.openToSide(.agentTerminal(projectID: projectID, terminalID: terminalID), title: title)
+        return dock.open(.agentTerminal(projectID: projectID, terminalID: terminalID), title: title)
     }
 
     /// 打开预览标签(如放大查看的 Mermaid 图)。
