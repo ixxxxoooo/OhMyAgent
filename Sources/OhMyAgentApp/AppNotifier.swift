@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 系统通知:Bridge 的 notify 工具与「会话完成」通知。点击完成通知会定位到对应项目与会话并清除未读点。
 
 import ChatKit
@@ -28,7 +28,7 @@ final class AppNotifier: NSObject, UNUserNotificationCenterDelegate, @unchecked 
     static func sendFinished(_ item: AttentionItem) {
         guard ClientPrefs.notifiesOnFinish() else { return }
         post(
-            title: "\(item.project) 已完成",
+            title: String(localized: "\(item.project) 已完成"),
             message: item.title,
             userInfo: ["uid": item.id, "workspace": item.workspacePath, "session": item.sessionId ?? "", "title": item.title]
         )

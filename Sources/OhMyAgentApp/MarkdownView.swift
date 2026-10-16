@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // Markdown 渲染:块级由 ChatKit.MarkdownParser 解析,行内交给系统 AttributedString。
 
 import IconKit
@@ -105,7 +105,7 @@ struct CodeBlockView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text(language ?? "代码")
+                Text(language ?? String(localized: "代码"))
                     .font(OMFonts.caption)
                     .foregroundStyle(OMColors.secondaryText)
                 Spacer()
@@ -118,7 +118,7 @@ struct CodeBlockView: View {
                         copied = false
                     }
                 } label: {
-                    Label(copied ? "已复制" : "复制", om: copied ? "checkmark" : "doc.on.doc")
+                    Label(copied ? String(localized: "已复制") : String(localized: "复制"), om: copied ? "checkmark" : "doc.on.doc")
                         .font(OMFonts.caption)
                 }
                 .buttonStyle(.plain)

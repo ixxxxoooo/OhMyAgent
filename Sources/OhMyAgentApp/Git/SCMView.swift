@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 源代码管理面板:分支、同步、提交框、冲突/已暂存/更改/未跟踪分组;点击文件打开 Diff 标签。
 
 import AppKit
@@ -201,7 +201,7 @@ private struct SCMContent: View {
                 .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
             HStack(spacing: 6) {
                 Button { Task { await model.commit() } } label: {
-                    Text(model.status.stagedChanges.isEmpty ? "提交全部" : "提交").frame(maxWidth: .infinity)
+                    Text(model.status.stagedChanges.isEmpty ? String(localized: "提交全部") : String(localized: "提交")).frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)

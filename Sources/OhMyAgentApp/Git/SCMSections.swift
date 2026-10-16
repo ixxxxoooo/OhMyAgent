@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // Git 页(源代码管理)里的两个可折叠分区,对齐 VSCode/Cursor 的信息架构:
 // ① 「本轮 Agent 改动」:当前会话最近一次改动汇总(原右栏「改动」页并入此处);
 // ② 「提交图谱」:最近提交与泳道图(原先只能从「更多」菜单打开历史标签),点击进入完整历史标签。
@@ -35,7 +35,7 @@ private struct CollapsibleHeader<Actions: View>: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(expanded ? "收起" : "展开")
+            .accessibilityLabel(expanded ? String(localized: "收起") : String(localized: "展开"))
             actions()
         }
         .padding(.horizontal, 10)
@@ -93,7 +93,7 @@ struct GitGraphSection: View {
             }
             if expanded {
                 if rows.isEmpty {
-                    Text(failed ? "无法读取提交历史" : "还没有提交")
+                    Text(failed ? String(localized: "无法读取提交历史") : String(localized: "还没有提交"))
                         .font(OMFonts.small)
                         .foregroundStyle(OMColors.tertiaryText)
                         .padding(.horizontal, 12)

@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // Skills / 斜杠命令 与 Subagents 的目录扫描、创建、编辑、删除。
 // Skill:`<scope>/.claude/skills/<name>/SKILL.md`;命令:`<scope>/.claude/commands/<name>.md`;
 // Subagent:`<scope>/.claude/agents/<name>.md`;插件内的同名目录只读展示。
@@ -13,7 +13,7 @@ public enum ItemSource: Sendable, Hashable {
     public var displayName: String {
         switch self {
         case .scope(let scope): return scope.displayName
-        case .plugin(let name): return "插件 \(name)"
+        case .plugin(let name): return String(localized: "插件 \(name)")
         }
     }
     public var isReadOnly: Bool { if case .plugin = self { return true } else { return false } }
@@ -45,9 +45,9 @@ public enum SkillTemplate: String, Sendable, CaseIterable, Identifiable {
     public var id: String { rawValue }
     public var displayName: String {
         switch self {
-        case .manual: return "手动调用"
-        case .automatic: return "模型自动调用"
-        case .fork: return "子代理(fork)"
+        case .manual: return String(localized: "手动调用")
+        case .automatic: return String(localized: "模型自动调用")
+        case .fork: return String(localized: "子代理(fork)")
         }
     }
 }
@@ -135,16 +135,16 @@ public struct SkillStore: Sendable {
     @discardableResult
     public func create(name: String, description: String, template: SkillTemplate, scope: ConfigScope) throws -> URL {
         guard name.range(of: Self.namePattern, options: .regularExpression) != nil else {
-            throw ConfigError.invalidValue("名称只能包含小写字母、数字和连字符,且不超过 64 个字符")
+            throw ConfigError.invalidValue(String(localized: "名称只能包含小写字母、数字和连字符,且不超过 64 个字符"))
         }
         guard let base = paths.directory("skills", scope: scope == .local ? .project : scope) else {
-            throw ConfigError.invalidValue("当前没有工作区,无法创建项目 Skill")
+            throw ConfigError.invalidValue(String(localized: "当前没有工作区,无法创建项目 Skill"))
         }
         let directory = base.appendingPathComponent(name)
         guard !FileManager.default.fileExists(atPath: directory.path) else { throw ConfigError.alreadyExists(name) }
-        var document = MarkdownDocument(body: "\n# \(name)\n\n在这里写下 Claude 使用这个 Skill 时应遵循的步骤。\n")
+        var document = MarkdownDocument(body: String(localized: "\n# \(name)\n\n在这里写下 Claude 使用这个 Skill 时应遵循的步骤。\n"))
         document.setValue("name", name)
-        document.setValue("description", description.isEmpty ? "描述这个 Skill 做什么、何时使用" : description)
+        document.setValue("description", description.isEmpty ? String(localized: "描述这个 Skill 做什么、何时使用") : description)
         switch template {
         case .manual: document.setBool("disable-model-invocation", true)
         case .automatic: break
@@ -165,13 +165,13 @@ public struct SkillStore: Sendable {
 
     /// 保存条目文档(插件内条目只读)。
     public func save(_ document: MarkdownDocument, to item: MarkdownItem) throws {
-        guard !item.source.isReadOnly else { throw ConfigError.invalidValue("插件内的条目是只读的") }
+        guard !item.source.isReadOnly else { throw ConfigError.invalidValue(String(localized: "插件内的条目是只读的")) }
         try document.render().write(to: item.fileURL, atomically: true, encoding: .utf8)
     }
 
     /// 删除条目(移入废纸篓;不可用时直接删除)。
     public func delete(_ item: MarkdownItem) throws {
-        guard !item.source.isReadOnly else { throw ConfigError.invalidValue("插件内的条目请通过插件管理卸载") }
+        guard !item.source.isReadOnly else { throw ConfigError.invalidValue(String(localized: "插件内的条目请通过插件管理卸载")) }
         Self.trash(item.directoryURL ?? item.fileURL)
     }
 
@@ -227,15 +227,15 @@ public struct AgentStore: Sendable {
     @discardableResult
     public func create(name: String, description: String, tools: [String], model: String?, prompt: String, scope: ConfigScope) throws -> URL {
         guard name.range(of: SkillStore.namePattern, options: .regularExpression) != nil else {
-            throw ConfigError.invalidValue("名称只能包含小写字母、数字和连字符,且不超过 64 个字符")
+            throw ConfigError.invalidValue(String(localized: "名称只能包含小写字母、数字和连字符,且不超过 64 个字符"))
         }
-        guard !description.trimmingCharacters(in: .whitespaces).isEmpty else { throw ConfigError.invalidValue("请填写描述,Claude 依据它决定何时委派") }
+        guard !description.trimmingCharacters(in: .whitespaces).isEmpty else { throw ConfigError.invalidValue(String(localized: "请填写描述,Claude 依据它决定何时委派")) }
         guard let directory = paths.directory("agents", scope: scope == .local ? .project : scope) else {
-            throw ConfigError.invalidValue("当前没有工作区,无法创建项目 Subagent")
+            throw ConfigError.invalidValue(String(localized: "当前没有工作区,无法创建项目 Subagent"))
         }
         let file = directory.appendingPathComponent("\(name).md")
         guard !FileManager.default.fileExists(atPath: file.path) else { throw ConfigError.alreadyExists(name) }
-        var document = MarkdownDocument(body: "\n\(prompt.isEmpty ? "你是一个专注的助手。" : prompt)\n")
+        var document = MarkdownDocument(body: "\n\(prompt.isEmpty ? String(localized: "你是一个专注的助手。") : prompt)\n")
         document.setValue("name", name)
         document.setValue("description", description)
         document.setList("tools", tools)
@@ -247,13 +247,13 @@ public struct AgentStore: Sendable {
 
     /// 保存。
     public func save(_ document: MarkdownDocument, to item: MarkdownItem) throws {
-        guard !item.source.isReadOnly else { throw ConfigError.invalidValue("插件内的 Subagent 是只读的") }
+        guard !item.source.isReadOnly else { throw ConfigError.invalidValue(String(localized: "插件内的 Subagent 是只读的")) }
         try document.render().write(to: item.fileURL, atomically: true, encoding: .utf8)
     }
 
     /// 删除。
     public func delete(_ item: MarkdownItem) throws {
-        guard !item.source.isReadOnly else { throw ConfigError.invalidValue("插件内的 Subagent 请通过插件管理卸载") }
+        guard !item.source.isReadOnly else { throw ConfigError.invalidValue(String(localized: "插件内的 Subagent 请通过插件管理卸载")) }
         SkillStore.trash(item.fileURL)
     }
 }

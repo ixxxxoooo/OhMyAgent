@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 输入框:基于 AppKit NSTextView(TextKit 2),支持 Return 发送、Shift+Return 换行、输入法组合态保护、
 // 自动增高与占位文字。比 SwiftUI TextEditor 更可控,且不会在输入法组合期间误触发发送。
 
@@ -171,7 +171,7 @@ struct ComposerTextView: NSViewRepresentable {
         textView.onImages = { [coordinator = context.coordinator] images in coordinator.parent.onImages?(images) }
         textView.acceptsImages = { [coordinator = context.coordinator] in coordinator.parent.acceptsImages() }
         textView.registerForDraggedTypes([.fileURL, .png, .tiff])
-        textView.setAccessibilityLabel("消息输入框")
+        textView.setAccessibilityLabel(String(localized: "消息输入框"))
         controller?.textView = textView
 
         let scrollView = NSScrollView()

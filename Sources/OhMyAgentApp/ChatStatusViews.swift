@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 输入区上方的状态卡片:`/goal` 目标条(排队/子 Agent/终端任务坞见 `ComposerDockView.swift`)。
 
 import ACPKit
@@ -21,7 +21,7 @@ struct GoalChip: View {
                     .font(OMFonts.small)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                Text(goal.isActive ? "进行中" : "已结束")
+                Text(goal.isActive ? String(localized: "进行中") : String(localized: "已结束"))
                     .font(OMFonts.caption)
                     .foregroundStyle(OMColors.secondaryText)
                     .padding(.horizontal, 5)

@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 项目信任:读写 `~/.claude.json` 中 `projects[<路径>].hasTrustDialogAccepted`。
 // 未信任的项目,Claude Code 不会自动执行其项目级 Hooks / MCP / 环境变量等。
 
@@ -44,7 +44,7 @@ public struct ProjectTrust: Sendable {
     ///   - projectPath: 项目目录(绝对路径)
     /// - Throws: `ConfigError.invalidValue`(路径为空)或文件读写错误
     public func setTrusted(_ trusted: Bool, for projectPath: String) throws {
-        guard !projectPath.isEmpty else { throw ConfigError.invalidValue("项目路径为空") }
+        guard !projectPath.isEmpty else { throw ConfigError.invalidValue(String(localized: "项目路径为空")) }
         let key = Self.normalize(projectPath)
         try JSONFile(paths.claudeJSON).update { root in
             var projects = root["projects"] as? [String: Any] ?? [:]

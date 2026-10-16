@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 插件管理:已安装列表(启停/更新/卸载)、市场管理与安装。变更全部委托官方 `claude plugin` CLI。
 
 import IconKit
@@ -31,7 +31,7 @@ struct PluginsManagerView: View {
         }
         .confirmationDialog("安装插件前请确认", isPresented: Binding(get: { pendingInstall != nil }, set: { if !$0 { pendingInstall = nil } }), presenting: pendingInstall) { name in
             Button("安装 \(name)") {
-                Task { await center.runCLI(PluginStore.installArguments(name, scope: installScope), message: "正在安装 \(name)…", notice: "已安装 \(name)") }
+                Task { await center.runCLI(PluginStore.installArguments(name, scope: installScope), message: String(localized: "正在安装 \(name)…"), notice: String(localized: "已安装 \(name)")) }
                 installName = ""
             }
         } message: { name in
@@ -39,7 +39,7 @@ struct PluginsManagerView: View {
         }
         .confirmationDialog("卸载插件?", isPresented: Binding(get: { pendingUninstall != nil }, set: { if !$0 { pendingUninstall = nil } }), presenting: pendingUninstall) { plugin in
             Button("卸载 \(plugin.name)", role: .destructive) {
-                Task { await center.runCLI(PluginStore.uninstallArguments(plugin.pluginID, scope: plugin.scope), message: "正在卸载…", notice: "已卸载 \(plugin.name)") }
+                Task { await center.runCLI(PluginStore.uninstallArguments(plugin.pluginID, scope: plugin.scope), message: String(localized: "正在卸载…"), notice: String(localized: "已卸载 \(plugin.name)")) }
             }
         }
     }
@@ -83,20 +83,20 @@ struct PluginsManagerView: View {
                             get: { plugin.isEnabled },
                             set: { value in
                                 Task { await center.runCLI(PluginStore.toggleArguments(plugin.pluginID, enable: value, scope: plugin.scope),
-                                                           message: value ? "正在启用…" : "正在停用…", notice: value ? "已启用 \(plugin.name),重启会话后生效" : "已停用 \(plugin.name)") }
+                                                           message: value ? String(localized: "正在启用…") : String(localized: "正在停用…"), notice: value ? String(localized: "已启用 \(plugin.name),重启会话后生效") : String(localized: "已停用 \(plugin.name)")) }
                             }))
                             .toggleStyle(.switch).disabled(center.isBusy || !center.canRunCLI)
-                        Button("更新") { Task { await center.runCLI(PluginStore.updateArguments(plugin.pluginID), message: "正在更新…", notice: "已更新 \(plugin.name),重启会话后生效") } }
+                        Button("更新") { Task { await center.runCLI(PluginStore.updateArguments(plugin.pluginID), message: String(localized: "正在更新…"), notice: String(localized: "已更新 \(plugin.name),重启会话后生效")) } }
                             .disabled(center.isBusy || !center.canRunCLI)
                         Button("卸载", role: .destructive) { pendingUninstall = plugin }.disabled(center.isBusy || !center.canRunCLI)
                     }
                     HStack(spacing: 6) {
-                        if plugin.skillCount > 0 { Tag("\(plugin.skillCount) 个 Skill") }
-                        if plugin.commandCount > 0 { Tag("\(plugin.commandCount) 个命令") }
-                        if plugin.agentCount > 0 { Tag("\(plugin.agentCount) 个子 Agent") }
+                        if plugin.skillCount > 0 { Tag(String(localized: "\(plugin.skillCount) 个 Skill")) }
+                        if plugin.commandCount > 0 { Tag(String(localized: "\(plugin.commandCount) 个命令")) }
+                        if plugin.agentCount > 0 { Tag(String(localized: "\(plugin.agentCount) 个子 Agent")) }
                         if plugin.hasHooks { Tag("Hooks") }
                         ForEach(plugin.mcpServerNames, id: \.self) { Tag("MCP \($0)") }
-                        if !plugin.author.isEmpty { Tag("作者 \(plugin.author)") }
+                        if !plugin.author.isEmpty { Tag(String(localized: "作者 \(plugin.author)")) }
                     }
                 }
                 .padding(10)
@@ -111,7 +111,7 @@ struct PluginsManagerView: View {
             HStack {
                 Text("插件市场(\(center.snapshot.marketplaces.count))").font(OMFonts.title)
                 Spacer()
-                Button("全部更新") { Task { await center.runCLI(PluginStore.marketplaceUpdateArguments(nil), message: "正在更新市场…", notice: "市场已更新") } }
+                Button("全部更新") { Task { await center.runCLI(PluginStore.marketplaceUpdateArguments(nil), message: String(localized: "正在更新市场…"), notice: String(localized: "市场已更新")) } }
                     .disabled(center.isBusy || !center.canRunCLI || center.snapshot.marketplaces.isEmpty)
             }
             HStack {
@@ -120,7 +120,7 @@ struct PluginsManagerView: View {
                     do {
                         try PluginStore.validateArgument(marketplaceSource)
                         let source = marketplaceSource.trimmingCharacters(in: .whitespaces)
-                        Task { await center.runCLI(PluginStore.marketplaceAddArguments(source), message: "正在添加市场…", notice: "已添加市场") }
+                        Task { await center.runCLI(PluginStore.marketplaceAddArguments(source), message: String(localized: "正在添加市场…"), notice: String(localized: "已添加市场")) }
                         marketplaceSource = ""
                     } catch { center.lastError = error.localizedDescription }
                 }
@@ -134,9 +134,9 @@ struct PluginsManagerView: View {
                     }
                     Spacer()
                     if let updated = market.lastUpdated { Text(updated.prefix(10)).font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText) }
-                    Button("更新") { Task { await center.runCLI(PluginStore.marketplaceUpdateArguments(market.name), message: "正在更新…", notice: "已更新 \(market.name)") } }
+                    Button("更新") { Task { await center.runCLI(PluginStore.marketplaceUpdateArguments(market.name), message: String(localized: "正在更新…"), notice: String(localized: "已更新 \(market.name)")) } }
                         .disabled(center.isBusy || !center.canRunCLI)
-                    Button("移除", role: .destructive) { Task { await center.runCLI(PluginStore.marketplaceRemoveArguments(market.name), message: "正在移除…", notice: "已移除 \(market.name)") } }
+                    Button("移除", role: .destructive) { Task { await center.runCLI(PluginStore.marketplaceRemoveArguments(market.name), message: String(localized: "正在移除…"), notice: String(localized: "已移除 \(market.name)")) } }
                         .disabled(center.isBusy || !center.canRunCLI)
                 }
                 .padding(.vertical, 2)

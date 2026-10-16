@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 输入区:玻璃浮层,包含输入框、模式/模型菜单、发送与停止按钮。
 
 import IconKit
@@ -192,8 +192,8 @@ struct ComposerView: View {
                 .buttonBorderShape(.circle)
                 .disabled(!hasContent)
                 .keyboardShortcut(ShortcutStore.shared.shortcut(for: .send))
-                .help(model.isRunning ? "引导当前轮次 (Return);⌘Return 排到本轮之后" : "发送 (Return)")
-                .accessibilityLabel(model.isRunning ? "引导当前轮次" : "发送")
+                .help(model.isRunning ? String(localized: "引导当前轮次 (Return);⌘Return 排到本轮之后") : String(localized: "发送 (Return)"))
+                .accessibilityLabel(model.isRunning ? String(localized: "引导当前轮次") : String(localized: "发送"))
             }
         }
     }

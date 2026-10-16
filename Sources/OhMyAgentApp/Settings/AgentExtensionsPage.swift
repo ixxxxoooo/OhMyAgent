@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 设置页:Agent 扩展(Agent 注册表、Agent-as-MCP、OhMyAgent Bridge)。均写回 agents.json。
 
 import IconKit
@@ -17,10 +17,10 @@ struct AgentPreset {
     var summary: String
 
     static let all: [AgentPreset] = [
-        AgentPreset(id: "gemini", name: "Gemini CLI", command: "gemini", args: ["--experimental-acp"], summary: "Google Gemini CLI 的 ACP 模式"),
-        AgentPreset(id: "goose", name: "Goose", command: "goose", args: ["acp"], summary: "Block 的 Goose Agent"),
-        AgentPreset(id: "opencode", name: "OpenCode", command: "opencode", args: ["acp"], summary: "OpenCode 的 ACP 模式"),
-        AgentPreset(id: "codex", name: "Codex(codex-acp 适配器)", command: "codex-acp", args: [], summary: "需先安装 codex-acp 适配器"),
+        AgentPreset(id: "gemini", name: "Gemini CLI", command: "gemini", args: ["--experimental-acp"], summary: String(localized: "Google Gemini CLI 的 ACP 模式")),
+        AgentPreset(id: "goose", name: "Goose", command: "goose", args: ["acp"], summary: String(localized: "Block 的 Goose Agent")),
+        AgentPreset(id: "opencode", name: "OpenCode", command: "opencode", args: ["acp"], summary: String(localized: "OpenCode 的 ACP 模式")),
+        AgentPreset(id: "codex", name: String(localized: "Codex(codex-acp 适配器)"), command: "codex-acp", args: [], summary: String(localized: "需先安装 codex-acp 适配器")),
     ]
 }
 
@@ -106,12 +106,12 @@ struct AgentExtensionsPage: View {
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 6) {
                             Text(agent.name)
-                            if registry.data.resolvedDefault.id == agent.id { OMTag("默认") }
-                            if builtIn { OMTag("内置") }
+                            if registry.data.resolvedDefault.id == agent.id { OMTag(String(localized: "默认")) }
+                            if builtIn { OMTag(String(localized: "内置")) }
                         }
                         if let summary = agent.summary { Note(summary) }
                         if !builtIn, let command = agent.command, GenericACPProvider.resolve(command, path: path) == nil {
-                            Label("在 PATH 中找不到 \(command)", om: "exclamationmark.triangle").font(OMFonts.caption).foregroundStyle(OMColors.warning)
+                            Label(String(localized: "在 PATH 中找不到 \(command)"), om: "exclamationmark.triangle").font(OMFonts.caption).foregroundStyle(OMColors.warning)
                         }
                     }
                     Spacer()
@@ -196,7 +196,7 @@ struct AgentEditSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(draft.isNew ? "添加 ACP Agent" : "编辑 Agent").font(OMFonts.title)
+            Text(draft.isNew ? String(localized: "添加 ACP Agent") : String(localized: "编辑 Agent")).font(OMFonts.title)
             Form {
                 TextField("标识(唯一)", text: $draft.id).disabled(!draft.isNew)
                 TextField("名称", text: $draft.name)
@@ -215,7 +215,7 @@ struct AgentEditSheet: View {
                 Button("取消", action: close).keyboardShortcut(.cancelAction)
                 Button("保存") {
                     let existing = AgentRegistryModel.shared.data.agents.first { $0.id == draft.id }
-                    if draft.isNew, existing != nil { error = "标识已存在"; return }
+                    if draft.isNew, existing != nil { error = String(localized: "标识已存在"); return }
                     error = AgentRegistryModel.shared.upsert(draft.descriptor(enabled: existing?.enabled ?? true))
                     if error == nil { close() }
                 }
@@ -256,7 +256,7 @@ struct MCPAgentEditSheet: View {
                 Button("取消", action: close).keyboardShortcut(.cancelAction)
                 Button("保存") {
                     let id = entry.id.trimmingCharacters(in: .whitespaces)
-                    guard !id.isEmpty, !entry.command.trimmingCharacters(in: .whitespaces).isEmpty else { error = "标识与命令不能为空"; return }
+                    guard !id.isEmpty, !entry.command.trimmingCharacters(in: .whitespaces).isEmpty else { error = String(localized: "标识与命令不能为空"); return }
                     entry.id = id
                     entry.name = entry.name.isEmpty ? id : entry.name
                     entry.args = args.split(separator: " ").map(String.init)

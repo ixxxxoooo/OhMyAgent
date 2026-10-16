@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 对话内的 MCP 面板:列出本机配置的 MCP 服务器及连接状态,可重连/启用/停用(经适配器的 `/mcp` 命令),
 // 并跳转设置页的完整管理界面。状态来自 `claude mcp list`,与设置页共用同一份数据。
 
@@ -173,8 +173,8 @@ struct MCPPanelView: View {
             }
             .buttonStyle(.plain)
             .disabled(model.isRunning)
-            .help(entry.isDisabled ? "在当前会话中启用" : "在当前会话中停用")
-            .accessibilityLabel(entry.isDisabled ? "启用 \(name)" : "停用 \(name)")
+            .help(entry.isDisabled ? String(localized: "在当前会话中启用") : String(localized: "在当前会话中停用"))
+            .accessibilityLabel(entry.isDisabled ? String(localized: "启用 \(name)") : String(localized: "停用 \(name)"))
         }
     }
 

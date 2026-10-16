@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 工具链解析器:后台解析登录 shell 环境并定位 node / claude / 适配器,结果在进程内缓存。
 // 登录 shell 环境解析约需 1 秒,绝不放在启动关键路径上同步等待。
 
@@ -63,7 +63,7 @@ public actor Toolchain {
         if isDemoMode || ProcessInfo.processInfo.environment["OMA_AGENT"] == "fake" {
             let dir = URL(fileURLWithPath: Bundle.main.executablePath ?? CommandLine.arguments[0]).deletingLastPathComponent()
             let path = dir.appendingPathComponent("FakeAgent").path
-            return AgentDescriptor(id: "fake", name: "Fake Agent", kind: .genericACP, command: path, summary: "脚本化测试 Agent")
+            return AgentDescriptor(id: "fake", name: "Fake Agent", kind: .genericACP, command: path, summary: String(localized: "脚本化测试 Agent"))
         }
         return AgentRegistryStore().load().resolvedDefault
     }

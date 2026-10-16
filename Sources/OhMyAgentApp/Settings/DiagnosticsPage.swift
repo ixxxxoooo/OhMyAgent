@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 设置页:诊断(进程资源、启动耗时、claude doctor、脱敏导出)。
 
 import AgentHost
@@ -33,9 +33,9 @@ struct DiagnosticsPage: View {
     var body: some View {
         SettingsForm {
             Section("启动耗时") {
-                LabeledContent("启动到首帧", value: DiagnosticsStore.shared.firstFrameMilliseconds.map { "\($0) ms" } ?? "未记录")
+                LabeledContent("启动到首帧", value: DiagnosticsStore.shared.firstFrameMilliseconds.map { "\($0) ms" } ?? String(localized: "未记录"))
                 if let model = AppEnvironment.shared.sessionModels.first {
-                    LabeledContent("Agent 连接", value: model.connectDuration.map { "\($0.components.seconds * 1000 + $0.components.attoseconds / 1_000_000_000_000_000) ms" } ?? "未连接")
+                    LabeledContent("Agent 连接", value: model.connectDuration.map { "\($0.components.seconds * 1000 + $0.components.attoseconds / 1_000_000_000_000_000) ms" } ?? String(localized: "未连接"))
                 }
             }
             Section("进程资源") {
@@ -79,7 +79,7 @@ struct DiagnosticsPage: View {
             Section("导出") {
                 HStack {
                     Button("导出诊断包…") { Task { await export() } }
-                    Text(redact ? "已启用脱敏" : "未脱敏").font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
+                    Text(redact ? String(localized: "已启用脱敏") : String(localized: "未脱敏")).font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
                 }
                 if let exportMessage { Note(exportMessage) }
                 Note("诊断包包含版本、工具路径、配置概要(仅键名)、最近 Agent 日志与计时,不含对话内容与凭据。")
@@ -133,7 +133,7 @@ struct DiagnosticsPage: View {
         doctorRunning = true
         defer { doctorRunning = false }
         let tools = await Toolchain.shared.resolve()
-        guard let path = tools.claudePath else { doctorOutput = "没有找到 claude 命令行工具"; return }
+        guard let path = tools.claudePath else { doctorOutput = String(localized: "没有找到 claude 命令行工具"); return }
         let result = await CLIRunner(executable: path, environment: tools.environment).run(["doctor"], in: center.paths.workspace, timeout: 60)
         let text = result.standardOutput + (result.standardError.isEmpty ? "" : "\n" + result.standardError)
         doctorOutput = text.isEmpty ? result.failureMessage : text
@@ -142,18 +142,18 @@ struct DiagnosticsPage: View {
     /// 生成诊断报告文本。
     func buildReport() async -> String {
         let tools = await Toolchain.shared.resolve()
-        var lines = ["# OhMyAgent 诊断报告", "时间: \(Date().formatted(.iso8601))", "macOS: \(ProcessInfo.processInfo.operatingSystemVersionString)",
-                     "应用版本: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev")",
+        var lines = [String(localized: "# OhMyAgent 诊断报告"), String(localized: "时间: \(Date().formatted(.iso8601))"), "macOS: \(ProcessInfo.processInfo.operatingSystemVersionString)",
+                     String(localized: "应用版本: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev")"),
                      "node: \(tools.nodePath ?? "-") \(tools.nodeVersion ?? "")", "claude: \(tools.claudePath ?? "-")", "adapter: \(tools.adapterEntry ?? "-")",
-                     "首帧: \(DiagnosticsStore.shared.firstFrameMilliseconds.map { "\($0)ms" } ?? "-")", "", "## 进程"]
+                     String(localized: "首帧: \(DiagnosticsStore.shared.firstFrameMilliseconds.map { "\($0)ms" } ?? "-")"), "", String(localized: "## 进程")]
         lines += rows.map { String(format: "%@ (%d) %.0fMB cpu %.1f%%", $0.name, $0.id, $0.rssMB, $0.cpu) }
         let settings = ClaudeSettingsModel(paths: center.paths)
-        lines += ["", "## settings.json env 键名", settings.dictionary(["env"]).keys.sorted().joined(separator: ", ")]
+        lines += ["", String(localized: "## settings.json env 键名"), settings.dictionary(["env"]).keys.sorted().joined(separator: ", ")]
         if let doctorOutput { lines += ["", "## claude doctor", doctorOutput] }
         for model in AppEnvironment.shared.sessionModels {
-            lines += ["", "## Agent 日志(\(model.agentName))"] + model.diagnostics
+            lines += ["", String(localized: "## Agent 日志(\(model.agentName))")] + model.diagnostics
         }
-        lines += ["", "## 最近应用日志(最多 500 条)"] + LogSystem.shared.recent(limit: 500).map(\.line)
+        lines += ["", String(localized: "## 最近应用日志(最多 500 条)")] + LogSystem.shared.recent(limit: 500).map(\.line)
         let text = lines.joined(separator: "\n")
         return redact ? DiagnosticsRedactor.redact(text) : text
     }
@@ -164,8 +164,8 @@ struct DiagnosticsPage: View {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             try await buildReport().write(to: url, atomically: true, encoding: .utf8)
-            exportMessage = "已导出到 \(url.path)"
-        } catch { exportMessage = "导出失败:\(error.localizedDescription)" }
+            exportMessage = String(localized: "已导出到 \(url.path)")
+        } catch { exportMessage = String(localized: "导出失败:\(error.localizedDescription)") }
     }
 }
 

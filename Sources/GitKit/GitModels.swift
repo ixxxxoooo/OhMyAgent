@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // Git 数据模型:状态、分支、提交、blame、stash。均为值类型,可跨并发边界传递。
 
 import Foundation
@@ -185,11 +185,11 @@ public enum GitError: Error, Sendable, Equatable, LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .notARepository(let path): return "不是 Git 仓库:\(path)"
-        case .launchFailed(let reason): return "无法启动 git:\(reason)"
-        case .commandFailed(_, _, let message): return message.isEmpty ? "git 命令执行失败" : message
+        case .notARepository(let path): return String(localized: "不是 Git 仓库:\(path)")
+        case .launchFailed(let reason): return String(localized: "无法启动 git:\(reason)")
+        case .commandFailed(_, _, let message): return message.isEmpty ? String(localized: "git 命令执行失败") : message
         case .invalidArgument(let reason): return reason
-        case .timedOut(let command): return "git \(command) 超时"
+        case .timedOut(let command): return String(localized: "git \(command) 超时")
         }
     }
 }

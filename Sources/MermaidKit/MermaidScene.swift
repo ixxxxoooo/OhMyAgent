@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // Mermaid 绘制场景:布局阶段的输出,与具体渲染器解耦(SwiftUI Canvas、PNG 导出、测试断言共用)。
 
 import CoreGraphics
@@ -74,7 +74,7 @@ public struct MermaidError: Error, Equatable, Sendable, CustomStringConvertible 
         self.line = line
         self.message = message
     }
-    public var description: String { line > 0 ? "第 \(line) 行:\(message)" : message }
+    public var description: String { line > 0 ? String(localized: "第 \(line) 行:\(message)") : message }
 }
 
 /// 文本度量:不依赖 AppKit 的近似估算(CJK 宽 1em,拉丁字母约 0.56em),保证布局确定、可测试。

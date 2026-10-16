@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // Agent 注册表:`~/Library/Application Support/OhMyAgent/agents.json`。
 // 保存用户自定义的 ACP Agent、作为 MCP 工具源登记的 Agent(Agent-as-MCP)、默认 Agent 与 Bridge 开关。
 
@@ -38,7 +38,7 @@ public struct AgentMCPEntry: Codable, Sendable, Hashable, Identifiable {
     /// 常用预设。
     public static let presets: [AgentMCPEntry] = [
         AgentMCPEntry(id: "codex", name: "Codex", command: "codex", args: ["mcp-server"], enabled: false),
-        AgentMCPEntry(id: "claude-code-mcp", name: "Claude Code(MCP 服务)", command: "claude", args: ["mcp", "serve"], enabled: false),
+        AgentMCPEntry(id: "claude-code-mcp", name: String(localized: "Claude Code(MCP 服务)"), command: "claude", args: ["mcp", "serve"], enabled: false),
     ]
 
     /// 转换为 `session/new` 的 stdio MCP 配置。

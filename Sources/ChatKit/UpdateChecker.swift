@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 更新检查:读取发布源(JSON appcast),与当前版本比较。
 // 发布源格式(按通道分键,至少需要 stable):
 //   { "stable": { "version": "0.2.0", "build": 12, "url": "https://…/OhMyAgent-0.2.0.dmg",
@@ -68,10 +68,10 @@ public enum UpdateChecker {
     public static func evaluate(data: Data, channel: String, currentVersion: String, currentBuild: Int,
                                 systemVersion: String = UpdateChecker.currentSystemVersion) -> UpdateResult {
         guard let feed = try? JSONDecoder().decode([String: UpdateInfo].self, from: data) else {
-            return .failed("发布源格式不正确")
+            return .failed(String(localized: "发布源格式不正确"))
         }
-        guard let info = feed[channel] ?? feed["stable"] else { return .failed("发布源缺少 stable 通道") }
-        guard URL(string: info.url)?.scheme?.hasPrefix("http") == true else { return .failed("发布源中的下载地址无效") }
+        guard let info = feed[channel] ?? feed["stable"] else { return .failed(String(localized: "发布源缺少 stable 通道")) }
+        guard URL(string: info.url)?.scheme?.hasPrefix("http") == true else { return .failed(String(localized: "发布源中的下载地址无效")) }
         let order = compare(info.version, currentVersion)
         let newer = order > 0 || (order == 0 && (info.build ?? 0) > currentBuild)
         guard newer else { return .upToDate }
@@ -91,16 +91,16 @@ public enum UpdateChecker {
                              fetch: @Sendable (URL) async throws -> Data = { try await URLSession.shared.data(from: $0).0 }) async -> UpdateResult {
         let trimmed = feedURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, let url = URL(string: trimmed), let scheme = url.scheme?.lowercased() else {
-            return .failed("尚未配置更新源地址")
+            return .failed(String(localized: "尚未配置更新源地址"))
         }
         guard scheme == "https" || url.isFileURL || url.host == "localhost" || url.host == "127.0.0.1" else {
-            return .failed("更新源必须使用 https")
+            return .failed(String(localized: "更新源必须使用 https"))
         }
         do {
             let data = try await fetch(url)
             return evaluate(data: data, channel: channel, currentVersion: currentVersion, currentBuild: currentBuild)
         } catch {
-            return .failed("获取更新信息失败:\(error.localizedDescription)")
+            return .failed(String(localized: "获取更新信息失败:\(error.localizedDescription)"))
         }
     }
 

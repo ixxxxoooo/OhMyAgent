@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // Git Blame 标签:逐行显示最后修改该行的提交、作者与日期;同一提交的连续行只在首行显示信息。
 
 import AppKit
@@ -76,7 +76,7 @@ private struct BlameLineRow: View {
         HStack(spacing: 0) {
             HStack(spacing: 8) {
                 if showsInfo {
-                    Text(line.isUncommitted ? "未提交" : String(line.hash.prefix(7))).font(OMFonts.monoSmall).foregroundStyle(OMColors.accent)
+                    Text(line.isUncommitted ? String(localized: "未提交") : String(line.hash.prefix(7))).font(OMFonts.monoSmall).foregroundStyle(OMColors.accent)
                     Text(line.author).lineLimit(1)
                     Spacer(minLength: 0)
                     Text(line.date, format: .dateTime.year().month().day()).foregroundStyle(OMColors.tertiaryText)

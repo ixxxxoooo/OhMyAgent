@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 记忆与指令:多层级 CLAUDE.md / rules 编辑器,规则创建与删除。
 
 import IconKit
@@ -27,8 +27,8 @@ struct MemoryManagerView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(file.title).font(OMFonts.body).lineLimit(1)
                         HStack(spacing: 4) {
-                            Tag(file.exists ? "已存在" : "未创建", color: file.exists ? .green : .gray)
-                            if !file.isLoadedByDefault { Tag("Claude 默认不读取", color: OMColors.warning) }
+                            Tag(file.exists ? String(localized: "已存在") : String(localized: "未创建"), color: file.exists ? .green : .gray)
+                            if !file.isLoadedByDefault { Tag(String(localized: "Claude 默认不读取"), color: OMColors.warning) }
                             ForEach(file.pathFilters.prefix(2), id: \.self) { Tag($0) }
                         }
                     }
@@ -41,7 +41,7 @@ struct MemoryManagerView: View {
             if let file = selected {
                 MemoryEditor(center: center, file: file).id(file.id)
             } else {
-                EmptyHint(icon: "brain", title: "选择一个文件", message: "记忆文件会在每次会话开始时作为上下文加载。")
+                EmptyHint(icon: "brain", title: String(localized: "选择一个文件"), message: String(localized: "记忆文件会在每次会话开始时作为上下文加载。"))
             }
         }
         .sheet(isPresented: $showCreateRule) { RuleCreateSheet(center: center) { showCreateRule = false } }
@@ -67,7 +67,7 @@ struct MemoryEditor: View {
                     Button("删除", role: .destructive) { confirmDelete = true }
                 }
                 Button("还原") { text = original }.disabled(!isDirty)
-                Button(file.exists ? "保存" : "创建并保存", action: save).buttonStyle(.borderedProminent)
+                Button(file.exists ? String(localized: "保存") : String(localized: "创建并保存"), action: save).buttonStyle(.borderedProminent)
                     .disabled(!isDirty && file.exists).keyboardShortcut("s", modifiers: .command)
             }
             Text(file.url.abbreviatingHome).font(OMFonts.caption).foregroundStyle(OMColors.secondaryText).lineLimit(1).truncationMode(.middle)
@@ -84,12 +84,12 @@ struct MemoryEditor: View {
         .padding(16)
         .onAppear { text = MemoryStore(paths: center.paths).read(file); original = text }
         .confirmationDialog("删除规则?", isPresented: $confirmDelete) {
-            Button("移到废纸篓", role: .destructive) { center.perform("已删除 \(file.title)") { try MemoryStore(paths: center.paths).deleteRule(file) } }
+            Button("移到废纸篓", role: .destructive) { center.perform(String(localized: "已删除 \(file.title)")) { try MemoryStore(paths: center.paths).deleteRule(file) } }
         }
     }
 
     private func save() {
-        if center.perform("已保存 \(file.title)", { try MemoryStore(paths: center.paths).write(text, to: file) }) { original = text }
+        if center.perform(String(localized: "已保存 \(file.title)"), { try MemoryStore(paths: center.paths).write(text, to: file) }) { original = text }
     }
 }
 
@@ -104,15 +104,15 @@ struct RuleCreateSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("新建规则").font(OMFonts.title)
-            FormRow(label: "文件名") { TextField("swift-style", text: $name).textFieldStyle(.roundedBorder) }
-            FormRow(label: "适用路径", hint: "可选,逗号分隔 glob,如 **/*.swift;留空表示始终加载") { TextField("", text: $paths).textFieldStyle(.roundedBorder).font(OMFonts.mono) }
-            FormRow(label: "位置") {
+            FormRow(label: String(localized: "文件名")) { TextField("swift-style", text: $name).textFieldStyle(.roundedBorder) }
+            FormRow(label: String(localized: "适用路径"), hint: String(localized: "可选,逗号分隔 glob,如 **/*.swift;留空表示始终加载")) { TextField("", text: $paths).textFieldStyle(.roundedBorder).font(OMFonts.mono) }
+            FormRow(label: String(localized: "位置")) {
                 Picker("", selection: $scope) { Text("用户").tag(ConfigScope.user); Text("项目").tag(ConfigScope.project) }.pickerStyle(.segmented).labelsHidden()
             }
-            SheetFooter(problems: name.range(of: "^[A-Za-z0-9_.-]+$", options: .regularExpression) == nil ? ["文件名只能包含字母、数字、点、下划线和连字符"] : [],
-                        confirmTitle: "创建", onCancel: onClose) {
+            SheetFooter(problems: name.range(of: "^[A-Za-z0-9_.-]+$", options: .regularExpression) == nil ? [String(localized: "文件名只能包含字母、数字、点、下划线和连字符")] : [],
+                        confirmTitle: String(localized: "创建"), onCancel: onClose) {
                 let filters = paths.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-                if center.perform("已创建规则 \(name)", { try MemoryStore(paths: center.paths).createRule(name: name, scope: scope, pathFilters: filters) }) { onClose() }
+                if center.perform(String(localized: "已创建规则 \(name)"), { try MemoryStore(paths: center.paths).createRule(name: name, scope: scope, pathFilters: filters) }) { onClose() }
             }
         }
         .padding(20)

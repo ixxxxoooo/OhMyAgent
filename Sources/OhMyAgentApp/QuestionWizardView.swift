@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // AskUserQuestion 向导卡片(输入栏上方,布局与交互参考 kuku 的问答面板):
 // 可折叠标题 + 逐题步骤 + 字母徽标选项 + 「其他」输入行 + 页码与跳过/下一题/提交。
 // 单选点选后自动进入下一题;选项多于 6 个时分两列;键盘:A–Z 选择、⏎ 下一题/提交、Esc 跳过。
@@ -76,7 +76,7 @@ struct QuestionWizardCard: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(collapsed ? "展开提问" : "收起提问")
+        .accessibilityLabel(collapsed ? String(localized: "展开提问") : String(localized: "收起提问"))
     }
 
     private var footer: some View {
@@ -104,7 +104,7 @@ struct QuestionWizardCard: View {
                 advance()
             } label: {
                 HStack(spacing: 4) {
-                    Text(isLast ? "提交" : "下一题")
+                    Text(isLast ? String(localized: "提交") : String(localized: "下一题"))
                     Text("⏎").opacity(0.7)
                 }
             }

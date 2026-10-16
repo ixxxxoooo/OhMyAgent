@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // “本轮改动”汇总与文件查看面板:逐文件审查、按块撤销、整体撤销;点击文件在 EditorKit 编辑器中打开。
 
 import IconKit
@@ -58,7 +58,7 @@ struct FileChangeRow: View {
                             .rotationEffect(.degrees(expanded ? 90 : 0))
                             .foregroundStyle(OMColors.tertiaryText)
                         Text(change.fileName).font(OMFonts.small.weight(.medium))
-                        if change.original == nil { OMTag("新建", tint: .green) }
+                        if change.original == nil { OMTag(String(localized: "新建"), tint: .green) }
                         Text("+\(change.diff.added)").foregroundStyle(OMColors.diffAdded)
                         Text("−\(change.diff.removed)").foregroundStyle(OMColors.diffRemoved)
                         Spacer(minLength: 0)
@@ -107,10 +107,10 @@ struct FileChangeRow: View {
     private var statusLabel: some View {
         switch change.status {
         case .pending: EmptyView()
-        case .reverted: OMTag("已撤销")
-        case .partiallyReverted: OMTag("部分撤销", tint: OMColors.warning)
-        case .conflict: OMTag("文件已被修改,未撤销", tint: .red)
-        case .failed(let message): OMTag("失败:\(message)", tint: .red)
+        case .reverted: OMTag(String(localized: "已撤销"))
+        case .partiallyReverted: OMTag(String(localized: "部分撤销"), tint: OMColors.warning)
+        case .conflict: OMTag(String(localized: "文件已被修改,未撤销"), tint: .red)
+        case .failed(let message): OMTag(String(localized: "失败:\(message)"), tint: .red)
         }
     }
 }

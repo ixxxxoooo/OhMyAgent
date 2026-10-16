@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 调用官方 `claude` CLI(插件、MCP 健康检查等"通道 C"操作)。带超时与输出收集。
 
 import Foundation
@@ -15,9 +15,9 @@ public struct CLIResult: Sendable, Equatable {
 
     /// 面向用户的失败说明。
     public var failureMessage: String {
-        if timedOut { return "命令执行超时" }
+        if timedOut { return String(localized: "命令执行超时") }
         let text = standardError.trimmingCharacters(in: .whitespacesAndNewlines)
-        return text.isEmpty ? (standardOutput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "命令退出码 \(exitCode)" : standardOutput) : text
+        return text.isEmpty ? (standardOutput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? String(localized: "命令退出码 \(Int(exitCode))") : standardOutput) : text
     }
 }
 

@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 菜单栏托盘:NSStatusItem + NSMenu。
 // 图标右下角的状态点:运行中闪烁(蓝)、待处理闪烁(橙)、未读完成常亮(绿);已读后消失。
 // 不使用 SwiftUI MenuBarExtra(它在状态变化时的刷新循环曾造成 CPU 空转),菜单仅在打开时构建。
@@ -163,12 +163,12 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             let header = NSMenuItem(title: Self.tooltip(attention).replacingOccurrences(of: "OhMyAgent · ", with: ""), action: nil, keyEquivalent: "")
             header.isEnabled = false
             menu.addItem(header)
-            if unread > 0 { menu.addItem(item("全部标为已读") { [attention] in attention.markAllRead() }) }
+            if unread > 0 { menu.addItem(item(String(localized: "全部标为已读")) { [attention] in attention.markAllRead() }) }
             menu.addItem(.separator())
         }
-        menu.addItem(item("打开 OhMyAgent") { AppActions.shared.showMainWindow() })
-        menu.addItem(item("新对话", key: "n") { AppActions.shared.newConversation() })
-        menu.addItem(item("打开项目…", key: "o") {
+        menu.addItem(item(String(localized: "打开 OhMyAgent")) { AppActions.shared.showMainWindow() })
+        menu.addItem(item(String(localized: "新对话"), key: "n") { AppActions.shared.newConversation() })
+        menu.addItem(item(String(localized: "打开项目…"), key: "o") {
             NSApp.activate()
             if let url = WorkspaceStore.chooseDirectory() { AppActions.shared.openWorkspace(url) }
         })
@@ -184,7 +184,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         }
         if !projects.isEmpty {
             projectMenu.addItem(.separator())
-            projectMenu.addItem(item("清除最近项目") { RecentStore.clearProjects() })
+            projectMenu.addItem(item(String(localized: "清除最近项目")) { RecentStore.clearProjects() })
         }
         let projectsItem = NSMenuItem(title: String(localized: "最近项目"), action: nil, keyEquivalent: "")
         projectsItem.submenu = projectMenu
@@ -223,10 +223,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         }
 
         menu.addItem(.separator())
-        menu.addItem(item("设置…", key: ",") { AppActions.shared.openSettings() })
-        menu.addItem(item("检查更新…") { UpdateModel.shared.checkInteractively() })
+        menu.addItem(item(String(localized: "设置…"), key: ",") { AppActions.shared.openSettings() })
+        menu.addItem(item(String(localized: "检查更新…")) { UpdateModel.shared.checkInteractively() })
         menu.addItem(.separator())
-        menu.addItem(item("退出 OhMyAgent", key: "q") { NSApp.terminate(nil) })
+        menu.addItem(item(String(localized: "退出 OhMyAgent"), key: "q") { NSApp.terminate(nil) })
         Log.perf.debug("托盘菜单构建", ["ms": "\(Int(started.duration(to: .now) / .milliseconds(1)))", "sessions": "\(count)"])
     }
 

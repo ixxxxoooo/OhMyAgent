@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // pie 与 gantt:解析 + 布局。
 
 import CoreGraphics
@@ -32,12 +32,12 @@ enum PieParser {
             let ns = line as NSString
             guard let m = entry.firstMatch(in: line, range: NSRange(location: 0, length: ns.length)),
                   let value = Double(ns.substring(with: m.range(at: 2))) else {
-                throw MermaidError(line: idx + 1, "饼图条目格式应为 \"名称\" : 数值")
+                throw MermaidError(line: idx + 1, String(localized: "饼图条目格式应为 \"名称\" : 数值"))
             }
-            guard value >= 0 else { throw MermaidError(line: idx + 1, "饼图数值不能为负") }
+            guard value >= 0 else { throw MermaidError(line: idx + 1, String(localized: "饼图数值不能为负")) }
             model.slices.append((ns.substring(with: m.range(at: 1)), value))
         }
-        guard !model.slices.isEmpty else { throw MermaidError("饼图没有数据") }
+        guard !model.slices.isEmpty else { throw MermaidError(String(localized: "饼图没有数据")) }
         return model
     }
 }
@@ -135,7 +135,7 @@ enum GanttParser {
             if lower.hasPrefix("section") {
                 model.sections.append(String(line.dropFirst(7)).trimmingCharacters(in: .whitespaces)); section = model.sections.count - 1; continue
             }
-            guard let colon = line.lastIndex(of: ":") else { throw MermaidError(line: idx + 1, "甘特图任务应为 名称 : 日期信息") }
+            guard let colon = line.lastIndex(of: ":") else { throw MermaidError(line: idx + 1, String(localized: "甘特图任务应为 名称 : 日期信息")) }
             let title = String(line[..<colon]).trimmingCharacters(in: .whitespaces)
             let fields = line[line.index(after: colon)...].split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
             var task = GanttTask(title: title, id: nil, section: max(section, 0), start: 0, end: 0)
@@ -160,14 +160,14 @@ enum GanttParser {
                 start = lastEnd
                 if let d = days(e) { end = d } else if let n = duration(e), let st = lastEnd { end = st + n }
             }
-            guard let st = start ?? lastEnd, let en = end else { throw MermaidError(line: idx + 1, "无法解析任务日期:\(line.prefix(30))") }
+            guard let st = start ?? lastEnd, let en = end else { throw MermaidError(line: idx + 1, String(localized: "无法解析任务日期:\(line.prefix(30))")) }
             task.start = st
             task.end = task.milestone ? st : max(en, st)
             lastEnd = task.end
             if let id = task.id { byID[id] = task }
             model.tasks.append(task)
         }
-        guard !model.tasks.isEmpty else { throw MermaidError("甘特图没有任务") }
+        guard !model.tasks.isEmpty else { throw MermaidError(String(localized: "甘特图没有任务")) }
         if model.sections.isEmpty { model.sections = [""] }
         return model
     }

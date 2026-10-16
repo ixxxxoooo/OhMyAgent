@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // MCP 服务器配置:跨 user / local / project 作用域读写,优先级解析,启停与项目审批,JSON 导入与校验。
 // 存储位置:user=~/.claude.json 顶层 mcpServers;local=~/.claude.json 的 projects[<工作区>].mcpServers;
 // project=<工作区>/.mcp.json。优先级:local > project > user。
@@ -11,9 +11,9 @@ public enum MCPTransportKind: String, Sendable, CaseIterable, Identifiable {
     public var id: String { rawValue }
     public var displayName: String {
         switch self {
-        case .stdio: return "stdio(本地进程)"
+        case .stdio: return String(localized: "stdio(本地进程)")
         case .http: return "HTTP"
-        case .sse: return "SSE(已弃用)"
+        case .sse: return String(localized: "SSE(已弃用)")
         case .ws: return "WebSocket"
         }
     }
@@ -180,7 +180,7 @@ public struct MCPStore: Sendable {
     ///   - scope: 目标作用域
     public func addJSON(name: String, json: String, scope: ConfigScope) throws {
         guard let data = json.data(using: .utf8), let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw ConfigError.invalidValue("JSON 格式不正确,需要是一个对象")
+            throw ConfigError.invalidValue(String(localized: "JSON 格式不正确,需要是一个对象"))
         }
         let config = MCPServerConfig(name: name, dictionary: object)
         if let first = Self.validate(config).first { throw ConfigError.invalidValue(first) }
@@ -209,7 +209,7 @@ public struct MCPStore: Sendable {
             try settings.set(["enabledMcpjsonServers"], to: allowed.isEmpty ? nil : allowed, in: .local)
             return
         }
-        guard let key = paths.workspace?.path else { throw ConfigError.invalidValue("当前没有工作区") }
+        guard let key = paths.workspace?.path else { throw ConfigError.invalidValue(String(localized: "当前没有工作区")) }
         try JSONFile(paths.claudeJSON).update { root in
             var projects = root["projects"] as? [String: Any] ?? [:]
             var project = projects[key] as? [String: Any] ?? [:]
@@ -243,7 +243,7 @@ public struct MCPStore: Sendable {
                 root["mcpServers"] = servers
             }
         case .local:
-            guard let key = paths.workspace?.path else { throw ConfigError.invalidValue("当前没有工作区,无法写入本地作用域") }
+            guard let key = paths.workspace?.path else { throw ConfigError.invalidValue(String(localized: "当前没有工作区,无法写入本地作用域")) }
             try JSONFile(paths.claudeJSON).update { root in
                 var projects = root["projects"] as? [String: Any] ?? [:]
                 var project = projects[key] as? [String: Any] ?? [:]
@@ -254,7 +254,7 @@ public struct MCPStore: Sendable {
                 root["projects"] = projects
             }
         case .project:
-            guard let url = paths.projectMCP else { throw ConfigError.invalidValue("当前没有工作区,无法写入项目作用域") }
+            guard let url = paths.projectMCP else { throw ConfigError.invalidValue(String(localized: "当前没有工作区,无法写入项目作用域")) }
             try JSONFile(url).update { root in
                 var servers = root["mcpServers"] as? [String: Any] ?? [:]
                 body(&servers)
@@ -270,15 +270,15 @@ public struct MCPStore: Sendable {
         var problems: [String] = []
         let name = config.name
         if name.isEmpty || name.range(of: "^[A-Za-z0-9_-]+$", options: .regularExpression) == nil {
-            problems.append("名称只能包含字母、数字、下划线和连字符")
+            problems.append(String(localized: "名称只能包含字母、数字、下划线和连字符"))
         }
         if config.transport == .stdio {
-            if config.command.trimmingCharacters(in: .whitespaces).isEmpty { problems.append("stdio 服务器需要填写命令") }
+            if config.command.trimmingCharacters(in: .whitespaces).isEmpty { problems.append(String(localized: "stdio 服务器需要填写命令")) }
         } else {
             let scheme = URL(string: config.url)?.scheme?.lowercased()
             let allowed = config.transport == .ws ? ["ws", "wss"] : ["http", "https"]
             if config.url.isEmpty || scheme == nil || !allowed.contains(scheme!) {
-                problems.append("URL 无效,\(config.transport.displayName) 需要以 \(allowed.joined(separator: " 或 ")) 开头")
+                problems.append(String(localized: "URL 无效,\(config.transport.displayName) 需要以 \(allowed.joined(separator: String(localized: " 或 "))) 开头"))
             }
         }
         return problems

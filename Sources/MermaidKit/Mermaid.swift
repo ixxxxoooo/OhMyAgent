@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // MermaidKit 入口:识别图类型 → 解析 → 布局 → 场景。
 
 import CoreGraphics
@@ -21,7 +21,7 @@ public enum Mermaid {
         if first.hasPrefix("pie") { return .pie }
         if first.hasPrefix("gantt") { return .gantt }
         let word = first.split(separator: " ").first.map(String.init) ?? ""
-        throw MermaidError(word.isEmpty ? "内容为空" : "暂不支持的图类型:\(word)")
+        throw MermaidError(word.isEmpty ? String(localized: "内容为空") : String(localized: "暂不支持的图类型:\(word)"))
     }
 
     /// 解析并布局,生成可绘制的场景。

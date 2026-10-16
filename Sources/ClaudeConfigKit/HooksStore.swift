@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // Hooks 读写:settings.json 的 `hooks`(事件 → matcher 组 → 处理器),插件 hooks.json 只读。
 
 import Foundation
@@ -52,8 +52,8 @@ public struct HookEntry: Sendable, Identifiable, Equatable {
         case plugin(String)
         public var displayName: String {
             switch self {
-            case .settings(let scope): return "\(scope.displayName)设置"
-            case .plugin(let name): return "插件 \(name)"
+            case .settings(let scope): return String(localized: "\(scope.displayName)设置")
+            case .plugin(let name): return String(localized: "插件 \(name)")
             }
         }
     }
@@ -146,7 +146,7 @@ public struct HooksStore: Sendable {
 
     /// 更新已有处理器(保留该处理器的未知字段)。
     public func update(_ entry: HookEntry, handler: HookHandler, matcher: String) throws {
-        guard case .settings(let scope) = entry.origin else { throw ConfigError.invalidValue("插件内的 Hook 是只读的") }
+        guard case .settings(let scope) = entry.origin else { throw ConfigError.invalidValue(String(localized: "插件内的 Hook 是只读的")) }
         if let first = Self.validate(handler: handler, event: entry.event, matcher: matcher).first { throw ConfigError.invalidValue(first) }
         try mutateHooks(scope) { hooks in
             guard var groups = hooks[entry.event] as? [[String: Any]], groups.indices.contains(entry.groupIndex),
@@ -162,7 +162,7 @@ public struct HooksStore: Sendable {
 
     /// 删除处理器;组或事件变空时一并清理。
     public func remove(_ entry: HookEntry) throws {
-        guard case .settings(let scope) = entry.origin else { throw ConfigError.invalidValue("插件内的 Hook 是只读的") }
+        guard case .settings(let scope) = entry.origin else { throw ConfigError.invalidValue(String(localized: "插件内的 Hook 是只读的")) }
         try mutateHooks(scope) { hooks in
             guard var groups = hooks[entry.event] as? [[String: Any]], groups.indices.contains(entry.groupIndex),
                   var handlers = groups[entry.groupIndex]["hooks"] as? [[String: Any]], handlers.indices.contains(entry.handlerIndex) else { return }
@@ -173,7 +173,7 @@ public struct HooksStore: Sendable {
     }
 
     private func mutateHooks(_ scope: ConfigScope, _ body: (inout [String: Any]) -> Void) throws {
-        guard let url = paths.settingsFile(scope) else { throw ConfigError.invalidValue("当前没有工作区,无法写入\(scope.displayName)设置") }
+        guard let url = paths.settingsFile(scope) else { throw ConfigError.invalidValue(String(localized: "当前没有工作区,无法写入\(scope.displayName)设置")) }
         try JSONFile(url).update { root in
             var hooks = root["hooks"] as? [String: Any] ?? [:]
             body(&hooks)
@@ -186,16 +186,16 @@ public struct HooksStore: Sendable {
     /// 校验,返回问题列表。
     public static func validate(handler: HookHandler, event: String, matcher: String) -> [String] {
         var problems: [String] = []
-        if !events.contains(event) { problems.append("未知事件「\(event)」") }
-        if !handlerTypes.contains(handler.type) { problems.append("未知处理器类型「\(handler.type)」") }
-        if handler.type == "command", handler.command.trimmingCharacters(in: .whitespaces).isEmpty { problems.append("command 类型需要填写命令") }
+        if !events.contains(event) { problems.append(String(localized: "未知事件「\(event)」")) }
+        if !handlerTypes.contains(handler.type) { problems.append(String(localized: "未知处理器类型「\(handler.type)」")) }
+        if handler.type == "command", handler.command.trimmingCharacters(in: .whitespaces).isEmpty { problems.append(String(localized: "command 类型需要填写命令")) }
         if handler.type == "http" {
             let scheme = URL(string: handler.url)?.scheme?.lowercased()
-            if scheme != "http" && scheme != "https" { problems.append("http 类型需要有效的 URL") }
+            if scheme != "http" && scheme != "https" { problems.append(String(localized: "http 类型需要有效的 URL")) }
         }
-        if (handler.type == "prompt" || handler.type == "agent"), handler.prompt.trimmingCharacters(in: .whitespaces).isEmpty { problems.append("\(handler.type) 类型需要填写提示词") }
-        if let timeout = handler.timeout, timeout <= 0 { problems.append("超时必须大于 0 秒") }
-        if !matcher.isEmpty, matcher != "*", (try? NSRegularExpression(pattern: matcher)) == nil { problems.append("matcher 不是合法的正则表达式") }
+        if (handler.type == "prompt" || handler.type == "agent"), handler.prompt.trimmingCharacters(in: .whitespaces).isEmpty { problems.append(String(localized: "\(handler.type) 类型需要填写提示词")) }
+        if let timeout = handler.timeout, timeout <= 0 { problems.append(String(localized: "超时必须大于 0 秒")) }
+        if !matcher.isEmpty, matcher != "*", (try? NSRegularExpression(pattern: matcher)) == nil { problems.append(String(localized: "matcher 不是合法的正则表达式")) }
         return problems
     }
 }

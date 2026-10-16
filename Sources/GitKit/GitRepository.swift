@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // Git 仓库:对 `git` 命令的类型化封装。所有方法在后台子进程执行,不阻塞主线程。
 // 路径参数一律放在 `--` 之后,分支名等做合法性校验,避免被解释为选项。
 
@@ -32,7 +32,7 @@ public struct GitRepository: Sendable {
     public static func initialize(at directory: String) async throws -> GitRepository {
         var isDir: ObjCBool = false
         guard FileManager.default.fileExists(atPath: directory, isDirectory: &isDir), isDir.boolValue else {
-            throw GitError.invalidArgument("目录不存在:\(directory)")
+            throw GitError.invalidArgument(String(localized: "目录不存在:\(directory)"))
         }
         let url = URL(fileURLWithPath: directory)
         let output = try await GitProcess.run(["init", "-b", "main"], in: url, timeout: 15)
@@ -81,14 +81,14 @@ public struct GitRepository: Sendable {
         guard !trimmed.isEmpty, trimmed == name, !name.hasPrefix("-"),
               !name.contains(where: { $0.isWhitespace || $0.isNewline || $0 == "~" || $0 == "^" || $0 == ":" || $0 == "?" || $0 == "*" || $0 == "[" || $0 == "\\" }),
               !name.contains("..") else {
-            throw GitError.invalidArgument("无效的名称:\(name)")
+            throw GitError.invalidArgument(String(localized: "无效的名称:\(name)"))
         }
     }
 
     private func validatePaths(_ paths: [String]) throws {
-        guard !paths.isEmpty else { throw GitError.invalidArgument("没有指定文件") }
+        guard !paths.isEmpty else { throw GitError.invalidArgument(String(localized: "没有指定文件")) }
         for path in paths where path.isEmpty || path.hasPrefix("/") || path.split(separator: "/").contains("..") {
-            throw GitError.invalidArgument("无效的路径:\(path)")
+            throw GitError.invalidArgument(String(localized: "无效的路径:\(path)"))
         }
     }
 
@@ -209,7 +209,7 @@ public struct GitRepository: Sendable {
     @discardableResult
     public func commit(message: String, amend: Bool = false) async throws -> String {
         let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { throw GitError.invalidArgument("提交信息不能为空") }
+        guard !trimmed.isEmpty else { throw GitError.invalidArgument(String(localized: "提交信息不能为空")) }
         var args = ["commit", "-F", "-"]
         if amend { args.append("--amend") }
         try await git(args, input: Data(trimmed.utf8), lockFree: false)
@@ -236,10 +236,10 @@ public struct GitRepository: Sendable {
             try await git(["push"], timeout: 180)
             return
         }
-        guard let branch = current.branch else { throw GitError.invalidArgument("游离 HEAD 无法推送,请先创建分支") }
+        guard let branch = current.branch else { throw GitError.invalidArgument(String(localized: "游离 HEAD 无法推送,请先创建分支")) }
         let remotes = try await git(["remote"]).text.split(separator: "\n").map(String.init)
         guard let remote = remotes.first(where: { $0 == "origin" }) ?? remotes.first else {
-            throw GitError.invalidArgument("没有配置远程仓库")
+            throw GitError.invalidArgument(String(localized: "没有配置远程仓库"))
         }
         try await git(["push", "--set-upstream", remote, branch], timeout: 180)
     }
@@ -317,12 +317,12 @@ public struct GitRepository: Sendable {
     }
 
     public func stashPop(index: Int = 0) async throws {
-        guard index >= 0 else { throw GitError.invalidArgument("无效的 stash 序号") }
+        guard index >= 0 else { throw GitError.invalidArgument(String(localized: "无效的 stash 序号")) }
         try await git(["stash", "pop", "stash@{\(index)}"], lockFree: false)
     }
 
     public func stashDrop(index: Int) async throws {
-        guard index >= 0 else { throw GitError.invalidArgument("无效的 stash 序号") }
+        guard index >= 0 else { throw GitError.invalidArgument(String(localized: "无效的 stash 序号")) }
         try await git(["stash", "drop", "stash@{\(index)}"])
     }
 

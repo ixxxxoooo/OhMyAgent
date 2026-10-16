@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 工具调用的呈现模型:把 ACP 的 ToolCall 归纳为“动词 + 对象 + 附注”的一行摘要(Cursor 风格紧凑工具行),
 // 并提供搜索结果解析与时间线步骤分组。纯数据逻辑,不含视图,便于单测。
 
@@ -53,15 +53,15 @@ public struct ToolPresentation: Sendable, Equatable {
         }
         if hasChild || name == "Task" || name == "Agent" {
             category = .subagent
-            verb = "子任务"
+            verb = String(localized: "子任务")
             subject = input?["description"]?.stringValue ?? tool.title
             agentType = input?["subagent_type"]?.stringValue
-            if input?["run_in_background"]?.boolValue == true { detail = "后台" }
+            if input?["run_in_background"]?.boolValue == true { detail = String(localized: "后台") }
             return
         }
         if name == "TodoWrite" || name == "ExitPlanMode" {
             category = .plan
-            verb = name == "ExitPlanMode" ? "提交计划" : "更新待办"
+            verb = name == "ExitPlanMode" ? String(localized: "提交计划") : String(localized: "更新待办")
             subject = ""
             return
         }
@@ -69,7 +69,7 @@ public struct ToolPresentation: Sendable, Equatable {
         switch tool.kind {
         case .read:
             category = .read
-            verb = "读取"
+            verb = String(localized: "读取")
             subject = path ?? Self.stripVerb(tool.title)
             subjectIsPath = path != nil
             detail = Self.lineRange(input: input, location: tool.locations.first)
@@ -79,48 +79,48 @@ public struct ToolPresentation: Sendable, Equatable {
                 return false
             }
             category = isNew ? .write : .edit
-            verb = isNew ? "写入" : "编辑"
+            verb = isNew ? String(localized: "写入") : String(localized: "编辑")
             subject = path ?? Self.stripVerb(tool.title)
             subjectIsPath = path != nil
         case .delete:
             category = .delete
-            verb = "删除"
+            verb = String(localized: "删除")
             subject = path ?? Self.stripVerb(tool.title)
             subjectIsPath = path != nil
         case .move:
             category = .move
-            verb = "移动"
+            verb = String(localized: "移动")
             subject = path ?? Self.stripVerb(tool.title)
             subjectIsPath = path != nil
         case .search:
             category = .search
             let pattern = input?["pattern"]?.stringValue ?? input?["query"]?.stringValue
-            verb = name == "Glob" ? "查找文件" : "搜索"
+            verb = name == "Glob" ? String(localized: "查找文件") : String(localized: "搜索")
             subject = pattern ?? Self.stripVerb(tool.title)
             detail = input?["path"]?.stringValue.map { ($0 as NSString).lastPathComponent }
                 ?? input?["glob"]?.stringValue
         case .execute:
             category = .terminal
-            verb = "运行"
+            verb = String(localized: "运行")
             let command = input?["command"]?.stringValue ?? Self.stripVerb(tool.title)
             subject = command.split(separator: "\n", omittingEmptySubsequences: true).first.map(String.init) ?? command
             detail = input?["description"]?.stringValue
         case .fetch:
             category = .fetch
-            verb = name == "WebSearch" ? "联网搜索" : "获取"
+            verb = name == "WebSearch" ? String(localized: "联网搜索") : String(localized: "获取")
             subject = input?["url"]?.stringValue ?? input?["query"]?.stringValue ?? Self.stripVerb(tool.title)
         case .think:
             category = .think
-            verb = "思考"
+            verb = String(localized: "思考")
             subject = tool.title
         case .switchMode:
             category = .other
-            verb = "切换模式"
+            verb = String(localized: "切换模式")
             subject = tool.title
         case .other:
             category = .other
             verb = ""
-            subject = tool.title.isEmpty ? (tool.name ?? "工具调用") : tool.title
+            subject = tool.title.isEmpty ? (tool.name ?? String(localized: "工具调用")) : tool.title
         }
     }
 
@@ -148,9 +148,9 @@ public struct ToolPresentation: Sendable, Equatable {
     static func lineRange(input: JSONValue?, location: ToolLocation?) -> String? {
         if let offset = input?["offset"]?.intValue {
             if let limit = input?["limit"]?.intValue { return "L\(offset)-\(offset + limit - 1)" }
-            return "L\(offset)起"
+            return String(localized: "L\(offset)起")
         }
-        if let limit = input?["limit"]?.intValue { return "前 \(limit) 行" }
+        if let limit = input?["limit"]?.intValue { return String(localized: "前 \(limit) 行") }
         if let line = location?.line, line > 0 { return "L\(line)" }
         return nil
     }
@@ -290,10 +290,10 @@ public struct ExploreGroup: Identifiable {
             }
         }
         var parts: [String] = []
-        if reads > 0 { parts.append("\(reads) 个文件") }
-        if searches > 0 { parts.append("\(searches) 次搜索") }
-        if fetches > 0 { parts.append("\(fetches) 次联网") }
-        return (isRunning ? "正在浏览 " : "已浏览 ") + parts.joined(separator: "、")
+        if reads > 0 { parts.append(String(localized: "\(reads) 个文件")) }
+        if searches > 0 { parts.append(String(localized: "\(searches) 次搜索")) }
+        if fetches > 0 { parts.append(String(localized: "\(fetches) 次联网")) }
+        return (isRunning ? String(localized: "正在浏览 ") : String(localized: "已浏览 ")) + parts.joined(separator: String(localized: "、"))
     }
 }
 

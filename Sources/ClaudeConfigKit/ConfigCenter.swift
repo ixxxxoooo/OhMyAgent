@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 配置中心:聚合各类存储的快照供界面使用,监听文件变化自动刷新,封装增删改与 CLI 调用。
 
 import Foundation
@@ -127,7 +127,7 @@ public final class ConfigCenter {
     @discardableResult
     public func runCLI(_ arguments: [String], message: String, notice: String, timeout: TimeInterval = 180) async -> Bool {
         guard let runner else {
-            lastError = "没有找到 claude 命令行工具,请在「设置 → 高级」中指定路径"
+            lastError = String(localized: "没有找到 claude 命令行工具,请在「设置 → 高级」中指定路径")
             return false
         }
         isBusy = true
@@ -147,11 +147,11 @@ public final class ConfigCenter {
     /// 运行 `claude mcp list` 检测各服务器连接状态。
     public func checkMCPHealth() async {
         guard let runner else {
-            lastError = "没有找到 claude 命令行工具"
+            lastError = String(localized: "没有找到 claude 命令行工具")
             return
         }
         isBusy = true
-        busyMessage = "正在检测 MCP 服务器连接…"
+        busyMessage = String(localized: "正在检测 MCP 服务器连接…")
         defer { isBusy = false; busyMessage = nil }
         let result = await runner.run(["mcp", "list"], in: paths.workspace, timeout: 60)
         guard result.succeeded else { lastError = result.failureMessage; return }

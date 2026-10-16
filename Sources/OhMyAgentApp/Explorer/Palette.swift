@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 命令面板与快速打开:⌘P 模糊查找项目文件,⇧⌘P(或在输入框前加 `>`)执行命令。
 
 import AppKit
@@ -167,7 +167,7 @@ struct PaletteOverlay: View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
                 Image.om(palette.mode == .files ? "file-search" : "command", size: 14).foregroundStyle(OMColors.secondaryText)
-                TextField(palette.mode == .files ? "按文件名搜索(输入 > 执行命令)" : "输入命令", text: $palette.query)
+                TextField(palette.mode == .files ? String(localized: "按文件名搜索(输入 > 执行命令)") : String(localized: "输入命令"), text: $palette.query)
                     .textFieldStyle(.plain)
                     .font(.system(size: 14))
                     .focused($focused)
@@ -179,7 +179,7 @@ struct PaletteOverlay: View {
             .padding(.horizontal, 14).padding(.vertical, 10)
             Divider()
             if items.isEmpty {
-                Text(palette.mode == .files && WorkspaceIndexModel.shared.isLoading ? "正在建立文件索引…" : "没有匹配项")
+                Text(palette.mode == .files && WorkspaceIndexModel.shared.isLoading ? String(localized: "正在建立文件索引…") : String(localized: "没有匹配项"))
                     .font(OMFonts.small).foregroundStyle(OMColors.secondaryText).padding(16)
             } else {
                 ScrollViewReader { proxy in

@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // Mermaid 代码块:原生渲染图(MermaidKit),支持复制源码、导出 PNG、在标签中放大;解析失败时回退为源码并提示原因。
 
 import AppKit
@@ -180,7 +180,7 @@ struct PreviewTabView: View {
         }
         .task {
             guard let source = MermaidPreviewStore.shared.sources[id] else {
-                result = .failure(MermaidError("预览内容已失效"))
+                result = .failure(MermaidError(String(localized: "预览内容已失效")))
                 return
             }
             result = await renderMermaid(source)

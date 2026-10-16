@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // Git 历史标签:左侧提交列表(含泳道图、引用徽标),右侧所选提交的文件与差异。
 
 import AppKit
@@ -63,7 +63,7 @@ struct GitHistoryTabView: View {
         do {
             var relative: String?
             if let path {
-                guard let rel = found.relativePath(of: path) else { throw GitError.invalidArgument("文件不在仓库内") }
+                guard let rel = found.relativePath(of: path) else { throw GitError.invalidArgument(String(localized: "文件不在仓库内")) }
                 relative = rel
             }
             let commits = try await found.log(limit: 400, path: relative, all: allBranches)
@@ -240,7 +240,7 @@ private struct CommitDetailView: View {
                     Text(commit.author)
                     Text(commit.date, format: .dateTime.year().month().day().hour().minute())
                     Text(commit.shortHash).font(OMFonts.monoSmall)
-                    if commit.isMerge { OMTag("合并", tint: .purple) }
+                    if commit.isMerge { OMTag(String(localized: "合并"), tint: .purple) }
                 }
                 .font(OMFonts.caption).foregroundStyle(OMColors.secondaryText)
             }

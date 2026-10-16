@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 全局搜索面板:关键词、区分大小写/整词/正则、路径过滤;结果按文件分组,点击跳转到行。
 
 import DesignSystem
@@ -97,7 +97,7 @@ struct SearchPaneView: View {
 
     private func summary(_ output: SearchOutput) -> some View {
         HStack(spacing: 6) {
-            Text("\(output.totalHits) 个结果,\(output.files.count) 个文件\(output.truncated ? "(已截断)" : "")")
+            Text("\(output.totalHits) 个结果,\(output.files.count) 个文件\(output.truncated ? String(localized: "(已截断)") : "")")
             if model.isSearching { ProgressView().controlSize(.mini) }
             Spacer()
         }

@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // LSP 客户端 actor:初始化握手、文档同步、诊断订阅与 hover/定义/补全请求。
 // JSON-RPC 往返复用 ACPKit 的 `ACPConnection`(传输层负责 Content-Length 分帧)。
 
@@ -14,9 +14,9 @@ public enum LSPError: Error, Sendable, Equatable, LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .notReady: return "语言服务器尚未就绪"
-        case .timeout(let method): return "语言服务器请求超时:\(method)"
-        case .initializeFailed(let message): return "语言服务器初始化失败:\(message)"
+        case .notReady: return String(localized: "语言服务器尚未就绪")
+        case .timeout(let method): return String(localized: "语言服务器请求超时:\(method)")
+        case .initializeFailed(let message): return String(localized: "语言服务器初始化失败:\(message)")
         }
     }
 }

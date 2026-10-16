@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // LSP 管理器:按「服务器种类 + 工作区根」复用客户端,懒启动、失败退避、空闲回收。
 
 import ACPKit
@@ -75,7 +75,7 @@ public actor LSPManager {
         idleTasks[key]?.cancel()
         idleTasks[key] = nil
         if let until = failedUntil[key], until > Date() {
-            return .failed(kind: kind, message: "语言服务器最近启动失败,稍后重试")
+            return .failed(kind: kind, message: String(localized: "语言服务器最近启动失败,稍后重试"))
         }
         let client: LSPClient
         switch await ensureClient(key: key, kind: kind, projectRoot: projectRoot, workspace: workspace) {

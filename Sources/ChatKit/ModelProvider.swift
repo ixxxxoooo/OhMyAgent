@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 模型提供商:每个会话启动时,经 ACP 的 `_meta.claudeCode.options` 把「上游地址 + 模型 + 密钥」
 // 交给 Claude Code,不改动用户的 `~/.claude/settings.json`(做法参考 baocode 的 launchEnvironment)。
 //
@@ -63,12 +63,12 @@ public struct ModelProvider: Codable, Identifiable, Hashable, Sendable {
         case emptyName, invalidBaseURL, emptyModel, invalidNumber(String), invalidEffort, invalidHeaders
         public var errorDescription: String? {
             switch self {
-            case .invalidNumber(let field): "\(field) 必须是正整数"
-            case .invalidEffort: "思考强度只能是 low / medium / high"
-            case .invalidHeaders: "自定义请求头每行必须是「Name: Value」"
-            case .emptyName: "名称不能为空"
-            case .invalidBaseURL: "地址必须是 http(s) 绝对地址"
-            case .emptyModel: "模型不能为空"
+            case .invalidNumber(let field): String(localized: "\(field) 必须是正整数")
+            case .invalidEffort: String(localized: "思考强度只能是 low / medium / high")
+            case .invalidHeaders: String(localized: "自定义请求头每行必须是「Name: Value」")
+            case .emptyName: String(localized: "名称不能为空")
+            case .invalidBaseURL: String(localized: "地址必须是 http(s) 绝对地址")
+            case .emptyModel: String(localized: "模型不能为空")
             }
         }
     }
@@ -80,8 +80,8 @@ public struct ModelProvider: Codable, Identifiable, Hashable, Sendable {
         guard let url = URL(string: baseURL.trimmingCharacters(in: .whitespaces)), let scheme = url.scheme?.lowercased(),
               scheme == "http" || scheme == "https", let host = url.host, !host.isEmpty else { throw ValidationError.invalidBaseURL }
         if model.trimmingCharacters(in: .whitespaces).isEmpty { throw ValidationError.emptyModel }
-        if let maxOutputTokens, maxOutputTokens <= 0 { throw ValidationError.invalidNumber("最大输出 token") }
-        if let contextWindow, contextWindow <= 0 { throw ValidationError.invalidNumber("上下文窗口") }
+        if let maxOutputTokens, maxOutputTokens <= 0 { throw ValidationError.invalidNumber(String(localized: "最大输出 token")) }
+        if let contextWindow, contextWindow <= 0 { throw ValidationError.invalidNumber(String(localized: "上下文窗口")) }
         if let effort, !effort.isEmpty, !["low", "medium", "high"].contains(effort) { throw ValidationError.invalidEffort }
         if let customHeaders, !Self.headerLines(customHeaders).allSatisfy({ $0.contains(":") && !($0.split(separator: ":").first ?? "").trimmingCharacters(in: .whitespaces).isEmpty }) {
             throw ValidationError.invalidHeaders
@@ -125,13 +125,13 @@ public struct ProviderPreset: Identifiable, Sendable {
 
     /// 预设列表。
     public static let all: [ProviderPreset] = [
-        ProviderPreset(id: "anthropic", name: "Anthropic 官方", baseURL: "https://api.anthropic.com", models: ["claude-sonnet-4-5", "claude-opus-4-1", "claude-haiku-4-5"], hint: "官方 API(按量计费),使用 x-api-key 鉴权;需要自己的 API Key,不使用 claude 登录凭据。"),
-        ProviderPreset(id: "opencode", name: "OpenCode Zen", baseURL: "https://opencode.ai/zen", models: ["claude-sonnet-4-5", "qwen3-coder", "kimi-k2"], hint: "OpenCode Zen 网关的 Anthropic 兼容端点;模型名以其控制台为准,可用「获取模型列表」同步。"),
-        ProviderPreset(id: "deepseek", name: "DeepSeek", baseURL: "https://api.deepseek.com/anthropic", models: ["deepseek-chat", "deepseek-reasoner"], hint: "官方原生兼容 Anthropic 协议,国内直连。注意 `/v1` 是 OpenAI 协议端点,这里必须用 `/anthropic`。"),
-        ProviderPreset(id: "glm", name: "智谱 GLM", baseURL: "https://open.bigmodel.cn/api/anthropic", models: ["glm-4.6", "glm-4.5", "glm-4.5-air"], hint: "智谱开放平台 Claude API 兼容端点"),
-        ProviderPreset(id: "kimi", name: "Kimi(Moonshot)", baseURL: "https://api.moonshot.cn/anthropic", models: ["kimi-k2-turbo-preview", "kimi-k2-0905-preview"], hint: "海外可改用 api.moonshot.ai/anthropic"),
-        ProviderPreset(id: "minimax", name: "MiniMax", baseURL: "https://api.minimaxi.com/anthropic", models: ["MiniMax-M2"], hint: "海外可改用 api.minimax.io/anthropic"),
-        ProviderPreset(id: "qwen", name: "阿里云百炼(Qwen)", baseURL: "https://dashscope.aliyuncs.com/apps/anthropic", models: ["qwen3-coder-plus", "qwen3-coder-flash"], hint: "Coding Plan 用户端点略有不同,可手动修改"),
+        ProviderPreset(id: "anthropic", name: String(localized: "Anthropic 官方"), baseURL: "https://api.anthropic.com", models: ["claude-sonnet-4-5", "claude-opus-4-1", "claude-haiku-4-5"], hint: String(localized: "官方 API(按量计费),使用 x-api-key 鉴权;需要自己的 API Key,不使用 claude 登录凭据。")),
+        ProviderPreset(id: "opencode", name: "OpenCode Zen", baseURL: "https://opencode.ai/zen", models: ["claude-sonnet-4-5", "qwen3-coder", "kimi-k2"], hint: String(localized: "OpenCode Zen 网关的 Anthropic 兼容端点;模型名以其控制台为准,可用「获取模型列表」同步。")),
+        ProviderPreset(id: "deepseek", name: "DeepSeek", baseURL: "https://api.deepseek.com/anthropic", models: ["deepseek-chat", "deepseek-reasoner"], hint: String(localized: "官方原生兼容 Anthropic 协议,国内直连。注意 `/v1` 是 OpenAI 协议端点,这里必须用 `/anthropic`。")),
+        ProviderPreset(id: "glm", name: String(localized: "智谱 GLM"), baseURL: "https://open.bigmodel.cn/api/anthropic", models: ["glm-4.6", "glm-4.5", "glm-4.5-air"], hint: String(localized: "智谱开放平台 Claude API 兼容端点")),
+        ProviderPreset(id: "kimi", name: "Kimi(Moonshot)", baseURL: "https://api.moonshot.cn/anthropic", models: ["kimi-k2-turbo-preview", "kimi-k2-0905-preview"], hint: String(localized: "海外可改用 api.moonshot.ai/anthropic")),
+        ProviderPreset(id: "minimax", name: "MiniMax", baseURL: "https://api.minimaxi.com/anthropic", models: ["MiniMax-M2"], hint: String(localized: "海外可改用 api.minimax.io/anthropic")),
+        ProviderPreset(id: "qwen", name: String(localized: "阿里云百炼(Qwen)"), baseURL: "https://dashscope.aliyuncs.com/apps/anthropic", models: ["qwen3-coder-plus", "qwen3-coder-flash"], hint: String(localized: "Coding Plan 用户端点略有不同,可手动修改")),
     ]
 
     /// 由预设生成提供商。
@@ -309,8 +309,8 @@ public enum ProviderStorage {
         case invalid(String, String)
         public var errorDescription: String? {
             switch self {
-            case .missingKey(let name): "模型提供商「\(name)」未设置 API Key:请在 设置 → 模型提供商 中填写。已暂时使用 ~/.claude 的默认配置。"
-            case .invalid(let name, let reason): "模型提供商「\(name)」配置无效(\(reason)),已暂时使用 ~/.claude 的默认配置。"
+            case .missingKey(let name): String(localized: "模型提供商「\(name)」未设置 API Key:请在 设置 → 模型提供商 中填写。已暂时使用 ~/.claude 的默认配置。")
+            case .invalid(let name, let reason): String(localized: "模型提供商「\(name)」配置无效(\(reason)),已暂时使用 ~/.claude 的默认配置。")
             }
         }
     }
@@ -333,8 +333,8 @@ public enum ProviderTester {
     /// - Returns: 结果(错误信息不含密钥)
     public static func test(_ provider: ModelProvider, key: String, session: URLSession? = nil, timeout: TimeInterval = 30) async -> ProviderTestResult {
         do { try provider.validate() } catch { return .failed(error.localizedDescription) }
-        guard !key.trimmingCharacters(in: .whitespaces).isEmpty else { return .failed("未填写 API Key") }
-        guard let base = provider.url else { return .failed("地址无效") }
+        guard !key.trimmingCharacters(in: .whitespaces).isEmpty else { return .failed(String(localized: "未填写 API Key")) }
+        guard let base = provider.url else { return .failed(String(localized: "地址无效")) }
         var request = URLRequest(url: base.appendingPathComponent("v1/messages"), cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: timeout)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "content-type")
@@ -347,13 +347,13 @@ public enum ProviderTester {
         do {
             let (data, response) = try await urlSession.data(for: request)
             let ms = OMLogger.milliseconds(since: started)
-            guard let http = response as? HTTPURLResponse else { return .failed("无效的响应") }
+            guard let http = response as? HTTPURLResponse else { return .failed(String(localized: "无效的响应")) }
             guard (200..<300).contains(http.statusCode) else { return .failed(describe(status: http.statusCode, body: data)) }
             let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
             let content = (object?["content"] as? [[String: Any]])?.compactMap { $0["text"] as? String }.joined() ?? ""
             return .ok(milliseconds: ms, reply: String(content.prefix(60)))
         } catch let error as URLError {
-            return .failed("无法连接:\(ModelGateway.describe(error))")
+            return .failed(String(localized: "无法连接:\(ModelGateway.describe(error))"))
         } catch {
             return .failed(error.localizedDescription)
         }
@@ -364,11 +364,11 @@ public enum ProviderTester {
         let snippet = LogRedactor.redact(String(String(data: body, encoding: .utf8)?.prefix(160) ?? ""))
         let head: String
         switch status {
-        case 401, 403: head = "鉴权失败(\(status)):请检查 API Key 是否正确、是否有该模型权限"
-        case 404: head = "接口或模型不存在(404):请确认地址是 Anthropic 兼容端点,模型名正确"
-        case 429: head = "触发限流或额度不足(429)"
-        case 500...: head = "上游服务出错(\(status))"
-        default: head = "请求失败(\(status))"
+        case 401, 403: head = String(localized: "鉴权失败(\(status)):请检查 API Key 是否正确、是否有该模型权限")
+        case 404: head = String(localized: "接口或模型不存在(404):请确认地址是 Anthropic 兼容端点,模型名正确")
+        case 429: head = String(localized: "触发限流或额度不足(429)")
+        case 500...: head = String(localized: "上游服务出错(\(status))")
+        default: head = String(localized: "请求失败(\(status))")
         }
         return snippet.isEmpty ? head : "\(head):\(snippet)"
     }
@@ -384,21 +384,21 @@ public enum ProviderModelFetcher {
     ///   - timeout: 超时秒数
     /// - Returns: 成功返回去重后的模型 ID;失败返回不含密钥的错误描述
     public static func fetch(_ provider: ModelProvider, key: String, session: URLSession? = nil, timeout: TimeInterval = 20) async -> Result<[String], ModelFetchError> {
-        guard let base = provider.url else { return .failure(ModelFetchError(message: "地址无效")) }
-        guard !key.trimmingCharacters(in: .whitespaces).isEmpty else { return .failure(ModelFetchError(message: "未填写 API Key")) }
+        guard let base = provider.url else { return .failure(ModelFetchError(message: String(localized: "地址无效"))) }
+        guard !key.trimmingCharacters(in: .whitespaces).isEmpty else { return .failure(ModelFetchError(message: String(localized: "未填写 API Key"))) }
         var request = URLRequest(url: base.appendingPathComponent("v1/models"), cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: timeout)
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         if provider.usesAPIKeyHeader == true { request.setValue(key, forHTTPHeaderField: "x-api-key") } else { request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization") }
         do {
             let (data, response) = try await (session ?? URLSession(configuration: .ephemeral)).data(for: request)
-            guard let http = response as? HTTPURLResponse else { return .failure(ModelFetchError(message: "无效的响应")) }
+            guard let http = response as? HTTPURLResponse else { return .failure(ModelFetchError(message: String(localized: "无效的响应"))) }
             guard (200..<300).contains(http.statusCode) else {
                 return .failure(ModelFetchError(message: ProviderTester.describe(status: http.statusCode, body: data)))
             }
             let ids = parse(data)
-            return ids.isEmpty ? .failure(ModelFetchError(message: "该端点没有返回模型列表")) : .success(ids)
+            return ids.isEmpty ? .failure(ModelFetchError(message: String(localized: "该端点没有返回模型列表"))) : .success(ids)
         } catch let error as URLError {
-            return .failure(ModelFetchError(message: "无法连接:\(ModelGateway.describe(error))"))
+            return .failure(ModelFetchError(message: String(localized: "无法连接:\(ModelGateway.describe(error))")))
         } catch {
             return .failure(ModelFetchError(message: error.localizedDescription))
         }

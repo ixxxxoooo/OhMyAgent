@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // Git 视图模型:每个项目一个,持有最近一次状态快照并串行化写操作(暂存/提交/推拉/分支…)。
 // 所有 git 调用都在 GitKit 的后台子进程里执行,主线程只更新状态。
 
@@ -113,14 +113,14 @@ final class GitModel {
         return success
     }
 
-    func stage(_ paths: [String]) async { await perform("暂存") { try await $0.stage(paths) } }
-    func stageAll() async { await perform("暂存全部") { try await $0.stageAll() } }
-    func unstage(_ paths: [String]) async { await perform("取消暂存") { try await $0.unstage(paths) } }
-    func unstageAll() async { await perform("取消全部暂存") { try await $0.unstageAll() } }
+    func stage(_ paths: [String]) async { await perform(String(localized: "暂存")) { try await $0.stage(paths) } }
+    func stageAll() async { await perform(String(localized: "暂存全部")) { try await $0.stageAll() } }
+    func unstage(_ paths: [String]) async { await perform(String(localized: "取消暂存")) { try await $0.unstage(paths) } }
+    func unstageAll() async { await perform(String(localized: "取消全部暂存")) { try await $0.unstageAll() } }
 
     /// 丢弃修改(调用方应先确认)。
     func discard(_ paths: [String], untracked: [String] = []) async {
-        await perform("丢弃修改") { try await $0.discard(paths, untracked: untracked) }
+        await perform(String(localized: "丢弃修改")) { try await $0.discard(paths, untracked: untracked) }
     }
 
     /// 提交。没有暂存内容时先暂存全部(与 VS Code 的智能提交一致)。
@@ -128,7 +128,7 @@ final class GitModel {
     func commit(push: Bool = false) async {
         let message = commitMessage
         let needsStageAll = status.stagedChanges.isEmpty
-        let ok = await perform(push ? "提交并推送" : "提交") { repo in
+        let ok = await perform(push ? String(localized: "提交并推送") : String(localized: "提交")) { repo in
             if needsStageAll { try await repo.stageAll() }
             try await repo.commit(message: message)
             if push { try await repo.push(status: nil) }
@@ -136,28 +136,28 @@ final class GitModel {
         if ok { commitMessage = "" }
     }
 
-    func fetch() async { await perform("获取") { try await $0.fetch() } }
-    func pull() async { await perform("拉取") { try await $0.pull() } }
-    func push() async { let current = status; await perform("推送") { try await $0.push(status: current) } }
+    func fetch() async { await perform(String(localized: "获取")) { try await $0.fetch() } }
+    func pull() async { await perform(String(localized: "拉取")) { try await $0.pull() } }
+    func push() async { let current = status; await perform(String(localized: "推送")) { try await $0.push(status: current) } }
 
-    func checkout(_ branch: String) async { await perform("切换分支") { try await $0.checkout(branch) } }
-    func createBranch(_ name: String) async { await perform("新建分支") { try await $0.createBranch(name, checkout: true) } }
-    func deleteBranch(_ name: String) async { await perform("删除分支") { try await $0.deleteBranch(name, force: false) } }
+    func checkout(_ branch: String) async { await perform(String(localized: "切换分支")) { try await $0.checkout(branch) } }
+    func createBranch(_ name: String) async { await perform(String(localized: "新建分支")) { try await $0.createBranch(name, checkout: true) } }
+    func deleteBranch(_ name: String) async { await perform(String(localized: "删除分支")) { try await $0.deleteBranch(name, force: false) } }
 
-    func stashPush(message: String?) async { await perform("暂存到 stash") { try await $0.stashPush(message: message) } }
-    func stashPop(_ index: Int) async { await perform("应用 stash") { try await $0.stashPop(index: index) } }
-    func stashDrop(_ index: Int) async { await perform("丢弃 stash") { try await $0.stashDrop(index: index) } }
+    func stashPush(message: String?) async { await perform(String(localized: "暂存到 stash")) { try await $0.stashPush(message: message) } }
+    func stashPop(_ index: Int) async { await perform(String(localized: "应用 stash")) { try await $0.stashPop(index: index) } }
+    func stashDrop(_ index: Int) async { await perform(String(localized: "丢弃 stash")) { try await $0.stashDrop(index: index) } }
 
     func resolve(_ path: String, with resolution: GitConflictResolution) async {
-        await perform("解决冲突") { try await $0.resolve(path, with: resolution) }
+        await perform(String(localized: "解决冲突")) { try await $0.resolve(path, with: resolution) }
     }
 
-    func markResolved(_ path: String) async { await perform("标记已解决") { try await $0.markResolved(path) } }
+    func markResolved(_ path: String) async { await perform(String(localized: "标记已解决")) { try await $0.markResolved(path) } }
 
     /// 在项目目录初始化仓库。
     func initializeRepository() async {
         guard busy == nil else { return }
-        busy = "初始化"
+        busy = String(localized: "初始化")
         defer { busy = nil }
         do {
             repo = try await GitRepository.initialize(at: projectPath)

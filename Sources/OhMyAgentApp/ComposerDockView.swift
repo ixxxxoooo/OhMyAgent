@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 输入栏上方的任务坞(参考 Cursor):排队消息 / 后台子 Agent / 运行中的终端三类,
 // 底部是胶囊标签(点击切换面板,再点当前标签收起),上方是对应面板;
 // 每行悬停有底色与操作按钮,点击行会以新标签页在主内容区打开详情(子 Agent 的只读会话、终端的只读输出)。
@@ -264,7 +264,7 @@ private struct QueuedRow: View {
                     .font(OMFonts.small)
                     .foregroundStyle(OMColors.secondaryText)
                     .disabled(model.isRunning && !model.canSteer)
-                    .help(model.isRunning ? "立即引导进当前轮次" : "立即发送")
+                    .help(model.isRunning ? String(localized: "立即引导进当前轮次") : String(localized: "立即发送"))
                     .padding(.trailing, 4)
                 RowIconButton(icon: "pencil", label: String(localized: "编辑")) { model.editFollowUp(item.id) }
                 RowIconButton(icon: "trash", label: String(localized: "移除")) { model.removeFollowUp(item.id) }

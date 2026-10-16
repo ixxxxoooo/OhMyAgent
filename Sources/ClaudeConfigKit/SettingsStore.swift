@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // settings.json 分层读写(用户 / 项目 / 本地),按键路径读取与写回,保留未知字段。
 
 import Foundation
@@ -36,9 +36,9 @@ public struct SettingsStore: Sendable {
     /// - Throws: 没有工作区却写项目/本地层,或文件内容非法
     public func set(_ path: [String], to value: Any?, in scope: ConfigScope) throws {
         guard let url = paths.settingsFile(scope) else {
-            throw ConfigError.invalidValue("当前没有工作区,无法写入\(scope.displayName)设置")
+            throw ConfigError.invalidValue(String(localized: "当前没有工作区,无法写入\(scope.displayName)设置"))
         }
-        guard !path.isEmpty else { throw ConfigError.invalidValue("键路径不能为空") }
+        guard !path.isEmpty else { throw ConfigError.invalidValue(String(localized: "键路径不能为空")) }
         try JSONFile(url).update { JSONPath.set(&$0, path, value) }
     }
 }

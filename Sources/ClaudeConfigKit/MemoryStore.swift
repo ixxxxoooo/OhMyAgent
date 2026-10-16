@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 记忆与指令文件:CLAUDE.md / AGENTS.md / CLAUDE.local.md / rules。
 
 import Foundation
@@ -30,19 +30,19 @@ public struct MemoryStore: Sendable {
             files.append(MemoryFile(kind: kind, title: title, url: url, exists: FileManager.default.fileExists(atPath: url.path),
                                     pathFilters: Self.pathFilters(of: url), isLoadedByDefault: loaded))
         }
-        add(.user, "用户记忆 ~/.claude/CLAUDE.md", paths.claudeDirectory.appendingPathComponent("CLAUDE.md"))
+        add(.user, String(localized: "用户记忆 ~/.claude/CLAUDE.md"), paths.claudeDirectory.appendingPathComponent("CLAUDE.md"))
         if let workspace = paths.workspace {
-            add(.project, "项目 CLAUDE.md", workspace.appendingPathComponent("CLAUDE.md"))
-            add(.projectInClaudeDir, "项目 .claude/CLAUDE.md", workspace.appendingPathComponent(".claude/CLAUDE.md"))
-            add(.local, "本地 CLAUDE.local.md", workspace.appendingPathComponent("CLAUDE.local.md"))
+            add(.project, String(localized: "项目 CLAUDE.md"), workspace.appendingPathComponent("CLAUDE.md"))
+            add(.projectInClaudeDir, String(localized: "项目 .claude/CLAUDE.md"), workspace.appendingPathComponent(".claude/CLAUDE.md"))
+            add(.local, String(localized: "本地 CLAUDE.local.md"), workspace.appendingPathComponent("CLAUDE.local.md"))
             let agents = workspace.appendingPathComponent("AGENTS.md")
-            if FileManager.default.fileExists(atPath: agents.path) { add(.agentsMD, "项目 AGENTS.md", agents, loaded: false) }
+            if FileManager.default.fileExists(atPath: agents.path) { add(.agentsMD, String(localized: "项目 AGENTS.md"), agents, loaded: false) }
         }
         for url in markdownFiles(in: paths.claudeDirectory.appendingPathComponent("rules")) {
-            add(.userRule, "用户规则 \(url.lastPathComponent)", url)
+            add(.userRule, String(localized: "用户规则 \(url.lastPathComponent)"), url)
         }
         if let rules = paths.projectClaudeDirectory?.appendingPathComponent("rules") {
-            for url in markdownFiles(in: rules) { add(.projectRule, "项目规则 \(url.lastPathComponent)", url) }
+            for url in markdownFiles(in: rules) { add(.projectRule, String(localized: "项目规则 \(url.lastPathComponent)"), url) }
         }
         return files
     }
@@ -75,8 +75,8 @@ public struct MemoryStore: Sendable {
     ///   - pathFilters: 可选的 `paths` 限定
     @discardableResult
     public func createRule(name: String, scope: ConfigScope, pathFilters: [String]) throws -> URL {
-        guard name.range(of: "^[A-Za-z0-9_.-]+$", options: .regularExpression) != nil else { throw ConfigError.invalidValue("文件名只能包含字母、数字、点、下划线和连字符") }
-        guard let directory = paths.directory("rules", scope: scope == .local ? .project : scope) else { throw ConfigError.invalidValue("当前没有工作区") }
+        guard name.range(of: "^[A-Za-z0-9_.-]+$", options: .regularExpression) != nil else { throw ConfigError.invalidValue(String(localized: "文件名只能包含字母、数字、点、下划线和连字符")) }
+        guard let directory = paths.directory("rules", scope: scope == .local ? .project : scope) else { throw ConfigError.invalidValue(String(localized: "当前没有工作区")) }
         let url = directory.appendingPathComponent("\(name).md")
         guard !FileManager.default.fileExists(atPath: url.path) else { throw ConfigError.alreadyExists(name) }
         var document = MarkdownDocument(body: "\n# \(name)\n\n")
@@ -88,7 +88,7 @@ public struct MemoryStore: Sendable {
 
     /// 删除规则文件。
     public func deleteRule(_ file: MemoryFile) throws {
-        guard file.kind == .userRule || file.kind == .projectRule else { throw ConfigError.invalidValue("只能删除规则文件") }
+        guard file.kind == .userRule || file.kind == .projectRule else { throw ConfigError.invalidValue(String(localized: "只能删除规则文件")) }
         SkillStore.trash(file.url)
     }
 }

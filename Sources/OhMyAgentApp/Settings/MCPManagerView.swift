@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // MCP 服务器管理:列表(作用域/覆盖/启停/审批/健康)、表单与 JSON 添加、Claude Desktop 导入、删除。
 
 import IconKit
@@ -22,7 +22,7 @@ struct MCPManagerView: View {
             VStack(spacing: 0) {
                 toolbar
                 if entries.isEmpty {
-                    EmptyHint(icon: "server.rack", title: "还没有 MCP 服务器", message: "点击「添加」配置一个,或从 Claude Desktop 导入。")
+                    EmptyHint(icon: "server.rack", title: String(localized: "还没有 MCP 服务器"), message: String(localized: "点击「添加」配置一个,或从 Claude Desktop 导入。"))
                 } else {
                     List(entries, selection: $selectedID) { entry in
                         row(entry).tag(entry.id)
@@ -34,7 +34,7 @@ struct MCPManagerView: View {
             if let entry = selected {
                 detail(entry)
             } else {
-                EmptyHint(icon: "server.rack", title: "选择一个服务器查看详情")
+                EmptyHint(icon: "server.rack", title: String(localized: "选择一个服务器查看详情"))
             }
         }
         .sheet(item: $editor) { target in
@@ -45,7 +45,7 @@ struct MCPManagerView: View {
         }
         .confirmationDialog("删除 MCP 服务器?", isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }), presenting: pendingDelete) { entry in
             Button("删除「\(entry.config.name)」", role: .destructive) {
-                center.perform("已删除 \(entry.config.name)") { try MCPStore(paths: center.paths).remove(name: entry.config.name, scope: entry.scope) }
+                center.perform(String(localized: "已删除 \(entry.config.name)")) { try MCPStore(paths: center.paths).remove(name: entry.config.name, scope: entry.scope) }
                 selectedID = nil
             }
         } message: { entry in
@@ -87,9 +87,9 @@ struct MCPManagerView: View {
                 HStack(spacing: 4) {
                     Tag(entry.scope.displayName, color: .accentColor)
                     Tag(entry.config.transport.rawValue)
-                    if entry.isDisabled { Tag("已禁用", color: .gray) }
-                    if entry.needsApproval { Tag("待批准", color: OMColors.warning) }
-                    if let over = entry.overriddenBy { Tag("被\(over.displayName)覆盖", color: OMColors.warning) }
+                    if entry.isDisabled { Tag(String(localized: "已禁用"), color: .gray) }
+                    if entry.needsApproval { Tag(String(localized: "待批准"), color: OMColors.warning) }
+                    if let over = entry.overriddenBy { Tag(String(localized: "被\(over.displayName)覆盖"), color: OMColors.warning) }
                 }
             }
             Spacer(minLength: 0)
@@ -132,23 +132,23 @@ struct MCPManagerView: View {
                     Label("这是项目 .mcp.json 中的服务器,尚未批准。批准后 Claude 才会启动它。", om: "hand.raised").font(OMFonts.small).foregroundStyle(OMColors.warning)
                 }
                 if let over = entry.overriddenBy {
-                    Label("同名服务器在\(over.displayName)作用域中优先生效,此条目被整体覆盖。", om: "arrow.triangle.merge").font(OMFonts.small).foregroundStyle(OMColors.warning)
+                    Label(String(localized: "同名服务器在\(over.displayName)作用域中优先生效,此条目被整体覆盖。"), om: "arrow.triangle.merge").font(OMFonts.small).foregroundStyle(OMColors.warning)
                 }
                 if let health = center.mcpHealth[config.name] {
                     Label(health.detail, om: "waveform.path.ecg").font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
                 }
                 if !missing.isEmpty {
-                    Label("引用了未设置的环境变量:\(missing.joined(separator: "、"))。注意 ANTHROPIC_API_KEY 等凭据变量在远程 url/headers 中会读为空。", om: "exclamationmark.circle")
+                    Label(String(localized: "引用了未设置的环境变量:\(missing.joined(separator: String(localized: "、")))。注意 ANTHROPIC_API_KEY 等凭据变量在远程 url/headers 中会读为空。"), om: "exclamationmark.circle")
                         .font(OMFonts.small).foregroundStyle(OMColors.warning)
                 }
                 Group {
-                    keyValue("传输", config.transport.displayName)
+                    keyValue(String(localized: "传输"), config.transport.displayName)
                     if config.transport == .stdio {
-                        keyValue("命令", ([config.command] + config.args).joined(separator: " "))
-                        if !config.env.isEmpty { keyValue("环境变量", config.env.keys.sorted().map { "\($0)=\(mask(config.env[$0] ?? "", key: $0))" }.joined(separator: "\n")) }
+                        keyValue(String(localized: "命令"), ([config.command] + config.args).joined(separator: " "))
+                        if !config.env.isEmpty { keyValue(String(localized: "环境变量"), config.env.keys.sorted().map { "\($0)=\(mask(config.env[$0] ?? "", key: $0))" }.joined(separator: "\n")) }
                     } else {
                         keyValue("URL", config.url)
-                        if !config.headers.isEmpty { keyValue("请求头", config.headers.keys.sorted().map { "\($0): \(mask(config.headers[$0] ?? "", key: $0))" }.joined(separator: "\n")) }
+                        if !config.headers.isEmpty { keyValue(String(localized: "请求头"), config.headers.keys.sorted().map { "\($0): \(mask(config.headers[$0] ?? "", key: $0))" }.joined(separator: "\n")) }
                     }
                 }
             }
@@ -160,11 +160,11 @@ struct MCPManagerView: View {
     private func detailActions(_ entry: MCPServerEntry) -> some View {
         HStack(spacing: 8) {
             if entry.needsApproval {
-                Button("批准") { center.perform("已批准 \(entry.config.name)") { try MCPStore(paths: center.paths).approveProjectServer(name: entry.config.name) } }
+                Button("批准") { center.perform(String(localized: "已批准 \(entry.config.name)")) { try MCPStore(paths: center.paths).approveProjectServer(name: entry.config.name) } }
                     .buttonStyle(.borderedProminent)
             }
-            Button(entry.isDisabled ? "启用" : "禁用") {
-                center.perform(entry.isDisabled ? "已启用" : "已禁用") {
+            Button(entry.isDisabled ? String(localized: "启用") : String(localized: "禁用")) {
+                center.perform(entry.isDisabled ? String(localized: "已启用") : String(localized: "已禁用")) {
                     try MCPStore(paths: center.paths).setEnabled(entry.isDisabled, name: entry.config.name, scope: entry.scope)
                 }
             }
@@ -190,10 +190,10 @@ struct MCPManagerView: View {
     private func importFromDesktop() {
         let servers = MCPStore.claudeDesktopServers(home: center.paths.home)
         guard !servers.isEmpty else {
-            center.lastError = "没有在 Claude Desktop 配置中找到 MCP 服务器"
+            center.lastError = String(localized: "没有在 Claude Desktop 配置中找到 MCP 服务器")
             return
         }
-        center.perform("已导入 \(servers.count) 个服务器到用户作用域") {
+        center.perform(String(localized: "已导入 \(servers.count) 个服务器到用户作用域")) {
             let store = MCPStore(paths: center.paths)
             for server in servers { try store.save(server, scope: .user) }
         }
@@ -229,27 +229,27 @@ struct MCPEditorSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(target.entry == nil ? "添加 MCP 服务器" : "编辑 \(target.entry!.config.name)").font(OMFonts.title)
-            FormRow(label: "名称") { TextField("例如 github", text: $name).textFieldStyle(.roundedBorder) }
+            Text(target.entry == nil ? String(localized: "添加 MCP 服务器") : String(localized: "编辑 \(target.entry!.config.name)")).font(OMFonts.title)
+            FormRow(label: String(localized: "名称")) { TextField("例如 github", text: $name).textFieldStyle(.roundedBorder) }
             if target.entry == nil {
-                FormRow(label: "作用域", hint: "用户:所有项目可用;本地:仅此工作区、不入版本库;项目:写入 .mcp.json 与团队共享") {
+                FormRow(label: String(localized: "作用域"), hint: String(localized: "用户:所有项目可用;本地:仅此工作区、不入版本库;项目:写入 .mcp.json 与团队共享")) {
                     Picker("", selection: $scope) { ForEach(ConfigScope.allCases) { Text($0.displayName).tag($0) } }
                         .pickerStyle(.segmented).labelsHidden()
                 }
             }
-            FormRow(label: "传输") {
+            FormRow(label: String(localized: "传输")) {
                 Picker("", selection: $transport) { ForEach(MCPTransportKind.allCases) { Text($0.displayName).tag($0) } }.labelsHidden().fixedSize()
             }
             if transport == .stdio {
-                FormRow(label: "命令") { TextField("npx", text: $command).textFieldStyle(.roundedBorder).font(OMFonts.mono) }
-                FormRow(label: "参数", hint: "每行一个参数") { editor($args) }
-                FormRow(label: "环境变量", hint: "每行 KEY=VALUE,支持 ${VAR} 与 ${VAR:-默认值}") { editor($env) }
+                FormRow(label: String(localized: "命令")) { TextField("npx", text: $command).textFieldStyle(.roundedBorder).font(OMFonts.mono) }
+                FormRow(label: String(localized: "参数"), hint: String(localized: "每行一个参数")) { editor($args) }
+                FormRow(label: String(localized: "环境变量"), hint: String(localized: "每行 KEY=VALUE,支持 ${VAR} 与 ${VAR:-默认值}")) { editor($env) }
             } else {
                 FormRow(label: "URL") { TextField("https://", text: $url).textFieldStyle(.roundedBorder).font(OMFonts.mono) }
-                FormRow(label: "请求头", hint: "每行 Key: Value") { editor($headers) }
+                FormRow(label: String(localized: "请求头"), hint: String(localized: "每行 Key: Value")) { editor($headers) }
             }
-            SheetFooter(problems: name.isEmpty && command.isEmpty && url.isEmpty ? ["请填写名称与连接信息"] : MCPStore.validate(config),
-                        confirmTitle: "保存", onCancel: onClose, onConfirm: save)
+            SheetFooter(problems: name.isEmpty && command.isEmpty && url.isEmpty ? [String(localized: "请填写名称与连接信息")] : MCPStore.validate(config),
+                        confirmTitle: String(localized: "保存"), onCancel: onClose, onConfirm: save)
         }
         .padding(20)
         .frame(width: 560)
@@ -277,7 +277,7 @@ struct MCPEditorSheet: View {
     }
 
     private func save() {
-        let ok = center.perform("已保存 \(name)") {
+        let ok = center.perform(String(localized: "已保存 \(name)")) {
             try MCPStore(paths: center.paths).save(config, scope: target.entry?.scope ?? scope, replacing: target.entry?.config.name)
         }
         if ok { onClose() }
@@ -295,16 +295,16 @@ struct MCPJSONSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("通过 JSON 添加").font(OMFonts.title)
-            FormRow(label: "名称") { TextField("服务器名称", text: $name).textFieldStyle(.roundedBorder) }
-            FormRow(label: "作用域") {
+            FormRow(label: String(localized: "名称")) { TextField("服务器名称", text: $name).textFieldStyle(.roundedBorder) }
+            FormRow(label: String(localized: "作用域")) {
                 Picker("", selection: $scope) { ForEach(ConfigScope.allCases) { Text($0.displayName).tag($0) } }.pickerStyle(.segmented).labelsHidden()
             }
             TextEditor(text: $json)
                 .font(OMFonts.mono)
                 .frame(height: 180)
                 .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(OMColors.hairline))
-            SheetFooter(problems: name.isEmpty ? ["请填写名称"] : [], confirmTitle: "添加", onCancel: onClose) {
-                if center.perform("已添加 \(name)", { try MCPStore(paths: center.paths).addJSON(name: name, json: json, scope: scope) }) { onClose() }
+            SheetFooter(problems: name.isEmpty ? [String(localized: "请填写名称")] : [], confirmTitle: String(localized: "添加"), onCancel: onClose) {
+                if center.perform(String(localized: "已添加 \(name)"), { try MCPStore(paths: center.paths).addJSON(name: name, json: json, scope: scope) }) { onClose() }
             }
         }
         .padding(20)

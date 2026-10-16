@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 把对话会话与应用界面接起来:客户端命令(打开设置/面板/导出/历史)、Skills 与子 Agent 目录。
 
 import AppKit
@@ -98,7 +98,7 @@ enum ChatBindings {
     private static func exportTranscript(of model: SessionModel) {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [UTType(filenameExtension: "md") ?? .plainText]
-        panel.nameFieldStringValue = (model.sessionTitle?.isEmpty == false ? model.sessionTitle ?? "" : "OhMyAgent 对话") + ".md"
+        panel.nameFieldStringValue = (model.sessionTitle?.isEmpty == false ? model.sessionTitle ?? "" : String(localized: "OhMyAgent 对话")) + ".md"
         panel.message = String(localized: "导出对话为 Markdown")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let text = TranscriptExporter.markdown(entries: model.timeline.entries, title: model.sessionTitle, workspace: model.workspace.path)

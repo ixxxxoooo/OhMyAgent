@@ -2,11 +2,11 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleDevelopmentRegion</key><string>zh-Hans</string>
+    <key>CFBundleDevelopmentRegion</key><string>en</string>
     <key>CFBundleLocalizations</key><array><string>zh-Hans</string><string>en</string></array>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundleExecutable</key><string>OhMyAgent</string>
-    <key>CFBundleIdentifier</key><string>com.ygw.OhMyAgent</string>
+    <key>CFBundleIdentifier</key><string>com.ixxxxoooo.OhMyAgent</string>
     <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
     <key>CFBundleName</key><string>OhMyAgent</string>
     <key>CFBundleDisplayName</key><string>OhMyAgent</string>
@@ -17,5 +17,6 @@
     <key>NSHighResolutionCapable</key><true/>
     <key>NSPrincipalClass</key><string>NSApplication</string>
     <key>LSApplicationCategoryType</key><string>public.app-category.developer-tools</string>
+    <key>NSHumanReadableCopyright</key><string>Copyright © 2026 ixxxxoooo. All rights reserved.</string>
 </dict>
 </plist>

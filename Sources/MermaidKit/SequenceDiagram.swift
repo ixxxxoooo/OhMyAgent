@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // sequenceDiagram:解析 + 布局(直接生成场景)。
 
 import CoreGraphics
@@ -93,7 +93,7 @@ enum SequenceParser {
                 model.events.append(.message(from: a, to: b, text: cap(m, 5) ?? "", dashed: op.hasPrefix("--") || op == "<<-->>", head: head, activate: flag == "+", deactivate: flag == "-"))
                 continue
             }
-            throw MermaidError(line: idx + 1, "无法识别的时序图语句:\(line.prefix(24))")
+            throw MermaidError(line: idx + 1, String(localized: "无法识别的时序图语句:\(line.prefix(24))"))
         }
         return model
     }

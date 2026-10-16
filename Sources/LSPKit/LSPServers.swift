@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 语言服务器种类、可执行文件定位与工作区根目录推断。
 
 import ACPKit
@@ -20,9 +20,9 @@ public enum LSPServerKind: String, Sendable, CaseIterable, Hashable {
     /// 未安装时给用户的安装提示。
     public var installHint: String {
         switch self {
-        case .swift: return "需要安装 Xcode 或 Swift 工具链(自带 sourcekit-lsp)"
+        case .swift: return String(localized: "需要安装 Xcode 或 Swift 工具链(自带 sourcekit-lsp)")
         case .typescript: return "npm i -g typescript-language-server typescript"
-        case .python: return "npm i -g pyright(或 pip install basedpyright)"
+        case .python: return String(localized: "npm i -g pyright(或 pip install basedpyright)")
         }
     }
 

@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // ClaudeConfigKit 基础设施:路径解析、JSON 文件的"读-改-写"(保留未知字段)、错误类型。
 
 import Foundation
@@ -14,10 +14,10 @@ public enum ConfigError: Error, LocalizedError, Equatable {
 
     public var errorDescription: String? {
         switch self {
-        case .invalidJSON(let path, let reason): return "无法解析 \(path):\(reason)"
+        case .invalidJSON(let path, let reason): return String(localized: "无法解析 \(path):\(reason)")
         case .invalidValue(let message): return message
-        case .alreadyExists(let name): return "「\(name)」已存在"
-        case .notFound(let name): return "找不到「\(name)」"
+        case .alreadyExists(let name): return String(localized: "「\(name)」已存在")
+        case .notFound(let name): return String(localized: "找不到「\(name)」")
         case .commandFailed(let message): return message
         }
     }
@@ -90,7 +90,7 @@ public struct JSONFile: Sendable {
         guard let data = try? Data(contentsOf: url), !data.isEmpty else { return [:] }
         do {
             guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                throw ConfigError.invalidJSON(path: url.path, reason: "根节点不是对象")
+                throw ConfigError.invalidJSON(path: url.path, reason: String(localized: "根节点不是对象"))
             }
             return object
         } catch let error as ConfigError {

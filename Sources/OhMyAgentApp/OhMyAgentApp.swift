@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 应用入口:每个 Workspace 一个窗口,每个窗口独占一个 Agent 子进程。
 
 import AgentHost
@@ -20,8 +20,8 @@ enum WorkspaceStore {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
-        panel.prompt = "打开项目"
-        panel.message = "选择 Agent 要在其中工作的项目目录"
+        panel.prompt = String(localized: "打开项目")
+        panel.message = String(localized: "选择 Agent 要在其中工作的项目目录")
         return panel.runModal() == .OK ? panel.url : nil
     }
 }
@@ -71,7 +71,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !dirty.isEmpty else { return .terminateNow }
         let alert = NSAlert()
         alert.messageText = String(localized: "有 \(dirty.count) 个文件尚未保存")
-        alert.informativeText = dirty.prefix(5).map { ($0.path as NSString).lastPathComponent }.joined(separator: "、")
+        alert.informativeText = dirty.prefix(5).map { ($0.path as NSString).lastPathComponent }.joined(separator: String(localized: "、"))
         alert.addButton(withTitle: String(localized: "全部保存并退出"))
         alert.addButton(withTitle: String(localized: "不保存直接退出"))
         alert.addButton(withTitle: String(localized: "取消"))
@@ -117,6 +117,8 @@ struct OhMyAgentApp: App {
     init() {
         Log.bootstrap(process: "app")
         DemoLaunch.activateIfRequested()
+        // Bundle ID 变更迁移:须早于外观、快捷键等偏好的首次读取(演示模式使用隔离沙盒,不迁移)
+        if !DemoLaunch.isActive { LegacyDefaultsMigration.migrateIfNeeded() }
         DiagnosticsStore.shared.markLaunch()
     }
 
@@ -172,11 +174,11 @@ struct WorkbenchCommands: Commands {
             Button("检查更新…") { UpdateModel.shared.checkInteractively() }
         }
         CommandGroup(replacing: .sidebar) {
-            Button(workbench.layout.leftVisible ? "隐藏左栏" : "显示左栏") { workbench.toggleLeft() }
+            Button(workbench.layout.leftVisible ? String(localized: "隐藏左栏") : String(localized: "显示左栏")) { workbench.toggleLeft() }
                 .keyboardShortcut(shortcuts.shortcut(for: .toggleSidebar))
-            Button(workbench.layout.rightVisible ? "隐藏右栏" : "显示右栏") { workbench.toggleRight() }
+            Button(workbench.layout.rightVisible ? String(localized: "隐藏右栏") : String(localized: "显示右栏")) { workbench.toggleRight() }
                 .keyboardShortcut(shortcuts.shortcut(for: .toggleInspector))
-            Button(workbench.layout.bottomVisible ? "隐藏底部面板" : "显示底部面板") { workbench.toggleBottom() }
+            Button(workbench.layout.bottomVisible ? String(localized: "隐藏底部面板") : String(localized: "显示底部面板")) { workbench.toggleBottom() }
                 .keyboardShortcut(shortcuts.shortcut(for: .togglePanel))
             Divider()
             Button("工具与扩展…") {

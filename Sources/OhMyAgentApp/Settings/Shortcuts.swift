@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 快捷键:可自定义的动作表,冲突检测,导入导出。菜单与按钮从这里读取,修改后立即生效。
 
 import AppKit
@@ -14,18 +14,18 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .newConversation: return "新对话"
-        case .openWorkspace: return "打开项目"
-        case .extensions: return "工具与扩展"
-        case .send: return "发送消息"
-        case .toggleSidebar: return "切换左栏"
-        case .toggleInspector: return "切换右栏"
-        case .togglePanel: return "切换底部面板"
-        case .saveFile: return "保存文件"
-        case .quickOpen: return "快速打开文件"
-        case .commandPalette: return "命令面板"
-        case .globalSearch: return "在文件中搜索"
-        case .newTerminal: return "新建终端标签"
+        case .newConversation: return String(localized: "新对话")
+        case .openWorkspace: return String(localized: "打开项目")
+        case .extensions: return String(localized: "工具与扩展")
+        case .send: return String(localized: "发送消息")
+        case .toggleSidebar: return String(localized: "切换左栏")
+        case .toggleInspector: return String(localized: "切换右栏")
+        case .togglePanel: return String(localized: "切换底部面板")
+        case .saveFile: return String(localized: "保存文件")
+        case .quickOpen: return String(localized: "快速打开文件")
+        case .commandPalette: return String(localized: "命令面板")
+        case .globalSearch: return String(localized: "在文件中搜索")
+        case .newTerminal: return String(localized: "新建终端标签")
         }
     }
 
@@ -136,14 +136,14 @@ final class ShortcutStore {
 
     /// 检测冲突:返回与之冲突的动作名或"系统保留"。
     func conflict(for binding: ShortcutBinding, excluding action: ShortcutAction) -> String? {
-        if Self.reserved.contains(binding) { return "系统保留" }
+        if Self.reserved.contains(binding) { return String(localized: "系统保留") }
         return ShortcutAction.allCases.first { $0 != action && self.binding(for: $0) == binding }?.title
     }
 
     /// 设置;冲突时返回原因且不修改。
     @discardableResult
     func set(_ binding: ShortcutBinding, for action: ShortcutAction) -> String? {
-        if let reason = conflict(for: binding, excluding: action) { return "与「\(reason)」冲突" }
+        if let reason = conflict(for: binding, excluding: action) { return String(localized: "与「\(reason)」冲突") }
         if binding == action.defaultBinding {
             reset(action)
         } else {
@@ -170,11 +170,11 @@ final class ShortcutStore {
     /// 导入 JSON;跳过未知动作与冲突项。
     /// - Returns: 成功导入数量与被跳过的说明
     func importJSON(_ data: Data) -> (imported: Int, skipped: [String]) {
-        guard let decoded = try? JSONDecoder().decode([String: ShortcutBinding].self, from: data) else { return (0, ["文件格式不正确"]) }
+        guard let decoded = try? JSONDecoder().decode([String: ShortcutBinding].self, from: data) else { return (0, [String(localized: "文件格式不正确")]) }
         var imported = 0
         var skipped: [String] = []
         for (name, binding) in decoded {
-            guard let action = ShortcutAction(rawValue: name) else { skipped.append("未知动作 \(name)"); continue }
+            guard let action = ShortcutAction(rawValue: name) else { skipped.append(String(localized: "未知动作 \(name)")); continue }
             if let reason = set(binding, for: action) { skipped.append("\(action.title):\(reason)") } else { imported += 1 }
         }
         return (imported, skipped)

@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 标签组:标签栏 + 内容区。支持标签拖拽(重排/跨组/拖到边缘新建分屏)、五区落点蒙层、右键菜单与溢出菜单。
 
 import ChatKit
@@ -338,13 +338,13 @@ struct TabItemView: View {
         Button("关闭其它") { workbench.dock.closeOthers(tab.id) }
             .disabled(group.tabs.count < 2)
         Divider()
-        Button(tab.isPinned ? "取消固定" : "固定") { workbench.dock.togglePinned(tab.id) }
+        Button(tab.isPinned ? String(localized: "取消固定") : String(localized: "固定")) { workbench.dock.togglePinned(tab.id) }
         Button("向右拆分") {
             workbench.dock.drop(tab.id, onGroup: group.id, zone: .right)
             workbench.syncSelectionFromDock()
         }
         .disabled(group.tabs.count < 2)
-        Button(workbench.dock.maximizedGroupID == group.id ? "还原布局" : "最大化此组") { workbench.dock.toggleMaximize(group: group.id) }
+        Button(workbench.dock.maximizedGroupID == group.id ? String(localized: "还原布局") : String(localized: "最大化此组")) { workbench.dock.toggleMaximize(group: group.id) }
         if case .file(let path) = tab.kind {
             Divider()
             Button("在 Finder 中显示") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }

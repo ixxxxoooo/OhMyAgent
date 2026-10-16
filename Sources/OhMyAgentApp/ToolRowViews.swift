@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // Cursor 风格的紧凑工具行:一行摘要(动词 + 对象 + 附注 + 统计 + 状态),点击展开详情;
 // 连续的“浏览”类步骤折叠为一组;终端输出支持 ANSI 颜色、复制、耗时与中断。
 
@@ -269,18 +269,18 @@ struct ToolRowView: View {
 
     static func statusText(_ status: ToolStatus) -> String {
         switch status {
-        case .pending: return "等待中"
-        case .inProgress: return "进行中"
-        case .completed: return "已完成"
-        case .failed: return "失败"
+        case .pending: return String(localized: "等待中")
+        case .inProgress: return String(localized: "进行中")
+        case .completed: return String(localized: "已完成")
+        case .failed: return String(localized: "失败")
         }
     }
 
     /// 耗时格式:<10 秒保留一位小数。
     static func format(_ seconds: Double) -> String {
-        if seconds < 10 { return String(format: "%.1f 秒", seconds) }
-        if seconds < 60 { return "\(Int(seconds)) 秒" }
-        return "\(Int(seconds) / 60) 分 \(Int(seconds) % 60) 秒"
+        if seconds < 10 { return String(format: String(localized: "%.1f 秒"), seconds) }
+        if seconds < 60 { return String(localized: "\(Int(seconds)) 秒") }
+        return String(localized: "\(Int(seconds) / 60) 分 \(Int(seconds) % 60) 秒")
     }
 }
 
@@ -296,7 +296,7 @@ struct ToolDetailsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if presentation.category == .mcp, let input = tool.rawInput {
-                KeyValueBox(title: "入参", value: input)
+                KeyValueBox(title: String(localized: "入参"), value: input)
             }
             if presentation.category == .terminal, !hasTerminalContent,
                let command = tool.rawInput?["command"]?.stringValue {
@@ -341,7 +341,7 @@ struct ToolDetailsView: View {
             if let session = model.terminals[id] {
                 TerminalOutputView(session: session) { model.interruptTerminal(id) }
             } else {
-                Label("终端 \(id)", om: "terminal").font(OMFonts.monoSmall)
+                Label(String(localized: "终端 \(id)"), om: "terminal").font(OMFonts.monoSmall)
             }
         case .content(let block):
             if let text = block.plainText, !text.isEmpty {
@@ -382,7 +382,7 @@ struct TextOutputBox: View {
                 }
             }
             if lines.count > lineLimit {
-                Button(showAll ? "收起" : "显示全部 \(lines.count) 行") { showAll.toggle() }
+                Button(showAll ? String(localized: "收起") : String(localized: "显示全部 \(lines.count) 行")) { showAll.toggle() }
                     .buttonStyle(.link)
                     .font(OMFonts.caption)
             }
@@ -439,8 +439,8 @@ struct CopyButton: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(OMColors.secondaryText)
-        .help(copied ? "已复制" : "复制")
-        .accessibilityLabel(copied ? "已复制" : "复制")
+        .help(copied ? String(localized: "已复制") : String(localized: "复制"))
+        .accessibilityLabel(copied ? String(localized: "已复制") : String(localized: "复制"))
     }
 }
 
@@ -495,7 +495,7 @@ struct SearchResultsView: View {
                     }
                 }
                 if hits.count > initialCount {
-                    Button(showAll ? "收起" : "显示全部 \(hits.count) 条") { showAll.toggle() }
+                    Button(showAll ? String(localized: "收起") : String(localized: "显示全部 \(hits.count) 条")) { showAll.toggle() }
                         .buttonStyle(.link)
                         .font(OMFonts.caption)
                         .padding(.horizontal, 8)
@@ -538,7 +538,7 @@ struct SearchHitRow: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .help(hit.path)
-        .accessibilityLabel("\(hit.path)\(hit.line.map { " 第 \($0) 行" } ?? "")")
+        .accessibilityLabel("\(hit.path)\(hit.line.map { String(localized: " 第 \($0) 行") } ?? "")")
     }
 }
 
@@ -627,7 +627,7 @@ struct TerminalOutputView: View {
                             .controlSize(.mini)
                     }
                 } else if let code = session.exitCode {
-                    OMTag(code == 0 ? "退出 0" : "退出 \(code)", tint: code == 0 ? .green : .red)
+                    OMTag(code == 0 ? String(localized: "退出 0") : String(localized: "退出 \(code)"), tint: code == 0 ? .green : .red)
                 } else if let signal = session.signal {
                     OMTag(signal, tint: .red)
                 }

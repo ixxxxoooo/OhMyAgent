@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 会话模型:一个窗口对应一个 SessionModel,独占一个 Agent 子进程与一个 ACP 会话。
 // 后台:事件接收与合并;主 actor:只应用合并后的批次。
 
@@ -26,7 +26,7 @@ public final class PermissionPrompt: Identifiable {
 
     init(request: PermissionRequest, continuation: CheckedContinuation<PermissionOutcome, Never>) {
         self.request = request
-        self.title = request.toolCallRaw["title"]?.stringValue ?? "工具调用"
+        self.title = request.toolCallRaw["title"]?.stringValue ?? String(localized: "工具调用")
         self.kind = ToolKind(rawOrOther: request.toolCallRaw["kind"]?.stringValue)
         self.tool = ToolCall(json: request.toolCallRaw)
         self.continuation = continuation
@@ -512,7 +512,7 @@ public final class SessionModel {
             return
         }
         guard image.data.count <= ImageAttachment.maxBytes else {
-            timeline.appendNotice("图片太大(上限 \(ImageAttachment.maxBytes / 1024 / 1024) MB),已忽略:\(image.name)", isError: true)
+            timeline.appendNotice(String(localized: "图片太大(上限 \(ImageAttachment.maxBytes / 1024 / 1024) MB),已忽略:\(image.name)"), isError: true)
             return
         }
         guard attachments.count < 8 else {
@@ -613,7 +613,7 @@ public final class SessionModel {
         case .setModel(let name):
             switchModel(named: name)
         case .accountNotice:
-            timeline.appendNotice(ChatL10n.t("账号登录由本机 `claude` 管理"), detail: "OhMyAgent 不处理登录/登出。请在终端运行 `claude`,执行 `/login` 或 `/logout`。")
+            timeline.appendNotice(ChatL10n.t("账号登录由本机 `claude` 管理"), detail: String(localized: "OhMyAgent 不处理登录/登出。请在终端运行 `claude`,执行 `/login` 或 `/logout`。"))
         case .modelMenu:
             timeline.appendNotice(ChatL10n.t("当前模型"), detail: modelListMarkdown())
         case .exportTranscript, .settings, .extensions, .mcpPanel, .history:
@@ -637,7 +637,7 @@ public final class SessionModel {
             if copy.sessionId == sessionId { copy.title = clean }
             return copy
         }
-        timeline.appendNotice("会话已重命名为「\(clean)」。")
+        timeline.appendNotice(String(localized: "会话已重命名为「\(clean)」。"))
     }
 
     /// 按名称(值或显示名,不区分大小写,支持前缀)切换模型。
@@ -650,38 +650,38 @@ public final class SessionModel {
         let match = option.options.first { $0.value.lowercased() == needle || $0.name.lowercased() == needle }
             ?? option.options.first { $0.value.lowercased().contains(needle) || $0.name.lowercased().contains(needle) }
         guard let match else {
-            let names = option.options.map { "`\($0.value)`" }.joined(separator: "、")
-            timeline.appendNotice("没有名为「\(name)」的模型。", detail: "可选:\(names)", severity: "warning")
+            let names = option.options.map { "`\($0.value)`" }.joined(separator: String(localized: "、"))
+            timeline.appendNotice(String(localized: "没有名为「\(name)」的模型。"), detail: String(localized: "可选:\(names)"), severity: "warning")
             return
         }
         setConfigOption(option.id, value: match.value)
-        timeline.appendNotice("模型已切换为 \(match.name)。")
+        timeline.appendNotice(String(localized: "模型已切换为 \(match.name)。"))
     }
 
     /// `/model` 无参数时的模型列表。
     private func modelListMarkdown() -> String {
-        guard let option = option(category: "model") else { return "当前 Agent 没有可切换的模型。" }
+        guard let option = option(category: "model") else { return String(localized: "当前 Agent 没有可切换的模型。") }
         let lines = option.options.map { item in
-            "- \(item.value == option.currentValue.stringValue ? "**" : "")`\(item.value)` \(item.name)\(item.value == option.currentValue.stringValue ? "**(当前)" : "")"
+            "- \(item.value == option.currentValue.stringValue ? "**" : "")`\(item.value)` \(item.name)\(item.value == option.currentValue.stringValue ? String(localized: "**(当前)") : "")"
         }
-        return (["用 `/model <名称>` 切换,或点输入框下方的模型菜单:", ""] + lines).joined(separator: "\n")
+        return ([String(localized: "用 `/model <名称>` 切换,或点输入框下方的模型菜单:"), ""] + lines).joined(separator: "\n")
     }
 
     /// `/status` 文本。
     private func statusMarkdown() -> String {
         var lines: [String] = []
-        lines.append("- 工作区:`\(workspace.path)`")
-        if let sessionId { lines.append("- 会话:`\(sessionId)`") }
+        lines.append(String(localized: "- 工作区:`\(workspace.path)`"))
+        if let sessionId { lines.append(String(localized: "- 会话:`\(sessionId)`")) }
         if let model = option(category: "model") {
-            lines.append("- 模型:\(model.options.first { $0.value == model.currentValue.stringValue }?.name ?? model.currentValue.stringValue ?? "-")")
+            lines.append(String(localized: "- 模型:\(model.options.first { $0.value == model.currentValue.stringValue }?.name ?? model.currentValue.stringValue ?? "-")"))
         }
         if let mode = option(category: "mode") {
-            lines.append("- 权限模式:\(mode.options.first { $0.value == mode.currentValue.stringValue }?.name ?? mode.currentValue.stringValue ?? "-")")
+            lines.append(String(localized: "- 权限模式:\(mode.options.first { $0.value == mode.currentValue.stringValue }?.name ?? mode.currentValue.stringValue ?? "-")"))
         }
-        if let providerName { lines.append("- 模型提供商:\(providerName)") }
-        lines.append("- 通告命令:\(availableCommands.count) 个")
-        lines.append("- 运行中引导:\(capabilities.canSteer ? "支持" : "不支持");图片输入:\(capabilities.imagePrompts ? "支持" : "不支持")")
-        if let goal { lines.append("- 目标:\(goal.objective)\(goal.isActive ? "(进行中)" : "(已结束)")") }
+        if let providerName { lines.append(String(localized: "- 模型提供商:\(providerName)")) }
+        lines.append(String(localized: "- 通告命令:\(availableCommands.count) 个"))
+        lines.append(String(localized: "- 运行中引导:\(capabilities.canSteer ? String(localized: "支持") : String(localized: "不支持"));图片输入:\(capabilities.imagePrompts ? String(localized: "支持") : String(localized: "不支持"))"))
+        if let goal { lines.append(String(localized: "- 目标:\(goal.objective)\(goal.isActive ? String(localized: "(进行中)") : String(localized: "(已结束)"))")) }
         return lines.joined(separator: "\n")
     }
 
@@ -889,7 +889,7 @@ public final class SessionModel {
                     if let rpc = error as? JSONRPCError, rpc.code == -32000 {
                         self.timeline.appendNotice(ChatL10n.t("Claude Code 尚未登录或登录已失效:请在终端运行 claude 完成登录后重试。"), isError: true)
                     } else {
-                        self.timeline.appendNotice("请求失败:\(error.localizedDescription)", isError: true)
+                        self.timeline.appendNotice(String(localized: "请求失败:\(error.localizedDescription)"), isError: true)
                     }
                 }
             } else if reason == .refusal {
@@ -940,7 +940,7 @@ public final class SessionModel {
                 self?.configOptions = setup.configOptions
             } catch {
                 self?.log.error("创建新对话失败", error: error)
-                self?.timeline.appendNotice("创建新对话失败:\(error.localizedDescription)", isError: true)
+                self?.timeline.appendNotice(String(localized: "创建新对话失败:\(error.localizedDescription)"), isError: true)
             }
         }
     }
@@ -989,7 +989,7 @@ public final class SessionModel {
                     : try await client.resumeSession(sessionId: summary.sessionId, cwd: cwd, mcpServers: servers, meta: meta)
                 self?.configOptions = setup.configOptions.isEmpty ? (self?.configOptions ?? []) : setup.configOptions
             } catch {
-                self?.timeline.appendNotice("打开会话失败:\(error.localizedDescription)", isError: true)
+                self?.timeline.appendNotice(String(localized: "打开会话失败:\(error.localizedDescription)"), isError: true)
             }
             await self?.settleEvents()
             self?.timeline.finishStreaming()
@@ -1011,7 +1011,7 @@ public final class SessionModel {
                 if !setup.configOptions.isEmpty { self?.configOptions = setup.configOptions }
                 self?.refreshHistory()
             } catch {
-                self?.timeline.appendNotice("分叉失败:\(error.localizedDescription)", isError: true)
+                self?.timeline.appendNotice(String(localized: "分叉失败:\(error.localizedDescription)"), isError: true)
             }
         }
     }
@@ -1135,10 +1135,10 @@ public final class SessionModel {
                 if hadConversation, canResume {
                     let setup = try await client.resumeSession(sessionId: sessionId, cwd: cwd, mcpServers: servers, meta: meta)
                     if !setup.configOptions.isEmpty { self.configOptions = setup.configOptions }
-                    self.timeline.appendNotice("已切换到 \(target),对话上下文已保留。")
+                    self.timeline.appendNotice(String(localized: "已切换到 \(target),对话上下文已保留。"))
                 } else {
                     try await self.startFreshSession(client: client, cwd: cwd, servers: servers, meta: meta)
-                    self.timeline.appendNotice("已切换到 \(target)。")
+                    self.timeline.appendNotice(String(localized: "已切换到 \(target)。"))
                 }
                 self.log.info("会话切换提供商", ["provider": self.providerID ?? "default", "ms": "\(OMLogger.milliseconds(since: started))"])
             } catch {
@@ -1146,9 +1146,9 @@ public final class SessionModel {
                 self.log.warning("恢复会话失败,改为新建会话", ["error": "\(error)"])
                 do {
                     try await self.startFreshSession(client: client, cwd: cwd, servers: servers, meta: meta)
-                    self.timeline.appendNotice("已切换到 \(target),但之前的对话上下文无法沿用,已开始新会话。", severity: "warning")
+                    self.timeline.appendNotice(String(localized: "已切换到 \(target),但之前的对话上下文无法沿用,已开始新会话。"), severity: "warning")
                 } catch {
-                    self.timeline.appendNotice("切换失败:\(error.localizedDescription)", isError: true)
+                    self.timeline.appendNotice(String(localized: "切换失败:\(error.localizedDescription)"), isError: true)
                 }
             }
         }
@@ -1175,7 +1175,7 @@ public final class SessionModel {
                 let updated = try await client.setConfigOption(sessionId: sessionId, configId: optionId, value: .string(value))
                 if !updated.isEmpty { self?.configOptions = updated }
             } catch {
-                self?.timeline.appendNotice("设置失败:\(error.localizedDescription)", isError: true)
+                self?.timeline.appendNotice(String(localized: "设置失败:\(error.localizedDescription)"), isError: true)
             }
         }
     }
@@ -1349,7 +1349,7 @@ public final class SessionModel {
                     change.status = change.diff.isEmpty ? .reverted : .partiallyReverted
                 }
             case .conflict: change.status = .conflict
-            case .notFound: change.status = .failed("没有可用的检查点")
+            case .notFound: change.status = .failed(String(localized: "没有可用的检查点"))
             case .failed(let message): change.status = .failed(message)
             }
             self?.changesRevision += 1
@@ -1413,7 +1413,7 @@ public final class SessionModel {
         timeline.finishStreaming()
         isRunning = false
         let detail = diagnostics.suffix(3).joined(separator: "\n")
-        phase = .failed("Agent 进程已退出(代码 \(code.map(String.init) ?? "未知"))。\(detail)")
+        phase = .failed(String(localized: "Agent 进程已退出(代码 \(code.map(String.init) ?? String(localized: "未知")))。\(detail)"))
         client = nil
         supervisor = nil
         sessionId = nil

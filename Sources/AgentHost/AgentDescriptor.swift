@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // Agent 描述符与提供者协议:新增 ACP Agent 只需增加描述符,无需改代码。
 
 import ACPKit
@@ -41,7 +41,7 @@ public struct AgentDescriptor: Codable, Sendable, Hashable, Identifiable {
         id: "claude-code",
         name: "Claude Code",
         kind: .claudeACP,
-        summary: "通过 claude-agent-acp 适配器接入官方 Claude Code"
+        summary: String(localized: "通过 claude-agent-acp 适配器接入官方 Claude Code")
     )
 }
 
@@ -55,11 +55,11 @@ public enum AgentLaunchError: Error, LocalizedError, Sendable {
 
     public var errorDescription: String? {
         switch self {
-        case .missingNode: return "未找到 Node.js(需要 22 或更高版本)。请安装 Node,或在设置 → 高级中指定路径。"
-        case .missingAdapter: return "未找到 claude-agent-acp 适配器。请在设置 → 高级中指定路径,或运行 Scripts/install-adapter.sh。"
-        case .missingClaude: return "未找到 claude 命令行工具。请先安装 Claude Code。"
-        case .missingCommand(let name): return "Agent「\(name)」未配置可执行文件。"
-        case .missingHelper(let name): return "缺少随应用分发的辅助程序 \(name),请重新安装或运行 Scripts/bundle.sh。"
+        case .missingNode: return String(localized: "未找到 Node.js(需要 22 或更高版本)。请安装 Node,或在设置 → 高级中指定路径。")
+        case .missingAdapter: return String(localized: "未找到 claude-agent-acp 适配器。请在设置 → 高级中指定路径,或运行 Scripts/install-adapter.sh。")
+        case .missingClaude: return String(localized: "未找到 claude 命令行工具。请先安装 Claude Code。")
+        case .missingCommand(let name): return String(localized: "Agent「\(name)」未配置可执行文件。")
+        case .missingHelper(let name): return String(localized: "缺少随应用分发的辅助程序 \(name),请重新安装或运行 Scripts/bundle.sh。")
         }
     }
 }

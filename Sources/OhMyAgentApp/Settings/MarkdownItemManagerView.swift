@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // Skills / 命令 / 子 Agent 管理:分组列表、源码编辑(含 frontmatter 快捷开关)、新建向导、删除。
 
 import IconKit
@@ -22,20 +22,20 @@ struct MarkdownItemManagerView: View {
         return all.filter { $0.name.localizedCaseInsensitiveContains(search) || $0.description.localizedCaseInsensitiveContains(search) }
     }
     private var selected: MarkdownItem? { items.first { $0.id == selectedID } }
-    private var noun: String { kind == .agent ? "子 Agent" : "Skill" }
+    private var noun: String { kind == .agent ? String(localized: "子 Agent") : "Skill" }
 
     var body: some View {
         ListDetail {
             VStack(spacing: 0) {
                 HStack(spacing: 8) {
-                    Button { showCreate = true } label: { Label("新建\(noun)", om: "plus") }
+                    Button { showCreate = true } label: { Label(String(localized: "新建\(noun)"), om: "plus") }
                     Spacer()
                     Button { center.reload() } label: { Image.om("arrow.clockwise") }.help("重新读取").accessibilityLabel("刷新")
                 }
                 .padding(10)
                 TextField("搜索名称或描述", text: $search).textFieldStyle(.roundedBorder).padding(.horizontal, 10).padding(.bottom, 8)
                 if items.isEmpty {
-                    EmptyHint(icon: kind == .agent ? "person.2" : "sparkles", title: "没有\(noun)", message: "点击「新建\(noun)」创建,或安装带有\(noun)的插件。")
+                    EmptyHint(icon: kind == .agent ? "person.2" : "sparkles", title: String(localized: "没有\(noun)"), message: String(localized: "点击「新建\(noun)」创建,或安装带有\(noun)的插件。"))
                 } else {
                     List(selection: $selectedID) {
                         ForEach(grouped, id: \.0) { title, group in
@@ -52,7 +52,7 @@ struct MarkdownItemManagerView: View {
                 MarkdownItemEditor(center: center, item: item) { pendingDelete = item }
                     .id(item.id)
             } else {
-                EmptyHint(icon: "doc.text", title: "选择一个\(noun)进行查看或编辑")
+                EmptyHint(icon: "doc.text", title: String(localized: "选择一个\(noun)进行查看或编辑"))
             }
         }
         .sheet(isPresented: $showCreate) {
@@ -61,7 +61,7 @@ struct MarkdownItemManagerView: View {
         }
         .confirmationDialog("删除\(noun)?", isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }), presenting: pendingDelete) { item in
             Button("移到废纸篓", role: .destructive) {
-                center.perform("已删除 \(item.name)") {
+                center.perform(String(localized: "已删除 \(item.name)")) {
                     if kind == .agent { try AgentStore(paths: center.paths).delete(item) } else { try SkillStore(paths: center.paths).delete(item) }
                 }
                 selectedID = nil
@@ -86,10 +86,10 @@ struct MarkdownItemManagerView: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 4) {
                 Text(item.kind == .command ? "/\(item.name)" : item.name).font(OMFonts.body).lineLimit(1)
-                if item.kind == .command { Tag("命令") }
-                if item.disableModelInvocation { Tag("仅手动") }
-                if let over = item.overriddenBy { Tag("被\(over.displayName)覆盖", color: OMColors.warning) }
-                if item.isSymlink { Tag("链接") }
+                if item.kind == .command { Tag(String(localized: "命令")) }
+                if item.disableModelInvocation { Tag(String(localized: "仅手动")) }
+                if let over = item.overriddenBy { Tag(String(localized: "被\(over.displayName)覆盖"), color: OMColors.warning) }
+                if item.isSymlink { Tag(String(localized: "链接")) }
             }
             if !item.description.isEmpty {
                 Text(item.description).font(OMFonts.caption).foregroundStyle(OMColors.secondaryText).lineLimit(2)
@@ -122,7 +122,7 @@ struct MarkdownItemEditor: View {
                     Button {
                         AppActions.shared.insertIntoComposer(item.kind == .agent ? "@agent-\(item.name) " : "/\(item.name) ")
                     } label: { Label("在对话中使用", om: "message-square-plus") }
-                        .help(item.kind == .agent ? "回到对话并 @ 提及这个子 Agent" : "回到对话并插入这个命令")
+                        .help(item.kind == .agent ? String(localized: "回到对话并 @ 提及这个子 Agent") : String(localized: "回到对话并插入这个命令"))
                 }
                 Button { NSWorkspace.shared.activateFileViewerSelecting([item.fileURL]) } label: { Image.om("folder") }
                     .help("在 Finder 中显示").accessibilityLabel("在 Finder 中显示")
@@ -174,7 +174,7 @@ struct MarkdownItemEditor: View {
 
     private func save() {
         let doc = MarkdownDocument(parsing: text)
-        let ok = center.perform("已保存 \(item.name)") {
+        let ok = center.perform(String(localized: "已保存 \(item.name)")) {
             if item.kind == .agent { try AgentStore(paths: center.paths).save(doc, to: item) } else { try SkillStore(paths: center.paths).save(doc, to: item) }
         }
         if ok { original = text }
@@ -191,22 +191,22 @@ struct SkillCreateSheet: View {
     @State private var scope: ConfigScope = .user
 
     private var problems: [String] {
-        name.range(of: "^[a-z0-9][a-z0-9-]{0,63}$", options: .regularExpression) == nil ? ["名称只能包含小写字母、数字和连字符"] : []
+        name.range(of: "^[a-z0-9][a-z0-9-]{0,63}$", options: .regularExpression) == nil ? [String(localized: "名称只能包含小写字母、数字和连字符")] : []
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("新建 Skill").font(OMFonts.title)
-            FormRow(label: "名称", hint: "同时是斜杠命令名:/\(name.isEmpty ? "name" : name)") { TextField("code-review", text: $name).textFieldStyle(.roundedBorder) }
-            FormRow(label: "描述") { TextField("它做什么、何时使用", text: $description).textFieldStyle(.roundedBorder) }
-            FormRow(label: "模板") {
+            FormRow(label: String(localized: "名称"), hint: String(localized: "同时是斜杠命令名:/\(name.isEmpty ? "name" : name)")) { TextField("code-review", text: $name).textFieldStyle(.roundedBorder) }
+            FormRow(label: String(localized: "描述")) { TextField("它做什么、何时使用", text: $description).textFieldStyle(.roundedBorder) }
+            FormRow(label: String(localized: "模板")) {
                 Picker("", selection: $template) { ForEach(SkillTemplate.allCases) { Text($0.displayName).tag($0) } }.pickerStyle(.segmented).labelsHidden()
             }
-            FormRow(label: "位置") {
+            FormRow(label: String(localized: "位置")) {
                 Picker("", selection: $scope) { Text("用户").tag(ConfigScope.user); Text("项目").tag(ConfigScope.project) }.pickerStyle(.segmented).labelsHidden()
             }
-            SheetFooter(problems: problems, confirmTitle: "创建", onCancel: onClose) {
-                if center.perform("已创建 \(name)", { try SkillStore(paths: center.paths).create(name: name, description: description, template: template, scope: scope) }) { onClose() }
+            SheetFooter(problems: problems, confirmTitle: String(localized: "创建"), onCancel: onClose) {
+                if center.perform(String(localized: "已创建 \(name)"), { try SkillStore(paths: center.paths).create(name: name, description: description, template: template, scope: scope) }) { onClose() }
             }
         }
         .padding(20)
@@ -227,27 +227,27 @@ struct AgentCreateSheet: View {
 
     private var problems: [String] {
         var result: [String] = []
-        if name.range(of: "^[a-z0-9][a-z0-9-]{0,63}$", options: .regularExpression) == nil { result.append("名称只能包含小写字母、数字和连字符") }
-        if description.trimmingCharacters(in: .whitespaces).isEmpty { result.append("请填写描述,Claude 依据它决定何时委派") }
+        if name.range(of: "^[a-z0-9][a-z0-9-]{0,63}$", options: .regularExpression) == nil { result.append(String(localized: "名称只能包含小写字母、数字和连字符")) }
+        if description.trimmingCharacters(in: .whitespaces).isEmpty { result.append(String(localized: "请填写描述,Claude 依据它决定何时委派")) }
         return result
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("新建子 Agent").font(OMFonts.title)
-            FormRow(label: "名称") { TextField("code-reviewer", text: $name).textFieldStyle(.roundedBorder) }
-            FormRow(label: "描述") { TextField("何时应该委派给它", text: $description).textFieldStyle(.roundedBorder) }
-            FormRow(label: "工具", hint: "逗号分隔,留空表示继承全部工具") { TextField("Read, Grep, Glob", text: $tools).textFieldStyle(.roundedBorder) }
-            FormRow(label: "模型", hint: "可选:sonnet / opus / haiku / inherit") { TextField("留空继承", text: $model).textFieldStyle(.roundedBorder) }
-            FormRow(label: "系统提示") {
+            FormRow(label: String(localized: "名称")) { TextField("code-reviewer", text: $name).textFieldStyle(.roundedBorder) }
+            FormRow(label: String(localized: "描述")) { TextField("何时应该委派给它", text: $description).textFieldStyle(.roundedBorder) }
+            FormRow(label: String(localized: "工具"), hint: String(localized: "逗号分隔,留空表示继承全部工具")) { TextField("Read, Grep, Glob", text: $tools).textFieldStyle(.roundedBorder) }
+            FormRow(label: String(localized: "模型"), hint: String(localized: "可选:sonnet / opus / haiku / inherit")) { TextField("留空继承", text: $model).textFieldStyle(.roundedBorder) }
+            FormRow(label: String(localized: "系统提示")) {
                 TextEditor(text: $prompt).font(OMFonts.mono).frame(height: 110).overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(OMColors.hairline))
             }
-            FormRow(label: "位置") {
+            FormRow(label: String(localized: "位置")) {
                 Picker("", selection: $scope) { Text("用户").tag(ConfigScope.user); Text("项目").tag(ConfigScope.project) }.pickerStyle(.segmented).labelsHidden()
             }
-            SheetFooter(problems: problems, confirmTitle: "创建", onCancel: onClose) {
+            SheetFooter(problems: problems, confirmTitle: String(localized: "创建"), onCancel: onClose) {
                 let list = tools.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-                if center.perform("已创建 \(name)", { try AgentStore(paths: center.paths).create(name: name, description: description, tools: list, model: model, prompt: prompt, scope: scope) }) { onClose() }
+                if center.perform(String(localized: "已创建 \(name)"), { try AgentStore(paths: center.paths).create(name: name, description: description, tools: list, model: model, prompt: prompt, scope: scope) }) { onClose() }
             }
         }
         .padding(20)

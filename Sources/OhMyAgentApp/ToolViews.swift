@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 权限卡片与 Agent 提问表单。(工具行、终端输出等见 ToolRowViews.swift)
 
 import IconKit
@@ -18,7 +18,7 @@ struct PermissionCard: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Image.om(prompt.isPlanApproval ? "list-todo" : ToolIcons.symbol(for: prompt.kind)).foregroundStyle(OMColors.warning)
-                Text(prompt.isPlanApproval ? "计划待批准" : "需要你的许可").font(OMFonts.small.weight(.semibold))
+                Text(prompt.isPlanApproval ? String(localized: "计划待批准") : String(localized: "需要你的许可")).font(OMFonts.small.weight(.semibold))
             }
             if !prompt.isPlanApproval {
                 Text(prompt.title)

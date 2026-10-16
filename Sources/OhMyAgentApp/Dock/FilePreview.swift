@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 文件渲染预览:Markdown、Mermaid、图片/SVG、PDF、CSV/TSV。全部原生渲染(无 WebView)。
 // 文件标签通过「源码 / 预览」切换在编辑器与渲染结果之间切换,文本修改实时反映到预览。
 
@@ -171,7 +171,7 @@ struct ImageCanvas: View {
                 Text("\(Int(image.size.width)) × \(Int(image.size.height))")
                     .font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
                 Spacer()
-                Button(actualSize ? "适应窗口" : "实际大小") { actualSize.toggle() }
+                Button(actualSize ? String(localized: "适应窗口") : String(localized: "实际大小")) { actualSize.toggle() }
                     .controlSize(.small)
             }
             .padding(.horizontal, 12).padding(.vertical, 5)

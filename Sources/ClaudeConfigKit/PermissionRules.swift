@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 权限规则:`Tool` 或 `Tool(specifier)` 语法的解析、校验与匹配测试;allow / ask / deny 三类规则的读写。
 
 import Foundation
@@ -9,9 +9,9 @@ public enum PermissionBehavior: String, Sendable, CaseIterable, Identifiable {
     public var id: String { rawValue }
     public var displayName: String {
         switch self {
-        case .allow: return "允许"
-        case .ask: return "询问"
-        case .deny: return "拒绝"
+        case .allow: return String(localized: "允许")
+        case .ask: return String(localized: "询问")
+        case .deny: return String(localized: "拒绝")
         }
     }
 }
@@ -48,11 +48,11 @@ public struct PermissionRule: Sendable, Equatable {
     /// 校验,返回问题说明(空表示通过)。
     public static func validate(_ text: String) -> String? {
         let trimmed = text.trimmingCharacters(in: .whitespaces)
-        if trimmed.isEmpty { return "规则不能为空" }
-        if PermissionRule(trimmed) == nil { return "格式应为 Tool 或 Tool(规则),括号需成对" }
+        if trimmed.isEmpty { return String(localized: "规则不能为空") }
+        if PermissionRule(trimmed) == nil { return String(localized: "格式应为 Tool 或 Tool(规则),括号需成对") }
         if let rule = PermissionRule(trimmed), let specifier = rule.specifier {
-            if specifier.isEmpty { return "括号内不能为空;不带限定请直接写工具名" }
-            if rule.tool == "Bash", specifier.contains(":*"), !specifier.hasSuffix(":*") { return "Bash 的 :* 前缀通配只能放在末尾" }
+            if specifier.isEmpty { return String(localized: "括号内不能为空;不带限定请直接写工具名") }
+            if rule.tool == "Bash", specifier.contains(":*"), !specifier.hasSuffix(":*") { return String(localized: "Bash 的 :* 前缀通配只能放在末尾") }
         }
         return nil
     }

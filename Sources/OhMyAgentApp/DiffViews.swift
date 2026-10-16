@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // Diff 视图:按块展示新增/删除行与行号;可选“撤销此块”。差异计算放到后台,避免大文件卡主线程。
 
 import IconKit
@@ -143,9 +143,9 @@ struct DiffLineRow: View {
 
     private var accessibilityKind: String {
         switch line.kind {
-        case .added: return "新增"
-        case .removed: return "删除"
-        case .context: return "上下文"
+        case .added: return String(localized: "新增")
+        case .removed: return String(localized: "删除")
+        case .context: return String(localized: "上下文")
         }
     }
 }

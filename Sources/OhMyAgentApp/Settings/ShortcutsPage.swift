@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 设置页:快捷键(录制、冲突提示、导入导出)。
 
 import IconKit
@@ -20,7 +20,7 @@ struct ShortcutsPage: View {
                     HStack {
                         Text(action.title)
                         Spacer()
-                        Button(recording == action ? "按下新的组合键…(Esc 取消)" : store.binding(for: action).display) { toggleRecording(action) }
+                        Button(recording == action ? String(localized: "按下新的组合键…(Esc 取消)") : store.binding(for: action).display) { toggleRecording(action) }
                             .buttonStyle(.bordered)
                             .font(OMFonts.mono)
                         Button { store.reset(action) } label: { Image.om("arrow.uturn.backward") }
@@ -45,7 +45,7 @@ struct ShortcutsPage: View {
     }
 
     private static let fixed: [(String, String)] = [
-        ("换行", "⇧↩ / ⌥↩"), ("取消生成 / 关闭补全", "Esc"), ("切换模式", "⇧⇥"), ("补全选择", "↑ ↓ ⇥ ↩"), ("设置", "⌘,"),
+        (String(localized: "换行"), "⇧↩ / ⌥↩"), (String(localized: "取消生成 / 关闭补全"), "Esc"), (String(localized: "切换模式"), "⇧⇥"), (String(localized: "补全选择"), "↑ ↓ ⇥ ↩"), (String(localized: "设置"), "⌘,"),
     ]
 
     private func toggleRecording(_ action: ShortcutAction) {
@@ -80,6 +80,6 @@ struct ShortcutsPage: View {
         panel.allowedContentTypes = [.json]
         guard panel.runModal() == .OK, let url = panel.url, let data = try? Data(contentsOf: url) else { return }
         let result = store.importJSON(data)
-        message = result.skipped.isEmpty ? nil : "已导入 \(result.imported) 项;跳过:" + result.skipped.joined(separator: ";")
+        message = result.skipped.isEmpty ? nil : String(localized: "已导入 \(result.imported) 项;跳过:") + result.skipped.joined(separator: ";")
     }
 }

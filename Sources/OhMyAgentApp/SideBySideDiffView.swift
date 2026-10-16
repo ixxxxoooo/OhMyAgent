@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 并排 Diff 视图:左旧右新、行对齐;每块可撤销;超大差异默认只渲染前 300 行。
 
 import DesignSystem
@@ -122,9 +122,9 @@ private struct SideBySideHunkView: View {
 
     private func kindLabel(_ kind: DiffLineKind) -> String {
         switch kind {
-        case .added: return "新增"
-        case .removed: return "删除"
-        case .context: return "上下文"
+        case .added: return String(localized: "新增")
+        case .removed: return String(localized: "删除")
+        case .context: return String(localized: "上下文")
         }
     }
 }

@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 左栏(对齐 kuku 的 Sidebar):顶部 35pt 标题区(红绿灯与侧栏开关浮层) → 主操作(新对话/搜索/自定义)
 // → 「置顶」「工作区」两个分区 → 底部设置。分区标题行右侧放筛选菜单与添加工作区;
 // 分组标题:文件夹图标 + 名称 + 会话数(悬停换成「+」);会话行:状态点 + 渐隐标题 + 固定 76pt 保留区(相对时间 ⇄ 置顶/归档)。
@@ -395,7 +395,7 @@ private struct ProjectGroup: View {
             Button("新对话") { workbench.newConversation(in: project.id) }
             Button("选中此项目") { workbench.select(project: project.id) }
             Divider()
-            Button(project.pinned ? "取消置顶" : "置顶") { workbench.togglePin(project.id) }
+            Button(project.pinned ? String(localized: "取消置顶") : String(localized: "置顶")) { workbench.togglePin(project.id) }
             Button("在 Finder 中显示") { NSWorkspace.shared.activateFileViewerSelecting([project.url]) }
             Button("拷贝路径") {
                 NSPasteboard.general.clearContents()
@@ -536,8 +536,8 @@ private struct SessionLine: View {
     private var menu: some View {
         Button("打开", action: open)
         if let id = item.sessionId {
-            Button(isPinned ? "取消置顶" : "置顶") { workbench.toggleSessionPin(id, in: item.projectID) }
-            Button(isArchived ? "取消归档" : "归档") { workbench.setSessionArchived(!isArchived, sessionId: id, in: item.projectID) }
+            Button(isPinned ? String(localized: "取消置顶") : String(localized: "置顶")) { workbench.toggleSessionPin(id, in: item.projectID) }
+            Button(isArchived ? String(localized: "取消归档") : String(localized: "归档")) { workbench.setSessionArchived(!isArchived, sessionId: id, in: item.projectID) }
             if !item.isCurrent, let model = workbench.sessions[item.projectID], model.capabilities.canDelete {
                 Divider()
                 Button("删除", role: .destructive) {

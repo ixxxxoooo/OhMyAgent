@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 客户端接管的斜杠命令:Claude Code 里这些命令是终端 TUI 的界面(/config、/agents、/memory……),
 // 经 ACP 到达适配器时没有可用的界面,所以由 OhMyAgent 直接用原生界面实现。
 // 本文件只含纯数据逻辑(命令目录、解析、帮助文本),界面动作经 `SessionModel.onLocalCommand` 交给应用层。
@@ -137,25 +137,25 @@ public enum TranscriptExporter {
     /// - Returns: Markdown 文本
     @MainActor
     public static func markdown(entries: [TimelineEntry], title: String?, workspace: String) -> String {
-        var out: [String] = ["# \(title ?? "OhMyAgent 对话")", "", "> 工作区:`\(workspace)`", ""]
+        var out: [String] = ["# \(title ?? String(localized: "OhMyAgent 对话"))", "", String(localized: "> 工作区:`\(workspace)`"), ""]
         for entry in entries {
             switch entry.kind {
             case .user:
-                out += ["## 你", "", entry.text, ""]
+                out += [String(localized: "## 你"), "", entry.text, ""]
             case .assistant:
                 out += ["## Claude", "", entry.text, ""]
             case .thought:
                 continue
             case .tool:
-                if let tool = entry.tool { out += ["- 工具:`\(tool.name ?? tool.title)` — \(tool.title)", ""] }
+                if let tool = entry.tool { out += [String(localized: "- 工具:`\(tool.name ?? tool.title)` — \(tool.title)"), ""] }
             case .plan:
-                out += ["### 计划", ""] + entry.plan.map { "- [\($0.status == "completed" ? "x" : " ")] \($0.content)" } + [""]
+                out += [String(localized: "### 计划"), ""] + entry.plan.map { "- [\($0.status == "completed" ? "x" : " ")] \($0.content)" } + [""]
             case .notice:
                 out += ["> \(entry.text)", ""]
             case .changes:
-                out += ["### 改动", ""] + entry.changes.map { "- `\($0.path)`" } + [""]
+                out += [String(localized: "### 改动"), ""] + entry.changes.map { "- `\($0.path)`" } + [""]
             case .planDoc:
-                out += ["### 计划", "", entry.text, ""]
+                out += [String(localized: "### 计划"), "", entry.text, ""]
             }
         }
         return out.joined(separator: "\n")

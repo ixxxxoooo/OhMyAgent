@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 工作台根视图:左栏(项目 → 会话树)+ 中栏(会话)+ 右栏检查器(文件/搜索/Git/改动/计划)+ 底部面板。
 // 左右栏均可收起,尺寸与显隐持久化到 WorkbenchModel.layout。
 
@@ -184,7 +184,7 @@ struct WorkbenchView: View {
         if let source = env["OMA_OPEN_MERMAID"], !source.isEmpty {
             // 调试:直接以预览标签打开一段 Mermaid 源码(\n 表示换行)
             let id = MermaidPreviewStore.shared.register(source.replacingOccurrences(of: "\\n", with: "\n"))
-            workbench.openPreview(id: id, title: "Mermaid 图")
+            workbench.openPreview(id: id, title: String(localized: "Mermaid 图"))
         }
         if let diffPath = env["OMA_OPEN_DIFF"], !diffPath.isEmpty { workbench.openDiff(diffPath) }  // 调试:打开 Diff 标签
         if let history = env["OMA_OPEN_HISTORY"], let project = workbench.selectedProjectID {

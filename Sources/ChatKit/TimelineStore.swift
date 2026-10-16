@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 时间线模型:把 ACP 的 session/update 流归并为可渲染的条目。
 // 每个条目是独立的 @Observable 对象,流式追加文本时只会让对应条目的视图刷新。
 
@@ -321,8 +321,8 @@ public final class TimelineStore {
         switch content {
         case .text(let value): text = value
         case .resourceLink(_, let name, _, let title): text = "[\(title ?? name)]"
-        case .image: text = "[图片]"
-        case .audio: text = "[音频]"
+        case .image: text = String(localized: "[图片]")
+        case .audio: text = String(localized: "[音频]")
         default: return
         }
         if let last = entries.last, last.kind == kind, last.isStreaming,

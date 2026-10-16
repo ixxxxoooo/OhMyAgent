@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 演示模式隔离层:解析启动参数、准备沙盒、把进程主目录重定向到沙盒,确保不污染真实用户数据。
 
 import Foundation
@@ -15,7 +15,7 @@ import OMLog
 /// - 注意:外观、快捷键等纯界面偏好仍沿用 `UserDefaults.standard`(有意共享,演示时外观与日常一致)。
 public struct DemoEnvironment: Sendable {
     /// 演示用 UserDefaults suite 名称
-    public static let defaultsSuiteName = "com.ohmyagent.demo"
+    public static let defaultsSuiteName = "com.ixxxxoooo.OhMyAgent.demo"
 
     /// 沙盒路径
     public let paths: DemoPaths

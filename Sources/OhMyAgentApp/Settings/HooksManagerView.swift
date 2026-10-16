@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // Hooks 管理:事件 → matcher → 处理器 的分组视图;设置层的 Hook 可增删改,插件 Hook 只读。
 
 import IconKit
@@ -26,7 +26,7 @@ struct HooksManagerView: View {
             }
             .padding(10)
             if grouped.isEmpty {
-                EmptyHint(icon: "bolt.horizontal", title: "没有配置 Hook", message: "Hook 可在工具调用前后、会话开始/结束等事件上运行命令。")
+                EmptyHint(icon: "bolt.horizontal", title: String(localized: "没有配置 Hook"), message: String(localized: "Hook 可在工具调用前后、会话开始/结束等事件上运行命令。"))
             } else {
                 List {
                     ForEach(grouped, id: \.0) { event, entries in
@@ -38,7 +38,7 @@ struct HooksManagerView: View {
         }
         .sheet(item: $editor) { target in HookEditorSheet(center: center, target: target) { editor = nil } }
         .confirmationDialog("删除 Hook?", isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }), presenting: pendingDelete) { entry in
-            Button("删除", role: .destructive) { center.perform("已删除 Hook") { try HooksStore(paths: center.paths).remove(entry) } }
+            Button("删除", role: .destructive) { center.perform(String(localized: "已删除 Hook")) { try HooksStore(paths: center.paths).remove(entry) } }
         } message: { entry in
             Text("将从\(entry.origin.displayName)中移除。")
         }
@@ -49,7 +49,7 @@ struct HooksManagerView: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 4) {
                     Tag(entry.handler.type, color: .accentColor)
-                    if !entry.matcher.isEmpty { Tag("匹配 \(entry.matcher)") }
+                    if !entry.matcher.isEmpty { Tag(String(localized: "匹配 \(entry.matcher)")) }
                     Tag(entry.origin.displayName)
                     if let timeout = entry.handler.timeout { Tag("\(timeout)s") }
                 }
@@ -94,34 +94,34 @@ struct HookEditorSheet: View {
 
     private var problems: [String] {
         var result = HooksStore.validate(handler: handler, event: event, matcher: matcher)
-        if !timeout.isEmpty, Int(timeout) == nil { result.append("超时需要是整数秒") }
+        if !timeout.isEmpty, Int(timeout) == nil { result.append(String(localized: "超时需要是整数秒")) }
         return result
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(target.entry == nil ? "添加 Hook" : "编辑 Hook").font(OMFonts.title)
-            FormRow(label: "事件") {
+            Text(target.entry == nil ? String(localized: "添加 Hook") : String(localized: "编辑 Hook")).font(OMFonts.title)
+            FormRow(label: String(localized: "事件")) {
                 Picker("", selection: $event) { ForEach(HooksStore.events, id: \.self) { Text($0).tag($0) } }.labelsHidden().fixedSize().disabled(target.entry != nil)
             }
-            FormRow(label: "匹配器", hint: "工具名或正则,如 Bash、Edit|Write;留空表示全部") { TextField("", text: $matcher).textFieldStyle(.roundedBorder).font(OMFonts.mono) }
+            FormRow(label: String(localized: "匹配器"), hint: String(localized: "工具名或正则,如 Bash、Edit|Write;留空表示全部")) { TextField("", text: $matcher).textFieldStyle(.roundedBorder).font(OMFonts.mono) }
             if target.entry == nil {
-                FormRow(label: "写入位置") {
+                FormRow(label: String(localized: "写入位置")) {
                     Picker("", selection: $scope) { ForEach(ConfigScope.allCases) { Text($0.displayName).tag($0) } }.pickerStyle(.segmented).labelsHidden()
                 }
             }
-            FormRow(label: "类型") {
+            FormRow(label: String(localized: "类型")) {
                 Picker("", selection: $type) { ForEach(HooksStore.handlerTypes, id: \.self) { Text($0).tag($0) } }.labelsHidden().fixedSize()
             }
             switch type {
-            case "command": FormRow(label: "命令", hint: "通过 stdin 接收事件 JSON;退出码 2 表示阻止") { TextField("", text: $command).textFieldStyle(.roundedBorder).font(OMFonts.mono) }
+            case "command": FormRow(label: String(localized: "命令"), hint: String(localized: "通过 stdin 接收事件 JSON;退出码 2 表示阻止")) { TextField("", text: $command).textFieldStyle(.roundedBorder).font(OMFonts.mono) }
             case "http": FormRow(label: "URL") { TextField("https://", text: $url).textFieldStyle(.roundedBorder).font(OMFonts.mono) }
             case "prompt", "agent":
-                FormRow(label: "提示词") { TextEditor(text: $prompt).font(OMFonts.mono).frame(height: 80).overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(OMColors.hairline)) }
-            default: FormRow(label: "命令") { TextField("", text: $command).textFieldStyle(.roundedBorder).font(OMFonts.mono) }
+                FormRow(label: String(localized: "提示词")) { TextEditor(text: $prompt).font(OMFonts.mono).frame(height: 80).overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(OMColors.hairline)) }
+            default: FormRow(label: String(localized: "命令")) { TextField("", text: $command).textFieldStyle(.roundedBorder).font(OMFonts.mono) }
             }
-            FormRow(label: "超时(秒)") { TextField("默认", text: $timeout).textFieldStyle(.roundedBorder).frame(width: 90) }
-            SheetFooter(problems: problems, confirmTitle: "保存", onCancel: onClose, onConfirm: save)
+            FormRow(label: String(localized: "超时(秒)")) { TextField("默认", text: $timeout).textFieldStyle(.roundedBorder).frame(width: 90) }
+            SheetFooter(problems: problems, confirmTitle: String(localized: "保存"), onCancel: onClose, onConfirm: save)
         }
         .padding(20)
         .frame(width: 560)
@@ -138,7 +138,7 @@ struct HookEditorSheet: View {
     }
 
     private func save() {
-        let ok = center.perform("已保存 Hook") {
+        let ok = center.perform(String(localized: "已保存 Hook")) {
             let store = HooksStore(paths: center.paths)
             if let entry = target.entry { try store.update(entry, handler: handler, matcher: matcher) }
             else { try store.add(handler, event: event, matcher: matcher, scope: scope) }

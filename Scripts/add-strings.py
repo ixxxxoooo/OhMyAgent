@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """向 en.lproj/Localizable.strings 追加缺失的键(已存在的跳过)。用法: add-strings.py "中文=English" ...
-@author ygw"""
+@author ixxxxoooo"""
 import re, sys
 p = 'Resources/en.lproj/Localizable.strings'
 s = open(p, encoding='utf-8').read()
@@ -16,3 +16,6 @@ if add:
     s += '\n'.join(add) + '\n'
     open(p, 'w', encoding='utf-8').write(s)
 print('added', len(add))
+# 同步生成简体中文资源(键即值)
+import os, subprocess
+subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "sync-zh-strings.py")], check=True)

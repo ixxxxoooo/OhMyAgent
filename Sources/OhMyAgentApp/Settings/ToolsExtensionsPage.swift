@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 设置页「工具与扩展」:MCP / Skills / 子 Agent / Hooks / 插件 / 记忆与指令的唯一入口(取代原独立的「扩展管理」窗口)。
 
 import IconKit
@@ -13,12 +13,12 @@ enum ExtensionSection: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .mcp: return "MCP 服务器"
-        case .skills: return "Skills 与命令"
-        case .agents: return "子 Agent"
+        case .mcp: return String(localized: "MCP 服务器")
+        case .skills: return String(localized: "Skills 与命令")
+        case .agents: return String(localized: "子 Agent")
         case .hooks: return "Hooks"
-        case .plugins: return "插件"
-        case .memory: return "记忆与指令"
+        case .plugins: return String(localized: "插件")
+        case .memory: return String(localized: "记忆与指令")
         }
     }
 
@@ -27,10 +27,10 @@ enum ExtensionSection: String, CaseIterable, Identifiable {
         switch self {
         case .mcp: return "MCP"
         case .skills: return "Skills"
-        case .agents: return "子 Agent"
+        case .agents: return String(localized: "子 Agent")
         case .hooks: return "Hooks"
-        case .plugins: return "插件"
-        case .memory: return "记忆"
+        case .plugins: return String(localized: "插件")
+        case .memory: return String(localized: "记忆")
         }
     }
 

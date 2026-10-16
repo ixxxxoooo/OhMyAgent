@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 模型网关(代理)可达性:解析 `~/.claude/settings.json` / 进程环境里配置的 `ANTHROPIC_BASE_URL`,
 // 发送前探测其是否可连接,并把失败翻译成可操作的中文提示。
 //
@@ -95,12 +95,12 @@ public enum ModelGateway {
     /// 把 `URLError` 翻译成中文原因。
     static func describe(_ error: URLError) -> String {
         switch error.code {
-        case .cannotConnectToHost: "连接被拒绝(服务未启动?)"
-        case .timedOut: "连接超时"
-        case .cannotFindHost, .dnsLookupFailed: "域名无法解析"
-        case .networkConnectionLost: "连接被中断"
-        case .notConnectedToInternet: "当前没有网络"
-        case .secureConnectionFailed, .serverCertificateUntrusted: "TLS 握手失败"
+        case .cannotConnectToHost: String(localized: "连接被拒绝(服务未启动?)")
+        case .timedOut: String(localized: "连接超时")
+        case .cannotFindHost, .dnsLookupFailed: String(localized: "域名无法解析")
+        case .networkConnectionLost: String(localized: "连接被中断")
+        case .notConnectedToInternet: String(localized: "当前没有网络")
+        case .secureConnectionFailed, .serverCertificateUntrusted: String(localized: "TLS 握手失败")
         default: error.localizedDescription
         }
     }
@@ -113,9 +113,9 @@ public enum ModelGateway {
     public static func unreachableMessage(url: URL, reason: String) -> String {
         let local = ["127.0.0.1", "localhost", "::1"].contains(url.host ?? "")
         let hint = local
-            ? "请先启动本地代理(如 Claude Code Router),或在 ~/.claude/settings.json 的 env 中修正 ANTHROPIC_BASE_URL。"
-            : "请检查网络与代理服务状态,或在 ~/.claude/settings.json 的 env 中修正 ANTHROPIC_BASE_URL。"
-        return "无法连接模型网关 \(origin(of: url)):\(reason)。\(hint)消息已放回输入框,恢复后再次发送即可。"
+            ? String(localized: "请先启动本地代理(如 Claude Code Router),或在 ~/.claude/settings.json 的 env 中修正 ANTHROPIC_BASE_URL。")
+            : String(localized: "请检查网络与代理服务状态,或在 ~/.claude/settings.json 的 env 中修正 ANTHROPIC_BASE_URL。")
+        return String(localized: "无法连接模型网关 \(origin(of: url)):\(reason)。\(hint)消息已放回输入框,恢复后再次发送即可。")
     }
 
     /// 取 `scheme://host:port` 形式(不含路径与凭据,避免泄露)。
@@ -132,20 +132,20 @@ public enum ModelGateway {
     public static func classify(_ text: String) -> String? {
         let lower = text.lowercased()
         if lower.contains("connection error") || lower.contains("econnrefused") || lower.contains("fetch failed") {
-            return "模型请求连接失败:网关或网络不可用,请检查代理是否在运行。"
+            return String(localized: "模型请求连接失败:网关或网络不可用,请检查代理是否在运行。")
         }
         if lower.contains("unrecognized_model") || lower.contains("model_not_found") || lower.contains("no such model")
             || (lower.contains("model") && lower.contains("not found")) {
-            return "网关不认识当前模型:请在模型选择器中换一个可用模型,或检查 settings.json 里的 ANTHROPIC_MODEL。"
+            return String(localized: "网关不认识当前模型:请在模型选择器中换一个可用模型,或检查 settings.json 里的 ANTHROPIC_MODEL。")
         }
         if lower.contains("401") || lower.contains("invalid api key") || lower.contains("authentication") {
-            return "网关鉴权失败:请检查 API Key(apiKeyHelper / ANTHROPIC_AUTH_TOKEN)是否有效。"
+            return String(localized: "网关鉴权失败:请检查 API Key(apiKeyHelper / ANTHROPIC_AUTH_TOKEN)是否有效。")
         }
         if lower.contains("429") || lower.contains("rate limit") {
-            return "触发限流(429):请稍后重试,免费模型额度可能已用尽。"
+            return String(localized: "触发限流(429):请稍后重试,免费模型额度可能已用尽。")
         }
         if lower.contains("overloaded") || lower.contains("529") {
-            return "上游模型过载:请稍后重试。"
+            return String(localized: "上游模型过载:请稍后重试。")
         }
         return nil
     }

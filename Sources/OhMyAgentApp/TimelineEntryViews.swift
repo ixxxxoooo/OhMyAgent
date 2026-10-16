@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 时间线条目视图:用户、助手(Markdown)、思维面板、工具卡片、计划、提示。
 
 import IconKit
@@ -267,7 +267,7 @@ struct PlanDock: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(expanded ? "收起待办" : "展开待办")
+                .accessibilityLabel(expanded ? String(localized: "收起待办") : String(localized: "展开待办"))
                 if expanded {
                     PlanView(entry: entry).padding([.horizontal, .bottom], 4)
                 }

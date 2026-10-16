@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // flowchart / graph 语法解析。
 
 import Foundation
@@ -113,7 +113,7 @@ enum FlowchartParser {
             previous = group
             cur.skipSpaces()
             if cur.atEnd { break }
-            guard let op = parseEdgeOp(&cur) else { throw MermaidError("无法识别的连线:\(cur.rest.prefix(12))") }
+            guard let op = parseEdgeOp(&cur) else { throw MermaidError(String(localized: "无法识别的连线:\(cur.rest.prefix(12))")) }
             pending = op
         }
         if pending != nil, previous != nil, let p = pending, p.from.isEmpty {
@@ -126,7 +126,7 @@ enum FlowchartParser {
         while true {
             cur.skipSpaces()
             let id = parseID(&cur)
-            guard !id.isEmpty else { throw MermaidError("缺少节点标识:\(cur.rest.prefix(12))") }
+            guard !id.isEmpty else { throw MermaidError(String(localized: "缺少节点标识:\(cur.rest.prefix(12))")) }
             if let (text, shape) = try parseShape(&cur) {
                 model.declare(id, text: text, shape: shape, parent: parent)
             } else {
@@ -177,7 +177,7 @@ enum FlowchartParser {
                 return (unquote(raw), entry.shape)
             }
         }
-        throw MermaidError("节点形状未闭合:\(cur.rest.prefix(12))")
+        throw MermaidError(String(localized: "节点形状未闭合:\(cur.rest.prefix(12))"))
     }
 
     private static func findClose(_ chars: [Character], from: Int, close: [Character]) -> Int? {

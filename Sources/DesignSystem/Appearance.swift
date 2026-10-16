@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 外观偏好:主题、强调色、字号、密度、动效与透明度。写入 UserDefaults,修改后立即生效(热更新)。
 
 import AppKit
@@ -11,9 +11,9 @@ public enum AppTheme: String, CaseIterable, Identifiable, Sendable {
     public var id: String { rawValue }
     public var displayName: String {
         switch self {
-        case .system: return "跟随系统"
-        case .light: return "浅色"
-        case .dark: return "深色"
+        case .system: return String(localized: "跟随系统")
+        case .light: return String(localized: "浅色")
+        case .dark: return String(localized: "深色")
         }
     }
 }
@@ -24,13 +24,13 @@ public enum AccentChoice: String, CaseIterable, Identifiable, Sendable {
     public var id: String { rawValue }
     public var displayName: String {
         switch self {
-        case .system: return "系统"
-        case .blue: return "蓝色"
-        case .purple: return "紫色"
-        case .pink: return "粉色"
-        case .orange: return "橙色"
-        case .green: return "绿色"
-        case .graphite: return "石墨"
+        case .system: return String(localized: "系统")
+        case .blue: return String(localized: "蓝色")
+        case .purple: return String(localized: "紫色")
+        case .pink: return String(localized: "粉色")
+        case .orange: return String(localized: "橙色")
+        case .green: return String(localized: "绿色")
+        case .graphite: return String(localized: "石墨")
         }
     }
     /// 对应颜色;`system` 返回 nil 表示使用系统强调色。

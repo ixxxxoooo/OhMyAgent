@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 设置页:模型提供商(会话级 Anthropic 协议上游 + 模型 + 密钥)。不改动 ~/.claude/settings.json。
 
 import IconKit
@@ -34,8 +34,8 @@ struct ModelProvidersPage: View {
                             Text(provider.name)
                             Text(provider.model).font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
                             Spacer()
-                            if model.snapshot.active == provider.id { OMTag("使用中") }
-                            if !model.hasKey(id: provider.id) { OMTag("缺少 Key") }
+                            if model.snapshot.active == provider.id { OMTag(String(localized: "使用中")) }
+                            if !model.hasKey(id: provider.id) { OMTag(String(localized: "缺少 Key")) }
                         }
                         .contentShape(Rectangle())
                     }
@@ -47,7 +47,7 @@ struct ModelProvidersPage: View {
                         Button(preset.name) { select(preset.makeProvider(), isNew: true) }
                     }
                     Divider()
-                    Button("自定义(Anthropic 兼容端点)") { select(ModelProvider(id: "custom-\(UUID().uuidString.prefix(6))", name: "自定义", baseURL: "https://", model: ""), isNew: true) }
+                    Button("自定义(Anthropic 兼容端点)") { select(ModelProvider(id: "custom-\(UUID().uuidString.prefix(6))", name: String(localized: "自定义"), baseURL: "https://", model: ""), isNew: true) }
                 }
             }
             if selection != nil { editor }
@@ -112,12 +112,12 @@ struct ModelProvidersPage: View {
                     Button("获取模型列表") { Task { await fetchModels() } }.disabled(fetching)
                     if fetching { ProgressView().controlSize(.small) }
                 }
-                Text((draft.availableModels ?? []).isEmpty ? String(localized: "尚未获取;输入框的模型菜单将只显示主模型。") : (draft.availableModels ?? []).joined(separator: "、"))
+                Text((draft.availableModels ?? []).isEmpty ? String(localized: "尚未获取;输入框的模型菜单将只显示主模型。") : (draft.availableModels ?? []).joined(separator: String(localized: "、")))
                     .font(OMFonts.caption).foregroundStyle(OMColors.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
                 if let fetchMessage { Text(fetchMessage).font(OMFonts.caption).foregroundStyle(OMColors.secondaryText) }
             }
-            SecureField(model.hasKey(id: draft.id) ? "API Key(已保存,留空表示不修改)" : "API Key", text: $keyText).textFieldStyle(.roundedBorder)
+            SecureField(model.hasKey(id: draft.id) ? String(localized: "API Key(已保存,留空表示不修改)") : "API Key", text: $keyText).textFieldStyle(.roundedBorder)
             Note("密钥保存在 ~/Library/Application Support/OhMyAgent/provider-keys.json(权限 0600),只在启动会话时放进 Claude Code 进程的环境变量,不写入日志。")
             HStack {
                 Button("保存") { save() }.keyboardShortcut(.defaultAction)

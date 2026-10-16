@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 设置窗口(⌘,):18 个页面。Claude Code 自身的设置写回 settings.json 并热更新,客户端设置存 UserDefaults。
 
 import IconKit
@@ -18,10 +18,10 @@ enum SettingsPage: String, CaseIterable, Identifiable {
 
     /// 侧栏分组(从上到下)。
     static let groups: [(title: String, pages: [SettingsPage])] = [
-        ("客户端", [.general, .appearance, .shortcuts]),
+        (String(localized: "客户端"), [.general, .appearance, .shortcuts]),
         ("Agent", [.agent, .providers, .prompts, .network, .permissions, .trust, .tools, .agentExtensions]),
-        ("工作台", [.editor, .terminal]),
-        ("其他", [.usage, .privacy, .advanced, .diagnostics]),
+        (String(localized: "工作台"), [.editor, .terminal]),
+        (String(localized: "其他"), [.usage, .privacy, .advanced, .diagnostics]),
     ]
 
     var title: String {

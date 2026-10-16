@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 设置页:隐私、高级(路径覆盖、环境变量、MCP 运行参数、客户端能力、数据管理)。
 
 import AgentHost
@@ -56,9 +56,9 @@ struct AdvancedPage: View {
     var body: some View {
         SettingsForm {
             Section("工具路径(留空自动探测)") {
-                TextField("node", text: $nodePath, prompt: Text(tools?.nodePath ?? "未找到"))
-                TextField("claude", text: $claudePath, prompt: Text(tools?.claudePath ?? "未找到"))
-                TextField("ACP 适配器入口", text: $adapterPath, prompt: Text(tools?.adapterEntry ?? "未找到"))
+                TextField("node", text: $nodePath, prompt: Text(tools?.nodePath ?? String(localized: "未找到")))
+                TextField("claude", text: $claudePath, prompt: Text(tools?.claudePath ?? String(localized: "未找到")))
+                TextField("ACP 适配器入口", text: $adapterPath, prompt: Text(tools?.adapterEntry ?? String(localized: "未找到")))
                 HStack {
                     Button("应用并重新探测") { Task { await redetect() } }
                     if let version = tools?.nodeVersion { Text("node \(version)").font(OMFonts.small).foregroundStyle(OMColors.secondaryText) }
@@ -67,9 +67,9 @@ struct AdvancedPage: View {
             }
             Section("MCP 运行参数") {
                 ScopeHeader(model: model)
-                envField("启动超时(ms)", "MCP_TIMEOUT")
-                envField("工具调用超时(ms)", "MCP_TOOL_TIMEOUT")
-                envField("输出 token 上限", "MAX_MCP_OUTPUT_TOKENS")
+                envField(String(localized: "启动超时(ms)"), "MCP_TIMEOUT")
+                envField(String(localized: "工具调用超时(ms)"), "MCP_TOOL_TIMEOUT")
+                envField(String(localized: "输出 token 上限"), "MAX_MCP_OUTPUT_TOKENS")
             }
             Section("环境变量(\(model.scope.displayName)层)") {
                 TextEditor(text: $envText)
@@ -96,7 +96,7 @@ struct AdvancedPage: View {
                     HStack { Text("\(backupCount) 个"); Button("清理") { cleanBackups() }.disabled(backupCount == 0) }
                 }
                 LabeledContent("客户端偏好") {
-                    Button("恢复默认", role: .destructive) { ClientPrefs.resetAll(); notice = "已恢复客户端默认偏好(不影响 Claude 配置)" }
+                    Button("恢复默认", role: .destructive) { ClientPrefs.resetAll(); notice = String(localized: "已恢复客户端默认偏好(不影响 Claude 配置)") }
                 }
                 if let notice { Note(notice) }
             }
@@ -150,7 +150,7 @@ struct AdvancedPage: View {
     private func cleanBackups() {
         let files = backupFiles()
         for file in files { try? FileManager.default.removeItem(at: file) }
-        notice = "已清理 \(files.count) 个备份"
+        notice = String(localized: "已清理 \(files.count) 个备份")
         countBackups()
     }
 }

@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // ACP 连接:基于任意传输实现 JSON-RPC 请求/响应关联、通知分发与反向请求处理。
 
 import Foundation
@@ -79,7 +79,7 @@ public actor ACPConnection {
     /// - Throws: `JSONRPCError`(对端错误)或连接关闭错误
     public func request(_ method: String, params: JSONValue? = nil) async throws -> JSONValue {
         if isClosed {
-            throw JSONRPCError(code: JSONRPCError.internalError, message: "连接已关闭")
+            throw JSONRPCError(code: JSONRPCError.internalError, message: String(localized: "连接已关闭"))
         }
         let id = RequestID.int(nextRequestID)
         nextRequestID += 1
@@ -136,7 +136,7 @@ public actor ACPConnection {
         if let raw = try? JSONValue.from(id) {
             try? send(.notification(method: "$/cancel_request", params: ["requestId": raw]))
         }
-        continuation.resume(throwing: JSONRPCError(code: JSONRPCError.requestCancelled, message: "请求已取消"))
+        continuation.resume(throwing: JSONRPCError(code: JSONRPCError.requestCancelled, message: String(localized: "请求已取消")))
     }
 
     private func send(_ message: JSONRPCMessage) throws {
@@ -230,7 +230,7 @@ public actor ACPConnection {
         isClosed = true
         log.info("连接关闭", ["exit": exitCode.map { "\($0)" } ?? "-", "pending": "\(pending.count)"])
         pendingInfo.removeAll()
-        let error = JSONRPCError(code: JSONRPCError.internalError, message: "连接已关闭")
+        let error = JSONRPCError(code: JSONRPCError.internalError, message: String(localized: "连接已关闭"))
         for (_, continuation) in pending { continuation.resume(throwing: error) }
         pending.removeAll()
         inboundContinuation.yield(.closed(exitCode: exitCode))

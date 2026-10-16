@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 可观察的 Agent 注册表模型:设置页与窗口工具栏共享,修改即写回 agents.json。
 
 import AgentHost
@@ -36,7 +36,7 @@ public final class AgentRegistryModel {
             try store.save(next)
             lastError = nil
         } catch {
-            lastError = "保存 agents.json 失败:\(error.localizedDescription)"
+            lastError = String(localized: "保存 agents.json 失败:\(error.localizedDescription)")
         }
         data = next
     }
@@ -45,9 +45,9 @@ public final class AgentRegistryModel {
     /// - Returns: 失败原因;成功返回 nil
     @discardableResult
     public func upsert(_ agent: AgentDescriptor) -> String? {
-        if agent.id.trimmingCharacters(in: .whitespaces).isEmpty { return "Agent 标识不能为空" }
-        if AgentDescriptor.builtIns.contains(where: { $0.id == agent.id }) { return "标识 \(agent.id) 已被内置 Agent 占用" }
-        if (agent.command ?? "").trimmingCharacters(in: .whitespaces).isEmpty { return "请填写可执行文件或命令名" }
+        if agent.id.trimmingCharacters(in: .whitespaces).isEmpty { return String(localized: "Agent 标识不能为空") }
+        if AgentDescriptor.builtIns.contains(where: { $0.id == agent.id }) { return String(localized: "标识 \(agent.id) 已被内置 Agent 占用") }
+        if (agent.command ?? "").trimmingCharacters(in: .whitespaces).isEmpty { return String(localized: "请填写可执行文件或命令名") }
         update { value in
             if let index = value.agents.firstIndex(where: { $0.id == agent.id }) { value.agents[index] = agent } else { value.agents.append(agent) }
         }

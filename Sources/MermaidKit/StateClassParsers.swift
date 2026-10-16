@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // stateDiagram(-v2) 与 classDiagram 解析,均产出 FlowModel。
 
 import Foundation
@@ -87,7 +87,7 @@ enum StateParser {
                 else { model.nodes[id]?.text = text; model.nodes[id]?.declared = true }
                 continue
             }
-            throw MermaidError(line: idx + 1, "无法识别的状态图语句:\(line.prefix(24))")
+            throw MermaidError(line: idx + 1, String(localized: "无法识别的状态图语句:\(line.prefix(24))"))
         }
         return model
     }
@@ -170,7 +170,7 @@ enum ClassParser {
                 add(id, member: ns.substring(with: m.range(at: 2)))
                 continue
             }
-            throw MermaidError(line: idx + 1, "无法识别的类图语句:\(line.prefix(24))")
+            throw MermaidError(line: idx + 1, String(localized: "无法识别的类图语句:\(line.prefix(24))"))
         }
         return model
     }

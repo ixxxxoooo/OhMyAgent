@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 设置页:Agent 与模型、权限。均写回 settings.json。
 
 import IconKit
@@ -22,7 +22,7 @@ struct AgentModelPage: View {
                     TextField("默认模型", text: model.stringBinding(["model"]), prompt: Text("留空使用 Claude Code 默认"))
                     Menu("常用") {
                         ForEach(aliases, id: \.self) { alias in
-                            Button(alias.isEmpty ? "默认" : alias) { model.set(["model"], alias.isEmpty ? nil : alias) }
+                            Button(alias.isEmpty ? String(localized: "默认") : alias) { model.set(["model"], alias.isEmpty ? nil : alias) }
                         }
                     }
                     .fixedSize()
@@ -72,7 +72,7 @@ struct PermissionsPage: View {
     @State private var testArgument = ""
 
     private var store: PermissionsStore { PermissionsStore(paths: model.paths) }
-    private let modes: [(String, String)] = [("", "默认(逐次询问)"), ("acceptEdits", "自动接受编辑"), ("plan", "计划模式"), ("dontAsk", "不再询问(仅执行允许规则)"), ("bypassPermissions", "跳过所有权限(危险)")]
+    private let modes: [(String, String)] = [("", String(localized: "默认(逐次询问)")), ("acceptEdits", String(localized: "自动接受编辑")), ("plan", String(localized: "计划模式")), ("dontAsk", String(localized: "不再询问(仅执行允许规则)")), ("bypassPermissions", String(localized: "跳过所有权限(危险)"))]
 
     var body: some View {
         SettingsForm {
@@ -114,8 +114,8 @@ struct PermissionsPage: View {
 
     private var testResult: String {
         _ = model.revision
-        guard let hit = store.evaluate(tool: testTool, argument: testArgument.isEmpty ? nil : testArgument) else { return "没有规则命中,将按默认模式处理。" }
-        return "命中\(hit.behavior.displayName)规则 \(hit.rule)(\(hit.scope.displayName)层)"
+        guard let hit = store.evaluate(tool: testTool, argument: testArgument.isEmpty ? nil : testArgument) else { return String(localized: "没有规则命中,将按默认模式处理。") }
+        return String(localized: "命中\(hit.behavior.displayName)规则 \(hit.rule)(\(hit.scope.displayName)层)")
     }
 }
 

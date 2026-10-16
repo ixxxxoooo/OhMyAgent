@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 插件:读取 ~/.claude/plugins 下的安装记录与市场(通道 B,只读),变更通过 `claude plugin` CLI(通道 C)。
 
 import Foundation
@@ -108,7 +108,7 @@ public struct PluginStore: Sendable {
     public static func validateArgument(_ value: String) throws {
         let trimmed = value.trimmingCharacters(in: .whitespaces)
         if trimmed.isEmpty || trimmed.hasPrefix("-") || trimmed.contains(where: { $0.isNewline }) {
-            throw ConfigError.invalidValue("输入无效:不能为空,也不能以 - 开头")
+            throw ConfigError.invalidValue(String(localized: "输入无效:不能为空,也不能以 - 开头"))
         }
     }
 }
