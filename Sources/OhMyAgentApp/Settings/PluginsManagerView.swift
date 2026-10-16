@@ -79,17 +79,18 @@ struct PluginsManagerView: View {
                             if !plugin.description.isEmpty { Text(plugin.description).font(OMFonts.small).foregroundStyle(OMColors.secondaryText) }
                         }
                         Spacer()
-                        Toggle("启用", isOn: Binding(
+                        OMSwitch(String(localized: "启用 \(plugin.name)"), isOn: Binding(
                             get: { plugin.isEnabled },
                             set: { value in
                                 Task { await center.runCLI(PluginStore.toggleArguments(plugin.pluginID, enable: value, scope: plugin.scope),
                                                            message: value ? String(localized: "正在启用…") : String(localized: "正在停用…"), notice: value ? String(localized: "已启用 \(plugin.name),重启会话后生效") : String(localized: "已停用 \(plugin.name)")) }
                             }))
-                            .toggleStyle(.switch).disabled(center.isBusy || !center.canRunCLI)
+                            .disabled(center.isBusy || !center.canRunCLI)
                         Button("更新") { Task { await center.runCLI(PluginStore.updateArguments(plugin.pluginID), message: String(localized: "正在更新…"), notice: String(localized: "已更新 \(plugin.name),重启会话后生效")) } }
                             .disabled(center.isBusy || !center.canRunCLI)
                         Button("卸载", role: .destructive) { pendingUninstall = plugin }.disabled(center.isBusy || !center.canRunCLI)
                     }
+                    .controlSize(.small)
                     HStack(spacing: 6) {
                         if plugin.skillCount > 0 { Tag(String(localized: "\(plugin.skillCount) 个 Skill")) }
                         if plugin.commandCount > 0 { Tag(String(localized: "\(plugin.commandCount) 个命令")) }
@@ -139,6 +140,7 @@ struct PluginsManagerView: View {
                     Button("移除", role: .destructive) { Task { await center.runCLI(PluginStore.marketplaceRemoveArguments(market.name), message: String(localized: "正在移除…"), notice: String(localized: "已移除 \(market.name)")) } }
                         .disabled(center.isBusy || !center.canRunCLI)
                 }
+                .controlSize(.small)
                 .padding(.vertical, 2)
             }
         }

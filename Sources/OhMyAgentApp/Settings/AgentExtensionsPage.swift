@@ -129,12 +129,15 @@ struct AgentExtensionsPage: View {
                         }
                     }
                     Spacer()
-                    if agent.enabled, registry.data.resolvedDefault.id != agent.id { Button("设为默认") { registry.setDefault(agentId: agent.id) } }
-                    if !builtIn {
-                        Button("编辑") { draft = AgentDraft(agent) }
-                        Button("删除", role: .destructive) { registry.remove(agentId: agent.id) }
-                        Toggle("", isOn: Binding(get: { agent.enabled }, set: { registry.setEnabled($0, agentId: agent.id) })).labelsHidden()
+                    HStack(spacing: 8) {
+                        if agent.enabled, registry.data.resolvedDefault.id != agent.id { Button("设为默认") { registry.setDefault(agentId: agent.id) } }
+                        if !builtIn {
+                            Button("编辑") { draft = AgentDraft(agent) }
+                            Button("删除", role: .destructive) { registry.remove(agentId: agent.id) }
+                            OMSwitch(String(localized: "启用 \(agent.name)"), isOn: Binding(get: { agent.enabled }, set: { registry.setEnabled($0, agentId: agent.id) }))
+                        }
                     }
+                    .controlSize(.small)
                 }
             }
             HStack {
@@ -157,9 +160,12 @@ struct AgentExtensionsPage: View {
                         Text(([entry.command] + entry.args).joined(separator: " ")).font(OMFonts.monoSmall).foregroundStyle(OMColors.secondaryText)
                     }
                     Spacer()
-                    Button("编辑") { mcpDraft = entry }
-                    Button("删除", role: .destructive) { registry.removeMCP(id: entry.id) }
-                    Toggle("", isOn: Binding(get: { entry.enabled }, set: { value in var copy = entry; copy.enabled = value; registry.upsertMCP(copy) })).labelsHidden()
+                    HStack(spacing: 8) {
+                        Button("编辑") { mcpDraft = entry }
+                        Button("删除", role: .destructive) { registry.removeMCP(id: entry.id) }
+                        OMSwitch(String(localized: "启用 \(entry.name)"), isOn: Binding(get: { entry.enabled }, set: { value in var copy = entry; copy.enabled = value; registry.upsertMCP(copy) }))
+                    }
+                    .controlSize(.small)
                 }
             }
             HStack {

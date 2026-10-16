@@ -131,7 +131,7 @@ struct MCPSettingsPage: View {
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
             } else {
-                Toggle("", isOn: Binding(
+                OMSwitch(String(localized: "启用 \(entry.config.name)"), isOn: Binding(
                     get: { !entry.isDisabled },
                     set: { enabled in
                         center.perform(enabled ? String(localized: "已启用") : String(localized: "已禁用")) {
@@ -139,10 +139,6 @@ struct MCPSettingsPage: View {
                         }
                     }
                 ))
-                .toggleStyle(.switch)
-                .controlSize(.small)
-                .labelsHidden()
-                .accessibilityLabel(String(localized: "启用 \(entry.config.name)"))
             }
             Menu {
                 Button("编辑…") { editor = MCPEditorTarget(entry: entry) }
