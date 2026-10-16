@@ -131,12 +131,18 @@ struct AppearancePage: View {
     var body: some View {
         SettingsForm {
             Section("主题") {
-                ForEach(ThemeGroup.allCases, id: \.self) { group in
+                // 当前主题的迷你工作台预览(侧栏、对话、代码块、输入框、终端)
+                ThemeMiniWorkbench(package: appearance.themePackage)
+                    .frame(height: 170)
+                    .clipShape(RoundedRectangle(cornerRadius: OMMetrics.cardRadius, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: OMMetrics.cardRadius, style: .continuous).strokeBorder(OMColors.hairline))
+                    .accessibilityLabel(Text("主题预览"))
+                ForEach(ThemeGroup.allCases.filter { $0 != .custom }, id: \.self) { group in
                     VStack(alignment: .leading, spacing: 6) {
                         Text(group.title).font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 220), spacing: 8)], alignment: .leading, spacing: 8) {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 170, maximum: 240), spacing: 8)], alignment: .leading, spacing: 8) {
                             ForEach(ThemePackage.all.filter { $0.group == group }) { package in
-                                ThemeCard(package: package, selected: appearance.themeID == package.id) {
+                                ThemeCardPublic(package: package, selected: appearance.themeID == package.id) {
                                     appearance.themeID = package.id
                                 }
                             }
@@ -148,6 +154,7 @@ struct AppearancePage: View {
                     .disabled(appearance.themePackage.tone != .system)
                 Note("「模式」只在主题为「跟随系统」时可选;其余主题自带明暗。")
             }
+            CustomThemeSection()
             Section("强调色") {
                 AccentPicker(title: "主强调色", choice: $appearance.accent, hex: $appearance.customAccentHex)
                 AccentPicker(title: "第二强调色", choice: $appearance.accent2, hex: $appearance.customAccent2Hex)
@@ -295,7 +302,7 @@ private struct VerbStyleRow: View {
 }
 
 /// 主题卡片:迷你色板 + 名称,选中时描边。
-private struct ThemeCard: View {
+struct ThemeCardPublic: View {
     let package: ThemePackage
     let selected: Bool
     let action: () -> Void
@@ -303,8 +310,8 @@ private struct ThemeCard: View {
     var body: some View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 6) {
-                swatch
-                    .frame(height: 34)
+                ThemeMiniWorkbench(package: package)
+                    .frame(height: 72)
                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
                 HStack(spacing: 4) {
@@ -321,34 +328,6 @@ private struct ThemeCard: View {
         .buttonStyle(.plain)
         .accessibilityLabel(package.name)
         .accessibilityAddTraits(selected ? [.isSelected] : [])
-    }
-
-    /// 迷你预览:左半底色 + 卡片条 + 强调色点。
-    @ViewBuilder private var swatch: some View {
-        if let palette = package.palette {
-            ZStack(alignment: .leading) {
-                palette.surface.color
-                HStack(spacing: 5) {
-                    RoundedRectangle(cornerRadius: 3).fill(palette.card.color).frame(width: 34, height: 22)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Capsule().fill(palette.editorForeground.color.opacity(0.7)).frame(width: 40, height: 3)
-                        Capsule().fill(palette.comment.color).frame(width: 26, height: 3)
-                    }
-                    Spacer(minLength: 0)
-                    HStack(spacing: 3) {
-                        Circle().fill(palette.accent.color).frame(width: 9, height: 9)
-                        Circle().fill(palette.accent2.color).frame(width: 9, height: 9)
-                    }
-                }
-                .padding(.horizontal, 7)
-            }
-        } else {
-            HStack(spacing: 0) {
-                OMColors.systemSidebar
-                OMColors.systemContentBackground
-            }
-            .overlay(Image.om("monitor", size: 14).foregroundStyle(OMColors.tertiaryText))
-        }
     }
 }
 

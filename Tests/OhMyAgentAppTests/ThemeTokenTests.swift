@@ -25,7 +25,7 @@ struct ThemeTokenTests {
             guard let palette = package.palette else { continue }
             let colors = palette.ansiColors
             #expect(colors.count == 16, "\(package.id) ANSI 色数量")
-            #expect(Set(colors.prefix(8).map(\.hexString)).count == 8, "\(package.id) 前 8 色应互不相同")
+            #expect(Set(colors.prefix(8).map(\.hexString)).count == 8, "\(package.id) 前 8 色应互不相同: \(colors.prefix(8).map(\.hexString))")
         }
     }
 

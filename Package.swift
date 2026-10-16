@@ -41,7 +41,7 @@ let package = Package(
         // 演示模式数据:确定性生成演示项目、Git 仓库、历史会话与演示用 Claude 配置(无视图)
         .target(name: "DemoKit", dependencies: ["ACPKit", "OMLog", "WorkbenchKit"]),
         // Liquid Glass 设计系统
-        .target(name: "DesignSystem", dependencies: ["IconKit"]),
+        .target(name: "DesignSystem", dependencies: ["IconKit", "OMLog"]),
         // 模型协议代理:本地回环 HTTP,把 Anthropic /v1/messages 转换为 OpenAI /chat/completions(无视图)
         .target(name: "ProviderProxyKit", dependencies: ["OMLog"]),
         // 聊天核心:时间线模型、事件合并、Markdown 解析、会话模型(不含视图)

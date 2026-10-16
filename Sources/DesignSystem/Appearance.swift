@@ -123,6 +123,8 @@ public final class AppearanceModel {
         func string(_ key: String) -> String? { defaults.string(forKey: Self.prefix + key) }
         func double(_ key: String, _ fallback: Double) -> Double { defaults.object(forKey: Self.prefix + key) as? Double ?? fallback }
         func bool(_ key: String, _ fallback: Bool) -> Bool { defaults.object(forKey: Self.prefix + key) as? Bool ?? fallback }
+        // 自定义主题体积很小(单个 JSON),启动时同步读取,避免先闪一下系统主题
+        ThemeRuntime.customThemes = CustomThemeStore.loadAll()
         theme = AppTheme(rawValue: string("theme") ?? "") ?? .system
         themeID = string("themePackage") ?? ThemePackage.system.id
         accent = AccentChoice(rawValue: string("accent") ?? "") ?? .system
@@ -137,6 +139,33 @@ public final class AppearanceModel {
         fallbackOnLowPower = bool("fallbackOnLowPower", true)
         isLoading = false
         applyAll()
+    }
+
+    /// 重新读取磁盘上的自定义主题并刷新当前主题。
+    public func reloadCustomThemes() {
+        ThemeRuntime.customThemes = CustomThemeStore.loadAll()
+        applyTheme()
+        ThemeRuntime.bump()
+        themeRevision += 1
+    }
+
+    /// 保存(新建或覆盖)自定义主题并立即选中。
+    /// - Parameter file: 主题文件
+    /// - Returns: 生效的主题包
+    @discardableResult
+    public func saveCustomTheme(_ file: CustomThemeFile) throws -> ThemePackage {
+        let package = try CustomThemeStore.save(file)
+        reloadCustomThemes()
+        themeID = package.id
+        return package
+    }
+
+    /// 删除自定义主题;若正在使用则回退为「跟随系统」。
+    /// - Parameter id: 主题 id
+    public func deleteCustomTheme(id: String) {
+        CustomThemeStore.delete(id: id)
+        if themeID == id { themeID = ThemePackage.system.id }
+        reloadCustomThemes()
     }
 
     /// 动画:减弱动效时返回 nil。

@@ -136,7 +136,17 @@ extension ThemePalette {
         if let ansi, ansi.count == 16 { return ansi }
         let black = isDark ? surface.mixed(with: editorForeground, 0.22) : editorForeground.mixed(with: surface, 0.10)
         let white = isDark ? editorForeground.mixed(with: surface, 0.18) : surface.mixed(with: editorForeground, 0.22)
-        let base: [ThemeRGB] = [black, danger, success, warning, function, keyword, type, white]
+        // 蓝/品红/青从候选里挑与已选颜色不同的,避免语法色与语义色撞车导致终端里两种颜色一样
+        var used: Set<String> = [black, danger, success, warning, white].map(\.hexString).reduce(into: Set<String>()) { $0.insert($1) }
+        func pick(_ candidates: [ThemeRGB]) -> ThemeRGB {
+            let chosen = candidates.first { !used.contains($0.hexString) } ?? candidates[0].mixed(with: editorForeground, 0.25)
+            used.insert(chosen.hexString)
+            return chosen
+        }
+        let blue = pick([function, accent, property, type])
+        let magenta = pick([keyword, accent2, number, string])
+        let cyan = pick([type, property, accent, function, number])
+        let base: [ThemeRGB] = [black, danger, success, warning, blue, magenta, cyan, white]
         let lift = isDark ? editorForeground : surface
         var bright = base.map { $0.mixed(with: lift, isDark ? 0.22 : 0.0) }
         if !isDark { bright = base.map { $0.mixed(with: editorForeground, 0.18) } }
@@ -157,6 +167,10 @@ public enum ThemeTone: String, Sendable {
 /// 主题分组(设置页分组展示)。
 public enum ThemeGroup: String, CaseIterable, Sendable {
     case system, cursor, anthropic, claudeCode, opencode
+    /// 经典配色(Nord、Dracula、Solarized 等社区流行方案)
+    case classic
+    /// 用户自定义/导入的主题
+    case custom
 
     public var title: String {
         switch self {
@@ -165,6 +179,8 @@ public enum ThemeGroup: String, CaseIterable, Sendable {
         case .anthropic: return "Anthropic"
         case .claudeCode: return "Claude Code"
         case .opencode: return "OpenCode"
+        case .classic: return String(localized: "经典配色")
+        case .custom: return String(localized: "自定义")
         }
     }
 }
@@ -369,14 +385,119 @@ extension ThemePackage {
         $0.setSyntax(keyword: 0x7B5BB6, string: 0x3D9A57, comment: 0x8A8A8A, number: 0xD68C27, type: 0xB0851F, function: 0x3B7DD8, property: 0xD1383D)
     })
 
-    /// 全部预置主题(设置页按分组展示)。
-    public static let all: [ThemePackage] = [
+    // 经典配色:每套都带独立的圆角/描边/阴影风格
+    static let nord = ThemePackage(id: "nord", name: "Nord", group: .classic, tone: .dark, palette: .make(.darkBase) {
+        $0.setBackgrounds(surface: 0x2E3440, card: 0x3B4252, gutter: 0x2B303B, currentLine: 0x3B4252, sidebar: 0x272C36)
+        $0.editorForeground = ThemeRGB(hex: 0xE5E9F0); $0.gutterForeground = ThemeRGB(hex: 0x6B7790)
+        $0.accent = ThemeRGB(hex: 0x88C0D0); $0.accent2 = ThemeRGB(hex: 0xB48EAD)
+        $0.success = ThemeRGB(hex: 0xA3BE8C); $0.danger = ThemeRGB(hex: 0xBF616A); $0.warning = ThemeRGB(hex: 0xEBCB8B)
+        $0.diffAdded = ThemeRGB(hex: 0x33473A); $0.diffRemoved = ThemeRGB(hex: 0x4A3338)
+        $0.setSyntax(keyword: 0x81A1C1, string: 0xA3BE8C, comment: 0x7B88A1, number: 0xB48EAD, type: 0x8FBCBB, function: 0x88C0D0, property: 0xD8DEE9)
+        $0.style = ThemeStyle(cornerScale: 0.9, strokeScale: 0.8, shadowScale: 0.8)
+    })
+
+    static let solarizedDark = ThemePackage(id: "solarized-dark", name: "Solarized Dark", group: .classic, tone: .dark, palette: .make(.darkBase) {
+        $0.setBackgrounds(surface: 0x002B36, card: 0x073642, gutter: 0x01313C, currentLine: 0x0B3C49, sidebar: 0x00222B)
+        $0.editorForeground = ThemeRGB(hex: 0xD5DDDD); $0.gutterForeground = ThemeRGB(hex: 0x586E75)
+        $0.accent = ThemeRGB(hex: 0x2AA198); $0.accent2 = ThemeRGB(hex: 0x6C71C4)
+        $0.success = ThemeRGB(hex: 0x859900); $0.danger = ThemeRGB(hex: 0xDC322F); $0.warning = ThemeRGB(hex: 0xB58900)
+        $0.diffAdded = ThemeRGB(hex: 0x0B4A35); $0.diffRemoved = ThemeRGB(hex: 0x4A2229)
+        $0.setSyntax(keyword: 0x859900, string: 0x2AA198, comment: 0x6C8790, number: 0xD33682, type: 0xB58900, function: 0x268BD2, property: 0x93A1A1)
+        $0.style = ThemeStyle(cornerScale: 0.8, strokeScale: 1.2, shadowScale: 0.6)
+    })
+
+    static let solarizedLight = ThemePackage(id: "solarized-light", name: "Solarized Light", group: .classic, tone: .light, palette: .make(.lightBase) {
+        $0.setBackgrounds(surface: 0xFDF6E3, card: 0xF5EDD6, gutter: 0xF3EBD3, currentLine: 0xEEE8D5, sidebar: 0xEEE8D5)
+        $0.editorForeground = ThemeRGB(hex: 0x30454D); $0.gutterForeground = ThemeRGB(hex: 0x93A1A1)
+        $0.accent = ThemeRGB(hex: 0x1E8A82); $0.accent2 = ThemeRGB(hex: 0x6C71C4)
+        $0.success = ThemeRGB(hex: 0x667700); $0.danger = ThemeRGB(hex: 0xCB2F2D); $0.warning = ThemeRGB(hex: 0x946C00)
+        $0.diffAdded = ThemeRGB(hex: 0xE3EBC7); $0.diffRemoved = ThemeRGB(hex: 0xF7DDD3)
+        $0.setSyntax(keyword: 0x667700, string: 0x1E8A82, comment: 0x7C8F94, number: 0xC22C74, type: 0x946C00, function: 0x1F78B8, property: 0x586E75)
+        $0.style = ThemeStyle(cornerScale: 0.8, strokeScale: 1.2, shadowScale: 0.6)
+    })
+
+    static let dracula = ThemePackage(id: "dracula", name: "Dracula", group: .classic, tone: .dark, palette: .make(.darkBase) {
+        $0.setBackgrounds(surface: 0x282A36, card: 0x343746, gutter: 0x2C2E3B, currentLine: 0x3A3D4F, sidebar: 0x21222C)
+        $0.editorForeground = ThemeRGB(hex: 0xF8F8F2); $0.gutterForeground = ThemeRGB(hex: 0x6D7399)
+        $0.accent = ThemeRGB(hex: 0xBD93F9); $0.accent2 = ThemeRGB(hex: 0xFF79C6)
+        $0.success = ThemeRGB(hex: 0x50FA7B); $0.danger = ThemeRGB(hex: 0xFF5555); $0.warning = ThemeRGB(hex: 0xFFB86C)
+        $0.diffAdded = ThemeRGB(hex: 0x1F4A33); $0.diffRemoved = ThemeRGB(hex: 0x57262E)
+        $0.setSyntax(keyword: 0xFF79C6, string: 0xF1FA8C, comment: 0x7C89BD, number: 0xBD93F9, type: 0x8BE9FD, function: 0x50FA7B, property: 0xFFB86C)
+        $0.style = ThemeStyle(cornerScale: 1.25, strokeScale: 0.9, shadowScale: 1.2, glassTint: 0.08)
+    })
+
+    static let tokyoNight = ThemePackage(id: "tokyo-night", name: "Tokyo Night", group: .classic, tone: .dark, palette: .make(.darkBase) {
+        $0.setBackgrounds(surface: 0x1A1B26, card: 0x24283B, gutter: 0x1E202E, currentLine: 0x292E42, sidebar: 0x16161E)
+        $0.editorForeground = ThemeRGB(hex: 0xC8D0F7); $0.gutterForeground = ThemeRGB(hex: 0x565F89)
+        $0.accent = ThemeRGB(hex: 0x7AA2F7); $0.accent2 = ThemeRGB(hex: 0xBB9AF7)
+        $0.success = ThemeRGB(hex: 0x9ECE6A); $0.danger = ThemeRGB(hex: 0xF7768E); $0.warning = ThemeRGB(hex: 0xE0AF68)
+        $0.diffAdded = ThemeRGB(hex: 0x1F3A2C); $0.diffRemoved = ThemeRGB(hex: 0x472631)
+        $0.setSyntax(keyword: 0xBB9AF7, string: 0x9ECE6A, comment: 0x6F7AA6, number: 0xFF9E64, type: 0x2AC3DE, function: 0x7AA2F7, property: 0x73DACA)
+        $0.style = ThemeStyle(cornerScale: 1.1, strokeScale: 0.9, shadowScale: 1.1, glassTint: 0.05)
+    })
+
+    static let githubLight = ThemePackage(id: "github-light", name: "GitHub Light", group: .classic, tone: .light, palette: .make(.lightBase) {
+        $0.setBackgrounds(surface: 0xFFFFFF, card: 0xF6F8FA, gutter: 0xF6F8FA, currentLine: 0xEAF1FB, sidebar: 0xF6F8FA)
+        $0.editorForeground = ThemeRGB(hex: 0x1F2328); $0.gutterForeground = ThemeRGB(hex: 0x8C959F)
+        $0.accent = ThemeRGB(hex: 0x0969DA); $0.accent2 = ThemeRGB(hex: 0x8250DF)
+        $0.success = ThemeRGB(hex: 0x1A7F37); $0.danger = ThemeRGB(hex: 0xCF222E); $0.warning = ThemeRGB(hex: 0x9A6700)
+        $0.diffAdded = ThemeRGB(hex: 0xDAFBE1); $0.diffRemoved = ThemeRGB(hex: 0xFFEBE9)
+        $0.setSyntax(keyword: 0xCF222E, string: 0x0A3069, comment: 0x6E7781, number: 0x0550AE, type: 0x953800, function: 0x8250DF, property: 0x0550AE)
+        $0.style = ThemeStyle(cornerScale: 0.75, strokeScale: 1.4, shadowScale: 0.6)
+    })
+
+    static let githubDark = ThemePackage(id: "github-dark", name: "GitHub Dark", group: .classic, tone: .dark, palette: .make(.darkBase) {
+        $0.setBackgrounds(surface: 0x0D1117, card: 0x161B22, gutter: 0x0D1117, currentLine: 0x1B2330, sidebar: 0x010409)
+        $0.editorForeground = ThemeRGB(hex: 0xE6EDF3); $0.gutterForeground = ThemeRGB(hex: 0x6E7681)
+        $0.accent = ThemeRGB(hex: 0x58A6FF); $0.accent2 = ThemeRGB(hex: 0xBC8CFF)
+        $0.success = ThemeRGB(hex: 0x3FB950); $0.danger = ThemeRGB(hex: 0xF85149); $0.warning = ThemeRGB(hex: 0xD29922)
+        $0.diffAdded = ThemeRGB(hex: 0x12361E); $0.diffRemoved = ThemeRGB(hex: 0x4A1E21)
+        $0.setSyntax(keyword: 0xFF7B72, string: 0xA5D6FF, comment: 0x8B949E, number: 0x79C0FF, type: 0xFFA657, function: 0xD2A8FF, property: 0x79C0FF)
+        $0.style = ThemeStyle(cornerScale: 0.75, strokeScale: 1.4, shadowScale: 0.6)
+    })
+
+    static let gruvboxDark = ThemePackage(id: "gruvbox-dark", name: "Gruvbox Dark", group: .classic, tone: .dark, palette: .make(.darkBase) {
+        $0.setBackgrounds(surface: 0x282828, card: 0x32302F, gutter: 0x2B2A29, currentLine: 0x3C3836, sidebar: 0x1D2021)
+        $0.editorForeground = ThemeRGB(hex: 0xEBDBB2); $0.gutterForeground = ThemeRGB(hex: 0x7C6F64)
+        $0.accent = ThemeRGB(hex: 0xFE8019); $0.accent2 = ThemeRGB(hex: 0xD3869B)
+        $0.success = ThemeRGB(hex: 0xB8BB26); $0.danger = ThemeRGB(hex: 0xFB4934); $0.warning = ThemeRGB(hex: 0xFABD2F)
+        $0.diffAdded = ThemeRGB(hex: 0x3A3D1C); $0.diffRemoved = ThemeRGB(hex: 0x4F2420)
+        $0.setSyntax(keyword: 0xFB4934, string: 0xB8BB26, comment: 0xA09484, number: 0xD3869B, type: 0xFABD2F, function: 0x83A598, property: 0x8EC07C)
+        $0.style = ThemeStyle(cornerScale: 0.6, strokeScale: 1.2, shadowScale: 0.5)
+    })
+
+    static let catppuccinMocha = ThemePackage(id: "catppuccin-mocha", name: "Catppuccin Mocha", group: .classic, tone: .dark, palette: .make(.darkBase) {
+        $0.setBackgrounds(surface: 0x1E1E2E, card: 0x313244, gutter: 0x232334, currentLine: 0x2A2B3C, sidebar: 0x181825)
+        $0.editorForeground = ThemeRGB(hex: 0xCDD6F4); $0.gutterForeground = ThemeRGB(hex: 0x6C7086)
+        $0.accent = ThemeRGB(hex: 0xCBA6F7); $0.accent2 = ThemeRGB(hex: 0xF5C2E7)
+        $0.success = ThemeRGB(hex: 0xA6E3A1); $0.danger = ThemeRGB(hex: 0xF38BA8); $0.warning = ThemeRGB(hex: 0xF9E2AF)
+        $0.diffAdded = ThemeRGB(hex: 0x27402E); $0.diffRemoved = ThemeRGB(hex: 0x4B2735)
+        $0.setSyntax(keyword: 0xCBA6F7, string: 0xA6E3A1, comment: 0x8F94AF, number: 0xFAB387, type: 0xF9E2AF, function: 0x89B4FA, property: 0x94E2D5)
+        $0.style = ThemeStyle(cornerScale: 1.35, strokeScale: 0.8, shadowScale: 1.2, glassTint: 0.1, fillScale: 1.2)
+    })
+
+    static let monoInk = ThemePackage(id: "mono-ink", name: String(localized: "墨色单色"), group: .classic, tone: .light, palette: .make(.lightBase) {
+        $0.setBackgrounds(surface: 0xFAFAFA, card: 0xF0F0F0, gutter: 0xF3F3F3, currentLine: 0xEBEBEB, sidebar: 0xECECEC)
+        $0.editorForeground = ThemeRGB(hex: 0x111111); $0.gutterForeground = ThemeRGB(hex: 0x9A9A9A)
+        $0.accent = ThemeRGB(hex: 0x1A1A1A); $0.accent2 = ThemeRGB(hex: 0x5A5A5A)
+        $0.success = ThemeRGB(hex: 0x2F6F3E); $0.danger = ThemeRGB(hex: 0xB3261E); $0.warning = ThemeRGB(hex: 0x8A5A00)
+        $0.diffAdded = ThemeRGB(hex: 0xE4EEE6); $0.diffRemoved = ThemeRGB(hex: 0xF2E3E1)
+        $0.setSyntax(keyword: 0x111111, string: 0x4A4A4A, comment: 0x8A8A8A, number: 0x333333, type: 0x2B2B2B, function: 0x000000, property: 0x555555)
+        $0.style = ThemeStyle(cornerScale: 0.4, strokeScale: 1.6, shadowScale: 0.3)
+    })
+
+    /// 内置主题(不含用户自定义)。
+    public static let builtin: [ThemePackage] = [
         system,
         cursorLight, cursorLightColorblind, cursorDark, cursorDarkHC,
         anthropicLight, anthropicDark,
         claudeDark, claudeLight, claudeDarkDaltonized, claudeLightDaltonized, claudeDarkANSI, claudeLightANSI,
         opencodeDark, opencodeLight,
+        nord, solarizedDark, solarizedLight, dracula, tokyoNight, githubLight, githubDark, gruvboxDark, catppuccinMocha, monoInk,
     ]
+
+    /// 全部主题:内置 + 用户自定义(设置页按分组展示)。
+    public static var all: [ThemePackage] { builtin + ThemeRuntime.customThemes }
 
     /// 按 id 查找,未知回退系统。
     public static func find(_ id: String) -> ThemePackage { all.first { $0.id == id } ?? .system }
@@ -397,6 +518,8 @@ public final class ThemeTracker: @unchecked Sendable {
 /// 当前主题与强调色覆盖(由 `AppearanceModel` 写入;只在主线程的界面刷新周期读取)。
 public enum ThemeRuntime {
     nonisolated(unsafe) public static var package: ThemePackage = .system
+    /// 用户自定义主题(由 `CustomThemeStore` 加载后写入,只在主线程变更)
+    nonisolated(unsafe) public static var customThemes: [ThemePackage] = []
     /// 用户选择的主强调色(nil = 跟随主题默认)
     nonisolated(unsafe) public static var accentOverride: ThemeRGB?
     /// 用户选择的第二强调色(nil = 跟随主题默认)
