@@ -32,7 +32,11 @@ public struct TurnSummary: Sendable, Equatable {
     /// 厂商图标匹配线索(界面据此解析厂商 logo;为空则按模型名匹配)
     public var brand: ModelBrandHint?
 
-    public init(model: String, durationSeconds: Double, usage: TurnUsage? = nil, brand: ModelBrandHint? = nil) {
+    /// 本轮助手输出的正文(Markdown 原文,多条消息以空行连接);结束行的复制按钮复制它,而不是这一行元数据。
+    public var outputText: String
+
+    public init(model: String, durationSeconds: Double, usage: TurnUsage? = nil, brand: ModelBrandHint? = nil, outputText: String = "") {
+        self.outputText = outputText
         self.brand = brand
         self.model = model
         self.durationSeconds = max(durationSeconds, 0)

@@ -323,10 +323,23 @@ public final class TimelineStore {
         return child
     }
 
+    /// 最近一轮的助手输出正文:从末尾向前收集 `.assistant` 条目,遇到用户消息或上一轮结束语即停止。
+    /// - Returns: 多条助手消息以空行连接的 Markdown 原文;没有输出时为空串。
+    public func latestTurnOutput() -> String {
+        var pieces: [String] = []
+        for entry in entries.reversed() {
+            if entry.kind == .user || entry.kind == .turnSummary { break }
+            if entry.kind == .assistant, !entry.text.isEmpty { pieces.append(entry.text) }
+        }
+        return pieces.reversed().joined(separator: "\n\n")
+    }
+
     /// 追加回合结束语条目。
     /// - Parameter summary: 本轮摘要
     public func appendTurnSummary(_ summary: TurnSummary) {
         finishStreaming()
+        var summary = summary
+        if summary.outputText.isEmpty { summary.outputText = latestTurnOutput() }
         let entry = TimelineEntry(kind: .turnSummary, text: summary.copyText)
         entry.summary = summary
         entries.append(entry)

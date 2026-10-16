@@ -73,4 +73,29 @@ struct TurnSummaryTests {
         let summary = TurnSummary(model: "GLM 5", durationSeconds: 1, brand: hint)
         #expect(summary.brand == hint)
     }
+
+    @MainActor
+    @Test("结束行记录本轮助手输出:只含最近一轮,多条消息以空行连接")
+    func outputTextCollectsLatestTurn() {
+        let store = TimelineStore()
+        store.appendUser("第一问")
+        store.apply(.agentMessageChunk(messageId: "a1", content: .text("第一答")))
+        store.appendTurnSummary(TurnSummary(model: "m", durationSeconds: 1))
+        store.appendUser("第二问")
+        store.apply(.agentMessageChunk(messageId: "a2", content: .text("第二答上")))
+        store.apply(.agentThoughtChunk(messageId: "t", content: .text("思考不计入")))
+        store.apply(.agentMessageChunk(messageId: "a3", content: .text("第二答下")))
+        store.appendTurnSummary(TurnSummary(model: "m", durationSeconds: 1))
+        #expect(store.entries.first { $0.kind == .turnSummary }?.summary?.outputText == "第一答")
+        #expect(store.entries.last?.summary?.outputText == "第二答上\n\n第二答下")
+    }
+
+    @MainActor
+    @Test("没有助手输出时结束行的输出正文为空")
+    func outputTextEmpty() {
+        let store = TimelineStore()
+        store.appendUser("问")
+        store.appendTurnSummary(TurnSummary(model: "m", durationSeconds: 1))
+        #expect(store.entries.last?.summary?.outputText.isEmpty == true)
+    }
 }

@@ -41,7 +41,11 @@ struct TurnSummaryView: View {
                     .foregroundStyle(OMColors.tertiaryText)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                ModelCopyButton(text: summary.copyText, label: String(localized: "复制本轮信息"))
+                Spacer(minLength: 8)
+                // 复制的是本轮输出正文(不是这一行元数据);没有正文时不显示按钮
+                if !summary.outputText.isEmpty {
+                    OMCopyButton(help: String(localized: "复制本轮输出")) { summary.outputText }
+                }
             }
             .padding(.horizontal, 2)
             .frame(maxWidth: .infinity, alignment: .leading)
