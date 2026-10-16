@@ -143,6 +143,18 @@ ALLOWLIST = (
     ("Sources/IconKit/BrandIcons.swift", None),           # 厂商匹配关键字(用户自建提供商名称),不是界面文案
     ("Sources/ChatKit/SessionModel.swift", "仅允许写入工作区内的文件: \u0000"),
     ("Sources/LSPKit/LSPClient.swift", "未实现: \u0000"),
+    ("Sources/ChatKit/TitleGenerator.swift", None),       # 标题生成:发给小模型的提示词与前缀清洗,不是界面文案
+    ("Sources/OhMyAgentApp/Settings/SettingsWindow.swift", "服务器"),  # 设置搜索的中文别名关键词
+    ("Sources/OhMyAgentApp/Settings/SettingsWindow.swift", "斜杠"),  # 设置搜索的中文别名关键词
+    ("Sources/OhMyAgentApp/Settings/SettingsWindow.swift", "子代理"),  # 设置搜索的中文别名关键词
+    ("Sources/OhMyAgentApp/Settings/SettingsWindow.swift", "子 agent"),  # 设置搜索的中文别名关键词
+    ("Sources/OhMyAgentApp/Settings/SettingsWindow.swift", "钩子"),  # 设置搜索的中文别名关键词
+    ("Sources/OhMyAgentApp/Settings/SettingsWindow.swift", "生命周期"),  # 设置搜索的中文别名关键词
+    ("Sources/OhMyAgentApp/Settings/SettingsWindow.swift", "市场"),  # 设置搜索的中文别名关键词
+    ("Sources/OhMyAgentApp/Settings/SettingsWindow.swift", "指令"),  # 设置搜索的中文别名关键词
+    ("Sources/OhMyAgentApp/Settings/SettingsWindow.swift", "规则"),  # 设置搜索的中文别名关键词
+    ("Sources/OhMyAgentApp/Settings/SettingsWindow.swift", "密钥"),  # 设置搜索的中文别名关键词
+    ("Sources/OhMyAgentApp/Settings/SettingsWindow.swift", "注册表"),  # 设置搜索的中文别名关键词
     ("Sources/OMLog/", None),                            # 日志文本不本地化
     ("Sources/EditorKit/CodeEditorView.swift", "不支持从 nib 创建"),  # fatalError 信息
     ("Sources/OhMyAgentApp/StatusItemController.swift", "init(coder:) 不可用"),
