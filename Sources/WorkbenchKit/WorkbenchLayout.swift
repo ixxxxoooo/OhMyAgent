@@ -110,12 +110,16 @@ public struct CachedSession: Codable, Equatable, Sendable, Identifiable {
     public var updatedAt: String?
     /// 首次被侧栏看到的时间(ISO8601):用作稳定排序键,会话有新活动时顺序不跳动(对齐 kuku 的「按创建时间」)。
     public var firstSeenAt: String?
+    /// 该会话属于哪个 Agent(引擎)。会话由 Agent 在服务端保存,别的引擎打不开,
+    /// 所以切换引擎时按此标记分开保留;旧数据没有该字段(nil 视为当前引擎)。
+    public var agentId: String?
 
-    public init(sessionId: String, title: String?, updatedAt: String?, firstSeenAt: String? = nil) {
+    public init(sessionId: String, title: String?, updatedAt: String?, firstSeenAt: String? = nil, agentId: String? = nil) {
         self.sessionId = sessionId
         self.title = title
         self.updatedAt = updatedAt
         self.firstSeenAt = firstSeenAt
+        self.agentId = agentId
     }
 
     /// 侧栏稳定排序键:首次出现时间,缺失时回退到更新时间。

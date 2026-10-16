@@ -38,6 +38,8 @@ public final class WorkbenchModel {
     @ObservationIgnored private var closedTabs = ClosedTabStack()
     @ObservationIgnored private let store: WorkbenchStore
     @ObservationIgnored private let makeSession: @MainActor (URL) -> SessionModel
+    /// 按 Agent ID 创建会话模型的工厂(应用层注入):打开其他引擎的历史会话时,用原引擎承载。
+    @ObservationIgnored public var makeAgentSession: (@MainActor (URL, String) -> SessionModel?)?
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private let log = Log.session
     @ObservationIgnored private let autoConnect: Bool
@@ -459,9 +461,26 @@ public final class WorkbenchModel {
         return tab
     }
 
+    /// 缓存里某个会话所属的 Agent(旧数据或未登记为 nil)。
+    /// - Parameters:
+    ///   - sessionId: 协议会话 ID
+    ///   - id: 项目 ID
+    public func cachedAgentID(ofSession sessionId: String, in id: String) -> String? {
+        projects.first { $0.id == id }?.sessions.first { $0.sessionId == sessionId }?.agentId
+    }
+
     /// 在项目下打开历史会话:已经在某个标签里打开的直接切过去;否则新开一个标签承载。
-    public func openHistory(project id: String, sessionId: String, title: String?) {
+    ///
+    /// 会话属于某个 Agent(引擎)。属于其他引擎的会话会用原引擎新开标签承载,
+    /// 这样切换引擎后原来的会话依然能恢复,不会因为引擎不认识会话 ID 而打不开。
+    /// - Parameters:
+    ///   - id: 项目 ID
+    ///   - sessionId: 协议会话 ID
+    ///   - title: 标题(兜底显示)
+    ///   - agentID: 会话所属 Agent;nil 时取缓存里登记的归属
+    public func openHistory(project id: String, sessionId: String, title: String?, agentID: String? = nil) {
         guard let project = projects.first(where: { $0.id == id }) else { return }
+        let owner = agentID ?? cachedAgentID(ofSession: sessionId, in: id)
         mode = .workspace
         selectedProjectID = id
         if let (key, _) = conversations.first(where: { $0.key.projectID == id && $0.value.sessionId == sessionId }),
@@ -470,14 +489,15 @@ public final class WorkbenchModel {
             syncSelectionFromDock()
             return
         }
-        // 当前活动会话还是空白的就在它身上打开,否则新开一个标签
+        // 当前活动会话还是空白的就在它身上打开,否则新开一个标签;会话属于别的引擎时一律新开标签并用原引擎承载
         var target = sessions[id]
-        if target == nil || target?.isPristine != true {
+        let foreignAgent = owner.flatMap { $0 != target?.descriptor.id ? $0 : nil }
+        if target == nil || target?.isPristine != true || foreignAgent != nil {
             let slot = UUID().uuidString
             let tab = dock.open(.chat(projectID: id, slot: slot), title: title ?? project.name)
             dock.activate(tab)
             lastSlot[id] = .some(slot)
-            target = ensureSession(project: id, slot: slot)
+            target = ensureSession(project: id, slot: slot, agentID: foreignAgent)
         } else {
             syncSelectionFromDock()
         }
@@ -509,12 +529,13 @@ public final class WorkbenchModel {
     /// - Parameters:
     ///   - id: 项目 ID
     ///   - slot: 会话槽位(nil 为项目主会话)
+    ///   - agentID: 指定承载的 Agent;nil 或工厂不认识时用默认 Agent
     @discardableResult
-    public func ensureSession(project id: String, slot: String?) -> SessionModel? {
+    public func ensureSession(project id: String, slot: String?, agentID: String? = nil) -> SessionModel? {
         let key = ConversationKey(projectID: id, slot: slot)
         if let existing = conversations[key] { return existing }
         guard let project = projects.first(where: { $0.id == id }) else { return nil }
-        let model = makeSession(project.url)
+        let model = agentID.flatMap { makeAgentSession?(project.url, $0) } ?? makeSession(project.url)
         wire(model, project: id)
         conversations[key] = model
         if autoConnect { model.connect() }
@@ -529,7 +550,9 @@ public final class WorkbenchModel {
 
     /// 给会话挂接历史缓存与跟随回调。
     private func wire(_ model: SessionModel, project id: String) {
-        model.onHistoryChanged = { [weak self] history in self?.cacheHistory(history, for: id) }
+        model.onHistoryChanged = { [weak self, weak model] history in
+            self?.cacheHistory(history, agentID: model?.descriptor.id, for: id)
+        }
         model.onAgentEdit = { [weak self] edit in self?.followAgentEdit(edit, project: id) }
     }
 
@@ -549,6 +572,10 @@ public final class WorkbenchModel {
     public func replaceSession(for id: String, with model: SessionModel) {
         let slot = preferredSlot(for: id)
         let key = ConversationKey(projectID: id, slot: slot)
+        if let old = conversations[key], let sessionId = old.sessionId, !old.isPristine {
+            // 切换引擎不丢会话:旧引擎的会话记入缓存,侧栏里仍可见,点击时切回原引擎打开
+            rememberSession(sessionId, title: old.sessionTitle, agentID: old.descriptor.id, for: id)
+        }
         conversations[key]?.shutdown()
         wire(model, project: id)
         conversations[key] = model
@@ -556,19 +583,55 @@ public final class WorkbenchModel {
         if autoConnect { model.connect() }
     }
 
-    /// 缓存历史会话摘要(每项目最多 30 条);为每条会话保留/生成「首次出现时间」作为稳定排序键。
-    func cacheHistory(_ history: [SessionSummary], for id: String, now: Date = Date()) {
+    /// 缓存历史会话摘要(每个项目每个 Agent 最多 30 条);为每条会话保留/生成「首次出现时间」作为稳定排序键。
+    ///
+    /// 会话按 Agent 分开保留:某个 Agent 的列表刷新只替换它自己的条目,**不会冲掉其他 Agent 的会话**
+    /// (切换引擎后,原引擎的会话仍在侧栏,点击时会切回对应引擎打开)。
+    /// - Parameters:
+    ///   - history: 当前 Agent 返回的会话列表
+    ///   - agentID: 该列表所属的 Agent;nil 表示不区分(旧调用方式,整体替换)
+    ///   - id: 项目 ID
+    ///   - now: 当前时间(测试可注入)
+    func cacheHistory(_ history: [SessionSummary], agentID: String? = nil, for id: String, now: Date = Date()) {
         guard let index = projects.firstIndex(where: { $0.id == id }) else { return }
-        let previous = Dictionary(projects[index].sessions.map { ($0.sessionId, $0) }, uniquingKeysWith: { first, _ in first })
-        let hadCache = !projects[index].sessions.isEmpty
+        let existing = projects[index].sessions
+        let previous = Dictionary(existing.map { ($0.sessionId, $0) }, uniquingKeysWith: { first, _ in first })
+        let hadCache = !existing.isEmpty
         let nowText = now.formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true))
-        let cached = history.prefix(30).map { item -> CachedSession in
+        let fresh = history.prefix(30).map { item -> CachedSession in
             // 首次填充时冻结为更新时间;之后新出现的会话以出现时刻为准(排在最前)
             let first = previous[item.sessionId]?.firstSeenAt ?? (hadCache ? nowText : item.updatedAt)
-            return CachedSession(sessionId: item.sessionId, title: item.title, updatedAt: item.updatedAt, firstSeenAt: first)
+            return CachedSession(sessionId: item.sessionId, title: item.title, updatedAt: item.updatedAt, firstSeenAt: first, agentId: agentID)
         }
+        // 其他 Agent 的条目原样保留(同一会话 ID 以新列表为准)
+        let freshIDs = Set(fresh.map(\.sessionId))
+        let kept = agentID == nil ? [] : existing.filter { item in
+            guard let owner = item.agentId, owner != agentID else { return false }
+            return !freshIDs.contains(item.sessionId)
+        }
+        let cached = fresh + kept
         guard projects[index].sessions != cached else { return }
         projects[index].sessions = cached
+        scheduleSave()
+    }
+
+    /// 记住某个会话(切换引擎或关闭前调用):列表刷新可能还没覆盖到它,这里直接写入缓存,保证不丢。
+    /// - Parameters:
+    ///   - sessionId: 协议会话 ID
+    ///   - title: 标题
+    ///   - agentID: 所属 Agent
+    ///   - id: 项目 ID
+    func rememberSession(_ sessionId: String, title: String?, agentID: String, for id: String, now: Date = Date()) {
+        guard !sessionId.isEmpty, let index = projects.firstIndex(where: { $0.id == id }) else { return }
+        let nowText = now.formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true))
+        if let at = projects[index].sessions.firstIndex(where: { $0.sessionId == sessionId }) {
+            var item = projects[index].sessions[at]
+            if item.agentId == nil { item.agentId = agentID }
+            if let title, !title.isEmpty { item.title = title }
+            projects[index].sessions[at] = item
+        } else {
+            projects[index].sessions.append(CachedSession(sessionId: sessionId, title: title, updatedAt: nowText, firstSeenAt: nowText, agentId: agentID))
+        }
         scheduleSave()
     }
 

@@ -179,11 +179,12 @@ public struct ToolCall: Sendable, Hashable, Identifiable {
             status: ToolStatus(rawOrPending: json["status"]?.stringValue),
             content: (json["content"]?.arrayValue ?? []).map(ToolCallContent.init(json:)),
             locations: Self.parseLocations(json["locations"]),
-            rawInput: json["rawInput"].flatMap { $0.isNull ? nil : $0 },
+            rawInput: ToolInputNormalizer.normalize(json["rawInput"]),
             rawOutput: json["rawOutput"].flatMap { $0.isNull ? nil : $0 }
         )
         parentToolCallId = json["_meta"]?["claudeCode"]?["parentToolUseId"]?.stringValue
         if name == nil { name = json["_meta"]?["claudeCode"]?["toolName"]?.stringValue }
+        if name == nil { name = ToolInputNormalizer.toolName(fromTitle: title) }
     }
 
     static func parseLocations(_ json: JSONValue?) -> [ToolLocation] {
@@ -202,13 +203,15 @@ public struct ToolCall: Sendable, Hashable, Identifiable {
         if let value = json["status"]?.stringValue { status = ToolStatus(rawOrPending: value) }
         if let value = json["content"]?.arrayValue { content = value.map(ToolCallContent.init(json:)) }
         if json["locations"]?.arrayValue != nil { locations = Self.parseLocations(json["locations"]) }
-        if let value = json["rawInput"], !value.isNull { rawInput = value }
+        if let value = json["rawInput"], !value.isNull { rawInput = ToolInputNormalizer.merge(rawInput, with: value) }
         if let value = json["rawOutput"], !value.isNull {
             rawOutput = value
-            if !status.isTerminal { status = .completed }
+            // 更新没有显式给状态时,带结果的更新视为已完成;显式状态(含 in_progress)以更新为准
+            if json["status"] == nil, !status.isTerminal { status = .completed }
         }
         if let value = json["_meta"]?["claudeCode"]?["parentToolUseId"]?.stringValue { parentToolCallId = value }
         if name == nil, let value = json["_meta"]?["claudeCode"]?["toolName"]?.stringValue { name = value }
+        if name == nil { name = ToolInputNormalizer.toolName(fromTitle: title) }
     }
 }
 

@@ -2,6 +2,7 @@
 // 工作台模型测试:项目增删、选择、持久化、布局折叠与历史缓存。
 
 import ACPKit
+import AgentHost
 import ChatKit
 import Foundation
 import Testing
@@ -284,6 +285,69 @@ struct WorkbenchTests {
         let new = try #require(sessions.first { $0.sessionId == "new" })
         #expect(old.firstSeenAt == "2026-01-01T00:00:00Z")
         #expect(new.stableKey > old.stableKey)
+        model.shutdownAll()
+    }
+
+    @Test("切换引擎:各引擎的会话分开保留,一个引擎的刷新不会冲掉另一个引擎的会话")
+    func sessionsKeptPerAgent() throws {
+        let env = try makeEnvironment()
+        defer { try? FileManager.default.removeItem(at: env.root) }
+        let model = makeModel(env.store)
+        let a = try #require(model.openProject(env.dirs[0]))
+        let claude = [SessionSummary(sessionId: "c1", cwd: a, title: "Claude 会话", updatedAt: nil)]
+        let agy = [SessionSummary(sessionId: "g1", cwd: a, title: "Antigravity 会话", updatedAt: nil)]
+        model.cacheHistory(claude, agentID: "claude-code", for: a)
+        model.cacheHistory(agy, agentID: "antigravity", for: a)
+        var ids = Set(model.projects[0].sessions.map(\.sessionId))
+        #expect(ids == ["c1", "g1"])
+        #expect(model.cachedAgentID(ofSession: "c1", in: a) == "claude-code")
+        #expect(model.cachedAgentID(ofSession: "g1", in: a) == "antigravity")
+        // Antigravity 列表变化(g1 被删、g2 新增)不影响 Claude 的 c1
+        model.cacheHistory([SessionSummary(sessionId: "g2", cwd: a, title: "新", updatedAt: nil)], agentID: "antigravity", for: a)
+        ids = Set(model.projects[0].sessions.map(\.sessionId))
+        #expect(ids == ["c1", "g2"])
+        // 每个引擎各自最多 30 条
+        let many = (0..<40).map { SessionSummary(sessionId: "m\($0)", cwd: a, title: "m", updatedAt: nil) }
+        model.cacheHistory(many, agentID: "antigravity", for: a)
+        #expect(model.projects[0].sessions.filter { $0.agentId == "antigravity" }.count == 30)
+        #expect(model.projects[0].sessions.contains { $0.sessionId == "c1" })
+        model.shutdownAll()
+    }
+
+    @Test("记住会话:切换引擎前把当前会话写进缓存并标记所属引擎")
+    func rememberSession() throws {
+        let env = try makeEnvironment()
+        defer { try? FileManager.default.removeItem(at: env.root) }
+        let model = makeModel(env.store)
+        let a = try #require(model.openProject(env.dirs[0]))
+        model.rememberSession("x1", title: "写到一半", agentID: "claude-code", for: a)
+        let first = try #require(model.projects[0].sessions.first)
+        #expect(first.sessionId == "x1" && first.agentId == "claude-code" && first.title == "写到一半")
+        // 重复记住只更新标题,不产生重复项
+        model.rememberSession("x1", title: "改了标题", agentID: "claude-code", for: a)
+        #expect(model.projects[0].sessions.count == 1)
+        #expect(model.projects[0].sessions[0].title == "改了标题")
+        model.shutdownAll()
+    }
+
+    @Test("打开其他引擎的会话:新开标签并用原引擎承载")
+    func openForeignAgentSession() throws {
+        let env = try makeEnvironment()
+        defer { try? FileManager.default.removeItem(at: env.root) }
+        let model = makeModel(env.store)
+        var requested: [String] = []
+        model.makeAgentSession = { url, agentID in
+            requested.append(agentID)
+            let descriptor = AgentDescriptor(id: agentID, name: agentID, kind: .genericACP, command: "/usr/bin/true")
+            return SessionModel(workspace: url, descriptor: descriptor)
+        }
+        let a = try #require(model.openProject(env.dirs[0]))
+        model.cacheHistory([SessionSummary(sessionId: "g1", cwd: a, title: "旧会话", updatedAt: nil)], agentID: "zz-other-engine", for: a)
+        let before = model.conversations.count
+        model.openHistory(project: a, sessionId: "g1", title: "旧会话")
+        #expect(requested == ["zz-other-engine"])
+        #expect(model.conversations.count == before + 1)
+        #expect(model.conversations.values.contains { $0.descriptor.id == "zz-other-engine" })
         model.shutdownAll()
     }
 

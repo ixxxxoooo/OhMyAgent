@@ -18,6 +18,11 @@ final class AppEnvironment {
         workbench = WorkbenchModel(store: store) { url in
             AppEnvironment.makeSession(workspace: url, descriptor: Toolchain.defaultDescriptor())
         }
+        // 打开其他引擎的历史会话时,按 Agent ID 找到注册的描述符,用原引擎承载
+        workbench.makeAgentSession = { url, agentID in
+            guard let descriptor = AgentRegistryModel.shared.data.allAgents.first(where: { $0.id == agentID }) else { return nil }
+            return AppEnvironment.makeSession(workspace: url, descriptor: descriptor)
+        }
     }
 
     /// 创建会话模型并接入应用层能力(系统通知)。

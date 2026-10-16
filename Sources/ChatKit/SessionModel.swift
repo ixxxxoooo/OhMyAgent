@@ -426,7 +426,9 @@ public final class SessionModel {
     private func newSessionAuthenticating(client: ACPClient, methods: [AuthMethod], servers: [MCPServerConfig]) async throws -> SessionSetup {
         let cwd = workspace.path
         do {
-            return try await client.newSession(cwd: cwd, mcpServers: servers, meta: effectiveMeta())
+            let setup = try await client.newSession(cwd: cwd, mcpServers: servers, meta: effectiveMeta())
+            EmptySessionRegistry.hide(setup.sessionId)
+            return setup
         } catch let error as JSONRPCError where error.isAuthRequired {
             guard let method = methods.first else { throw error }
             log.info("Agent 需要登录,开始认证", ["agent": descriptor.id, "method": method.id])
@@ -437,7 +439,9 @@ public final class SessionModel {
                 log.error("认证失败", error: error, ["agent": descriptor.id, "method": method.id])
                 throw AuthenticationFailure(agent: descriptor.name, reason: error.localizedDescription)
             }
-            return try await client.newSession(cwd: cwd, mcpServers: servers, meta: effectiveMeta())
+            let setup = try await client.newSession(cwd: cwd, mcpServers: servers, meta: effectiveMeta())
+            EmptySessionRegistry.hide(setup.sessionId)
+            return setup
         }
     }
 
@@ -792,6 +796,12 @@ public final class SessionModel {
     @ObservationIgnored private var defaultGatewayMeta: JSONValue?
     /// 本机网关地址(发送前探测用)
     @ObservationIgnored private var providerURL: URL?
+
+    /// 轻量任务(提交说明等)可用的本机网关地址与小模型别名;当前没有经网关的提供商映射时为 nil。
+    public var utilityGateway: (url: URL, alias: String)? {
+        guard let url = providerURL, mappedModels[.haiku] != nil || mappedModels[.main] != nil else { return nil }
+        return (url, (mappedModels[.haiku] != nil ? ModelSlot.haiku : ModelSlot.main).alias)
+    }
     /// 提供商目录(测试可注入;默认 Application Support)
     @ObservationIgnored public var providerDirectory: URL = ProviderStorage.defaultDirectory
     /// 提供商解析使用的环境(测试可注入)
@@ -897,6 +907,7 @@ public final class SessionModel {
         }
         trackGoal(in: prompt)
         timeline.appendUser(prompt, attachments: images)
+        EmptySessionRegistry.unhide(sessionId)
         turnNumber += 1
         if sessionTitle == nil, titleSource == .none { startAutoTitle(for: prompt, sessionId: sessionId) }
         turnStart = ContinuousClock.now
@@ -995,7 +1006,7 @@ public final class SessionModel {
             // 让出一次,使 flush 产生的批次先被应用
             await Task.yield()
             guard let self else { return }
-            self.timeline.finishTurn()
+            self.timeline.finishTurn(aborted: error != nil || reason == .cancelled)
             if let stall = self.stallMessage {
                 self.stallMessage = nil
                 self.timeline.appendNotice(stall, isError: true)
@@ -1074,6 +1085,7 @@ public final class SessionModel {
         Task { [weak self] in
             do {
                 let setup = try await client.newSession(cwd: cwd, mcpServers: servers, meta: meta)
+                EmptySessionRegistry.hide(setup.sessionId)
                 self?.sessionId = setup.sessionId
                 self?.configOptions = setup.configOptions
             } catch {
@@ -1093,7 +1105,7 @@ public final class SessionModel {
             guard let result = try? await client.listSessions(cwd: cwd) else { return }
             let overrides = ClientPrefs.sessionTitleOverrides()
             let generated = ClientPrefs.generatedSessionTitles()
-            let sorted = result.sessions.sorted { ($0.updatedAt ?? "") > ($1.updatedAt ?? "") }.map { item -> SessionSummary in
+            let sorted = result.sessions.filter { !EmptySessionRegistry.isHidden($0.sessionId) }.sorted { ($0.updatedAt ?? "") > ($1.updatedAt ?? "") }.map { item -> SessionSummary in
                 var copy = item
                 if let title = overrides[item.sessionId] ?? generated[item.sessionId] { copy.title = title }
                 return copy
@@ -1136,11 +1148,23 @@ public final class SessionModel {
                     : try await client.resumeSession(sessionId: summary.sessionId, cwd: cwd, mcpServers: servers, meta: meta)
                 self?.configOptions = setup.configOptions.isEmpty ? (self?.configOptions ?? []) : setup.configOptions
             } catch {
-                self?.timeline.appendNotice(String(localized: "打开会话失败:\(error.localizedDescription)"), isError: true)
+                if let rpc = error as? JSONRPCError, rpc.code == -32002 {
+                    // Agent 报「会话不存在」:通常是会话属于别的引擎(会话数据由各引擎自己保存),或已被删除
+                    self?.timeline.appendNotice(String(localized: "当前引擎找不到这个会话:它可能属于其他引擎,或已被删除。"), isError: true)
+                } else {
+                    self?.timeline.appendNotice(String(localized: "打开会话失败:\(error.localizedDescription)"), isError: true)
+                }
+                self?.log.warning("打开历史会话失败", ["target": String(summary.sessionId.prefix(8)), "error": "\(error)"])
             }
             await self?.settleEvents()
             self?.timeline.finishStreaming()
             self?.isReplaying = false
+            // 回放后一条内容都没有:多半是 Agent 建会话时落盘、却从没发过消息的空会话。登记后从列表里隐藏
+            if let self, self.timeline.entries.isEmpty, self.sessionId == summary.sessionId {
+                EmptySessionRegistry.hide(summary.sessionId)
+                self.timeline.appendNotice(String(localized: "这个会话里没有任何消息(从未发送过内容),已从列表中隐藏。"))
+                self.log.info("历史会话回放为空,已隐藏", ["target": String(summary.sessionId.prefix(8))])
+            }
         }
     }
 
@@ -1180,6 +1204,8 @@ public final class SessionModel {
         Task { [weak self] in
             do {
                 let setup = try await client.forkSession(sessionId: sessionId, cwd: cwd, mcpServers: servers, meta: meta)
+                // 分叉出的会话带有原会话的内容,不属于「空会话」,必须显示在历史里
+                EmptySessionRegistry.unhide(setup.sessionId)
                 self?.sessionId = setup.sessionId
                 self?.timeline.appendNotice(ChatL10n.t("已从此处分叉出新会话,后续对话不会影响原会话。"))
                 if !setup.configOptions.isEmpty { self?.configOptions = setup.configOptions }
@@ -1360,6 +1386,7 @@ public final class SessionModel {
     /// 用给定 `_meta` 新建会话并替换当前会话 ID。
     private func startFreshSession(client: ACPClient, cwd: String, servers: [MCPServerConfig], meta: JSONValue?) async throws {
         let setup = try await client.newSession(cwd: cwd, mcpServers: servers, meta: meta)
+        EmptySessionRegistry.hide(setup.sessionId)
         sessionId = setup.sessionId
         configOptions = setup.configOptions
         contextUsage = nil

@@ -81,7 +81,7 @@ public struct ToolPresentation: Sendable, Equatable {
             subjectIsPath = path != nil
             detail = Self.lineRange(input: input, location: tool.locations.first)
         case .edit:
-            let isNew = name == "Write" || tool.content.contains {
+            let isNew = name == "Write" || Self.createToolNames.contains(name.lowercased()) || tool.content.contains {
                 if case .diff(_, let old, _) = $0 { return old == nil }
                 return false
             }
@@ -103,7 +103,7 @@ public struct ToolPresentation: Sendable, Equatable {
         case .search:
             category = .search
             let pattern = input?["pattern"]?.stringValue ?? input?["query"]?.stringValue
-            verb = name == "Glob" ? String(localized: "查找文件") : String(localized: "搜索")
+            verb = name == "Glob" || name.lowercased() == "find_by_name" ? String(localized: "查找文件") : String(localized: "搜索")
             subject = pattern ?? Self.stripVerb(tool.title)
             detail = input?["path"]?.stringValue.map { ($0 as NSString).lastPathComponent }
                 ?? input?["glob"]?.stringValue
@@ -115,7 +115,7 @@ public struct ToolPresentation: Sendable, Equatable {
             detail = input?["description"]?.stringValue
         case .fetch:
             category = .fetch
-            verb = name == "WebSearch" ? String(localized: "联网搜索") : String(localized: "获取")
+            verb = name == "WebSearch" || name.lowercased() == "search_web" ? String(localized: "联网搜索") : String(localized: "获取")
             subject = input?["url"]?.stringValue ?? input?["query"]?.stringValue ?? Self.stripVerb(tool.title)
         case .think:
             category = .think
@@ -128,8 +128,17 @@ public struct ToolPresentation: Sendable, Equatable {
         case .other:
             category = .other
             verb = ""
-            subject = tool.title.isEmpty ? (tool.name ?? String(localized: "工具调用")) : tool.title
+            subject = tool.title.isEmpty ? (tool.name ?? String(localized: "工具调用")) : Self.prettyTitle(tool.title)
         }
+    }
+
+    /// 「新建文件」类工具名(小写):其 Diff 没有旧内容时也据此归为「写入」。
+    static let createToolNames: Set<String> = ["write_to_file", "client_create_file", "create_file"]
+
+    /// 美化只有工具标识的标题:`Running manage_task` → `manage task`;其余原样返回。
+    static func prettyTitle(_ title: String) -> String {
+        guard let name = ToolInputNormalizer.toolName(fromTitle: title) else { return title }
+        return name.replacingOccurrences(of: "_", with: " ")
     }
 
     /// 是否属于“浏览”类(读取/搜索/联网获取),可被折叠为分组。
@@ -146,7 +155,7 @@ public struct ToolPresentation: Sendable, Equatable {
 
     /// 去掉标题里常见的动词前缀(“读取 ”“修改 ”等),避免与动词重复。
     static func stripVerb(_ title: String) -> String {
-        for prefix in ["读取 ", "修改 ", "编辑 ", "写入 ", "运行 ", "搜索 ", "Read ", "Edit ", "Write ", "Run "] where title.hasPrefix(prefix) {
+        for prefix in ["读取 ", "修改 ", "编辑 ", "写入 ", "运行 ", "搜索 ", "Read ", "Edit ", "Write ", "Running ", "Run "] where title.hasPrefix(prefix) {
             return String(title.dropFirst(prefix.count))
         }
         return title

@@ -11,6 +11,8 @@ public actor ScriptedAgent: ACPRequestHandler {
     var modes: [String: String] = [:]
     var models: [String: String] = [:]
     var sessionCounter = 0
+    /// 本实例的会话 ID 前缀:并行测试里多个脚本 Agent 的 ID 互不相同(客户端按 ID 全局记忆「空会话」等状态)
+    private let idTag = UUID().uuidString.prefix(6).lowercased()
     /// 模拟登录状态(`OMA_FAKE_AUTH=1` 时 session/new 需要先 authenticate)
     var authenticated = false
     /// 是否要求先登录(默认读 `OMA_FAKE_AUTH`;测试可直接传参,避免修改进程环境变量)
@@ -99,7 +101,7 @@ public actor ScriptedAgent: ACPRequestHandler {
                 throw JSONRPCError(code: -32000, message: "Authentication required")
             }
             sessionCounter += 1
-            let id = "scripted-\(sessionCounter)"
+            let id = "scripted-\(idTag)-\(sessionCounter)"
             sessions[id] = p["cwd"]?.stringValue ?? "/"
             modes[id] = "default"
             models[id] = "scripted-1"
@@ -133,7 +135,7 @@ public actor ScriptedAgent: ACPRequestHandler {
             return ["configOptions": configOptions(sessionId: id)]
         case "session/fork":
             sessionCounter += 1
-            let id = "scripted-\(sessionCounter)"
+            let id = "scripted-\(idTag)-\(sessionCounter)"
             sessions[id] = p["cwd"]?.stringValue ?? "/"
             modes[id] = "default"
             models[id] = "scripted-1"

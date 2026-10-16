@@ -22,6 +22,8 @@ struct SidebarSession: Identifiable, Equatable {
     let updatedAt: Date?
     let isCurrent: Bool
     let isRunning: Bool
+    /// 会话所属 Agent;只在属于「别的引擎」时才有值(用来显示引擎徽标、点击时切回原引擎打开)
+    var foreignAgentID: String?
 }
 
 extension WorkbenchModel {
@@ -31,18 +33,22 @@ extension WorkbenchModel {
     func sidebarSessions(for project: ProjectEntry) -> [SidebarSession] {
         let model = sessions[project.id]
         let cache = Dictionary(project.sessions.map { ($0.sessionId, $0) }, uniquingKeysWith: { first, _ in first })
+        let currentAgent = model?.descriptor.id
+        // 当前引擎的会话取实时列表;其他引擎的会话取缓存——切换引擎不会让原来的会话从侧栏消失
         let source: [CachedSession] = {
-            if let live = model?.history, !live.isEmpty {
-                return live.map { CachedSession(sessionId: $0.sessionId, title: $0.title, updatedAt: $0.updatedAt, firstSeenAt: cache[$0.sessionId]?.firstSeenAt) }
-            }
-            return project.sessions
+            guard let live = model?.history, !live.isEmpty else { return project.sessions }
+            let liveItems = live.map { CachedSession(sessionId: $0.sessionId, title: $0.title, updatedAt: $0.updatedAt, firstSeenAt: cache[$0.sessionId]?.firstSeenAt, agentId: currentAgent) }
+            let liveIDs = Set(live.map(\.sessionId))
+            let others = project.sessions.filter { !liveIDs.contains($0.sessionId) && $0.agentId != nil && $0.agentId != currentAgent }
+            return liveItems + others
         }()
         var rows: [(key: Date, row: SidebarSession)] = source.compactMap { item in
-            guard item.sessionId != model?.sessionId else { return nil }
+            guard item.sessionId != model?.sessionId, !EmptySessionRegistry.isHidden(item.sessionId) else { return nil }
             return (item.stableKey, SidebarSession(
                 projectID: project.id, sessionId: item.sessionId, uid: nil,
                 title: item.title ?? String(localized: "未命名对话"),
-                updatedAt: Self.parseDate(item.updatedAt), isCurrent: false, isRunning: false
+                updatedAt: Self.parseDate(item.updatedAt), isCurrent: false, isRunning: false,
+                foreignAgentID: item.agentId.flatMap { $0 != currentAgent ? $0 : nil }
             ))
         }
         if let model, selectedProjectID == project.id || model.sessionId != nil || model.isRunning {
@@ -443,6 +449,7 @@ private struct SessionLine: View {
                         LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing).frame(width: 24)
                     }
                 )
+            if let agent = item.foreignAgentID { AgentBadge(agentID: agent) }
             trailing
                 .frame(width: 76, height: 20, alignment: .trailing)
         }
@@ -523,8 +530,29 @@ private struct SessionLine: View {
         if item.isCurrent {
             workbench.select(project: item.projectID)
         } else if let id = item.sessionId {
-            workbench.openHistory(project: item.projectID, sessionId: id, title: item.title)
+            workbench.openHistory(project: item.projectID, sessionId: id, title: item.title, agentID: item.foreignAgentID)
         }
+    }
+}
+
+/// 会话行上的引擎徽标:会话属于另一个 Agent(引擎)时显示其名称,点击该行会切回原引擎打开。
+private struct AgentBadge: View {
+    let agentID: String
+
+    private var name: String {
+        AgentRegistryModel.shared.data.allAgents.first { $0.id == agentID }?.name ?? agentID
+    }
+
+    var body: some View {
+        Text(verbatim: name)
+            .font(OMFonts.caption)
+            .foregroundStyle(OMColors.tertiaryText)
+            .lineLimit(1)
+            .padding(.horizontal, 5)
+            .frame(maxWidth: 72, minHeight: 16)
+            .background(OMColors.subtleFill, in: Capsule())
+            .help(String(localized: "属于 \(name):点击会切回该引擎打开"))
+            .accessibilityLabel(String(localized: "引擎 \(name)"))
     }
 }
 

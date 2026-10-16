@@ -237,13 +237,14 @@ public final class TimelineStore {
         last.finishedAt = Date()
     }
 
-    /// 轮次结束时收尾:结束流式并确保所有未终结的工具调用标记为完成。
-    public func finishTurn() {
+    /// 轮次结束时收尾:结束流式,并把未终结的工具调用收口(部分 Agent 不补发最终状态)。
+    /// - Parameter aborted: 轮次被取消或出错时为 true,未终结的工具标记为失败;正常结束标记为完成
+    public func finishTurn(aborted: Bool = false) {
         finishStreaming()
         for entry in entries where entry.kind == .tool {
             guard let tool = entry.tool, !tool.status.isTerminal else { continue }
             var updated = tool
-            updated.status = .completed
+            updated.status = aborted ? .failed : .completed
             entry.tool = updated
             if entry.finishedAt == nil { entry.finishedAt = Date() }
             onToolChange?(updated)

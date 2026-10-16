@@ -159,18 +159,13 @@ struct ToolRowView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
-        .background(hovering && canExpand ? OMColors.subtleFill : Color.clear, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .background(hovering && (canExpand || openablePath(tool, p) != nil) ? OMColors.subtleFill : Color.clear, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
-        .onTapGesture {
-            guard canExpand else { return }
-            // 展开/折叠不做整体高度动画:惰性栈里动画重排会让点击明显卡顿;箭头自带小动画
-            scrollState?.followSuspended = true
-            expanded = !isExpanded
-        }
+        .onTapGesture { handleTap(tool, p, canExpand: canExpand, isExpanded: isExpanded) }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(p.plainText),\(Self.statusText(tool.status))")
-        .accessibilityAddTraits(canExpand ? .isButton : [])
+        .accessibilityAddTraits(canExpand || openablePath(tool, p) != nil ? .isButton : [])
         .contextMenu {
             if p.category == .subagent {
                 if entry.childStore != nil {
@@ -184,6 +179,19 @@ struct ToolRowView: View {
                 Button("查看子 Agent 定义…") { AppActions.shared.openSettings(page: .subagents) }
             }
         }
+    }
+
+    /// 点击行:无详情可展开时直接在编辑器打开文件(如 Antigravity 的读取类工具不回传内容),否则展开/折叠。
+    private func handleTap(_ tool: ToolCall, _ p: ToolPresentation, canExpand: Bool, isExpanded: Bool) {
+        guard canExpand else {
+            if let path = openablePath(tool, p) {
+                model.viewerRequest = FileViewRequest(path: path, line: tool.locations.first?.line)
+            }
+            return
+        }
+        // 展开/折叠不做整体高度动画:惰性栈里动画重排会让点击明显卡顿;箭头自带小动画
+        scrollState?.followSuspended = true
+        expanded = !isExpanded
     }
 
     /// 行首图标:固定为工具类型的功能图标;文件的彩色类型图标紧贴文件名(见 `subject`)。
@@ -271,6 +279,8 @@ struct ToolRowView: View {
     /// 是否有可展开的详情。
     private func hasDetails(_ tool: ToolCall, _ p: ToolPresentation) -> Bool {
         if !tool.content.isEmpty || entry.childStore != nil { return true }
+        // 不经 content 回传结果的 Agent(Antigravity):结果在 rawOutput;失败原因必须能看到
+        if tool.resultText != nil || tool.failureText != nil { return true }
         if p.category == .mcp, tool.rawInput != nil { return true }
         if p.category == .terminal, let command = tool.rawInput?["command"]?.stringValue, command.contains("\n") || command.count > 80 { return true }
         if [.edit, .write].contains(p.category) {
@@ -324,7 +334,14 @@ struct ToolDetailsView: View {
             }
             if presentation.category == .terminal, !hasTerminalContent,
                let command = tool.rawInput?["command"]?.stringValue {
-                CommandBox(command: command, output: plainOutput, status: tool.status, copyText: command + (plainOutput.isEmpty ? "" : "\n" + ToolOutputText.stripFence(plainOutput)))
+                let output = plainOutput.isEmpty ? (tool.resultText ?? "") : plainOutput
+                CommandBox(command: command, output: output, status: tool.status, exitCode: tool.exitCode,
+                           copyText: command + (output.isEmpty ? "" : "\n" + ToolOutputText.stripFence(output)))
+            } else if !hasTextContent, let text = tool.resultText {
+                rawResultView(text)
+            }
+            if presentation.category != .terminal, let failure = tool.failureText, !failure.isEmpty, !hasTextContent {
+                ToolErrorBox(text: failure)
             }
             ForEach(Array(tool.content.enumerated()), id: \.offset) { _, content in
                 contentView(content)
@@ -346,6 +363,23 @@ struct ToolDetailsView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// `content` 里是否已有文本结果(有就不再重复展示 `rawOutput`)。
+    private var hasTextContent: Bool {
+        tool.content.contains { if case .content(let block) = $0 { return block.plainText?.isEmpty == false } else { return false } }
+    }
+
+    /// `rawOutput` 里的文本结果:搜索类按结果列表渲染,其余走普通文本框(失败时由 `ToolErrorBox` 单独展示)。
+    @ViewBuilder
+    private func rawResultView(_ text: String) -> some View {
+        if tool.status != .failed {
+            if presentation.category == .search {
+                SearchResultsView(text: text)
+            } else {
+                TextOutputBox(text: text, ansi: false)
+            }
+        }
     }
 
     private var hasTerminalContent: Bool {
@@ -426,11 +460,32 @@ struct TextOutputBox: View {
     }
 }
 
+/// 失败原因框:工具失败时展示 Agent 回传的错误文本(危险色,可选中复制)。
+struct ToolErrorBox: View {
+    let text: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image.om("circle-alert", size: 11).foregroundStyle(OMColors.danger)
+            Text(verbatim: text)
+                .font(OMFonts.monoSmall)
+                .foregroundStyle(OMColors.danger)
+                .textSelection(.enabled)
+                .lineLimit(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(8)
+        .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .accessibilityLabel(String(localized: "失败原因:\(text)"))
+    }
+}
+
 /// 命令框:`$ command` + 输出 + 复制(Agent 自带终端之外的命令执行)。
 struct CommandBox: View {
     let command: String
     let output: String
     let status: ToolStatus
+    var exitCode: Int?
     let copyText: String
     @State private var copied = false
     @State private var commandExpanded = false
@@ -445,6 +500,9 @@ struct CommandBox: View {
                 Text("$").font(OMFonts.monoSmall).foregroundStyle(OMColors.tertiaryText)
                 ShellCommandText(command: command, lineLimit: commandExpanded ? nil : Self.commandLineLimit)
                 Spacer(minLength: 8)
+                if let exitCode, exitCode != 0 {
+                    OMTag(String(localized: "退出 \(exitCode)"), tint: OMColors.danger)
+                }
                 if commandLines > Self.commandLineLimit {
                     Button { omWithAnimation(.snappy(duration: 0.2)) { commandExpanded.toggle() } } label: {
                         Image.om(commandExpanded ? "chevrons-down-up" : "chevrons-up-down", size: 11)

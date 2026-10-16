@@ -427,10 +427,11 @@ struct HistoryTests {
         let model = try await M3ScenarioTests.readyModel(workspace: ws)
         #expect(model.capabilities.loadSession)
         let first = try #require(model.sessionId)
-        #expect(await SessionModelTests.wait { model.history.contains { $0.sessionId == first } })
 
+        // 新建的空会话不进历史(避免列表被从未使用的会话占满);发出第一条消息后才出现
         model.send("第一条")
         #expect(await SessionModelTests.wait { !model.isRunning && model.timeline.entries.contains { $0.kind == .assistant } })
+        #expect(await SessionModelTests.wait { model.history.contains { $0.sessionId == first } })
 
         // 分叉:切到新会话并出现在历史中
         model.forkCurrentSession()
