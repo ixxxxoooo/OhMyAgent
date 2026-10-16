@@ -3,6 +3,7 @@
 
 import AppKit
 import DesignSystem
+import GitKit
 import IconKit
 import OMLog
 import SwiftUI
@@ -11,6 +12,14 @@ import WorkbenchKit
 struct ExplorerView: View {
     let workbench: WorkbenchModel
     private let model = ExplorerModel.shared
+
+    /// 当前项目的 Git 装饰(随状态轮询更新;非仓库时为空)
+    private var decorations: GitDecorationIndex {
+        guard let project = workbench.selectedProject else { return GitDecorationIndex() }
+        let git = GitStore.shared.model(for: project.id)
+        guard git.phase == .ready, !git.status.isClean else { return GitDecorationIndex() }
+        return GitDecorationIndex(status: git.status, base: git.absolutePath("").trimmingSuffix("/"))
+    }
 
     var body: some View {
         if let project = workbench.selectedProject {
@@ -30,6 +39,7 @@ struct ExplorerView: View {
                         DirectoryChildren(path: project.id, depth: 0, workbench: workbench, root: project.id)
                     }
                     .padding(.vertical, 4)
+                    .environment(\.gitDecorations, decorations)
                 }
             }
         } else {
@@ -76,11 +86,12 @@ private struct FolderRow: View {
     let workbench: WorkbenchModel
     let root: String
     @State private var expanded = false
+    @Environment(\.gitDecorations) private var decorations
     private let model = ExplorerModel.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ExplorerRow(depth: depth, name: entry.name, isDirectory: true, expanded: expanded, chevron: expanded ? "chevron-down" : "chevron-right", isActive: false) {
+            ExplorerRow(depth: depth, name: entry.name, isDirectory: true, expanded: expanded, chevron: expanded ? "chevron-down" : "chevron-right", isActive: false, decoration: decorations.kind(for: entry.path)) {
                 expanded.toggle()
             }
             .onDrag { NSItemProvider(object: URL(fileURLWithPath: entry.path) as NSURL) }
@@ -98,10 +109,11 @@ private struct FileRow: View {
     let depth: Int
     let workbench: WorkbenchModel
     let root: String
+    @Environment(\.gitDecorations) private var decorations
 
     var body: some View {
         let active = isActive
-        ExplorerRow(depth: depth, name: entry.name, isDirectory: false, expanded: false, chevron: nil, isActive: active) {
+        ExplorerRow(depth: depth, name: entry.name, isDirectory: false, expanded: false, chevron: nil, isActive: active, decoration: decorations.kind(for: entry.path)) {
             workbench.openFile(entry.path, preview: true)
         }
         .simultaneousGesture(TapGesture(count: 2).onEnded { workbench.openFile(entry.path, preview: false) })
@@ -123,6 +135,8 @@ private struct ExplorerRow: View {
     let expanded: Bool
     let chevron: String?
     let isActive: Bool
+    /// Git 装饰(有未提交变化时文字着色并在右侧显示字母/圆点)
+    let decoration: GitDecorationKind?
     let action: () -> Void
     @State private var hovering = false
 
@@ -135,7 +149,15 @@ private struct ExplorerRow: View {
                 .frame(width: 12)
                 OMFileIcon(name: name, isDirectory: isDirectory, expanded: expanded, size: 16)
                 Text(name).font(OMFonts.small).lineLimit(1).truncationMode(.middle)
+                    .foregroundStyle(decoration.map(Self.tint) ?? Color.primary)
                 Spacer(minLength: 0)
+                if let decoration {
+                    if isDirectory {
+                        Circle().fill(Self.tint(decoration)).frame(width: 6, height: 6).accessibilityHidden(true)
+                    } else {
+                        Text(decoration.letter).font(OMFonts.caption.weight(.semibold)).foregroundStyle(Self.tint(decoration))
+                    }
+                }
             }
             .padding(.leading, 8 + CGFloat(depth) * 12)
             .padding(.vertical, 3)
@@ -146,7 +168,39 @@ private struct ExplorerRow: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
+        .accessibilityValue(decoration.map(Self.accessibilityName) ?? "")
     }
+
+    /// 装饰类型对应的颜色:修改为警示黄、新增/未跟踪为绿、删除/冲突为红。
+    private static func tint(_ kind: GitDecorationKind) -> Color {
+        switch kind {
+        case .modified: return OMColors.warning
+        case .added, .renamed, .untracked: return OMColors.success
+        case .deleted, .conflict: return OMColors.danger
+        }
+    }
+
+    /// 无障碍读法。
+    private static func accessibilityName(_ kind: GitDecorationKind) -> String {
+        switch kind {
+        case .modified: return String(localized: "已修改")
+        case .added: return String(localized: "已新增")
+        case .renamed: return String(localized: "已重命名")
+        case .untracked: return String(localized: "未跟踪")
+        case .deleted: return String(localized: "已删除")
+        case .conflict: return String(localized: "有冲突")
+        }
+    }
+}
+
+extension EnvironmentValues {
+    /// 资源管理器的 Git 装饰索引
+    @Entry var gitDecorations = GitDecorationIndex()
+}
+
+private extension String {
+    /// 去掉末尾的指定后缀(仅一次)。
+    func trimmingSuffix(_ suffix: String) -> String { hasSuffix(suffix) ? String(dropLast(suffix.count)) : self }
 }
 
 private struct ExplorerMenu: View {

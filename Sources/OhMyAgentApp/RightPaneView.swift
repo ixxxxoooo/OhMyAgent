@@ -66,7 +66,8 @@ struct RightPaneView: View {
         guard let model = gitModel else { return }
         var delay = 6.0
         while !Task.isCancelled {
-            if workbench.layout.rightPane != .git, NSApp.isActive {
+            // 应用在后台时跳过轮询;但首次(仓库还没发现)总要取一次,否则资源管理器的 Git 装饰迟迟不出现
+            if workbench.layout.rightPane != .git, NSApp.isActive || model.phase == .unknown {
                 let before = model.status
                 let started = ContinuousClock.now
                 await model.refresh(full: false)
@@ -124,27 +125,9 @@ struct RightPaneView: View {
     }
 }
 
-/// 侧栏材质背景:左右栏共用的同一视觉效果。
+/// 侧栏背景:左右栏与设置页左栏共用的同一纯色(浅色 #EFEFEF,见 OMColors.sidebar)。
 struct SidebarBackground: View {
     var body: some View {
-        // 选择主题包后侧栏使用主题派生的纯色;系统主题保持原生侧栏毛玻璃
-        if let palette = ThemeRuntime.palette {
-            palette.surface.mixed(with: palette.editorForeground, palette.isDark ? 0.045 : 0.035).color
-        } else {
-            SidebarMaterial()
-        }
+        OMColors.sidebar
     }
-}
-
-/// 原生侧栏毛玻璃。
-private struct SidebarMaterial: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let view = NSVisualEffectView()
-        view.material = .sidebar
-        view.blendingMode = .behindWindow
-        view.state = .followsWindowActiveState
-        return view
-    }
-
-    func updateNSView(_ view: NSVisualEffectView, context: Context) {}
 }
