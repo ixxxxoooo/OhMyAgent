@@ -55,6 +55,8 @@ func tabIcon(_ kind: TabKind) -> String {
 struct TabGroupView: View {
     let workbench: WorkbenchModel
     let group: TabGroup
+    /// 是否位于停靠区左上角
+    var topLeft = false
     @State private var zone: DockDropZone?
     /// 保活的标签(最近使用的若干个视图保持挂载,切换时不重建)
     @State private var keepAlive = TabKeepAlive()
@@ -63,7 +65,7 @@ struct TabGroupView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            TabBarView(workbench: workbench, group: group, isFocused: isFocused)
+            TabBarView(workbench: workbench, group: group, isFocused: isFocused, leadingInset: topLeft && !workbench.layout.leftVisible ? TitlebarMetrics.collapsedLeadingInset : 0)
             Divider()
             GeometryReader { proxy in
                 content
@@ -203,9 +205,12 @@ struct TabBarView: View {
     let workbench: WorkbenchModel
     let group: TabGroup
     let isFocused: Bool
+    /// 左侧让位宽度(侧栏收起时,为红绿灯与侧栏开关浮层留位)
+    var leadingInset: CGFloat = 0
 
     var body: some View {
         HStack(spacing: 0) {
+            if leadingInset > 0 { Color.clear.frame(width: leadingInset) }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 0) {
                     ForEach(Array(group.tabs.enumerated()), id: \.element.id) { index, tab in
@@ -222,7 +227,8 @@ struct TabBarView: View {
                 overflowMenu
             }
         }
-        .frame(height: 32)
+        .frame(height: TitlebarMetrics.height)
+        .background(WindowDragArea())
         .background(.bar)
     }
 
@@ -270,7 +276,7 @@ struct TabItemView: View {
             trailing
         }
         .padding(.horizontal, 10)
-        .frame(height: 32)
+        .frame(height: TitlebarMetrics.height)
         .background(isActive ? OMColors.surface : (hovering ? Color.primary.opacity(0.05) : Color.clear))
         .overlay(alignment: .bottom) {
             if isActive { Rectangle().fill(isFocused ? OMColors.accent : OMColors.tertiaryText).frame(height: 2) }

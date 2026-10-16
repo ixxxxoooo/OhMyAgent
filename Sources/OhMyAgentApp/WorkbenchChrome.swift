@@ -28,10 +28,15 @@ struct AgentMenu: View {
                 AppActions.shared.openSettings(page: .agentExtensions)
             }
         } label: {
-            Label(model.descriptor.name, om: "person.crop.rectangle.stack")
+            Image.om("person.crop.rectangle.stack", size: 12)
+                .frame(width: 22, height: 18)
         }
-        .menuIndicator(.visible)
-        .help("切换 Agent(会在当前项目开始新会话)")
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("切换 Agent(会在当前项目开始新会话),当前:\(model.descriptor.name)")
+        .accessibilityLabel("切换 Agent")
     }
 }
 
@@ -97,12 +102,16 @@ struct UsageButton: View {
 
     var body: some View {
         Button { shown.toggle() } label: {
-            if usage.size != nil { UsageRing(fraction: fraction) } else { Image.om("gauge.with.needle") }
+            Group {
+                if usage.size != nil { UsageRing(fraction: fraction) } else { Image.om("gauge.with.needle", size: 12) }
+            }
+            .frame(width: 22, height: 18)
         }
+        .buttonStyle(.plain)
         .help("用量详情")
         .accessibilityLabel("用量详情")
         .accessibilityValue(usage.size != nil ? "上下文已使用 \(Int(fraction * 100))%" : "暂无数据")
-        .popover(isPresented: $shown, arrowEdge: .bottom) {
+        .popover(isPresented: $shown, arrowEdge: .top) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("会话用量").font(OMFonts.title)
                 if let used = usage.used {

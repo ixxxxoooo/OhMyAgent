@@ -50,7 +50,11 @@ struct RightPaneView: View {
                 .foregroundStyle(OMColors.secondaryText)
                 .lineLimit(1)
         }
-        .padding(.horizontal, 8).padding(.vertical, 6)
+        .padding(.leading, 8)
+        // 右上角留给右栏开关浮层
+        .padding(.trailing, TitlebarMetrics.trailingInset)
+        .frame(height: TitlebarMetrics.height)
+        .background(WindowDragArea())
     }
 
     @ViewBuilder
@@ -126,8 +130,8 @@ struct RightRail: View {
             }
             Spacer()
         }
-        .padding(.top, 10)
-        .frame(width: 34)
+        .padding(.top, TitlebarMetrics.height + 6)
+        .frame(width: TitlebarMetrics.trailingInset)
         .frame(maxHeight: .infinity)
         .background(.regularMaterial)
         .overlay(alignment: .leading) { Divider() }

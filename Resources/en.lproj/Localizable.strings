@@ -848,3 +848,10 @@
 "酝酿中" = "Percolating";
 "梳理中" = "Untangling";
 "盘算中" = "Computing";
+
+/* 无标题栏窗口 / kuku 风格侧栏 */
+"筛选" = "Filter";
+"显示更多(还有 %lld 条)" = "Show more (%lld more)";
+"收起" = "Collapse";
+"选中此项目" = "Select this project";
+"切换 Agent" = "Switch agent";

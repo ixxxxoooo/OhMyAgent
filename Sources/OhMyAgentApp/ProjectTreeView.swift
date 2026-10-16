@@ -1,6 +1,7 @@
 // @author ygw
-// 左栏(Cursor 风格):顶部导航(新对话/搜索/自定义)、置顶会话、项目 → 会话树、底部设置与添加项目。
-// 半透明侧栏材质、紧凑行高;会话行悬停显示置顶/归档;支持搜索过滤与拖入目录添加项目。
+// 左栏(对齐 kuku 的 Sidebar):顶部 35pt 标题区(红绿灯与侧栏开关浮层) → 主操作(新对话/搜索/自定义)
+// → 「置顶」「工作区」两个分区 → 底部设置。分区标题行右侧放筛选菜单与添加工作区;
+// 分组标题:文件夹图标 + 名称 + 会话数(悬停换成「+」);会话行:状态点 + 渐隐标题 + 固定 76pt 保留区(相对时间 ⇄ 置顶/归档)。
 
 import ACPKit
 import ChatKit
@@ -88,24 +89,31 @@ struct ProjectTreeView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // 顶部 35pt:红绿灯与侧栏开关浮层所在区域,可拖动窗口
+            Color.clear.frame(height: TitlebarMetrics.height).background(WindowDragArea())
             navigation
-            List {
-                if !pinned.isEmpty {
-                    Section("已置顶") {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    if !pinned.isEmpty {
+                        SectionTitle(title: "置顶")
                         ForEach(pinned) { item in
                             SessionLine(workbench: workbench, item: item, mode: .pinned)
                         }
                     }
-                }
-                Section("项目") {
+                    SectionTitle(title: "工作区") {
+                        filterMenu
+                        SectionIconButton(icon: "folder.badge.plus", label: String(localized: "添加项目…")) {
+                            if let url = WorkspaceStore.chooseDirectory() { AppActions.shared.openWorkspace(url) }
+                        }
+                    }
                     ForEach(workbench.orderedProjects) { project in
                         ProjectGroup(workbench: workbench, project: project, key: key, showArchived: showArchived)
                     }
                 }
+                .padding(.horizontal, 8)
+                .padding(.bottom, 16)
             }
-            .listStyle(.sidebar)
-            .scrollContentBackground(.hidden)
-            .environment(\.defaultMinListRowHeight, 24)
+            .scrollIndicators(.never)
             .overlay {
                 if workbench.projects.isEmpty {
                     ContentUnavailableView {
@@ -129,18 +137,18 @@ struct ProjectTreeView: View {
         }
     }
 
-    // MARK: 顶部导航
+    // MARK: 顶部主操作
 
-    /// 导航区:新对话、搜索(点击展开输入框)、自定义(进入设置)。
+    /// 主操作区:新对话、搜索(点击展开输入框)、自定义(进入设置)。
     private var navigation: some View {
-        VStack(spacing: 1) {
+        VStack(spacing: 2) {
             NavRow(title: "新对话", icon: "square.and.pencil", shortcut: ShortcutStore.shared.binding(for: .newConversation).display) {
                 if let id = workbench.selectedProjectID { workbench.newConversation(in: id) }
             }
             .disabled(workbench.selectedProjectID == nil)
             if searching {
-                HStack(spacing: 6) {
-                    Image.om("magnifyingglass", size: 12).foregroundStyle(OMColors.tertiaryText)
+                HStack(spacing: 8) {
+                    Image.om("magnifyingglass", size: 14).opacity(0.7).frame(width: 16)
                     TextField("搜索会话", text: $query)
                         .textFieldStyle(.plain)
                         .font(OMFonts.body)
@@ -151,10 +159,9 @@ struct ProjectTreeView: View {
                         .foregroundStyle(OMColors.tertiaryText)
                         .accessibilityLabel("清除搜索")
                 }
-                .padding(.horizontal, 8)
-                .frame(height: 26)
-                .background(RoundedRectangle(cornerRadius: 7).fill(Color.primary.opacity(0.07)))
-                .padding(.horizontal, 2)
+                .padding(.horizontal, 10)
+                .frame(height: 30)
+                .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.primary.opacity(0.07)))
             } else {
                 NavRow(title: "搜索", icon: "magnifyingglass", shortcut: nil) {
                     searching = true
@@ -164,8 +171,7 @@ struct ProjectTreeView: View {
             NavRow(title: "自定义", icon: "slider.horizontal.3", shortcut: nil) { AppActions.shared.openSettings() }
         }
         .padding(.horizontal, 10)
-        .padding(.top, 8)
-        .padding(.bottom, 4)
+        .padding(.bottom, 8)
     }
 
     private func endSearch() {
@@ -173,38 +179,88 @@ struct ProjectTreeView: View {
         searching = false
     }
 
+    /// 分区标题行里的筛选菜单(显示已归档会话)。
+    private var filterMenu: some View {
+        Menu {
+            Toggle("显示已归档会话", isOn: $showArchived)
+        } label: {
+            Image.om("sliders-horizontal", size: 12)
+                .frame(width: 22, height: 22)
+                .foregroundStyle(showArchived ? OMColors.accent : OMColors.tertiaryText)
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("筛选")
+        .accessibilityLabel("筛选")
+    }
+
     // MARK: 底部
 
+    /// 底部只保留设置图标(对齐 kuku)。
     private var footer: some View {
-        HStack(spacing: 4) {
-            Button {
-                if let url = WorkspaceStore.chooseDirectory() { AppActions.shared.openWorkspace(url) }
-            } label: {
-                Label("添加项目…", om: "folder.badge.plus").font(OMFonts.small)
+        HStack {
+            Button { AppActions.shared.openSettings() } label: {
+                Image.om("gearshape", size: 14)
+                    .frame(width: 26, height: 26)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .foregroundStyle(OMColors.secondaryText)
-            Spacer()
-            Button { showArchived.toggle() } label: {
-                Image.om("archivebox", size: 13)
-                    .foregroundStyle(showArchived ? OMColors.accent : OMColors.secondaryText)
-            }
-            .buttonStyle(.plain)
-            .help(showArchived ? "隐藏已归档会话" : "显示已归档会话")
-            .accessibilityLabel(showArchived ? "隐藏已归档会话" : "显示已归档会话")
-            Button { AppActions.shared.openSettings() } label: {
-                Image.om("gearshape", size: 14).foregroundStyle(OMColors.secondaryText)
-            }
-            .buttonStyle(.plain)
             .help("设置 (⌘,)")
             .accessibilityLabel("设置")
+            Spacer()
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
     }
 }
 
-/// 导航行:图标 + 文案 + 可选快捷键提示。
+/// 分区标题行:小号三级文字,右侧可放操作图标。
+private struct SectionTitle<Trailing: View>: View {
+    let title: LocalizedStringKey
+    @ViewBuilder var trailing: Trailing
+
+    var body: some View {
+        HStack(spacing: 2) {
+            Text(title)
+            Spacer(minLength: 0)
+            trailing
+        }
+        .font(OMFonts.caption.weight(.medium))
+        .foregroundStyle(OMColors.tertiaryText)
+        .padding(.horizontal, 8)
+        .frame(height: 28)
+        .padding(.top, 2)
+    }
+}
+
+extension SectionTitle where Trailing == EmptyView {
+    init(title: LocalizedStringKey) {
+        self.init(title: title) { EmptyView() }
+    }
+}
+
+/// 分区标题行里的小图标按钮。
+private struct SectionIconButton: View {
+    let icon: String
+    let label: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image.om(icon, size: 12)
+                .frame(width: 22, height: 22)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(label)
+        .accessibilityLabel(label)
+    }
+}
+
+/// 主操作行:图标 + 文案 + 可选快捷键提示(rounded-lg,hover 底色)。
 private struct NavRow: View {
     let title: LocalizedStringKey
     let icon: String
@@ -215,23 +271,26 @@ private struct NavRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                Image.om(icon, size: 13).frame(width: 16)
+                Image.om(icon, size: 14).opacity(0.7).frame(width: 16)
                 Text(title).font(OMFonts.body)
                 Spacer()
-                if let shortcut { Text(shortcut).font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText) }
+                if let shortcut { Text(shortcut).font(OMFonts.caption).monospacedDigit().foregroundStyle(OMColors.tertiaryText) }
             }
-            .padding(.horizontal, 8)
-            .frame(height: 26)
+            .padding(.horizontal, 10)
+            .frame(height: 30)
             .contentShape(Rectangle())
-            .background(RoundedRectangle(cornerRadius: 7).fill(hovering ? Color.primary.opacity(0.07) : .clear))
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(hovering ? Color.primary.opacity(0.07) : .clear))
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
     }
 }
 
-/// 项目节点:标题行 + 会话行(置顶会话不在此重复,已归档会话按开关显示)。
+/// 工作区分组:标题行(文件夹图标 + 名称 + 会话数/悬停「+」,点击折叠)+ 会话行。
 private struct ProjectGroup: View {
+    /// 每个分组默认展示的会话条数,超出走「显示更多」
+    private static let previewCount = 5
+
     let workbench: WorkbenchModel
     let project: ProjectEntry
     let key: String
@@ -240,6 +299,7 @@ private struct ProjectGroup: View {
     @State private var showAll = false
 
     private var isSelected: Bool { workbench.selectedProjectID == project.id }
+    private var expanded: Bool { !project.collapsed || !key.isEmpty }
 
     /// 本项目要在树中展示的会话(排除置顶,按搜索过滤,按开关决定是否含已归档)。
     private var rows: [SidebarSession] {
@@ -255,47 +315,75 @@ private struct ProjectGroup: View {
     var body: some View {
         let all = rows
         if key.isEmpty || !all.isEmpty {
-            DisclosureGroup(isExpanded: Binding(get: { !project.collapsed || !key.isEmpty }, set: { _ in workbench.toggleCollapsed(project.id) })) {
-                let visible = showAll || !key.isEmpty ? all : Array(all.prefix(8))
-                ForEach(visible) { item in
-                    SessionLine(workbench: workbench, item: item, mode: .tree)
-                    if item.isCurrent { SubagentRows(workbench: workbench, projectID: project.id) }
-                }
-                if all.count > 8 && key.isEmpty {
-                    Button(showAll ? "收起" : "显示全部 \(all.count) 个会话") { showAll.toggle() }
+            VStack(alignment: .leading, spacing: 2) {
+                header(count: all.count)
+                if expanded {
+                    if all.isEmpty {
+                        Text("暂无会话")
+                            .font(OMFonts.small)
+                            .foregroundStyle(OMColors.tertiaryText)
+                            .padding(.leading, 16)
+                            .padding(.vertical, 4)
+                    }
+                    let visible = showAll || !key.isEmpty ? all : Array(all.prefix(Self.previewCount))
+                    ForEach(visible) { item in
+                        SessionLine(workbench: workbench, item: item, mode: .tree)
+                        if item.isCurrent { SubagentRows(workbench: workbench, projectID: project.id) }
+                    }
+                    if all.count > Self.previewCount && key.isEmpty {
+                        Button(showAll ? String(localized: "收起") : String(localized: "显示更多(还有 \(all.count - Self.previewCount) 条)")) {
+                            omWithAnimation(.snappy(duration: 0.18)) { showAll.toggle() }
+                        }
                         .buttonStyle(.plain)
-                        .font(OMFonts.caption)
+                        .font(OMFonts.small)
                         .foregroundStyle(OMColors.secondaryText)
+                        .padding(.leading, 16)
+                        .padding(.vertical, 4)
+                    }
                 }
-            } label: {
-                header
             }
         }
     }
 
-    private var header: some View {
+    private func header(count: Int) -> some View {
         HStack(spacing: 6) {
-            Image.om(isSelected ? "folder.fill" : "folder", size: 13)
+            Image.om(expanded ? "folder-open" : "folder", size: 14)
+                .opacity(isSelected ? 1 : 0.6)
                 .foregroundStyle(isSelected ? OMColors.accent : OMColors.secondaryText)
             Text(project.name)
-                .font(OMFonts.body.weight(.medium))
+                .font(OMFonts.small.weight(.medium))
+                .foregroundStyle(OMColors.secondaryText)
                 .lineLimit(1)
             if project.pinned {
                 Image.om("pin.fill", size: 9).foregroundStyle(OMColors.tertiaryText)
             }
             Spacer(minLength: 4)
-            if hovering {
+            // 固定 24pt 保留区:会话数 ⇄ 悬停「+」,互换不位移
+            ZStack(alignment: .trailing) {
+                Text("\(count)")
+                    .font(OMFonts.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(OMColors.tertiaryText)
+                    .opacity(hovering ? 0 : 1)
                 Button { workbench.newConversation(in: project.id) } label: {
-                    Image.om("square.and.pencil", size: 12)
+                    Image.om("plus", size: 12)
+                        .frame(width: 22, height: 22)
+                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.plain)
+                .foregroundStyle(OMColors.secondaryText)
+                .opacity(hovering ? 1 : 0)
                 .help("在 \(project.name) 下新对话")
                 .accessibilityLabel("在 \(project.name) 下新对话")
             }
+            .frame(width: 24)
         }
+        .padding(.horizontal, 8)
+        .frame(height: 30)
+        .background(hovering ? Color.primary.opacity(0.06) : Color.clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
-        .onTapGesture { workbench.select(project: project.id) }
+        .onTapGesture { omWithAnimation(.snappy(duration: 0.18)) { workbench.toggleCollapsed(project.id) } }
         .help((project.id as NSString).abbreviatingWithTildeInPath)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(project.name)
@@ -303,6 +391,7 @@ private struct ProjectGroup: View {
         .accessibilityAction(named: Text("新对话")) { workbench.newConversation(in: project.id) }
         .contextMenu {
             Button("新对话") { workbench.newConversation(in: project.id) }
+            Button("选中此项目") { workbench.select(project: project.id) }
             Divider()
             Button(project.pinned ? "取消置顶" : "置顶") { workbench.togglePin(project.id) }
             Button("在 Finder 中显示") { NSWorkspace.shared.activateFileViewerSelecting([project.url]) }
@@ -351,7 +440,7 @@ private struct SubagentRows: View {
     }
 }
 
-/// 会话行:图标/状态点 + 标题 + 相对时间;悬停时时间位置换成「置顶/归档」按钮。
+/// 会话行:状态点 + 渐隐标题 + 固定 76pt 保留区(相对时间 ⇄ 悬停时的置顶/归档按钮),对齐 kuku 的 SessionRow。
 private struct SessionLine: View {
     enum Mode { case tree, pinned }
     let workbench: WorkbenchModel
@@ -365,20 +454,32 @@ private struct SessionLine: View {
     private var projectName: String { workbench.projects.first { $0.id == item.projectID }?.name ?? "" }
 
     var body: some View {
-        HStack(spacing: 6) {
-            leading
+        HStack(spacing: 8) {
+            SessionStatusDot(uid: item.isCurrent ? item.uid : nil, isRunning: item.isRunning)
+                .frame(width: 10)
+            // 标题溢出时右端渐隐(不用省略号硬截断);短标题不受影响
             Text(item.title)
-                .font(OMFonts.body)
+                .font(OMFonts.small)
                 .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
                 .foregroundStyle(isArchived ? OMColors.tertiaryText : Color.primary)
-            Spacer(minLength: 4)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .clipped()
+                .mask(
+                    HStack(spacing: 0) {
+                        Rectangle()
+                        LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing).frame(width: 24)
+                    }
+                )
             trailing
+                .frame(width: 76, height: 20, alignment: .trailing)
         }
-        .padding(.horizontal, 6)
-        .frame(minHeight: 24)
+        .padding(.leading, mode == .tree ? 16 : 8)
+        .padding(.trailing, 8)
+        .padding(.vertical, 5)
         .background {
-            if isSelected { RoundedRectangle(cornerRadius: 7).fill(OMColors.accent.opacity(0.14)) }
-            else if hovering { RoundedRectangle(cornerRadius: 7).fill(Color.primary.opacity(0.06)) }
+            if isSelected { RoundedRectangle(cornerRadius: 7, style: .continuous).fill(OMColors.accent.opacity(0.14)) }
+            else if hovering { RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Color.primary.opacity(0.06)) }
         }
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
@@ -386,48 +487,46 @@ private struct SessionLine: View {
         .help(mode == .pinned ? "\(projectName) · \(item.title)" : item.title)
         .contextMenu { menu }
         .accessibilityElement(children: .combine)
-    }
-
-    @ViewBuilder
-    private var leading: some View {
-        if let uid = item.uid, item.isCurrent {
-            ZStack {
-                Image.om("bubble.left", size: 11).foregroundStyle(isSelected ? OMColors.accent : OMColors.tertiaryText)
-                AttentionDot(uid: uid).offset(x: 7, y: -6)
-            }
-            .frame(width: 16)
-        } else {
-            Image.om(isPinned ? "pin.fill" : "bubble.left", size: 11)
-                .foregroundStyle(OMColors.tertiaryText)
-                .frame(width: 16)
-        }
+        .accessibilityAddTraits(.isButton)
     }
 
     @ViewBuilder
     private var trailing: some View {
         if hovering, let id = item.sessionId {
-            HStack(spacing: 4) {
-                Button { workbench.toggleSessionPin(id, in: item.projectID) } label: {
-                    Image.om(isPinned ? "pin.fill" : "pin", size: 12)
+            HStack(spacing: 2) {
+                if !isArchived {
+                    rowAction(icon: isPinned ? "pin.fill" : "pin", label: isPinned ? String(localized: "取消置顶") : String(localized: "置顶")) {
+                        workbench.toggleSessionPin(id, in: item.projectID)
+                    }
                 }
-                .help(isPinned ? "取消置顶" : "置顶")
-                .accessibilityLabel(isPinned ? "取消置顶" : "置顶")
-                Button { workbench.setSessionArchived(!isArchived, sessionId: id, in: item.projectID) } label: {
-                    Image.om("archivebox", size: 12)
+                rowAction(icon: "archivebox", label: isArchived ? String(localized: "取消归档") : String(localized: "归档")) {
+                    workbench.setSessionArchived(!isArchived, sessionId: id, in: item.projectID)
                 }
-                .help(isArchived ? "取消归档" : "归档")
-                .accessibilityLabel(isArchived ? "取消归档" : "归档")
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(OMColors.secondaryText)
-        } else if item.isRunning {
-            Text("工作中…").font(OMFonts.caption).foregroundStyle(OMColors.secondaryText)
         } else if let date = item.updatedAt {
-            Text(date.formatted(.relative(presentation: .numeric, unitsStyle: .narrow)))
-                .font(OMFonts.caption)
-                .foregroundStyle(OMColors.tertiaryText)
-                .lineLimit(1)
+            HStack(spacing: 4) {
+                if isPinned { Image.om("pin.fill", size: 9) }
+                Text(date.formatted(.relative(presentation: .numeric, unitsStyle: .narrow)))
+                    .monospacedDigit()
+                    .lineLimit(1)
+            }
+            .font(OMFonts.caption)
+            .foregroundStyle(OMColors.tertiaryText)
+        } else if isPinned {
+            Image.om("pin.fill", size: 9).foregroundStyle(OMColors.tertiaryText)
         }
+    }
+
+    private func rowAction(icon: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image.om(icon, size: 12)
+                .frame(width: 20, height: 20)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(OMColors.tertiaryText)
+        .help(label)
+        .accessibilityLabel(label)
     }
 
     @ViewBuilder
@@ -450,6 +549,39 @@ private struct SessionLine: View {
             workbench.select(project: item.projectID)
         } else if let id = item.sessionId {
             workbench.openHistory(project: item.projectID, sessionId: id, title: item.title)
+        }
+    }
+}
+
+/// 行首状态点:运行中小转圈 / 等待处理橙点闪烁 / 未读完成绿点 / 常态灰点(历史会话与空闲)。
+private struct SessionStatusDot: View {
+    /// 当前会话的 uid(历史会话为 nil,只显示灰点)
+    let uid: String?
+    let isRunning: Bool
+    private let center = AttentionCenter.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        let state = uid.flatMap { center.items[$0]?.state } ?? (isRunning ? .running : .idle)
+        switch state {
+        case .running:
+            ProgressView().controlSize(.mini).scaleEffect(0.7).accessibilityLabel("运行中")
+        case .needsInput:
+            dot(.orange, blink: true).accessibilityLabel("等待处理")
+        case .unreadDone:
+            dot(.green, blink: false).accessibilityLabel("已完成,未读")
+        case .idle:
+            dot(Color.secondary.opacity(0.45), blink: false)
+        }
+    }
+
+    @ViewBuilder
+    private func dot(_ color: Color, blink: Bool) -> some View {
+        if blink && !reduceMotion {
+            Circle().fill(color).frame(width: 6, height: 6)
+                .phaseAnimator([1.0, 0.3]) { view, opacity in view.opacity(opacity) } animation: { _ in .easeInOut(duration: 0.7) }
+        } else {
+            Circle().fill(color).frame(width: 6, height: 6)
         }
     }
 }

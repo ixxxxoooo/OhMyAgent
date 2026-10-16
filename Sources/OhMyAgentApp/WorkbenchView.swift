@@ -23,6 +23,8 @@ struct WorkbenchView: View {
         Group {
             if workbench.mode == .settings {
                 SettingsView(workbench: workbench)
+                    // 无标题栏:给红绿灯让出顶部位置
+                    .safeAreaInset(edge: .top, spacing: 0) { Color.clear.frame(height: 28) }
             } else {
                 workspaceBody
             }
@@ -30,8 +32,9 @@ struct WorkbenchView: View {
         .overlay { PaletteOverlay(workbench: workbench) }
         .tint(appearance.accent.color)
         .frame(minWidth: 860, minHeight: 560)
-        .background(WindowFocusReader(onWindow: { actions.mainWindow = $0 }, onChange: { key in
+        .background(WindowFocusReader(onWindow: { window in actions.mainWindow = window; WindowChrome.apply(to: window) }, onChange: { key in
             windowIsKey = key
+            if let window = actions.mainWindow { WindowChrome.apply(to: window) }
             updateFocus()
         }))
         .onAppear {
@@ -55,17 +58,20 @@ struct WorkbenchView: View {
                 NavigationSplitView(columnVisibility: columnVisibility) {
                     ProjectTreeView(workbench: workbench)
                         .id(appearance.fontRevision)
+                        .ignoresSafeArea(.container, edges: .top)
+                        .toolbar(removing: .sidebarToggle)
                         .navigationSplitViewColumnWidth(min: CGFloat(PanelMetrics.leftRange.lowerBound), ideal: CGFloat(workbench.layout.leftWidth), max: CGFloat(PanelMetrics.leftRange.upperBound))
                 } detail: {
                     CenterColumn(workbench: workbench)
-                        // 窗口标题仅保留给系统(Mission Control/辅助功能),界面上不再占一行:
-                        // 会话名已在标签栏显示,项目路径在侧栏与状态栏可见。
+                        .ignoresSafeArea(.container, edges: .top)
+                        // 无标题栏窗口:不再有工具栏与标题行,窗口标题仅保留给系统(Mission Control/辅助功能)。
                         .navigationTitle(title)
                         .toolbar(removing: .title)
-                        .toolbar { WorkbenchToolbar(workbench: workbench, switchAgent: switchAgent) }
                 }
+                .toolbar(removing: .sidebarToggle)
                 .inspector(isPresented: $workbench.layout.rightVisible) {
                     RightPaneView(workbench: workbench)
+                        .ignoresSafeArea(.container, edges: .top)
                         .inspectorColumnWidth(min: CGFloat(PanelMetrics.rightRange.lowerBound), ideal: CGFloat(workbench.layout.rightWidth), max: CGFloat(PanelMetrics.rightRange.upperBound))
                         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
                             if width > 0 { workbench.layout.rightWidth = Double(width) }
@@ -73,9 +79,11 @@ struct WorkbenchView: View {
                 }
                 if !workbench.layout.rightVisible { RightRail(workbench: workbench) }
             }
-            StatusBarView(workbench: workbench)
+            StatusBarView(workbench: workbench, switchAgent: switchAgent)
         }
         .background(PanelDividerReset(onReset: resetPanelWidth, visibility: { (left: workbench.layout.leftVisible, right: workbench.layout.rightVisible) }))
+        .overlay(alignment: .top) { TitlebarOverlay(workbench: workbench) }
+        .ignoresSafeArea(.container, edges: .top)
     }
 
     /// 双击分隔条:把对应侧栏宽度恢复默认并持久化。
@@ -231,52 +239,5 @@ struct CenterColumn: View {
     /// 任一会话中待处理的文件查看请求。
     private var pendingViewerRequest: FileViewRequest? {
         workbench.sessions.values.lazy.compactMap(\.viewerRequest).first
-    }
-}
-
-/// 工具栏:Agent 切换、用量、工具与扩展、新对话、右栏与底部面板开关。
-struct WorkbenchToolbar: ToolbarContent {
-    let workbench: WorkbenchModel
-    let switchAgent: (AgentDescriptor) -> Void
-
-    var body: some ToolbarContent {
-        ToolbarItem(placement: .primaryAction) {
-            if let model = workbench.activeSession { AgentMenu(model: model, switchAgent: switchAgent) }
-        }
-        ToolbarItem(placement: .primaryAction) {
-            if let usage = workbench.activeSession?.usage, usage.used != nil || usage.costAmount != nil {
-                UsageButton(usage: usage)
-            }
-        }
-        ToolbarItem(placement: .primaryAction) {
-            Button {
-                AppActions.shared.openSettings(page: .tools)
-            } label: {
-                Label("工具与扩展", om: "puzzlepiece.extension")
-            }
-            .help("MCP、Skills、子 Agent、Hooks、插件与记忆 (\(ShortcutStore.shared.binding(for: .extensions).display))")
-        }
-        ToolbarItem(placement: .primaryAction) {
-            Button {
-                if let id = workbench.selectedProjectID { workbench.newConversation(in: id) }
-            } label: {
-                Label("新对话", om: "square.and.pencil")
-            }
-            .help("新对话 (\(ShortcutStore.shared.binding(for: .newConversation).display))")
-            .disabled(workbench.activeSession?.phase != .ready)
-        }
-        ToolbarItem(placement: .primaryAction) {
-            Button { workbench.toggleBottom() } label: {
-                Label("底部面板", om: workbench.layout.bottomVisible ? "rectangle.bottomthird.inset.filled" : "rectangle.bottomthird.inset.filled")
-                    .symbolVariant(workbench.layout.bottomVisible ? .fill : .none)
-            }
-            .help("切换底部面板 (\(ShortcutStore.shared.binding(for: .togglePanel).display))")
-        }
-        ToolbarItem(placement: .primaryAction) {
-            Button { workbench.toggleRight() } label: {
-                Label("右栏", om: "sidebar.right")
-            }
-            .help("切换右栏 (\(ShortcutStore.shared.binding(for: .toggleInspector).display))")
-        }
     }
 }
