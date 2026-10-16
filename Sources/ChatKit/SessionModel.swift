@@ -253,6 +253,10 @@ public final class SessionModel {
     /// 正在探测上下文明细:非 nil 时拦截消息分片(按 messageId 累积),不进入时间线。
     private var contextProbeChunks: [String: String]?
     public private(set) var sessionTitle: String? { didSet { if sessionTitle != oldValue { recordRecent() } } }
+    /// 当前标题的来源(决定自动标题能否覆盖它)
+    @ObservationIgnored private var titleSource: TitleSource = .none
+    /// 自动标题生成任务(换会话时取消)
+    @ObservationIgnored private var titleTask: Task<Void, Never>?
     public private(set) var pendingPermissions: [PermissionPrompt] = [] { didSet { if pendingPermissions.isEmpty != oldValue.isEmpty { publishAttention() } } }
     public private(set) var pendingElicitations: [ElicitationPrompt] = [] { didSet { if pendingElicitations.isEmpty != oldValue.isEmpty { publishAttention() } } }
     /// 终端会话(按终端 ID)
@@ -654,6 +658,8 @@ public final class SessionModel {
         let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty, let sessionId else { return }
         ClientPrefs.setSessionTitle(clean, for: sessionId)
+        titleTask?.cancel()
+        titleSource = .manual
         sessionTitle = clean
         history = history.map { item in
             var copy = item
@@ -864,6 +870,7 @@ public final class SessionModel {
         trackGoal(in: prompt)
         timeline.appendUser(prompt, attachments: images)
         turnNumber += 1
+        if sessionTitle == nil, titleSource == .none { startAutoTitle(for: prompt, sessionId: sessionId) }
         turnStart = ContinuousClock.now
         turnStartedAt = Date()
         lastActivity = .now
@@ -879,6 +886,34 @@ public final class SessionModel {
             } catch {
                 self?.finishTurn(reason: nil, usage: nil, error: error)
             }
+        }
+    }
+
+    /// 首条消息后的自动标题:先用首句截取立刻给出临时标题,再异步经本机网关用小模型生成短标题覆盖。
+    /// 仅在没有更高优先级来源(手动、适配器)时生效;失败只记日志并保留截取标题。
+    private func startAutoTitle(for prompt: String, sessionId: String) {
+        if let fallback = TitleGenerator.fallbackTitle(from: prompt) {
+            applyAutoTitle(fallback, source: .truncated, sessionId: sessionId)
+        }
+        guard let gateway = providerURL, mappedModels[.haiku] != nil || mappedModels[.main] != nil else { return }
+        let alias = (mappedModels[.haiku] != nil ? ModelSlot.haiku : ModelSlot.main).alias
+        titleTask?.cancel()
+        titleTask = Task { [weak self] in
+            guard let title = await TitleGenerator.generate(gateway: gateway, model: alias, userText: prompt), !Task.isCancelled else { return }
+            self?.applyAutoTitle(title, source: .generated, sessionId: sessionId)
+        }
+    }
+
+    /// 应用自动标题:只在来源优先级不低于当前来源、且仍是同一会话时写入;持久化到「自动标题」偏好。
+    private func applyAutoTitle(_ title: String, source: TitleSource, sessionId: String) {
+        guard self.sessionId == sessionId, source >= titleSource, titleSource < .adapter else { return }
+        titleSource = source
+        sessionTitle = title
+        ClientPrefs.setGeneratedSessionTitle(title, for: sessionId)
+        history = history.map { item in
+            var copy = item
+            if copy.sessionId == sessionId { copy.title = title }
+            return copy
         }
     }
 
@@ -984,6 +1019,8 @@ public final class SessionModel {
         cancel()
         let cwd = workspace.path
         timeline.reset()
+        titleTask?.cancel()
+        titleSource = .none
         sessionTitle = nil
         goal = nil
         followUps.removeAll()
@@ -1014,9 +1051,10 @@ public final class SessionModel {
         Task { [weak self] in
             guard let result = try? await client.listSessions(cwd: cwd) else { return }
             let overrides = ClientPrefs.sessionTitleOverrides()
+            let generated = ClientPrefs.generatedSessionTitles()
             let sorted = result.sessions.sorted { ($0.updatedAt ?? "") > ($1.updatedAt ?? "") }.map { item -> SessionSummary in
                 var copy = item
-                if let title = overrides[item.sessionId] { copy.title = title }
+                if let title = overrides[item.sessionId] ?? generated[item.sessionId] { copy.title = title }
                 return copy
             }
             self?.history = sorted
@@ -1034,7 +1072,15 @@ public final class SessionModel {
         turnChanges.removeAll()
         turnChangeOrder.removeAll()
         Task { await checkpoints.reset() }
-        sessionTitle = ClientPrefs.sessionTitleOverrides()[summary.sessionId] ?? summary.title
+        titleTask?.cancel()
+        if let manual = ClientPrefs.sessionTitleOverrides()[summary.sessionId] {
+            titleSource = .manual; sessionTitle = manual
+        } else if let generated = ClientPrefs.generatedSessionTitles()[summary.sessionId] {
+            titleSource = .generated; sessionTitle = generated
+        } else {
+            titleSource = summary.title?.isEmpty == false ? .adapter : .none
+            sessionTitle = summary.title
+        }
         usage = nil
         sessionId = summary.sessionId
         isReplaying = true
@@ -1486,7 +1532,17 @@ public final class SessionModel {
                 configOptions[index].currentValue = .string(modeId)
             }
         case .sessionInfo(let title, _):
-            if let title { sessionTitle = sessionId.flatMap { ClientPrefs.sessionTitleOverrides()[$0] } ?? title }
+            if let title {
+                if let manual = sessionId.flatMap({ ClientPrefs.sessionTitleOverrides()[$0] }) {
+                    sessionTitle = manual
+                } else {
+                    // 适配器推送的标题优先于自动生成/截取的标题
+                    titleTask?.cancel()
+                    titleSource = .adapter
+                    if let sessionId { ClientPrefs.setGeneratedSessionTitle(nil, for: sessionId) }
+                    sessionTitle = title
+                }
+            }
         case .usage(let value): usage = value
         case .agentMessageChunk(let messageId, let content) where contextProbeChunks != nil:
             // 上下文探测期间的输出属于 `/context` 命令,只累积不展示;适配器可能以不同 messageId 重复发送整份输出

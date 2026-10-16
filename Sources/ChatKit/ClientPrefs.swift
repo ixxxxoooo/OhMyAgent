@@ -130,6 +130,21 @@ public enum ClientPrefs {
         defaults.set(map, forKey: "session.titleOverrides")
     }
 
+    /// 自动生成的会话标题(会话 ID → 标题);优先级低于用户重命名,高于适配器列表里的原始标题。
+    public static func generatedSessionTitles(_ defaults: UserDefaults = .standard) -> [String: String] {
+        defaults.dictionary(forKey: "session.generatedTitles") as? [String: String] ?? [:]
+    }
+
+    /// 保存自动生成的标题;`title` 为空时移除。
+    /// - Parameters:
+    ///   - title: 标题
+    ///   - sessionId: 会话 ID
+    public static func setGeneratedSessionTitle(_ title: String?, for sessionId: String, _ defaults: UserDefaults = .standard) {
+        var map = generatedSessionTitles(defaults)
+        if let title, !title.isEmpty { map[sessionId] = title } else { map.removeValue(forKey: sessionId) }
+        defaults.set(map, forKey: "session.generatedTitles")
+    }
+
     /// 删除全部客户端偏好(不含 Claude 设置)。
     public static func resetAll(_ defaults: UserDefaults = .standard) {
         for key in defaults.dictionaryRepresentation().keys {
