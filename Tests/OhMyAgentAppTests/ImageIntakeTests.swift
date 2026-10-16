@@ -1,4 +1,4 @@
-// @author ygw
+// @author ixxxxoooo
 // 图片摄取测试:粘贴板里的截图数据、文件 URL、TIFF 都能变成可发送的附件;非图片被忽略。
 
 import AppKit
