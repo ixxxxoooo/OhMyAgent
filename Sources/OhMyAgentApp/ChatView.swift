@@ -11,7 +11,8 @@ import WorkbenchKit
 struct ChatView: View {
     let model: SessionModel
     @State private var position = ScrollPosition(edge: .bottom)
-    @State private var isPinnedToBottom = true
+    /// 跟随底部状态(纯逻辑,见 ChatKit.FollowState)
+    @State private var follow = FollowState()
     @State private var scrollPhase: ScrollPhase = .idle
     /// 上下边缘是否还有被遮住的内容(没有时不做渐隐,避免末行文字被淡化、底部留出多余空白)
     @State private var fadeEdges = TimelineEdgeFade.Edges(top: false, bottom: false)
@@ -119,17 +120,15 @@ struct ChatView: View {
         .clipped()
         .scrollPosition($position)
         .onScrollPhaseChange { _, phase in scrollPhase = phase }
-        .onScrollGeometryChange(for: Bool.self) { geometry in
-            geometry.contentOffset.y + geometry.containerSize.height >= geometry.contentSize.height - 48
-        } action: { _, atBottom in
-            // 内容增高(工具详情异步展开、Diff 计算完成)会让“是否在底部”暂时为假;
-            // 只有用户主动滚动(非空闲阶段)离开底部才取消跟随。
-            if atBottom {
-                isPinnedToBottom = true
-                sticky.followSuspended = false
-            } else if scrollPhase != .idle {
-                isPinnedToBottom = false
-            }
+        .onScrollGeometryChange(for: ScrollMetrics.self) { geometry in
+            ScrollMetrics(offsetY: geometry.contentOffset.y, contentHeight: geometry.contentSize.height, containerHeight: geometry.containerSize.height)
+        } action: { _, metrics in
+            // 内容增高(工具详情异步展开)不会放手;用户主动向上滚(或在滚动中离开底部)才放手
+            follow.geometryChanged(
+                offsetY: metrics.offsetY, contentHeight: metrics.contentHeight, containerHeight: metrics.containerHeight,
+                userScrolling: scrollPhase != .idle, entryCount: model.timeline.entries.count
+            )
+            if follow.pinned { sticky.followSuspended = false }
         }
         .onScrollGeometryChange(for: TimelineEdgeFade.Edges.self) { geometry in
             TimelineEdgeFade.Edges(
@@ -140,11 +139,66 @@ struct ChatView: View {
             omWithAnimation { fadeEdges = edges }
         }
         .onScrollGeometryChange(for: CGFloat.self) { $0.contentSize.height } action: { _, _ in
-            if isPinnedToBottom, !sticky.followSuspended { position.scrollTo(edge: .bottom) }
+            autoFollow()
         }
-        .onChange(of: model.timeline.revision) {
-            if isPinnedToBottom, !sticky.followSuspended { position.scrollTo(edge: .bottom) }
+        .onChange(of: model.timeline.revision) { autoFollow() }
+        .overlay(alignment: .bottom) { jumpButton }
+    }
+
+    /// 内容变化后:贴底且用户没在滚动时才自动滚到底;否则只累计「新消息」。
+    private func autoFollow() {
+        let shouldScroll = follow.contentChanged(entryCount: model.timeline.entries.count, userScrolling: scrollPhase != .idle)
+        if shouldScroll, !sticky.followSuspended { position.scrollTo(edge: .bottom) }
+    }
+
+    /// 离开底部时的悬浮按钮:回到最新;有新内容时显示条数。
+    @ViewBuilder
+    private var jumpButton: some View {
+        if follow.showsJumpButton {
+            JumpToLatestButton(unseen: follow.unseen, hasActivity: follow.hasActivity || model.isRunning) {
+                follow.jumpToLatest()
+                sticky.followSuspended = false
+                omWithAnimation { position.scrollTo(edge: .bottom) }
+            }
+            .padding(.bottom, 10)
+            .transition(.opacity.combined(with: .offset(y: 6)))
         }
+    }
+}
+
+/// 滚动几何快照(Equatable,避免无关变化触发回调)。
+private struct ScrollMetrics: Equatable {
+    var offsetY: CGFloat
+    var contentHeight: CGFloat
+    var containerHeight: CGFloat
+}
+
+/// 「回到最新」悬浮按钮:沿用输入区的玻璃卡片风格。
+struct JumpToLatestButton: View {
+    /// 离开底部后新增的条目数
+    let unseen: Int
+    /// 是否有内容在更新(运行中或有新增)
+    let hasActivity: Bool
+    let action: () -> Void
+
+    private var label: String {
+        if unseen > 0 { return String(localized: "\(unseen) 条新消息") }
+        return hasActivity ? String(localized: "有新内容") : String(localized: "回到最新")
+    }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image.om("arrow-down", size: 11, weight: .bold)
+                Text(label).font(OMFonts.small)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .omGlassCard()
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .help("回到最新消息")
     }
 }
 
@@ -154,8 +208,6 @@ struct EmptyStateView: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            Image.om("sparkles", size: 30, weight: .light)
-                .foregroundStyle(OMColors.accent)
             Text("有什么可以帮你?")
                 .font(OMFonts.title)
             Text(model.workspace.abbreviatingHome)
