@@ -55,8 +55,11 @@ public struct ThemeRGB: Sendable, Equatable {
 /// 主题调色板。
 public struct ThemePalette: Sendable, Equatable {
     // 界面
+    /// 内容区背景(会话流、编辑区、设置页右侧)。
     public var surface: ThemeRGB
     public var card: ThemeRGB
+    /// 左/右侧栏与设置页左栏背景;nil 时由 `surface` 与前景色混合推导。
+    public var sidebarBackground: ThemeRGB? = nil
     // 编辑器
     public var editorBackground: ThemeRGB
     public var editorForeground: ThemeRGB
@@ -159,8 +162,9 @@ extension ThemePalette {
     }
 
     /// 统一设置编辑器与界面底色。
-    mutating func setBackgrounds(surface: UInt32, card: UInt32, gutter: UInt32, currentLine: UInt32) {
+    mutating func setBackgrounds(surface: UInt32, card: UInt32, gutter: UInt32, currentLine: UInt32, sidebar: UInt32? = nil) {
         self.surface = ThemeRGB(hex: surface)
+        sidebarBackground = sidebar.map { ThemeRGB(hex: $0) }
         self.card = ThemeRGB(hex: card)
         editorBackground = ThemeRGB(hex: surface)
         gutterBackground = ThemeRGB(hex: gutter)
@@ -181,14 +185,14 @@ extension ThemePackage {
 
     // Cursor 系
     static let cursorLight = ThemePackage(id: "cursor-light", name: String(localized: "Cursor 浅色"), group: .cursor, tone: .light, palette: .make(.lightBase) {
-        $0.setBackgrounds(surface: 0xFCFCFC, card: 0xF3F3F3, gutter: 0xF3F3F3, currentLine: 0xEDEDED)
+        $0.setBackgrounds(surface: 0xF6F6F7, card: 0xF3F3F3, gutter: 0xF3F3F3, currentLine: 0xEDEDED, sidebar: 0xEFEFEF)
         $0.editorForeground = ThemeRGB(hex: 0x141414)
         $0.accent = ThemeRGB(hex: 0x2778C1); $0.accent2 = ThemeRGB(hex: 0x6F4BB8)
         $0.setSyntax(keyword: 0x1F7A6A, string: 0xB8407C, comment: 0x8A8A8A, number: 0x8A6A1A, type: 0x1F5FA8, function: 0xB35A1F, property: 0x6A4FB8)
     })
 
     static let cursorLightColorblind = ThemePackage(id: "cursor-light-colorblind", name: String(localized: "Cursor 浅色(色盲友好)"), group: .cursor, tone: .light, palette: .make(.lightBase) {
-        $0.setBackgrounds(surface: 0xFCFCFC, card: 0xF3F3F3, gutter: 0xF3F3F3, currentLine: 0xEDEDED)
+        $0.setBackgrounds(surface: 0xF6F6F7, card: 0xF3F3F3, gutter: 0xF3F3F3, currentLine: 0xEDEDED, sidebar: 0xEFEFEF)
         $0.editorForeground = ThemeRGB(hex: 0x141414)
         $0.accent = ThemeRGB(hex: 0x0B5CAD); $0.accent2 = ThemeRGB(hex: 0x8A4DB5)
         // 蓝/橙代替红/绿
@@ -198,7 +202,7 @@ extension ThemePackage {
     })
 
     static let cursorDark = ThemePackage(id: "cursor-dark", name: String(localized: "Cursor 深色"), group: .cursor, tone: .dark, palette: .make(.darkBase) {
-        $0.setBackgrounds(surface: 0x181818, card: 0x202020, gutter: 0x1C1C1C, currentLine: 0x262A33)
+        $0.setBackgrounds(surface: 0x181818, card: 0x202020, gutter: 0x1C1C1C, currentLine: 0x262A33, sidebar: 0x141414)
         $0.editorForeground = ThemeRGB(hex: 0xE4E4E4); $0.gutterForeground = ThemeRGB(hex: 0x6D6D6D)
         $0.accent = ThemeRGB(hex: 0x81A1C1); $0.accent2 = ThemeRGB(hex: 0xB48EAD)
         $0.success = ThemeRGB(hex: 0xA3BE8C); $0.danger = ThemeRGB(hex: 0xBF616A); $0.warning = ThemeRGB(hex: 0xEBCB8B)
@@ -207,7 +211,7 @@ extension ThemePackage {
     })
 
     static let cursorDarkHC = ThemePackage(id: "cursor-dark-hc", name: String(localized: "Cursor 深色(高对比)"), group: .cursor, tone: .dark, palette: .make(.darkBase) {
-        $0.setBackgrounds(surface: 0x0A0A0A, card: 0x161616, gutter: 0x101010, currentLine: 0x1F2530)
+        $0.setBackgrounds(surface: 0x0A0A0A, card: 0x161616, gutter: 0x101010, currentLine: 0x1F2530, sidebar: 0x050505)
         $0.editorForeground = ThemeRGB(hex: 0xFFFFFF); $0.gutterForeground = ThemeRGB(hex: 0x9A9A9A)
         $0.accent = ThemeRGB(hex: 0x7CC4FF); $0.accent2 = ThemeRGB(hex: 0xFFD866)
         $0.success = ThemeRGB(hex: 0x5FE08A); $0.danger = ThemeRGB(hex: 0xFF7B7B)
@@ -217,7 +221,7 @@ extension ThemePackage {
 
     // Anthropic 系(品牌色 #D97757)
     static let anthropicLight = ThemePackage(id: "anthropic-light", name: String(localized: "Anthropic 浅色"), group: .anthropic, tone: .light, palette: .make(.lightBase) {
-        $0.setBackgrounds(surface: 0xFAF9F5, card: 0xF0EEE6, gutter: 0xF3F1EA, currentLine: 0xEFEBDD)
+        $0.setBackgrounds(surface: 0xFAF9F5, card: 0xF0EEE6, gutter: 0xF3F1EA, currentLine: 0xEFEBDD, sidebar: 0xF0EEE6)
         $0.editorForeground = ThemeRGB(hex: 0x141413); $0.gutterForeground = ThemeRGB(hex: 0x9A9484)
         $0.accent = ThemeRGB(hex: 0xD97757); $0.accent2 = ThemeRGB(hex: 0x5769F7)
         $0.success = ThemeRGB(hex: 0x5E7F3E); $0.danger = ThemeRGB(hex: 0xC4442F); $0.warning = ThemeRGB(hex: 0xB07A1E)
@@ -226,7 +230,7 @@ extension ThemePackage {
     })
 
     static let anthropicDark = ThemePackage(id: "anthropic-dark", name: String(localized: "Anthropic 深色"), group: .anthropic, tone: .dark, palette: .make(.darkBase) {
-        $0.setBackgrounds(surface: 0x141413, card: 0x1F1E1D, gutter: 0x181817, currentLine: 0x2A2825)
+        $0.setBackgrounds(surface: 0x141413, card: 0x1F1E1D, gutter: 0x181817, currentLine: 0x2A2825, sidebar: 0x0F0F0E)
         $0.editorForeground = ThemeRGB(hex: 0xE8E6DC); $0.gutterForeground = ThemeRGB(hex: 0x7D786C)
         $0.accent = ThemeRGB(hex: 0xE08A6B); $0.accent2 = ThemeRGB(hex: 0x8B9CFF)
         $0.success = ThemeRGB(hex: 0x9DB97A); $0.danger = ThemeRGB(hex: 0xE8705A); $0.warning = ThemeRGB(hex: 0xE0B35A)
@@ -236,7 +240,7 @@ extension ThemePackage {
 
     // Claude Code 系(语义色取自 Claude Code 终端主题)
     static let claudeDark = ThemePackage(id: "claude-dark", name: String(localized: "Claude Code 深色"), group: .claudeCode, tone: .dark, palette: .make(.darkBase) {
-        $0.setBackgrounds(surface: 0x171717, card: 0x212121, gutter: 0x1B1B1B, currentLine: 0x2A2724)
+        $0.setBackgrounds(surface: 0x171717, card: 0x212121, gutter: 0x1B1B1B, currentLine: 0x2A2724, sidebar: 0x121212)
         $0.editorForeground = ThemeRGB(hex: 0xEDEDED); $0.gutterForeground = ThemeRGB(hex: 0x777777)
         $0.accent = ThemeRGB(hex: 0xD77757); $0.accent2 = ThemeRGB(hex: 0xB1B9F9)
         $0.success = ThemeRGB(hex: 0x4EBA65); $0.danger = ThemeRGB(hex: 0xFF6B80); $0.warning = ThemeRGB(hex: 0xFFC107)
@@ -245,7 +249,7 @@ extension ThemePackage {
     })
 
     static let claudeLight = ThemePackage(id: "claude-light", name: String(localized: "Claude Code 浅色"), group: .claudeCode, tone: .light, palette: .make(.lightBase) {
-        $0.setBackgrounds(surface: 0xFFFFFF, card: 0xF6F4EF, gutter: 0xF5F3EE, currentLine: 0xF0ECE2)
+        $0.setBackgrounds(surface: 0xFFFFFF, card: 0xF6F4EF, gutter: 0xF5F3EE, currentLine: 0xF0ECE2, sidebar: 0xF6F4EF)
         $0.editorForeground = ThemeRGB(hex: 0x1A1A1A)
         $0.accent = ThemeRGB(hex: 0xD77757); $0.accent2 = ThemeRGB(hex: 0x5769F7)
         $0.success = ThemeRGB(hex: 0x2C7A39); $0.danger = ThemeRGB(hex: 0xAB2B3F); $0.warning = ThemeRGB(hex: 0x966C1E)
@@ -264,7 +268,7 @@ extension ThemePackage {
     })
 
     static let claudeDarkANSI = ThemePackage(id: "claude-dark-ansi", name: String(localized: "Claude Code 深色(ANSI)"), group: .claudeCode, tone: .dark, palette: .make(.darkBase) {
-        $0.setBackgrounds(surface: 0x0C0C0C, card: 0x1A1A1A, gutter: 0x121212, currentLine: 0x1F1F2E)
+        $0.setBackgrounds(surface: 0x0C0C0C, card: 0x1A1A1A, gutter: 0x121212, currentLine: 0x1F1F2E, sidebar: 0x080808)
         $0.editorForeground = ThemeRGB(hex: 0xE5E5E5)
         $0.accent = ThemeRGB(hex: 0xFF5555); $0.accent2 = ThemeRGB(hex: 0x5555FF)
         $0.success = ThemeRGB(hex: 0x55FF55); $0.danger = ThemeRGB(hex: 0xFF5555); $0.warning = ThemeRGB(hex: 0xFFFF55)
@@ -273,7 +277,7 @@ extension ThemePackage {
     })
 
     static let claudeLightANSI = ThemePackage(id: "claude-light-ansi", name: String(localized: "Claude Code 浅色(ANSI)"), group: .claudeCode, tone: .light, palette: .make(.lightBase) {
-        $0.setBackgrounds(surface: 0xFFFFFF, card: 0xF2F2F2, gutter: 0xF5F5F5, currentLine: 0xE8EEFF)
+        $0.setBackgrounds(surface: 0xFFFFFF, card: 0xF2F2F2, gutter: 0xF5F5F5, currentLine: 0xE8EEFF, sidebar: 0xF2F2F2)
         $0.editorForeground = ThemeRGB(hex: 0x000000)
         $0.accent = ThemeRGB(hex: 0xAA0000); $0.accent2 = ThemeRGB(hex: 0x0000AA)
         $0.success = ThemeRGB(hex: 0x00AA00); $0.danger = ThemeRGB(hex: 0xAA0000); $0.warning = ThemeRGB(hex: 0xAA5500)
@@ -283,7 +287,7 @@ extension ThemePackage {
 
     // OpenCode 系(取自 OpenCode 默认 TUI 主题:近黑底、桃橙主色、蓝/紫点缀)
     static let opencodeDark = ThemePackage(id: "opencode-dark", name: String(localized: "OpenCode 深色"), group: .opencode, tone: .dark, palette: .make(.darkBase) {
-        $0.setBackgrounds(surface: 0x0A0A0A, card: 0x141414, gutter: 0x0F0F0F, currentLine: 0x1E1E1E)
+        $0.setBackgrounds(surface: 0x0A0A0A, card: 0x141414, gutter: 0x0F0F0F, currentLine: 0x1E1E1E, sidebar: 0x050505)
         $0.editorForeground = ThemeRGB(hex: 0xEEEEEE); $0.gutterForeground = ThemeRGB(hex: 0x606060)
         $0.accent = ThemeRGB(hex: 0xFAB283); $0.accent2 = ThemeRGB(hex: 0x5C9CF5)
         $0.success = ThemeRGB(hex: 0x7FD88F); $0.danger = ThemeRGB(hex: 0xE06C75); $0.warning = ThemeRGB(hex: 0xF5A742)
@@ -292,7 +296,7 @@ extension ThemePackage {
     })
 
     static let opencodeLight = ThemePackage(id: "opencode-light", name: String(localized: "OpenCode 浅色"), group: .opencode, tone: .light, palette: .make(.lightBase) {
-        $0.setBackgrounds(surface: 0xFFFFFF, card: 0xF5F5F5, gutter: 0xFAFAFA, currentLine: 0xF0F0F0)
+        $0.setBackgrounds(surface: 0xFFFFFF, card: 0xF5F5F5, gutter: 0xFAFAFA, currentLine: 0xF0F0F0, sidebar: 0xF3F3F3)
         $0.editorForeground = ThemeRGB(hex: 0x1A1A1A); $0.gutterForeground = ThemeRGB(hex: 0x9A9A9A)
         $0.accent = ThemeRGB(hex: 0x3B7DD8); $0.accent2 = ThemeRGB(hex: 0x7B5BB6)
         $0.success = ThemeRGB(hex: 0x3D9A57); $0.danger = ThemeRGB(hex: 0xD1383D); $0.warning = ThemeRGB(hex: 0xD68C27)

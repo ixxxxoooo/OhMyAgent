@@ -127,4 +127,27 @@ struct ThemePackageTests {
     func pageTitle() {
         #expect(SettingsPage.appearance.title == String(localized: "主题"))
     }
+
+    @Test("侧栏色与内容色:仅 Cursor 浅色使用 #EFEFEF/#F6F6F7,其余主题各自提供且二者不同")
+    func sidebarAndSurface() {
+        for package in ThemePackage.all {
+            guard let palette = package.palette else { continue }
+            let sidebar = palette.sidebarBackground
+            #expect(sidebar != nil, "\(package.id) 必须显式提供侧栏背景")
+            #expect(sidebar != palette.surface, "\(package.id) 的侧栏与内容区不应同色")
+            if package.id.hasPrefix("cursor-light") {
+                #expect(palette.surface.hexString == "#F6F6F7" && sidebar?.hexString == "#EFEFEF")
+            } else {
+                #expect(!(palette.surface.hexString == "#F6F6F7" && sidebar?.hexString == "#EFEFEF"), "\(package.id) 不应套用 Cursor 浅色色值")
+            }
+        }
+    }
+
+    @Test("OMColors.sidebar 优先读主题的侧栏色")
+    func sidebarToken() {
+        withRuntime(.find("anthropic-dark")) {
+            let expected = ThemePackage.find("anthropic-dark").palette?.sidebarBackground?.nsColor
+            #expect(NSColor(OMColors.sidebar).usingColorSpace(.sRGB)?.redComponent == expected?.redComponent)
+        }
+    }
 }
