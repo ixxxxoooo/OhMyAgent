@@ -27,8 +27,21 @@ public struct ModelProvider: Codable, Identifiable, Hashable, Sendable {
     public var haikuModel: String?
     /// 来源预设(仅用于界面展示)
     public var presetId: String?
+    /// 最大输出 token(对应 `CLAUDE_CODE_MAX_OUTPUT_TOKENS`;nil 使用默认)
+    public var maxOutputTokens: Int?
+    /// 思考强度(`low` / `medium` / `high`,对应 `CLAUDE_CODE_EFFORT_LEVEL`;nil 使用默认)
+    public var effort: String?
+    /// 自定义请求头,每行一个 `Name: Value`(对应 `ANTHROPIC_CUSTOM_HEADERS`,可能含密钥,只进进程环境)
+    public var customHeaders: String?
+    /// 上下文窗口(token,对应 `CLAUDE_CODE_AUTO_COMPACT_WINDOW`;nil 使用默认)
+    public var contextWindow: Int?
+    /// 可选模型列表(从 `/v1/models` 获取或手动维护,用于输入框的模型菜单)
+    public var availableModels: [String]?
+    /// 鉴权头:`false`(默认)用 `Authorization: Bearer`(ANTHROPIC_AUTH_TOKEN);`true` 用 `x-api-key`(ANTHROPIC_API_KEY,Anthropic 官方 API)
+    public var usesAPIKeyHeader: Bool?
 
-    public init(id: String, name: String, baseURL: String, model: String, opusModel: String? = nil, sonnetModel: String? = nil, haikuModel: String? = nil, presetId: String? = nil) {
+    public init(id: String, name: String, baseURL: String, model: String, opusModel: String? = nil, sonnetModel: String? = nil, haikuModel: String? = nil, presetId: String? = nil,
+                maxOutputTokens: Int? = nil, effort: String? = nil, customHeaders: String? = nil, contextWindow: Int? = nil, availableModels: [String]? = nil, usesAPIKeyHeader: Bool? = nil) {
         self.id = id
         self.name = name
         self.baseURL = baseURL
@@ -37,13 +50,22 @@ public struct ModelProvider: Codable, Identifiable, Hashable, Sendable {
         self.sonnetModel = sonnetModel
         self.haikuModel = haikuModel
         self.presetId = presetId
+        self.maxOutputTokens = maxOutputTokens
+        self.effort = effort
+        self.customHeaders = customHeaders
+        self.contextWindow = contextWindow
+        self.availableModels = availableModels
+        self.usesAPIKeyHeader = usesAPIKeyHeader
     }
 
     /// 配置校验错误。
     public enum ValidationError: Error, LocalizedError, Equatable {
-        case emptyName, invalidBaseURL, emptyModel
+        case emptyName, invalidBaseURL, emptyModel, invalidNumber(String), invalidEffort, invalidHeaders
         public var errorDescription: String? {
             switch self {
+            case .invalidNumber(let field): "\(field) 必须是正整数"
+            case .invalidEffort: "思考强度只能是 low / medium / high"
+            case .invalidHeaders: "自定义请求头每行必须是「Name: Value」"
             case .emptyName: "名称不能为空"
             case .invalidBaseURL: "地址必须是 http(s) 绝对地址"
             case .emptyModel: "模型不能为空"
@@ -58,6 +80,25 @@ public struct ModelProvider: Codable, Identifiable, Hashable, Sendable {
         guard let url = URL(string: baseURL.trimmingCharacters(in: .whitespaces)), let scheme = url.scheme?.lowercased(),
               scheme == "http" || scheme == "https", let host = url.host, !host.isEmpty else { throw ValidationError.invalidBaseURL }
         if model.trimmingCharacters(in: .whitespaces).isEmpty { throw ValidationError.emptyModel }
+        if let maxOutputTokens, maxOutputTokens <= 0 { throw ValidationError.invalidNumber("最大输出 token") }
+        if let contextWindow, contextWindow <= 0 { throw ValidationError.invalidNumber("上下文窗口") }
+        if let effort, !effort.isEmpty, !["low", "medium", "high"].contains(effort) { throw ValidationError.invalidEffort }
+        if let customHeaders, !Self.headerLines(customHeaders).allSatisfy({ $0.contains(":") && !($0.split(separator: ":").first ?? "").trimmingCharacters(in: .whitespaces).isEmpty }) {
+            throw ValidationError.invalidHeaders
+        }
+    }
+
+    /// 自定义请求头的有效行(去空行与首尾空白)。
+    static func headerLines(_ text: String) -> [String] {
+        text.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+
+    /// 返回把主模型换成 `model` 的副本(会话级切换,不落盘)。
+    /// - Parameter model: 新的主模型
+    public func with(model: String) -> ModelProvider {
+        var copy = self
+        copy.model = model
+        return copy
     }
 
     /// 规范化后的地址(去空白与末尾斜杠)。
@@ -84,6 +125,8 @@ public struct ProviderPreset: Identifiable, Sendable {
 
     /// 预设列表。
     public static let all: [ProviderPreset] = [
+        ProviderPreset(id: "anthropic", name: "Anthropic 官方", baseURL: "https://api.anthropic.com", models: ["claude-sonnet-4-5", "claude-opus-4-1", "claude-haiku-4-5"], hint: "官方 API(按量计费),使用 x-api-key 鉴权;需要自己的 API Key,不使用 claude 登录凭据。"),
+        ProviderPreset(id: "opencode", name: "OpenCode Zen", baseURL: "https://opencode.ai/zen", models: ["claude-sonnet-4-5", "qwen3-coder", "kimi-k2"], hint: "OpenCode Zen 网关的 Anthropic 兼容端点;模型名以其控制台为准,可用「获取模型列表」同步。"),
         ProviderPreset(id: "deepseek", name: "DeepSeek", baseURL: "https://api.deepseek.com/anthropic", models: ["deepseek-chat", "deepseek-reasoner"], hint: "官方原生兼容 Anthropic 协议,国内直连。注意 `/v1` 是 OpenAI 协议端点,这里必须用 `/anthropic`。"),
         ProviderPreset(id: "glm", name: "智谱 GLM", baseURL: "https://open.bigmodel.cn/api/anthropic", models: ["glm-4.6", "glm-4.5", "glm-4.5-air"], hint: "智谱开放平台 Claude API 兼容端点"),
         ProviderPreset(id: "kimi", name: "Kimi(Moonshot)", baseURL: "https://api.moonshot.cn/anthropic", models: ["kimi-k2-turbo-preview", "kimi-k2-0905-preview"], hint: "海外可改用 api.moonshot.ai/anthropic"),
@@ -93,7 +136,7 @@ public struct ProviderPreset: Identifiable, Sendable {
 
     /// 由预设生成提供商。
     public func makeProvider() -> ModelProvider {
-        ModelProvider(id: id, name: name, baseURL: baseURL, model: defaultModel, presetId: id)
+        ModelProvider(id: id, name: name, baseURL: baseURL, model: defaultModel, presetId: id, usesAPIKeyHeader: id == "anthropic" ? true : nil)
     }
 }
 
@@ -113,13 +156,19 @@ public enum ProviderLaunch {
     /// - Returns: 环境字典
     public static func publicEnvironment(_ provider: ModelProvider) -> [String: String] {
         var env: [String: String] = [:]
-        for name in clearedVariables { env[name] = "" }
+        let hasHeaders = !headerLines(provider.customHeaders).isEmpty
+        // 自定义请求头改由进程 env 提供,此处不能再清空(程序化设置层优先于进程 env)
+        for name in clearedVariables where !(hasHeaders && name == "ANTHROPIC_CUSTOM_HEADERS") { env[name] = "" }
         env["ANTHROPIC_BASE_URL"] = provider.normalizedBaseURL
-        env["ANTHROPIC_API_KEY"] = ""
+        // 两种鉴权头互斥:未使用的那个在程序化设置层清空,避免用户自己的凭据串进来
+        if provider.usesAPIKeyHeader == true { env["ANTHROPIC_AUTH_TOKEN"] = "" } else { env["ANTHROPIC_API_KEY"] = "" }
         env["ANTHROPIC_MODEL"] = provider.model
         env["ANTHROPIC_DEFAULT_OPUS_MODEL"] = nonEmpty(provider.opusModel) ?? provider.model
         env["ANTHROPIC_DEFAULT_SONNET_MODEL"] = nonEmpty(provider.sonnetModel) ?? provider.model
         env["ANTHROPIC_DEFAULT_HAIKU_MODEL"] = nonEmpty(provider.haikuModel) ?? provider.model
+        if let value = provider.maxOutputTokens, value > 0 { env["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] = String(value) }
+        if let value = provider.contextWindow, value > 0 { env["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] = String(value) }
+        if let value = nonEmpty(provider.effort) { env["CLAUDE_CODE_EFFORT_LEVEL"] = value }
         return env
     }
 
@@ -131,13 +180,34 @@ public enum ProviderLaunch {
     public static func sessionMeta(_ provider: ModelProvider, key: String) -> JSONValue {
         let publicEnv = publicEnvironment(provider).mapValues(JSONValue.string)
         let settings: JSONValue = .object(["model": .string(provider.model), "apiKeyHelper": .string(""), "env": .object(publicEnv)])
-        let secretEnv: JSONValue = .object(["ANTHROPIC_AUTH_TOKEN": .string(key)])
+        // 密钥与可能含密钥的自定义请求头只进进程 env
+        var secret: [String: JSONValue] = [provider.usesAPIKeyHeader == true ? "ANTHROPIC_API_KEY" : "ANTHROPIC_AUTH_TOKEN": .string(key)]
+        let headers = headerLines(provider.customHeaders)
+        if !headers.isEmpty { secret["ANTHROPIC_CUSTOM_HEADERS"] = .string(headers.joined(separator: "\n")) }
+        let secretEnv: JSONValue = .object(secret)
         return .object(["claudeCode": .object(["options": .object(["settings": settings, "env": secretEnv])])])
+    }
+
+    private static func headerLines(_ text: String?) -> [String] {
+        ModelProvider.headerLines(text ?? "")
     }
 
     private static func nonEmpty(_ text: String?) -> String? {
         guard let text = text?.trimmingCharacters(in: .whitespaces), !text.isEmpty else { return nil }
         return text
+    }
+}
+
+/// 会话级提供商覆盖(输入框的模型菜单设置,不落盘)。
+public struct ProviderOverride: Equatable, Sendable {
+    /// 提供商 ID;nil 表示强制使用系统默认(~/.claude 配置)
+    public var providerId: String?
+    /// 覆盖主模型(nil 沿用提供商配置)
+    public var model: String?
+
+    public init(providerId: String?, model: String? = nil) {
+        self.providerId = providerId
+        self.model = model
     }
 }
 
@@ -217,9 +287,17 @@ public enum ProviderStorage {
     /// 解析当前启用的提供商。
     /// - Returns: 配置齐全返回 `ResolvedProvider`;未启用返回 nil;缺密钥时抛 `missingKey`
     /// - Throws: `ResolveError`
-    public static func resolveActive(directory: URL = defaultDirectory, environment: [String: String] = ProcessInfo.processInfo.environment) throws -> ResolvedProvider? {
+    public static func resolveActive(directory: URL = defaultDirectory, environment: [String: String] = ProcessInfo.processInfo.environment, override: ProviderOverride? = nil) throws -> ResolvedProvider? {
         let snapshot = load(directory: directory)
-        guard let activeId = snapshot.active, let provider = snapshot.providers.first(where: { $0.id == activeId }) else { return nil }
+        var activeId = snapshot.active
+        var modelOverride: String?
+        if let override {
+            // 会话级覆盖:`providerId` 为 nil 表示强制使用系统默认
+            activeId = override.providerId
+            modelOverride = override.model
+        }
+        guard let activeId, var provider = snapshot.providers.first(where: { $0.id == activeId }) else { return nil }
+        if let modelOverride, !modelOverride.isEmpty { provider = provider.with(model: modelOverride) }
         do { try provider.validate() } catch { throw ResolveError.invalid(provider.name, error.localizedDescription) }
         guard let key = key(for: provider.id, directory: directory, environment: environment) else { throw ResolveError.missingKey(provider.name) }
         return ResolvedProvider(provider: provider, meta: ProviderLaunch.sessionMeta(provider, key: key))
@@ -294,6 +372,62 @@ public enum ProviderTester {
         }
         return snippet.isEmpty ? head : "\(head):\(snippet)"
     }
+}
+
+/// 从提供商的 `/v1/models` 获取模型列表。
+public enum ProviderModelFetcher {
+    /// 获取模型 ID 列表。
+    /// - Parameters:
+    ///   - provider: 提供商
+    ///   - key: 密钥
+    ///   - session: URL 会话(测试可注入)
+    ///   - timeout: 超时秒数
+    /// - Returns: 成功返回去重后的模型 ID;失败返回不含密钥的错误描述
+    public static func fetch(_ provider: ModelProvider, key: String, session: URLSession? = nil, timeout: TimeInterval = 20) async -> Result<[String], ModelFetchError> {
+        guard let base = provider.url else { return .failure(ModelFetchError(message: "地址无效")) }
+        guard !key.trimmingCharacters(in: .whitespaces).isEmpty else { return .failure(ModelFetchError(message: "未填写 API Key")) }
+        var request = URLRequest(url: base.appendingPathComponent("v1/models"), cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: timeout)
+        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        if provider.usesAPIKeyHeader == true { request.setValue(key, forHTTPHeaderField: "x-api-key") } else { request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization") }
+        do {
+            let (data, response) = try await (session ?? URLSession(configuration: .ephemeral)).data(for: request)
+            guard let http = response as? HTTPURLResponse else { return .failure(ModelFetchError(message: "无效的响应")) }
+            guard (200..<300).contains(http.statusCode) else {
+                return .failure(ModelFetchError(message: ProviderTester.describe(status: http.statusCode, body: data)))
+            }
+            let ids = parse(data)
+            return ids.isEmpty ? .failure(ModelFetchError(message: "该端点没有返回模型列表")) : .success(ids)
+        } catch let error as URLError {
+            return .failure(ModelFetchError(message: "无法连接:\(ModelGateway.describe(error))"))
+        } catch {
+            return .failure(ModelFetchError(message: error.localizedDescription))
+        }
+    }
+
+    /// 解析 `{"data":[{"id":"…"}]}`(兼容 `models` 数组与字符串数组)。
+    /// - Parameter data: 响应体
+    /// - Returns: 去重、保持顺序的模型 ID
+    public static func parse(_ data: Data) -> [String] {
+        guard let object = try? JSONSerialization.jsonObject(with: data) else { return [] }
+        var raw: [Any] = []
+        if let dictionary = object as? [String: Any] {
+            raw = (dictionary["data"] as? [Any]) ?? (dictionary["models"] as? [Any]) ?? []
+        } else if let array = object as? [Any] {
+            raw = array
+        }
+        var seen = Set<String>()
+        var result: [String] = []
+        for item in raw {
+            let id = (item as? String) ?? (item as? [String: Any])?["id"] as? String
+            if let id, !id.isEmpty, seen.insert(id).inserted { result.append(id) }
+        }
+        return result
+    }
+}
+
+/// 模型列表获取失败。
+public struct ModelFetchError: Error, Equatable, Sendable {
+    public var message: String
 }
 
 /// 设置页使用的可观察模型:提供商列表、启用项与密钥存取(读写盘均为小文件)。

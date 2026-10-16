@@ -15,6 +15,8 @@ struct ModelProvidersPage: View {
     @State private var testing = false
     @State private var testResult: ProviderTestResult?
     @State private var saved = false
+    @State private var fetching = false
+    @State private var fetchMessage: String?
 
     var body: some View {
         SettingsForm {
@@ -77,6 +79,44 @@ struct ModelProvidersPage: View {
                 TextField("Haiku(后台任务)", text: optional($draft.haikuModel)).textFieldStyle(.roundedBorder)
                 Note("留空则都使用主模型。")
             }
+            DisclosureGroup("高级参数(可选)") {
+                Toggle("使用 x-api-key 鉴权(Anthropic 官方 API)", isOn: Binding(get: { draft.usesAPIKeyHeader == true }, set: { draft.usesAPIKeyHeader = $0 ? true : nil }))
+                LabeledContent("最大输出 token") {
+                    TextField("默认", value: $draft.maxOutputTokens, format: .number).frame(width: 100).multilineTextAlignment(.trailing)
+                }
+                LabeledContent("上下文窗口(token)") {
+                    TextField("默认", value: $draft.contextWindow, format: .number).frame(width: 100).multilineTextAlignment(.trailing)
+                }
+                Picker("思考强度", selection: Binding(get: { draft.effort ?? "" }, set: { draft.effort = $0.isEmpty ? nil : $0 })) {
+                    Text("默认").tag("")
+                    Text("低").tag("low")
+                    Text("中").tag("medium")
+                    Text("高").tag("high")
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("自定义请求头").font(OMFonts.small)
+                    TextEditor(text: optional($draft.customHeaders))
+                        .font(OMFonts.monoSmall)
+                        .frame(height: 60)
+                        .scrollContentBackground(.hidden)
+                        .padding(4)
+                        .background(OMColors.card, in: RoundedRectangle(cornerRadius: 6))
+                    Note("每行一个「Name: Value」,对应 ANTHROPIC_CUSTOM_HEADERS;只放进进程环境变量,不写入设置文件。")
+                }
+                Note("这些参数通过环境变量交给 Claude Code(CLAUDE_CODE_MAX_OUTPUT_TOKENS / CLAUDE_CODE_AUTO_COMPACT_WINDOW / CLAUDE_CODE_EFFORT_LEVEL),留空使用默认值;Claude Code 不支持自定义 temperature。")
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("可选模型").font(OMFonts.small)
+                    Spacer()
+                    Button("获取模型列表") { Task { await fetchModels() } }.disabled(fetching)
+                    if fetching { ProgressView().controlSize(.small) }
+                }
+                Text((draft.availableModels ?? []).isEmpty ? String(localized: "尚未获取;输入框的模型菜单将只显示主模型。") : (draft.availableModels ?? []).joined(separator: "、"))
+                    .font(OMFonts.caption).foregroundStyle(OMColors.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let fetchMessage { Text(fetchMessage).font(OMFonts.caption).foregroundStyle(OMColors.secondaryText) }
+            }
             SecureField(model.hasKey(id: draft.id) ? "API Key(已保存,留空表示不修改)" : "API Key", text: $keyText).textFieldStyle(.roundedBorder)
             Note("密钥保存在 ~/Library/Application Support/OhMyAgent/provider-keys.json(权限 0600),只在启动会话时放进 Claude Code 进程的环境变量,不写入日志。")
             HStack {
@@ -115,6 +155,7 @@ struct ModelProvidersPage: View {
         keyText = ""
         testResult = nil
         saved = false
+        fetchMessage = nil
     }
 
     private func save() {
@@ -130,6 +171,21 @@ struct ModelProvidersPage: View {
         let key = keyText.trimmingCharacters(in: .whitespaces).isEmpty ? (model.key(id: draft.id) ?? "") : keyText
         testResult = await ProviderTester.test(draft, key: key)
         testing = false
+    }
+
+    /// 从 `/v1/models` 获取模型列表并写入草稿(保存后生效)。
+    private func fetchModels() async {
+        fetching = true
+        fetchMessage = nil
+        let key = keyText.trimmingCharacters(in: .whitespaces).isEmpty ? (model.key(id: draft.id) ?? "") : keyText
+        switch await ProviderModelFetcher.fetch(draft, key: key) {
+        case .success(let ids):
+            draft.availableModels = ids
+            fetchMessage = String(localized: "已获取 \(ids.count) 个模型,点「保存」后生效。")
+        case .failure(let error):
+            fetchMessage = error.message
+        }
+        fetching = false
     }
 
     private func remove() {
