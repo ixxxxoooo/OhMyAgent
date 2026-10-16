@@ -942,6 +942,8 @@ public final class SessionModel {
                         } else {
                             self.timeline.appendNotice(ChatL10n.t("Claude Code 尚未登录或登录已失效:请在终端运行 claude 完成登录后重试。"), isError: true)
                         }
+                    } else if let hint = AgentErrorHints.message(for: error) {
+                        self.timeline.appendNotice(hint, isError: true)
                     } else {
                         self.timeline.appendNotice(String(localized: "请求失败:\(error.localizedDescription)"), isError: true)
                     }

@@ -36,7 +36,11 @@ public enum RequestID: Sendable, Hashable, Codable, CustomStringConvertible {
 }
 
 /// JSON-RPC 错误对象。
-public struct JSONRPCError: Error, Sendable, Codable, Hashable {
+public struct JSONRPCError: Error, LocalizedError, Sendable, Codable, Hashable {
+    /// 面向用户的错误描述:直接使用 Agent 返回的 `message`
+    /// (否则界面只会显示「ACPKit.JSONRPCError 错误 1」这种毫无信息量的文案)。
+    public var errorDescription: String? { message }
+
     public var code: Int
     public var message: String
     public var data: JSONValue?
