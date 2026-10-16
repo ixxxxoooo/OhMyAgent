@@ -4,25 +4,58 @@
 import AppKit
 import SwiftUI
 
-/// 渲染配色(随外观变化)。
+/// 由应用层(主题系统)提供的 Mermaid 配色:每个语义角色一个颜色,再加分类强调色表。
+public struct MermaidTheme: Sendable {
+    public var background: Color
+    public var text: Color
+    public var subtleText: Color
+    public var nodeFill: Color
+    public var nodeStroke: Color
+    public var edge: Color
+    public var groupFill: Color
+    public var groupStroke: Color
+    public var noteFill: Color
+    public var activation: Color
+    public var success: Color
+    public var danger: Color
+    public var warning: Color
+    public var accents: [Color]
+
+    public init(background: Color, text: Color, subtleText: Color, nodeFill: Color, nodeStroke: Color, edge: Color, groupFill: Color,
+                groupStroke: Color, noteFill: Color, activation: Color, success: Color, danger: Color, warning: Color, accents: [Color]) {
+        self.background = background; self.text = text; self.subtleText = subtleText; self.nodeFill = nodeFill; self.nodeStroke = nodeStroke
+        self.edge = edge; self.groupFill = groupFill; self.groupStroke = groupStroke; self.noteFill = noteFill; self.activation = activation
+        self.success = success; self.danger = danger; self.warning = warning; self.accents = accents
+    }
+}
+
+/// 渲染配色(随外观与主题变化)。
 public struct MermaidPalette: Sendable {
     public var dark: Bool
     public var background: Color
+    /// 主题配色;nil 时使用内置的明/暗配色(仅供无主题的测试与独立使用)。
+    public var theme: MermaidTheme?
+
+    /// 应用层注册的主题提供者:每次创建调色板时按当前明暗取最新主题色。
+    nonisolated(unsafe) public static var themeProvider: (@Sendable (Bool) -> MermaidTheme)?
 
     public init(dark: Bool, background: Color? = nil) {
         self.dark = dark
-        self.background = background ?? (dark ? Color(red: 0.11, green: 0.115, blue: 0.13) : .white)
+        let theme = Self.themeProvider?(dark)
+        self.theme = theme
+        self.background = background ?? theme?.background ?? (dark ? Color(red: 0.11, green: 0.115, blue: 0.13) : .white) // ui-lint:allow 无主题提供者时的内置回退
     }
 
     private func c(_ light: UInt32, _ darkValue: UInt32, _ alpha: Double = 1) -> Color {
         let v = dark ? darkValue : light
-        return Color(red: Double((v >> 16) & 0xFF) / 255, green: Double((v >> 8) & 0xFF) / 255, blue: Double(v & 0xFF) / 255).opacity(alpha)
+        return Color(red: Double((v >> 16) & 0xFF) / 255, green: Double((v >> 8) & 0xFF) / 255, blue: Double(v & 0xFF) / 255).opacity(alpha) // ui-lint:allow 无主题提供者时的内置回退
     }
 
     static let accents: [UInt32] = [0x6366F1, 0x22C55E, 0xF59E0B, 0xEF4444, 0x06B6D4, 0xA855F7, 0xEC4899, 0x84CC16]
 
     /// 语义色映射。
     public func color(_ role: MColor) -> Color {
+        if let theme { return themed(role, theme) }
         switch role {
         case .text: return c(0x1F2328, 0xE6E8EB)
         case .subtleText: return c(0x57606A, 0xA0A8B3)
@@ -38,7 +71,28 @@ public struct MermaidPalette: Sendable {
         case .warning: return c(0xD97706, 0xFBBF24)
         case .accent(let n):
             let v = Self.accents[((n % Self.accents.count) + Self.accents.count) % Self.accents.count]
-            return Color(red: Double((v >> 16) & 0xFF) / 255, green: Double((v >> 8) & 0xFF) / 255, blue: Double(v & 0xFF) / 255).opacity(dark ? 0.9 : 1)
+            return Color(red: Double((v >> 16) & 0xFF) / 255, green: Double((v >> 8) & 0xFF) / 255, blue: Double(v & 0xFF) / 255).opacity(dark ? 0.9 : 1) // ui-lint:allow 无主题提供者时的内置回退
+        }
+    }
+
+    /// 主题配色下的语义色映射。
+    private func themed(_ role: MColor, _ theme: MermaidTheme) -> Color {
+        switch role {
+        case .text: return theme.text
+        case .subtleText: return theme.subtleText
+        case .nodeFill: return theme.nodeFill
+        case .nodeStroke: return theme.nodeStroke
+        case .edge: return theme.edge
+        case .groupFill: return theme.groupFill
+        case .groupStroke: return theme.groupStroke
+        case .noteFill: return theme.noteFill
+        case .activation: return theme.activation
+        case .success: return theme.success
+        case .danger: return theme.danger
+        case .warning: return theme.warning
+        case .accent(let n):
+            guard !theme.accents.isEmpty else { return theme.edge }
+            return theme.accents[((n % theme.accents.count) + theme.accents.count) % theme.accents.count]
         }
     }
 }
@@ -105,7 +159,7 @@ public enum MermaidRenderer {
         }
         for (i, line) in lines.enumerated() {
             let y = p.y - totalHeight / 2 + lineHeight * (Double(i) + 0.5)
-            let t = Text(line).font(.system(size: size, weight: bold ? .semibold : .regular)).foregroundColor(color)
+            let t = Text(line).font(.system(size: size, weight: bold ? .semibold : .regular)) // ui-lint:allow 图表文字按场景坐标缩放,不走界面字号令牌.foregroundColor(color)
             let unit: UnitPoint = anchor == .center ? .center : (anchor == .leading ? .leading : .trailing)
             ctx.draw(t, at: CGPoint(x: p.x, y: y), anchor: unit)
         }
@@ -388,7 +442,7 @@ public struct MermaidCanvas: View {
     private func canvas(palette: MermaidPalette) -> some View {
         Canvas { ctx, _ in
             var c = ctx
-            let paletteWithBG = MermaidPalette(dark: palette.dark, background: palette.dark ? Color(red: 0.11, green: 0.115, blue: 0.13) : .white)
+            let paletteWithBG = MermaidPalette(dark: palette.dark, background: palette.background)
             MermaidRenderer.draw(scene, in: &c, palette: paletteWithBG)
         }
     }

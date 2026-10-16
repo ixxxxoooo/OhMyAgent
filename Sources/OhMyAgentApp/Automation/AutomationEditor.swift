@@ -141,9 +141,9 @@ struct AutomationEditor: View {
                     if on { draft.weekdays.remove(day) } else { draft.weekdays.insert(day) }
                 } label: {
                     Text(symbols[day - 1]).font(OMFonts.caption)
-                        .foregroundStyle(on ? OMColors.onAccent : Color.primary)
+                        .foregroundStyle(on ? OMColors.onAccent : OMColors.primaryText)
                         .frame(width: 38, height: 24)
-                        .background(Capsule().fill(on ? OMColors.accent : Color.primary.opacity(0.06)))
+                        .background(Capsule().fill(on ? OMColors.accent : OMColors.hoverFill))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(symbols[day - 1])

@@ -70,7 +70,7 @@ private struct ImagePreviewPanel: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            Color.black.opacity(0.72)
+            OMColors.maskInk.opacity(0.72)
                 .contentShape(Rectangle())
                 .onTapGesture { onClose() }
                 .accessibilityAddTraits(.isButton)
@@ -125,7 +125,7 @@ private struct ImagePreviewPanel: View {
         }
         .padding(.horizontal, 6).padding(.vertical, 4)
         .background(.regularMaterial, in: Capsule())
-        .overlay(Capsule().strokeBorder(Color.white.opacity(0.12)))
+        .overlay(Capsule().strokeBorder(OMColors.onAccent.opacity(0.12)))
         .padding(.top, 14)
     }
 

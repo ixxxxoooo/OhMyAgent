@@ -102,7 +102,7 @@ private struct BlameLineRow: View {
         }
         .frame(height: 18, alignment: .leading)
         .clipped()
-        .background(band ? Color.primary.opacity(0.04) : .clear)
+        .background(band ? OMColors.subtleFill : .clear)
         .help(line.summary)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("第 \(line.lineNumber) 行 \(line.author) \(line.summary) \(line.text)")

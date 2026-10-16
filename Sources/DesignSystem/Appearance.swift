@@ -74,7 +74,7 @@ public final class AppearanceModel {
     public static let shared = AppearanceModel()
 
     /// 外观模式(跟随系统/浅/深);仅在主题包为「跟随系统」时生效,其余主题自带明暗。
-    public var theme: AppTheme { didSet { save("theme", theme.rawValue); applyTheme() } }
+    public var theme: AppTheme { didSet { save("theme", theme.rawValue); themeChanged() } }
     /// 主题包 id(见 `ThemePackage.all`)。
     public var themeID: String { didSet { save("themePackage", themeID); themeChanged() } }
     /// 主强调色(`system` 跟随主题)。
@@ -116,6 +116,7 @@ public final class AppearanceModel {
 
     private static let prefix = "appearance."
     private var isLoading = true
+    @ObservationIgnored private var systemAppearanceObserver: NSObjectProtocol?
 
     private init() {
         let defaults = UserDefaults.standard
@@ -170,6 +171,33 @@ public final class AppearanceModel {
         case .light: NSApp?.appearance = NSAppearance(named: .aqua)
         case .dark: NSApp?.appearance = NSAppearance(named: .darkAqua)
         }
+        ThemeRuntime.systemIsDark = Self.resolveIsDark(tone)
+        observeSystemAppearanceIfNeeded()
+    }
+
+    /// 解析当前是否深色:显式明/暗直接返回,跟随系统时读系统偏好。
+    private static func resolveIsDark(_ tone: ThemeTone) -> Bool {
+        switch tone {
+        case .light: return false
+        case .dark: return true
+        case .system: return UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark"
+        }
+    }
+
+    /// 监听系统明暗切换(跟随系统时):更新令牌的明暗并刷新界面与终端。
+    private func observeSystemAppearanceIfNeeded() {
+        guard systemAppearanceObserver == nil else { return }
+        systemAppearanceObserver = DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("AppleInterfaceThemeChangedNotification"), object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                ThemeRuntime.systemIsDark = Self.resolveIsDark(.system)
+                self.themeRevision += 1
+                ThemeRuntime.bump()
+                NotificationCenter.default.post(name: ThemeRuntime.didChange, object: nil)
+            }
+        }
     }
 
     /// 主题或强调色变化:刷新运行时、递增修订号并通知编辑器。
@@ -177,6 +205,7 @@ public final class AppearanceModel {
         guard !isLoading else { return }
         applyTheme()
         themeRevision += 1
+        ThemeRuntime.bump()
         NotificationCenter.default.post(name: ThemeRuntime.didChange, object: nil)
     }
 

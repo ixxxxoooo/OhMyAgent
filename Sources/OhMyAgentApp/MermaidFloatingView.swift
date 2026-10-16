@@ -365,7 +365,7 @@ struct FloatingIconButton: View {
             Image.om(icon, size: 14)
                 .frame(width: 28, height: 26)
                 .background(
-                    (active ? OMColors.accent.opacity(0.16) : (hovering ? Color.primary.opacity(0.08) : Color.clear)),
+                    (active ? OMColors.accent.opacity(0.16) : (hovering ? OMColors.pressedFill : Color.clear)),
                     in: RoundedRectangle(cornerRadius: 6, style: .continuous)
                 )
                 .contentShape(Rectangle())

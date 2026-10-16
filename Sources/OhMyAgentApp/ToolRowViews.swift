@@ -159,7 +159,7 @@ struct ToolRowView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
-        .background(hovering && canExpand ? Color.primary.opacity(0.05) : Color.clear, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .background(hovering && canExpand ? OMColors.subtleFill : Color.clear, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture {
@@ -209,7 +209,7 @@ struct ToolRowView: View {
                 }
                 Text(name)
                     .font(OMFonts.small.weight(.medium))
-                    .foregroundStyle(failed ? OMColors.danger : Color.primary)
+                    .foregroundStyle(failed ? OMColors.danger : OMColors.primaryText)
                 if !dir.isEmpty, dir != "/" {
                     Text(dir).font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
                 }
@@ -222,13 +222,13 @@ struct ToolRowView: View {
         } else if p.category == .search {
             Text(p.subject)
                 .font(OMFonts.monoSmall)
-                .foregroundStyle(failed ? OMColors.danger : Color.primary)
+                .foregroundStyle(failed ? OMColors.danger : OMColors.primaryText)
                 .lineLimit(1)
                 .truncationMode(.middle)
         } else {
             Text(p.subject)
                 .font(OMFonts.small.weight(.medium))
-                .foregroundStyle(failed ? OMColors.danger : Color.primary)
+                .foregroundStyle(failed ? OMColors.danger : OMColors.primaryText)
                 .lineLimit(1)
                 .truncationMode(.middle)
         }
@@ -384,7 +384,7 @@ struct TextOutputBox: View {
         CollapsibleOutput(raw: ToolOutputText.stripFence(text), ansi: ansi)
             .padding(8)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
     }
 }
 
@@ -420,11 +420,11 @@ struct CommandBox: View {
             }
             if !cleaned.isEmpty {
                 CollapsibleOutput(raw: cleaned, followTail: status == .inProgress)
-                    .foregroundStyle(status == .failed ? OMColors.danger : Color.primary)
+                    .foregroundStyle(status == .failed ? OMColors.danger : OMColors.primaryText)
             }
         }
         .padding(8)
-        .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
     }
 }
 
@@ -478,7 +478,7 @@ struct KeyValueBox: View {
         }
         .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
     }
 }
 
@@ -511,7 +511,7 @@ struct SearchResultsView: View {
                 }
             }
             .padding(.vertical, 3)
-            .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
     }
 }
@@ -540,7 +540,7 @@ struct SearchHitRow: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(hovering ? Color.primary.opacity(0.06) : Color.clear)
+            .background(hovering ? OMColors.hoverFill : Color.clear)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -603,7 +603,7 @@ struct ExploreGroupView: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
-            .background(hovering ? Color.primary.opacity(0.05) : Color.clear, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .background(hovering ? OMColors.subtleFill : Color.clear, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
             .contentShape(Rectangle())
             .onHover { hovering = $0 }
             .onTapGesture {
@@ -653,9 +653,9 @@ struct TerminalOutputView: View {
                             .controlSize(.mini)
                     }
                 } else if let code = session.exitCode {
-                    OMTag(code == 0 ? String(localized: "退出 0") : String(localized: "退出 \(code)"), tint: code == 0 ? .green : .red)
+                    OMTag(code == 0 ? String(localized: "退出 0") : String(localized: "退出 \(code)"), tint: code == 0 ? OMColors.success : OMColors.danger)
                 } else if let signal = session.signal {
-                    OMTag(signal, tint: .red)
+                    OMTag(signal, tint: OMColors.danger)
                 }
                 CopyButton(text: ANSIParser.plainText(session.output), copied: $copied)
             }
@@ -675,6 +675,6 @@ struct TerminalOutputView: View {
         }
         .padding(10)
         .frame(maxHeight: fillHeight ? .infinity : nil, alignment: .top)
-        .background(Color.black.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 }

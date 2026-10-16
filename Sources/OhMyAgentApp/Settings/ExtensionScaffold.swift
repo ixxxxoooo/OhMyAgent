@@ -114,9 +114,9 @@ struct ExtensionBanners: View {
                 banner(icon: nil, text: message, tint: OMColors.secondaryText, showsProgress: true)
             }
             if let error = center.lastError {
-                banner(icon: "xmark.octagon.fill", text: error, tint: .red, dismiss: { center.lastError = nil })
+                banner(icon: "xmark.octagon.fill", text: error, tint: OMColors.danger, dismiss: { center.lastError = nil })
             } else if let notice = center.lastNotice {
-                banner(icon: "checkmark.circle.fill", text: notice, tint: .green)
+                banner(icon: "checkmark.circle.fill", text: notice, tint: OMColors.success)
                     .task(id: notice) {
                         try? await Task.sleep(for: .seconds(3))
                         if center.lastNotice == notice { center.lastNotice = nil }
@@ -220,7 +220,7 @@ struct ExtensionRow<Badges: View, Trailing: View, Detail: View>: View {
                     .transition(.opacity)
             }
         }
-        .background(hovering && onTap != nil ? Color.primary.opacity(0.03) : .clear)
+        .background(hovering && onTap != nil ? OMColors.subtleFill : .clear)
         .onHover { hovering = $0 }
         .accessibilityElement(children: .contain)
     }

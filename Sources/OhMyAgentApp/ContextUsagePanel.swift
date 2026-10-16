@@ -148,7 +148,7 @@ struct ContextUsageBody: View {
                         RoundedRectangle(cornerRadius: 3).fill(item.color).frame(width: 11, height: 11)
                         Text(item.category.name)
                             .font(OMFonts.small)
-                            .foregroundStyle(item.category.kind == .free ? OMColors.secondaryText : Color.primary)
+                            .foregroundStyle(item.category.kind == .free ? OMColors.secondaryText : OMColors.primaryText)
                             .lineLimit(1)
                         Spacer(minLength: 8)
                         Text(ContextUsage.formatTokens(item.category.tokens))
@@ -172,7 +172,7 @@ struct ContextUsageBody: View {
                 }
                 Spacer(minLength: 0)
             }
-            .background(Color.primary.opacity(0.08))
+            .background(OMColors.pressedFill)
             .clipShape(Capsule())
         }
         .frame(height: 8)
@@ -189,20 +189,12 @@ enum ContextPalette {
         var id: String { category.id }
     }
 
-    /// 已占用分类色板:灰、紫、绿、橙、洋红、蓝、绯红、红橙(循环)。
-    private static let used: [Color] = [
-        Color(red: 0.47, green: 0.47, blue: 0.47), Color(red: 0.48, green: 0.42, blue: 0.80),
-        Color(red: 0.06, green: 0.48, blue: 0.31), Color(red: 0.69, green: 0.45, blue: 0.10),
-        Color(red: 0.56, green: 0.10, blue: 0.43), Color(red: 0.18, green: 0.48, blue: 0.78),
-        Color(red: 0.76, green: 0.12, blue: 0.34), Color(red: 0.78, green: 0.25, blue: 0.12),
-    ]
-
     /// 取分类颜色:剩余用淡灰,压缩预留用冷灰,其余按序号取色板。
     static func color(for category: ContextCategory, index: Int) -> Color {
         switch category.kind {
-        case .free: return Color.primary.opacity(0.14)
-        case .buffer: return Color(red: 0.54, green: 0.58, blue: 0.64)
-        case .used: return used[index % used.count]
+        case .free: return OMColors.pressedFill
+        case .buffer: return OMColors.tertiaryText
+        case .used: return OMColors.chart(index)
         }
     }
 }

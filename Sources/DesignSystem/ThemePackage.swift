@@ -3,6 +3,7 @@
 // 纯数据,无视图依赖;运行时由 `ThemeRuntime` 持有当前选择,令牌(`OMColors` 等)从这里取色。
 
 import AppKit
+import Observation
 import SwiftUI
 
 /// 无色彩空间歧义的 sRGB 颜色(0…1)。
@@ -84,9 +85,65 @@ public struct ThemePalette: Sendable, Equatable {
     public var type: ThemeRGB
     public var function: ThemeRGB
     public var property: ThemeRGB
+    /// 主题风格(圆角/描边/阴影/玻璃着色);默认标准风格。
+    public var style: ThemeStyle = .standard
+    /// 终端 ANSI 16 色(0–7 标准色,8–15 高亮色);nil 时由语义色与语法色推导。
+    public var ansi: [ThemeRGB]? = nil
 
     /// 是否偏深色(按编辑器背景亮度)。
     public var isDark: Bool { editorBackground.luminance < 0.5 }
+}
+
+/// 主题风格:让每个主题不仅换色,还有各自的圆角、描边、阴影与玻璃着色。
+public struct ThemeStyle: Sendable, Equatable {
+    /// 圆角倍率(1 = 标准;<1 更方正,>1 更圆润)
+    public var cornerScale: Double
+    /// 描边(分隔线)强度倍率
+    public var strokeScale: Double
+    /// 阴影强度倍率
+    public var shadowScale: Double
+    /// 玻璃卡片的强调色着色强度(0 = 无着色)
+    public var glassTint: Double
+    /// 悬停/选中填充强度倍率
+    public var fillScale: Double
+
+    public init(cornerScale: Double = 1, strokeScale: Double = 1, shadowScale: Double = 1, glassTint: Double = 0, fillScale: Double = 1) {
+        self.cornerScale = cornerScale
+        self.strokeScale = strokeScale
+        self.shadowScale = shadowScale
+        self.glassTint = glassTint
+        self.fillScale = fillScale
+    }
+
+    /// 标准风格。
+    public static let standard = ThemeStyle()
+}
+
+// MARK: - 派生令牌
+
+extension ThemePalette {
+    /// 正文前景色。
+    public var foreground: ThemeRGB { editorForeground }
+    /// 次要文字:前景向底色混合。
+    public var secondaryText: ThemeRGB { editorForeground.mixed(with: surface, 0.40) }
+    /// 三级文字(占位、禁用)。
+    public var tertiaryText: ThemeRGB { editorForeground.mixed(with: surface, 0.62) }
+    /// 分隔线:底色向前景轻微混合。
+    public var hairline: ThemeRGB { surface.mixed(with: editorForeground, 0.14 * style.strokeScale) }
+
+    /// 终端 ANSI 16 色:显式提供优先,否则由语义色/语法色推导,保证每个主题的终端都有自己的味道。
+    public var ansiColors: [ThemeRGB] {
+        if let ansi, ansi.count == 16 { return ansi }
+        let black = isDark ? surface.mixed(with: editorForeground, 0.22) : editorForeground.mixed(with: surface, 0.10)
+        let white = isDark ? editorForeground.mixed(with: surface, 0.18) : surface.mixed(with: editorForeground, 0.22)
+        let base: [ThemeRGB] = [black, danger, success, warning, function, keyword, type, white]
+        let lift = isDark ? editorForeground : surface
+        var bright = base.map { $0.mixed(with: lift, isDark ? 0.22 : 0.0) }
+        if !isDark { bright = base.map { $0.mixed(with: editorForeground, 0.18) } }
+        bright[0] = isDark ? comment : editorForeground.mixed(with: surface, 0.40)
+        bright[7] = isDark ? editorForeground : surface
+        return base + bright
+    }
 }
 
 /// 主题明暗倾向。
@@ -121,6 +178,14 @@ public struct ThemePackage: Identifiable, Sendable, Equatable {
     /// nil 表示系统主题(不覆盖任何颜色)
     public let palette: ThemePalette?
 
+    public init(id: String, name: String, group: ThemeGroup, tone: ThemeTone, palette: ThemePalette?) {
+        self.id = id
+        self.name = name
+        self.group = group
+        self.tone = tone
+        self.palette = palette
+    }
+
     /// 主题的默认强调色(系统主题为 nil)。
     public var defaultAccent: ThemeRGB? { palette?.accent }
 
@@ -131,7 +196,7 @@ public struct ThemePackage: Identifiable, Sendable, Equatable {
 
 extension ThemePalette {
     /// 浅色基线(取自原有编辑器与 Diff 配色),各主题在其上覆盖。
-    static let lightBase = ThemePalette(
+    public static let lightBase = ThemePalette(
         surface: ThemeRGB(hex: 0xFFFFFF), card: ThemeRGB(hex: 0xF9F9FB),
         editorBackground: ThemeRGB(hex: 0xFFFFFF), editorForeground: ThemeRGB(hex: 0x1A1A1F),
         gutterBackground: ThemeRGB(hex: 0xF7F7FA), gutterForeground: ThemeRGB(hex: 0x8C8F99), currentLine: ThemeRGB(hex: 0xEDF2FF),
@@ -143,7 +208,7 @@ extension ThemePalette {
     )
 
     /// 深色基线。
-    static let darkBase = ThemePalette(
+    public static let darkBase = ThemePalette(
         surface: ThemeRGB(hex: 0x1B1C1F), card: ThemeRGB(hex: 0x252628),
         editorBackground: ThemeRGB(hex: 0x1B1C1F), editorForeground: ThemeRGB(hex: 0xDCDEE3),
         gutterBackground: ThemeRGB(hex: 0x202125), gutterForeground: ThemeRGB(hex: 0x73787F), currentLine: ThemeRGB(hex: 0x292E3B),
@@ -155,7 +220,7 @@ extension ThemePalette {
     )
 
     /// 基于基线做局部覆盖。
-    static func make(_ base: ThemePalette, _ edit: (inout ThemePalette) -> Void) -> ThemePalette {
+    public static func make(_ base: ThemePalette, _ edit: (inout ThemePalette) -> Void) -> ThemePalette {
         var copy = base
         edit(&copy)
         return copy
@@ -319,6 +384,16 @@ extension ThemePackage {
 
 // MARK: - 运行时
 
+/// 主题变更追踪器:`ThemeRuntime` 的每次读取都会登记对它的依赖,
+/// 因此任何读取 `OMColors`/`OMMetrics` 令牌的 SwiftUI 视图在主题切换时都会自动刷新,无需手动 `.id`。
+@Observable
+public final class ThemeTracker: @unchecked Sendable {
+    public static let shared = ThemeTracker()
+    /// 每次主题/强调色变化递增。
+    public var revision = 0
+    private init() {}
+}
+
 /// 当前主题与强调色覆盖(由 `AppearanceModel` 写入;只在主线程的界面刷新周期读取)。
 public enum ThemeRuntime {
     nonisolated(unsafe) public static var package: ThemePackage = .system
@@ -327,14 +402,28 @@ public enum ThemeRuntime {
     /// 用户选择的第二强调色(nil = 跟随主题默认)
     nonisolated(unsafe) public static var accent2Override: ThemeRGB?
 
-    /// 当前调色板(系统主题为 nil)。
-    public static var palette: ThemePalette? { package.palette }
+    /// 系统主题下当前是否深色(由 `AppearanceModel` 在外观变化时更新;供非主线程的令牌读取)。
+    nonisolated(unsafe) public static var systemIsDark = false
+
+    /// 当前调色板(系统主题为 nil)。读取会登记 Observation 依赖。
+    public static var palette: ThemePalette? {
+        _ = ThemeTracker.shared.revision
+        return package.palette
+    }
+
+    /// 当前主题风格。
+    public static var style: ThemeStyle { palette?.style ?? .standard }
 
     /// 生效的主强调色;nil 表示使用系统强调色。
-    public static var accent: ThemeRGB? { accentOverride ?? palette?.accent }
+    public static var accent: ThemeRGB? { _ = ThemeTracker.shared.revision; return accentOverride ?? package.palette?.accent }
     /// 生效的第二强调色;nil 表示回退为系统强调色。
-    public static var accent2: ThemeRGB? { accent2Override ?? palette?.accent2 }
+    public static var accent2: ThemeRGB? { _ = ThemeTracker.shared.revision; return accent2Override ?? package.palette?.accent2 }
 
     /// 主题变化通知(编辑器据此重新应用配色、清空高亮缓存)。
     public static let didChange = Notification.Name("OMThemeDidChange")
+
+    /// 通知所有依赖令牌的视图刷新(只应由 `AppearanceModel` 调用)。
+    @MainActor public static func bump() {
+        ThemeTracker.shared.revision += 1
+    }
 }

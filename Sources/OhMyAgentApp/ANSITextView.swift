@@ -27,7 +27,7 @@ struct ANSITextView: View {
         var result = AttributedString()
         for span in ANSIParser.parse(raw, maxLines: maxLines) {
             var piece = AttributedString(span.text)
-            piece.font = .system(size: fontSize, weight: span.bold ? .semibold : .regular, design: .monospaced)
+            piece.font = OMFonts.custom(fontSize, weight: span.bold ? .semibold : .regular, design: .monospaced)
             if let color = span.foreground { piece.foregroundColor = Self.color(color, dim: span.dim) }
             else if span.dim { piece.foregroundColor = OMColors.secondaryText }
             if span.underline { piece.underlineStyle = .single }
@@ -36,35 +36,25 @@ struct ANSITextView: View {
         return result
     }
 
-    /// 标准 xterm 调色板,在浅色/深色背景上都保持可读。
+    /// ANSI 调色板:取自当前主题(`OMTerminalPalette`),0/7/8/15 号映射到界面前景梯度以保证在内容区上可读。
     static func color(_ color: ANSIColor, dim: Bool) -> Color {
         let base: Color
         switch color {
         case .basic(let index): base = basic(index)
         case .palette(let index): base = palette(index)
-        case .rgb(let r, let g, let b): base = Color(red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255)
+        case .rgb(let r, let g, let b): base = ThemeRGB(red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255).color
         }
         return dim ? base.opacity(0.6) : base
     }
 
     private static func basic(_ index: Int) -> Color {
         switch index {
-        case 0: return Color(nsColor: .secondaryLabelColor)
-        case 1: return Color(nsColor: .systemRed)
-        case 2: return Color(nsColor: .systemGreen)
-        case 3: return Color(nsColor: .systemOrange)
-        case 4: return Color(nsColor: .systemBlue)
-        case 5: return Color(nsColor: .systemPurple)
-        case 6: return Color(nsColor: .systemTeal)
-        case 7: return Color(nsColor: .labelColor)
-        case 8: return Color(nsColor: .tertiaryLabelColor)
-        case 9: return Color(nsColor: .systemRed)
-        case 10: return Color(nsColor: .systemGreen)
-        case 11: return Color(nsColor: .systemYellow)
-        case 12: return Color(nsColor: .systemBlue)
-        case 13: return Color(nsColor: .systemPink)
-        case 14: return Color(nsColor: .systemCyan)
-        default: return Color(nsColor: .labelColor)
+        case 0: return OMColors.secondaryText
+        case 7, 15: return OMColors.primaryText
+        case 8: return OMColors.tertiaryText
+        case 1...6, 9...14:
+            return Color(nsColor: OMTerminalPalette.ansi(dark: OMTerminalPalette.currentIsDark)[index])
+        default: return OMColors.primaryText
         }
     }
 
@@ -74,10 +64,10 @@ struct ANSITextView: View {
         case 16..<232:
             let n = index - 16
             func level(_ v: Int) -> Double { v == 0 ? 0 : Double(55 + 40 * v) / 255 }
-            return Color(red: level(n / 36), green: level((n / 6) % 6), blue: level(n % 6))
+            return ThemeRGB(red: level(n / 36), green: level((n / 6) % 6), blue: level(n % 6)).color
         default:
             let gray = Double(8 + 10 * (index - 232)) / 255
-            return Color(white: min(max(gray, 0), 1))
+            return ThemeRGB(red: gray, green: gray, blue: gray).color
         }
     }
 }

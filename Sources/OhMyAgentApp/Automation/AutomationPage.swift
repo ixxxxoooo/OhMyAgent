@@ -109,7 +109,7 @@ struct AutomationPage: View {
             }
             .padding(.horizontal, 10)
             .frame(height: Metrics.rowHeight)
-            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(isSelected ? Color.primary.opacity(0.08) : .clear))
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(isSelected ? OMColors.pressedFill : .clear))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

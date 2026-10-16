@@ -222,7 +222,7 @@ private struct SCMContent: View {
                 .textFieldStyle(.plain)
                 .font(OMFonts.small)
                 .padding(8)
-                .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
             HStack(spacing: 6) {
                 Button { requestCommit(push: false) } label: {
                     Text(model.amend ? String(localized: "修补提交") : (model.status.stagedChanges.isEmpty ? String(localized: "提交全部") : String(localized: "提交"))).frame(maxWidth: .infinity)
@@ -401,7 +401,7 @@ private struct ChangeRow: View {
         .padding(.horizontal, 10)
         .frame(height: 24)   // 固定行高:悬停出现操作按钮时不改变高度
         .contentShape(Rectangle())
-        .background(hovering ? Color.primary.opacity(0.06) : .clear)
+        .background(hovering ? OMColors.hoverFill : .clear)
         .onHover { hovering = $0 }
         .onTapGesture(count: 2) { workbench.openFile(model.absolutePath(change.path), preview: false) }
         .onTapGesture { openDiff() }

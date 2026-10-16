@@ -90,7 +90,7 @@ struct RightPaneView: View {
             Circle()
                 .fill(badge.isOnlyBehind ? OMColors.accent2 : OMColors.accent)
                 .frame(width: 7, height: 7)
-                .overlay(Circle().strokeBorder(Color(nsColor: .windowBackgroundColor), lineWidth: 1))
+                .overlay(Circle().strokeBorder(OMColors.sidebar, lineWidth: 1))
                 .offset(x: -2, y: 2)
                 .accessibilityHidden(true)
         }

@@ -76,7 +76,7 @@ private struct OMButtonBody: View {
     private var foreground: Color {
         switch kind {
         case .primary: return OMColors.onAccent
-        case .secondary, .plain, .icon: return Color.primary
+        case .secondary, .plain, .icon: return OMColors.primaryText
         case .destructive: return OMColors.danger
         }
     }
@@ -84,9 +84,9 @@ private struct OMButtonBody: View {
     private var background: Color {
         switch kind {
         case .primary: return hovering && isEnabled ? OMColors.accent.opacity(0.88) : OMColors.accent
-        case .secondary: return Color.primary.opacity(hovering && isEnabled ? 0.10 : 0.05)
+        case .secondary: return OMColors.primaryText.opacity(hovering && isEnabled ? 0.10 : 0.05)
         case .destructive: return OMColors.danger.opacity(hovering && isEnabled ? 0.16 : 0.09)
-        case .plain, .icon: return Color.primary.opacity(hovering && isEnabled ? 0.08 : 0)
+        case .plain, .icon: return OMColors.primaryText.opacity(hovering && isEnabled ? 0.08 : 0)
         }
     }
 
@@ -177,7 +177,7 @@ public struct OMStepSlider: View {
             GeometryReader { proxy in
                 let travel = max(proxy.size.width - thumb, 1)
                 ZStack(alignment: .leading) {
-                    Capsule().fill(Color.primary.opacity(0.10)).frame(height: 4).padding(.horizontal, thumb / 2)
+                    Capsule().fill(OMColors.pressedFill).frame(height: 4).padding(.horizontal, thumb / 2)
                     Capsule().fill(OMColors.accent)
                         .frame(width: travel * fraction(current), height: 4)
                         .padding(.leading, thumb / 2)
@@ -231,7 +231,7 @@ public struct OMStepSlider: View {
                 ForEach(Array(stops.enumerated()), id: \.offset) { offset, name in
                     Text(verbatim: name)
                         .font(OMFonts.caption)
-                        .foregroundStyle(offset == current ? Color.primary : OMColors.tertiaryText)
+                        .foregroundStyle(offset == current ? OMColors.primaryText : OMColors.tertiaryText)
                         .frame(maxWidth: .infinity, alignment: offset == 0 ? .leading : (offset == lastIndex ? .trailing : .center))
                 }
             }

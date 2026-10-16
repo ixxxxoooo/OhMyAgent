@@ -10,10 +10,7 @@ import SwiftUI
 import WorkbenchKit
 
 /// 泳道颜色表。
-private let laneColors: [Color] = [
-    Color(nsColor: .systemBlue), Color(nsColor: .systemGreen), Color(nsColor: .systemOrange),
-    Color(nsColor: .systemPurple), Color(nsColor: .systemPink), Color(nsColor: .systemTeal),
-]
+private var laneColors: [Color] { (0..<6).map { OMColors.chart($0) } }
 
 struct GitHistoryTabView: View {
     let workbench: WorkbenchModel
@@ -171,10 +168,10 @@ struct CommitRow: View {
     }
 
     private func refColor(_ ref: String) -> Color {
-        if ref.hasPrefix("tag:") { return Color(nsColor: .systemOrange) }
+        if ref.hasPrefix("tag:") { return OMColors.warning }
         if ref.hasPrefix("HEAD") { return OMColors.accent }
-        if ref.contains("/") { return Color(nsColor: .systemPurple) }
-        return Color(nsColor: .systemGreen)
+        if ref.contains("/") { return OMColors.accent2 }
+        return OMColors.success
     }
 }
 
@@ -240,7 +237,7 @@ private struct CommitDetailView: View {
                     Text(commit.author)
                     Text(commit.date, format: .dateTime.year().month().day().hour().minute())
                     Text(commit.shortHash).font(OMFonts.monoSmall)
-                    if commit.isMerge { OMTag(String(localized: "合并"), tint: .purple) }
+                    if commit.isMerge { OMTag(String(localized: "合并"), tint: OMColors.accent2) }
                 }
                 .font(OMFonts.caption).foregroundStyle(OMColors.secondaryText)
             }

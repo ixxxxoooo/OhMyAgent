@@ -165,7 +165,7 @@ private struct GraphCommitDetail: View {
                 Text(commit.author)
                 Text(commit.date, format: .dateTime.month().day().hour().minute())
                 Text(commit.shortHash).font(OMFonts.monoSmall)
-                if commit.isMerge { OMTag(String(localized: "合并"), tint: .purple) }
+                if commit.isMerge { OMTag(String(localized: "合并"), tint: OMColors.accent2) }
                 Spacer(minLength: 0)
             }
             .font(OMFonts.caption)

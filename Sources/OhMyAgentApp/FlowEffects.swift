@@ -22,7 +22,7 @@ struct FlowSweep: View {
                 let phase = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: period) / period
                 GeometryReader { geometry in
                     let band = geometry.size.width * 0.5
-                    LinearGradient(colors: [.clear, Color.primary.opacity(opacity), .clear], startPoint: .leading, endPoint: .trailing)
+                    LinearGradient(colors: [.clear, OMColors.primaryText.opacity(opacity), .clear], startPoint: .leading, endPoint: .trailing)
                         .frame(width: band)
                         .offset(x: -band + phase * (geometry.size.width + band))
                 }
@@ -48,7 +48,7 @@ private struct FlowingTextModifier: ViewModifier {
                         let phase = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 2.4) / 2.4
                         GeometryReader { geometry in
                             let band = max(geometry.size.width * 0.45, 28)
-                            LinearGradient(colors: [.clear, Color.primary, .clear], startPoint: .leading, endPoint: .trailing)
+                            LinearGradient(colors: [.clear, OMColors.primaryText, .clear], startPoint: .leading, endPoint: .trailing)
                                 .frame(width: band)
                                 .offset(x: -band + phase * (geometry.size.width + band))
                         }

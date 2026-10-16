@@ -189,7 +189,7 @@ private struct Checkerboard: View {
             let rows = Int(size.height / cell) + 1
             for row in 0..<rows {
                 for column in 0..<columns where (row + column) % 2 == 0 {
-                    context.fill(Path(CGRect(x: CGFloat(column) * cell, y: CGFloat(row) * cell, width: cell, height: cell)), with: .color(Color.primary.opacity(0.05)))
+                    context.fill(Path(CGRect(x: CGFloat(column) * cell, y: CGFloat(row) * cell, width: cell, height: cell)), with: .color(OMColors.subtleFill))
                 }
             }
         }
@@ -324,7 +324,7 @@ struct CSVTableView: View {
                         Section {
                             ForEach(Array(rows.dropFirst().enumerated()), id: \.offset) { index, row in
                                 rowView(row, widths: widths, header: false)
-                                    .background(index % 2 == 1 ? Color.primary.opacity(0.035) : Color.clear)
+                                    .background(index % 2 == 1 ? OMColors.subtleFill : Color.clear)
                             }
                         } header: {
                             rowView(rows[0], widths: widths, header: true)

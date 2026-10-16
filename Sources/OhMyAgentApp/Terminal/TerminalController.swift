@@ -3,6 +3,7 @@
 // 视图与进程由 TerminalStore 持有,标签切换/隐藏不会终止会话;关闭标签才会结束进程。
 
 import AppKit
+import DesignSystem
 import Foundation
 import Observation
 import OMLog
@@ -47,12 +48,29 @@ final class TerminalController: Identifiable {
         self.extraEnvironment = environment
         let terminalView = TerminalView(frame: CGRect(x: 0, y: 0, width: 640, height: 360))
         terminalView.font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
-        terminalView.nativeBackgroundColor = .textBackgroundColor
-        terminalView.nativeForegroundColor = .labelColor
         terminalView.optionAsMetaKey = true
         view = terminalView
         terminalView.terminalDelegate = self
+        applyTheme()
+        // 主题切换/系统明暗变化:热更新终端配色(弱引用,控制器释放后回调为空操作)
+        NotificationCenter.default.addObserver(forName: ThemeRuntime.didChange, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.applyTheme() }
+        }
         start()
+    }
+
+    /// 把当前主题的终端配色(ANSI 16 色、前景、背景、光标、选区)应用到渲染视图。
+    func applyTheme() {
+        let colors = OMTerminalPalette.ansi(dark: OMTerminalPalette.currentIsDark).map { color -> SwiftTerm.Color in
+            let rgb = color.usingColorSpace(.sRGB) ?? color
+            func channel(_ value: CGFloat) -> UInt16 { UInt16((min(max(value, 0), 1) * 65535).rounded()) }
+            return SwiftTerm.Color(red: channel(rgb.redComponent), green: channel(rgb.greenComponent), blue: channel(rgb.blueComponent)) // ui-lint:allow SwiftTerm 通道换算,颜色来自 OMTerminalPalette
+        }
+        view.installColors(colors)
+        view.nativeBackgroundColor = OMTerminalPalette.background
+        view.nativeForegroundColor = OMTerminalPalette.foreground
+        view.caretColor = OMTerminalPalette.cursor
+        view.selectedTextBackgroundColor = OMTerminalPalette.selection
     }
 
     /// 启动(或重新启动)shell 进程。

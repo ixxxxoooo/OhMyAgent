@@ -3,6 +3,7 @@
 // 结果按「语言 + 内容」缓存,流式输出与反复重绘不重复扫描。
 
 import AppKit
+import DesignSystem
 import Foundation
 import SwiftUI
 
@@ -31,7 +32,9 @@ public enum CodeHighlighter {
     /// - Returns: 带前景色的 AttributedString(字体由调用方的 `.font` 决定)
     public static func attributed(_ code: String, language: SyntaxLanguage) -> AttributedString {
         guard language != .plain, !code.isEmpty, code.utf16.count <= maxCharacters else { return AttributedString(code) }
-        let key = "\(language.rawValue)#\(code.hashValue)#\(code.utf16.count)" as NSString
+        // 缓存键含主题 id 与明暗:切换主题后同一段代码立即以新配色重新生成
+        _ = ThemeRuntime.palette
+        let key = "\(ThemeRuntime.package.id)#\(ThemeRuntime.systemIsDark)#\(language.rawValue)#\(code.hashValue)#\(code.utf16.count)" as NSString
         if let hit = cache.object(forKey: key) { return hit.value }
         let result = build(code, language: language)
         cache.setObject(Box(result), forKey: key, cost: code.utf16.count * 4)

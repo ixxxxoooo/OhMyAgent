@@ -27,7 +27,7 @@ struct MemoryManagerView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(file.title).font(OMFonts.body).lineLimit(1)
                         HStack(spacing: 4) {
-                            Tag(file.exists ? String(localized: "已存在") : String(localized: "未创建"), color: file.exists ? .green : .gray)
+                            Tag(file.exists ? String(localized: "已存在") : String(localized: "未创建"), color: file.exists ? OMColors.success : OMColors.tertiaryText)
                             if !file.isLoadedByDefault { Tag(String(localized: "Claude 默认不读取"), color: OMColors.warning) }
                             ForEach(file.pathFilters.prefix(2), id: \.self) { Tag($0) }
                         }

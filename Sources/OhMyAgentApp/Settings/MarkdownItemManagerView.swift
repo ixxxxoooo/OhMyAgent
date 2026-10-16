@@ -112,7 +112,7 @@ struct SkillsSettingsPage: View {
                 if item.disableModelInvocation { Tag(String(localized: "仅手动")) }
                 if let over = item.overriddenBy { Tag(String(localized: "被\(over.displayName)覆盖"), color: OMColors.warning) }
                 if item.isSymlink { Tag(String(localized: "链接")) }
-                if item.source.isReadOnly { Tag(String(localized: "只读"), color: .gray) }
+                if item.source.isReadOnly { Tag(String(localized: "只读"), color: OMColors.tertiaryText) }
             },
             trailing: {
                 HStack(spacing: 6) {

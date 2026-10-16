@@ -108,7 +108,7 @@ struct LogViewerView: View {
     private func color(for level: LogLevel) -> Color {
         switch level {
         case .debug: return OMColors.tertiaryText
-        case .info: return Color.primary
+        case .info: return OMColors.primaryText
         case .warning: return OMColors.warning
         case .error: return OMColors.danger
         }

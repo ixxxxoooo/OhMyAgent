@@ -41,7 +41,7 @@ struct FileMentionChip: View {
     private var nameText: some View {
         Text(mention.name)
             .font(OMFonts.small)
-            .foregroundStyle(.primary)
+            .foregroundStyle(OMColors.primaryText)
             .lineLimit(1)
             .truncationMode(.middle)
             .frame(maxWidth: 180)

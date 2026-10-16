@@ -103,9 +103,9 @@ private struct HeaderIconButton: View {
     var body: some View {
         Button(action: action) {
             Image.om(icon, size: 13)
-                .foregroundStyle(tint ?? (hovering ? Color.primary : OMColors.secondaryText))
+                .foregroundStyle(tint ?? (hovering ? OMColors.primaryText : OMColors.secondaryText))
                 .frame(width: 24, height: 22)
-                .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(hovering ? Color.primary.opacity(0.07) : .clear))
+                .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(hovering ? OMColors.hoverFill : .clear))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -142,11 +142,11 @@ private struct BreadcrumbButton: View {
     var body: some View {
         Button { isOpen.toggle() } label: {
             Text(segment.name)
-                .foregroundStyle(isLast ? Color.primary : OMColors.secondaryText)
+                .foregroundStyle(isLast ? OMColors.primaryText : OMColors.secondaryText)
                 .lineLimit(1).truncationMode(isLast ? .middle : .head)
                 .padding(.horizontal, 4)
                 .frame(height: 20)
-                .background(RoundedRectangle(cornerRadius: 5, style: .continuous).fill(hovering || isOpen ? Color.primary.opacity(0.07) : .clear))
+                .background(RoundedRectangle(cornerRadius: 5, style: .continuous).fill(hovering || isOpen ? OMColors.hoverFill : .clear))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

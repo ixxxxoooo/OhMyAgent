@@ -33,7 +33,7 @@ struct BranchSwitcher: View {
             }
             .padding(.horizontal, 6)
             .frame(height: 22)
-            .background(Capsule().fill(hovering || shown ? Color.primary.opacity(0.07) : .clear))
+            .background(Capsule().fill(hovering || shown ? OMColors.hoverFill : .clear))
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)

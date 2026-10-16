@@ -137,7 +137,7 @@ struct AttachmentThumbnail: View {
             if let onRemove, hovering {
                 Button(action: onRemove) {
                     Image.om("circle-x", size: 14)
-                        .foregroundStyle(.white, Color.black.opacity(0.65))
+                        .foregroundStyle(OMColors.onAccent, OMColors.maskInk.opacity(0.65))
                 }
                 .buttonStyle(.plain)
                 .padding(2)
@@ -230,7 +230,7 @@ struct PlanView: View {
                     Text(item.content)
                         .font(OMFonts.reading)
                         .strikethrough(item.status == "completed")
-                        .foregroundStyle(item.status == "completed" ? OMColors.secondaryText : Color.primary)
+                        .foregroundStyle(item.status == "completed" ? OMColors.secondaryText : OMColors.primaryText)
                 }
             }
         }
@@ -255,7 +255,7 @@ struct NoticeView: View {
     private var tint: Color {
         switch entry.severity {
         case "error": return OMColors.danger
-        case "warning": return .orange
+        case "warning": return OMColors.warning
         default: return OMColors.secondaryText
         }
     }

@@ -35,7 +35,7 @@ struct BottomPanelView: View {
                     Button(Self.title(pane)) { workbench.layout.bottomPane = pane }
                         .buttonStyle(.plain)
                         .font(OMFonts.small.weight(currentPane == pane ? .semibold : .regular))
-                        .foregroundStyle(currentPane == pane ? Color.primary : OMColors.secondaryText)
+                        .foregroundStyle(currentPane == pane ? OMColors.primaryText : OMColors.secondaryText)
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(currentPane == pane ? OMColors.accent.opacity(0.12) : .clear, in: Capsule())
                 }

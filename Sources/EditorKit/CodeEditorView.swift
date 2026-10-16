@@ -321,10 +321,10 @@ public final class CodeEditorView: NSView {
 
     static func color(for severity: EditorDiagnostic.Severity) -> NSColor {
         switch severity {
-        case .error: return .systemRed
-        case .warning: return .systemOrange
-        case .information: return .systemBlue
-        case .hint: return .systemGray
+        case .error: return NSColor(OMColors.danger)
+        case .warning: return NSColor(OMColors.warning)
+        case .information: return NSColor(OMColors.accent2)
+        case .hint: return NSColor(OMColors.tertiaryText)
         }
     }
 
@@ -661,9 +661,9 @@ final class LineNumberRulerView: NSRulerView {
             if let marker = self.lineMarkers[line] {
                 let color: NSColor
                 switch marker {
-                case .added: color = .systemGreen
-                case .removed: color = .systemRed
-                case .modified: color = .systemOrange
+                case .added: color = NSColor(OMColors.success)
+                case .removed: color = NSColor(OMColors.danger)
+                case .modified: color = NSColor(OMColors.warning)
                 case .agent: color = .controlAccentColor
                 }
                 color.setFill()

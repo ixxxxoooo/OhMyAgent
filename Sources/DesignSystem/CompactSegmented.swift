@@ -44,10 +44,10 @@ public struct OMCompactSegmented<Value: Hashable>: View {
                 Button { onSelect(item.value) } label: {
                     Text(LocalizedStringKey(item.title))
                         .font(OMFonts.caption)
-                        .foregroundStyle(selected ? Color.primary : OMColors.secondaryText)
+                        .foregroundStyle(selected ? OMColors.primaryText : OMColors.secondaryText)
                         .padding(.horizontal, 9)
                         .frame(height: 20)
-                        .background(Capsule().fill(selected ? Color.primary.opacity(0.1) : .clear))
+                        .background(Capsule().fill(selected ? OMColors.pressedFill : .clear))
                         .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
@@ -55,7 +55,7 @@ public struct OMCompactSegmented<Value: Hashable>: View {
             }
         }
         .padding(2)
-        .background(Capsule().fill(Color.primary.opacity(0.04)))
+        .background(Capsule().fill(OMColors.subtleFill))
         .overlay(Capsule().strokeBorder(OMColors.hairline.opacity(0.6), lineWidth: 0.5))
         .fixedSize()
         .accessibilityElement(children: .contain)

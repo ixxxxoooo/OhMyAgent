@@ -54,7 +54,7 @@ struct TerminalTabView: View {
         VStack(spacing: 0) {
             TerminalHostView(controller: controller, focusOnAppear: focusOnAppear)
                 .padding(.leading, 6)
-                .background(Color(nsColor: .textBackgroundColor))
+                .background(Color(nsColor: OMTerminalPalette.background))
             if !controller.isRunning { exitedBar(controller) }
         }
         .accessibilityLabel("终端")

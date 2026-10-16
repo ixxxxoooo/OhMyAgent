@@ -242,7 +242,7 @@ private struct GridRow: View {
         let isSelected = selection == CellPosition(row: row, column: column)
         return Text(value.text)
             .font(OMFonts.small)
-            .foregroundStyle(value.kind == .error ? OMColors.danger : Color.primary)
+            .foregroundStyle(value.kind == .error ? OMColors.danger : OMColors.primaryText)
             .lineLimit(1)
             .truncationMode(.tail)
             .padding(.horizontal, 6)

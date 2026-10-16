@@ -123,7 +123,7 @@ struct DiffLineRow: View {
                 .diffFill(OMDiffPalette.background(paletteKind))
         }
         .font(OMFonts.monoSmall)
-        .foregroundStyle(line.kind == .context ? OMColors.secondaryText : Color.primary)
+        .foregroundStyle(line.kind == .context ? OMColors.secondaryText : OMColors.primaryText)
         .frame(maxWidth: .infinity, alignment: .leading)
         .fixedSize(horizontal: false, vertical: true)
         .accessibilityElement(children: .ignore)

@@ -367,7 +367,7 @@ struct SubagentTabView: View {
             Image.om("bot", size: 14).foregroundStyle(OMColors.accent)
             Text(tool.title).font(OMFonts.body.weight(.semibold)).lineLimit(1)
             if tool.status.isTerminal {
-                OMTag(tool.status == .failed ? String(localized: "失败") : String(localized: "已完成"), tint: tool.status == .failed ? .red : .green)
+                OMTag(tool.status == .failed ? String(localized: "失败") : String(localized: "已完成"), tint: tool.status == .failed ? OMColors.danger : OMColors.success)
             } else {
                 OMTag(String(localized: "运行中"), tint: OMColors.accent)
             }

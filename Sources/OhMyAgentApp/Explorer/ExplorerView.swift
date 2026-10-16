@@ -148,7 +148,7 @@ private struct ExplorerRow: View {
                 .frame(width: 12)
                 OMFileIcon(name: name, isDirectory: isDirectory, expanded: expanded, size: OMMetrics.fileIconList)
                 Text(name).font(OMFonts.small).lineLimit(1).truncationMode(.middle)
-                    .foregroundStyle(decoration.map(Self.tint) ?? Color.primary)
+                    .foregroundStyle(decoration.map(Self.tint) ?? OMColors.primaryText)
                 Spacer(minLength: 0)
                 if let decoration {
                     if isDirectory {
@@ -162,7 +162,7 @@ private struct ExplorerRow: View {
             .padding(.vertical, 3)
             .padding(.trailing, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 5).fill(isActive ? OMColors.accent.opacity(0.18) : (hovering ? Color.primary.opacity(0.06) : .clear)).padding(.horizontal, 4))
+            .background(RoundedRectangle(cornerRadius: 5).fill(isActive ? OMColors.accent.opacity(0.18) : (hovering ? OMColors.hoverFill : .clear)).padding(.horizontal, 4))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

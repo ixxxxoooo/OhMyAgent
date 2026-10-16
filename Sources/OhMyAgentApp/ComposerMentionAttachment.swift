@@ -4,6 +4,7 @@
 
 import AppKit
 import ChatKit
+import DesignSystem
 import SwiftUI
 
 /// 一个文件提及附件。
@@ -175,7 +176,7 @@ extension SubmitTextView {
             ComposerMentionLayout.pieces(for: plain, workspace: $0, allowTrailingEnd: allowTrailingEnd)
         } ?? (plain.isEmpty ? [] : [.text(plain)])
         let baseFont = font ?? NSFont.systemFont(ofSize: 13.5)
-        let attributes: [NSAttributedString.Key: Any] = [.font: baseFont, .foregroundColor: NSColor.labelColor]
+        let attributes: [NSAttributedString.Key: Any] = [.font: baseFont, .foregroundColor: NSColor(OMColors.primaryText)]
         let result = NSMutableAttributedString()
         for piece in pieces {
             switch piece {

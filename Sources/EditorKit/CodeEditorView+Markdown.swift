@@ -6,6 +6,7 @@
 // 只改文本属性(不改字符),不会触发 textDidChange 与撤销登记。
 
 import AppKit
+import DesignSystem
 
 /// 编辑器里 Markdown 的显示模式。
 public enum MarkdownEditorMode: Sendable, Equatable {
@@ -231,7 +232,7 @@ struct MarkdownStyler {
             }
         case .quote:
             attributes[.font] = font
-            attributes[.foregroundColor] = isLive ? NSColor.secondaryLabelColor : dimColor
+            attributes[.foregroundColor] = isLive ? NSColor(OMColors.secondaryText) : dimColor
             if isLive { attributes[.paragraphStyle] = paragraph(lineSpacing: 3.5, after: 6, indent: 16) }
         case .list:
             attributes[.font] = font
@@ -282,9 +283,9 @@ struct MarkdownStyler {
                 storage.addAttribute(.foregroundColor, value: dimColor, range: range)
             }
         case .listMarker:
-            storage.addAttributes([.foregroundColor: NSColor.controlAccentColor, .font: font(blockFont, .bold)], range: range)
+            storage.addAttributes([.foregroundColor: NSColor(OMColors.accent), .font: font(blockFont, .bold)], range: range)
         case .taskBox(let checked):
-            storage.addAttributes([.foregroundColor: checked ? NSColor.systemGreen : NSColor.controlAccentColor, .font: font(blockFont, .bold)], range: range)
+            storage.addAttributes([.foregroundColor: checked ? NSColor(OMColors.success) : NSColor(OMColors.accent), .font: font(blockFont, .bold)], range: range)
         case .codeToken(let token):
             if let color = theme.colors[token] { storage.addAttribute(.foregroundColor, value: color, range: range) }
         case .dim:

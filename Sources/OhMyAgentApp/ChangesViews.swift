@@ -59,7 +59,7 @@ struct FileChangeRow: View {
                             .foregroundStyle(OMColors.tertiaryText)
                         OMFileIcon(name: change.fileName, size: 14)
                         Text(change.fileName).font(OMFonts.small.weight(.medium))
-                        if change.original == nil { OMTag(String(localized: "新建"), tint: .green) }
+                        if change.original == nil { OMTag(String(localized: "新建"), tint: OMColors.success) }
                         Text("+\(change.diff.added)").foregroundStyle(OMColors.diffAdded)
                         Text("−\(change.diff.removed)").foregroundStyle(OMColors.diffRemoved)
                         Spacer(minLength: 0)
@@ -110,8 +110,8 @@ struct FileChangeRow: View {
         case .pending: EmptyView()
         case .reverted: OMTag(String(localized: "已撤销"))
         case .partiallyReverted: OMTag(String(localized: "部分撤销"), tint: OMColors.warning)
-        case .conflict: OMTag(String(localized: "文件已被修改,未撤销"), tint: .red)
-        case .failed(let message): OMTag(String(localized: "失败:\(message)"), tint: .red)
+        case .conflict: OMTag(String(localized: "文件已被修改,未撤销"), tint: OMColors.danger)
+        case .failed(let message): OMTag(String(localized: "失败:\(message)"), tint: OMColors.danger)
         }
     }
 }

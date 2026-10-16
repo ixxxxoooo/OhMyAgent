@@ -30,10 +30,10 @@ struct GeneralPage: View {
         switch updates.state {
         case .idle: EmptyView()
         case .checking: ProgressView().controlSize(.small)
-        case .result(.upToDate): Text("已是最新版本").foregroundStyle(.secondary)
+        case .result(.upToDate): Text("已是最新版本").foregroundStyle(OMColors.secondaryText)
         case .result(.available(let info)):
             Button("下载 \(info.version)") { updates.openDownload(info) }
-            if let notes = info.notes { Text(notes).foregroundStyle(.secondary).lineLimit(1) }
+            if let notes = info.notes { Text(notes).foregroundStyle(OMColors.secondaryText).lineLimit(1) }
         case .result(.unsupportedSystem(let info)): Text("\(info.version) 需要 macOS \(info.minimumSystemVersion ?? "")").foregroundStyle(OMColors.warning)
         case .result(.failed(let message)): Text(message).foregroundStyle(OMColors.danger).lineLimit(2)
         }
@@ -300,7 +300,7 @@ private struct ThemeCard: View {
                 OMColors.systemSidebar
                 OMColors.systemContentBackground
             }
-            .overlay(Image.om("monitor", size: 14).foregroundStyle(.gray))
+            .overlay(Image.om("monitor", size: 14).foregroundStyle(OMColors.tertiaryText))
         }
     }
 }
@@ -334,7 +334,7 @@ private struct AccentPicker: View {
                             } else {
                                 Circle().strokeBorder(OMColors.secondaryText, style: StrokeStyle(lineWidth: 1, dash: [2, 2]))
                             }
-                            if choice == item { Circle().strokeBorder(Color.primary, lineWidth: 2).padding(-3) }
+                            if choice == item { Circle().strokeBorder(OMColors.primaryText, lineWidth: 2).padding(-3) }
                         }
                         .frame(width: 16, height: 16)
                     }
@@ -355,7 +355,7 @@ private struct AccentPicker: View {
 private struct AccentPreview: View {
     var body: some View {
         HStack(spacing: 10) {
-            Text("主按钮").font(OMFonts.small).foregroundStyle(.white)
+            Text("主按钮").font(OMFonts.small).foregroundStyle(OMColors.onAccent)
                 .padding(.horizontal, 10).padding(.vertical, 4)
                 .background(OMColors.accent, in: Capsule())
             Text("链接示例").font(OMFonts.small).foregroundStyle(OMColors.accent2).underline()

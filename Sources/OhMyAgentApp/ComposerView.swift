@@ -101,7 +101,7 @@ struct ComposerView: View {
         .overlay(alignment: .top) {
             if dropTargeted {
                 Text("松开以添加图片或引用文件")
-                    .font(OMFonts.caption).foregroundStyle(.white)
+                    .font(OMFonts.caption).foregroundStyle(OMColors.onAccent)
                     .padding(.horizontal, 10).padding(.vertical, 4)
                     .background(OMColors.accent, in: Capsule())
                     .offset(y: -12)
@@ -336,8 +336,8 @@ struct OptionMenu: View {
         case .neutral: OMColors.secondaryText
         case .accent: OMColors.accent
         case .green: OMColors.success
-        case .blue: ThemeRuntime.palette?.accent2.color ?? Color(nsColor: .systemBlue)
-        case .purple: ThemeRuntime.palette?.keyword.color ?? Color(nsColor: .systemPurple)
+        case .blue: OMColors.accent2
+        case .purple: OMColors.chart(4)
         case .amber: OMColors.warning
         case .red: OMColors.danger
         }
@@ -452,7 +452,7 @@ struct CompletionPopup: View {
                     .foregroundStyle(OMColors.secondaryText)
                     .lineLimit(1)
                     .padding(.horizontal, 5)
-                    .background(Capsule().fill(Color.primary.opacity(0.08)))
+                    .background(Capsule().fill(OMColors.pressedFill))
             }
             if let subtitle = item.subtitle, !subtitle.isEmpty {
                 Text(subtitle)
@@ -465,7 +465,7 @@ struct CompletionPopup: View {
         }
         .padding(.horizontal, 8)
         .frame(height: 36)
-        .background(isSelected ? Color.accentColor.opacity(0.18) : .clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(isSelected ? OMColors.accent.opacity(0.18) : .clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .contentShape(Rectangle())
     }
 

@@ -181,7 +181,7 @@ struct UserMessageEditor: View {
     var body: some View {
         ZStack(alignment: .top) {
             // 点击空白处关闭;轻微压暗,突出编辑卡片
-            Color.black.opacity(0.08)
+            OMColors.scrim.opacity(0.3)
                 .contentShape(Rectangle())
                 .onTapGesture(perform: onClose)
                 .accessibilityHidden(true)
@@ -234,7 +234,7 @@ struct UserMessageEditor: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .omGlass(in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .shadow(color: .black.opacity(0.12), radius: 18, y: 6)
+        .omFloatShadow()
     }
 
     /// 模型切换按钮(没有可切换的模型时不显示)。

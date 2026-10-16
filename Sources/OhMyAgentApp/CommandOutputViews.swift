@@ -23,7 +23,7 @@ struct ShellCommandText: View {
     var body: some View {
         let text = Text(failed ? AttributedString(command) : CodeHighlighter.attributed(command, language: .shell))
             .font(fontSize.map { OMFonts.custom($0, design: .monospaced) } ?? OMFonts.monoSmall)
-            .foregroundStyle(failed ? OMColors.danger : Color.primary)
+            .foregroundStyle(failed ? OMColors.danger : OMColors.primaryText)
             .lineLimit(lineLimit)
             .truncationMode(.middle)
         if selectable { text.textSelection(.enabled) } else { text }
@@ -97,7 +97,7 @@ struct CollapsibleOutput: View {
         }
         .overlay(alignment: .bottom) {
             if !expanded, contentHeight > Self.collapsedHeight {
-                LinearGradient(colors: [.clear, Color(nsColor: .windowBackgroundColor).opacity(0.55)], startPoint: .top, endPoint: .bottom)
+                LinearGradient(colors: [.clear, OMColors.card.opacity(0.55)], startPoint: .top, endPoint: .bottom)
                     .frame(height: 22)
                     .allowsHitTesting(false)
             }

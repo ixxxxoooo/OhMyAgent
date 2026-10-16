@@ -249,7 +249,7 @@ private struct NavRow: View {
             .padding(.horizontal, 10)
             .frame(height: 30)
             .contentShape(Rectangle())
-            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(hovering ? Color.primary.opacity(0.07) : .clear))
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(hovering ? OMColors.hoverFill : .clear))
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
@@ -347,7 +347,7 @@ private struct ProjectGroup: View {
         }
         .padding(.horizontal, 8)
         .frame(height: 30)
-        .background(hovering ? Color.primary.opacity(0.06) : Color.clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(hovering ? OMColors.hoverFill : Color.clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .transaction { $0.animation = nil }
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
@@ -430,7 +430,7 @@ private struct SessionLine: View {
                 .font(OMFonts.small)
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
-                .foregroundStyle(isArchived ? OMColors.tertiaryText : Color.primary)
+                .foregroundStyle(isArchived ? OMColors.tertiaryText : OMColors.primaryText)
                 .flowingText(item.isRunning)
                 // minWidth: 0 允许收缩到小于文字自然宽度(否则长标题会把整行撑出侧栏)
                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
@@ -449,7 +449,7 @@ private struct SessionLine: View {
         .frame(height: 30)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(isSelected ? OMColors.accent.opacity(0.14) : (hovering ? Color.primary.opacity(0.06) : Color.clear))
+                .fill(isSelected ? OMColors.accent.opacity(0.14) : (hovering ? OMColors.hoverFill : Color.clear))
         )
         // 悬停时背景上扫过一条高光(流动效果);平时不创建动画视图
         .background { if hovering { FlowSweep() } }
@@ -540,11 +540,11 @@ private struct SessionStatusDot: View {
         case .running:
             ProgressView().controlSize(.mini).scaleEffect(0.7).frame(width: 10, height: 10).accessibilityLabel("运行中")
         case .needsInput:
-            dot(.orange, blink: true).accessibilityLabel("等待处理")
+            dot(OMColors.statusWaiting, blink: true).accessibilityLabel("等待处理")
         case .unreadDone:
-            dot(.green, blink: false).accessibilityLabel("已完成,未读")
+            dot(OMColors.statusUnread, blink: false).accessibilityLabel("已完成,未读")
         case .idle:
-            dot(Color.secondary.opacity(0.45), blink: false)
+            dot(OMColors.statusIdle, blink: false)
         }
     }
 
@@ -572,9 +572,9 @@ struct AttentionDot: View {
         case .unreadDone:
             Circle().fill(OMColors.success).frame(width: 8, height: 8).accessibilityLabel("已完成,未读")
         case .running:
-            blinking(.blue).accessibilityLabel("运行中")
+            blinking(OMColors.statusRunning).accessibilityLabel("运行中")
         case .needsInput:
-            blinking(.orange).accessibilityLabel("等待处理")
+            blinking(OMColors.statusWaiting).accessibilityLabel("等待处理")
         }
     }
 

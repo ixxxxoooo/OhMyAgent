@@ -189,7 +189,7 @@ struct HubOverlay: View {
     var body: some View {
         if hub.isPresented {
             ZStack(alignment: .top) {
-                Color.black.opacity(0.12)
+                OMColors.scrim
                     .contentShape(Rectangle())
                     .onTapGesture { hub.dismiss() }
                     .accessibilityHidden(true)
@@ -213,7 +213,7 @@ struct HubOverlay: View {
         .frame(width: 720)
         .background(OMColors.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(OMColors.hairline))
-        .shadow(color: .black.opacity(0.22), radius: 28, y: 10)
+        .omFloatShadow()
         .onAppear { focused = true }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("搜索")
@@ -246,10 +246,10 @@ struct HubOverlay: View {
                 Button { hub.segment = item; focused = true } label: {
                     Text(item.title)
                         .font(OMFonts.small.weight(hub.segment == item ? .semibold : .regular))
-                        .foregroundStyle(hub.segment == item ? Color.primary : OMColors.secondaryText)
+                        .foregroundStyle(hub.segment == item ? OMColors.primaryText : OMColors.secondaryText)
                         .padding(.horizontal, 10)
                         .frame(height: 24)
-                        .background(hub.segment == item ? Color.primary.opacity(0.08) : .clear, in: Capsule())
+                        .background(hub.segment == item ? OMColors.pressedFill : .clear, in: Capsule())
                         .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
@@ -343,7 +343,7 @@ struct HubOverlay: View {
                 .font(OMFonts.caption.weight(.medium))
                 .padding(.horizontal, 5)
                 .frame(minWidth: 18, minHeight: 16)
-                .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 4))
+                .background(OMColors.hoverFill, in: RoundedRectangle(cornerRadius: 4))
             Text(label).font(OMFonts.caption)
         }
         .foregroundStyle(OMColors.secondaryText)
@@ -391,7 +391,7 @@ private struct HubRow: View {
         for index in 0..<item.title.count {
             let next = text.index(afterCharacter: cursor)
             if item.positions.contains(index) {
-                text[cursor..<next].font = .system(size: 13.5, weight: .bold)
+                text[cursor..<next].font = OMFonts.custom(13.5, weight: .bold)
                 text[cursor..<next].foregroundColor = OMColors.accent
             }
             cursor = next

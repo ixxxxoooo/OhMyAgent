@@ -122,8 +122,8 @@ private struct TabBarIconButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .foregroundStyle(hovering ? Color.primary : OMColors.secondaryText)
-            .background(Color.primary.opacity(hovering || configuration.isPressed ? 0.07 : 0), in: RoundedRectangle(cornerRadius: TabMetrics.radius, style: .continuous))
+            .foregroundStyle(hovering ? OMColors.primaryText : OMColors.secondaryText)
+            .background(OMColors.primaryText.opacity(hovering || configuration.isPressed ? 0.07 : 0), in: RoundedRectangle(cornerRadius: TabMetrics.radius, style: .continuous))
             .onHover { hovering = $0 }
     }
 }
@@ -153,10 +153,10 @@ struct TabItemView: View {
         }
         .padding(.horizontal, 8)
         .frame(height: TabMetrics.height)
-        .foregroundStyle(isActive ? Color.primary : OMColors.secondaryText)
+        .foregroundStyle(isActive ? OMColors.primaryText : OMColors.secondaryText)
         .background(
             RoundedRectangle(cornerRadius: TabMetrics.radius, style: .continuous)
-                .fill(isActive ? Color.primary.opacity(0.07) : (hovering ? Color.primary.opacity(0.045) : Color.clear))
+                .fill(isActive ? OMColors.hoverFill : (hovering ? OMColors.subtleFill : Color.clear))
         )
         .contentShape(RoundedRectangle(cornerRadius: TabMetrics.radius, style: .continuous))
         .transaction { $0.animation = nil }
@@ -192,7 +192,7 @@ struct TabItemView: View {
                 .opacity(isActive ? 1 : 0.75)
         } else {
             Image.om(tabIcon(tab.kind), size: 12)
-                .foregroundStyle(isActive ? Color.primary : OMColors.tertiaryText)
+                .foregroundStyle(isActive ? OMColors.primaryText : OMColors.tertiaryText)
         }
     }
 
@@ -371,7 +371,7 @@ private struct TabOverflowRow: View {
                             .font(OMFonts.caption.monospacedDigit())
                             .foregroundStyle(OMColors.secondaryText)
                             .padding(.horizontal, 4)
-                            .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 3))
+                            .background(OMColors.hoverFill, in: RoundedRectangle(cornerRadius: 3))
                     }
                     if item.tab.isDirty { Circle().fill(OMColors.warning).frame(width: 6, height: 6).help("有未保存修改") }
                     if case .chat = item.tab.kind, let uid = workbench.session(forTab: item.tab)?.uid {

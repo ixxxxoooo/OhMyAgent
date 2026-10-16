@@ -140,7 +140,7 @@ private struct HitRow: View {
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 10).padding(.vertical, 2)
-            .background(hovering ? Color.primary.opacity(0.06) : .clear)
+            .background(hovering ? OMColors.hoverFill : .clear)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

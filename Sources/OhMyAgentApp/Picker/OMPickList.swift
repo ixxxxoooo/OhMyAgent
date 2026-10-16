@@ -121,7 +121,7 @@ struct PickListContent<Item: PickListItem, Row: View>: View {
         }
         .padding(.horizontal, 8)
         .frame(minHeight: 28)
-        .background(highlighted ? Color.primary.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .background(highlighted ? OMColors.pressedFill : Color.clear, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
         .padding(.horizontal, 4)
         .opacity(item.isEnabled ? 1 : 0.45)
         .contentShape(Rectangle())

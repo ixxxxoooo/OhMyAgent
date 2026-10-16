@@ -26,6 +26,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.syncVisibility() }
         }
+        // 主题切换:托盘状态点颜色随主题重绘
+        NotificationCenter.default.addObserver(forName: ThemeRuntime.didChange, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refresh() }
+        }
         syncVisibility()
     }
 
@@ -104,9 +108,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     static func dotColor(_ indicator: TrayIndicator) -> NSColor? {
         switch indicator {
         case .none: return nil
-        case .running: return .systemBlue
-        case .needsInput: return .systemOrange
-        case .unread: return .systemGreen
+        case .running: return NSColor(OMColors.statusRunning)
+        case .needsInput: return NSColor(OMColors.statusWaiting)
+        case .unread: return NSColor(OMColors.statusUnread)
         }
     }
 
@@ -114,7 +118,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     /// 不依赖绘制闭包里的动态颜色解析(状态栏按钮中不稳定),而是显式传入明暗。
     static func icon(indicator: TrayIndicator, dotVisible: Bool, dark: Bool) -> NSImage {
         let size = NSSize(width: 18, height: 18)
-        let ink: NSColor = dark ? .white : NSColor(white: 0.1, alpha: 1)
+        let ink: NSColor = dark ? NSColor(OMColors.onAccent) : NSColor(OMColors.maskInk).withAlphaComponent(0.9) // ui-lint:allow 菜单栏前景由系统菜单栏明暗决定
         let image = NSImage(size: size, flipped: false) { rect in
             ink.setFill()
             starPath(center: NSPoint(x: 8.2, y: 9.8), radius: 7.2).fill()
@@ -122,7 +126,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             if let color = dotColor(indicator), dotVisible {
                 let dotRect = NSRect(x: rect.maxX - 8.2, y: 0.4, width: 7.4, height: 7.4)
                 // 点外围留一圈细描边,在深浅菜单栏上都清晰
-                (dark ? NSColor(white: 0, alpha: 0.55) : NSColor(white: 1, alpha: 0.7)).setFill()
+                (dark ? NSColor(OMColors.maskInk).withAlphaComponent(0.55) : NSColor(OMColors.onAccent).withAlphaComponent(0.7)).setFill()
                 NSBezierPath(ovalIn: dotRect.insetBy(dx: -0.9, dy: -0.9)).fill()
                 color.setFill()
                 NSBezierPath(ovalIn: dotRect).fill()

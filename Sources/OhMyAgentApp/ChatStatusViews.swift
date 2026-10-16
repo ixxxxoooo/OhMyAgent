@@ -25,7 +25,7 @@ struct GoalChip: View {
                     .font(OMFonts.caption)
                     .foregroundStyle(OMColors.secondaryText)
                     .padding(.horizontal, 5)
-                    .background(Capsule().fill(Color.primary.opacity(0.08)))
+                    .background(Capsule().fill(OMColors.pressedFill))
                 Spacer(minLength: 4)
                 Button { model.clearGoal() } label: {
                     Image.om("x", size: 11).foregroundStyle(OMColors.secondaryText)
