@@ -1736,3 +1736,15 @@
 "日期" = "Date";
 "OpenCode 深色" = "OpenCode Dark";
 "OpenCode 浅色" = "OpenCode Light";
+"自动(默认)" = "Automatic (default)";
+"始终按需加载" = "Always load on demand";
+"启动时全部加载" = "Load all at startup";
+"上下文优化" = "Context optimization";
+"MCP 工具按需加载" = "MCP tool on-demand loading";
+"MCP 工具定义占用了约 %lld%% 的上下文。可在「高级」里开启 MCP 工具按需加载,或停用不常用的 MCP 服务器。" = "MCP tool definitions take about %lld%% of the context. Enable on-demand MCP tool loading in Advanced, or disable MCP servers you rarely use.";
+"去设置" = "Open settings";
+"打开高级设置" = "Open advanced settings";
+"上下文已用 %lld%%,建议输入 /compact 压缩,或开启新会话。" = "Context is %lld%% used. Run /compact or start a new session.";
+"开启后 MCP 工具定义不再启动即全部载入上下文,而是由模型按需搜索加载,MCP 较多时能明显降低初始占用。「自动」沿用 Claude Code 默认:直连官方 API 且 MCP 工具超过窗口 10% 时才启用。" = "When on, MCP tool definitions are no longer all loaded into the context at startup; the model searches and loads them on demand, which sharply cuts the initial footprint when you have many MCP servers. \"Automatic\" keeps Claude Code's default: enabled only on the official API when MCP tools exceed 10% of the window.";
+"经第三方网关或模型映射使用时,网关必须支持 tool_reference 内容块,否则请求可能报错;遇到问题请改回「自动」。" = "When used through a third-party gateway or model mapping, the gateway must support tool_reference content blocks or requests may fail; switch back to \"Automatic\" if you hit problems.";
+"对新建或恢复的会话生效。对应环境变量 ENABLE_TOOL_SEARCH。" = "Applies to new or resumed sessions. Maps to the ENABLE_TOOL_SEARCH environment variable.";

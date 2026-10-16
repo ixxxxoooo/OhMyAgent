@@ -27,6 +27,7 @@ struct ContextUsagePanel: View {
             header
             if let usage = display {
                 ContextUsageBody(usage: usage)
+                hintRows(for: usage)
                 footnotes(isSynthetic: isSynthetic)
             } else {
                 Text(model.isProbingContext ? LocalizedStringKey("正在读取上下文明细…") : LocalizedStringKey("该 Agent 暂未上报上下文用量,发送消息后将显示。"))
@@ -64,6 +65,39 @@ struct ContextUsagePanel: View {
             .buttonStyle(.plain)
             .help("关闭")
             .accessibilityLabel("关闭")
+        }
+    }
+
+    /// 优化建议:MCP 工具定义占用偏高时提示开启按需加载;接近上限时提示压缩。
+    @ViewBuilder
+    private func hintRows(for usage: ContextUsage) -> some View {
+        let hints = ContextAdvisor.hints(for: usage)
+        if !hints.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(hints, id: \.self) { hint in
+                    switch hint {
+                    case .mcpHeavy(let percent):
+                        HStack(alignment: .top, spacing: 6) {
+                            Image.om("sparkles", size: 12).foregroundStyle(OMColors.accent).padding(.top, 1)
+                            Text("MCP 工具定义占用了约 \(percent)% 的上下文。可在「高级」里开启 MCP 工具按需加载,或停用不常用的 MCP 服务器。")
+                                .font(OMFonts.caption).foregroundStyle(OMColors.secondaryText).fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: 4)
+                            Button("去设置") { AppActions.shared.openSettings(page: .advanced) }
+                                .buttonStyle(.plain).font(OMFonts.caption).foregroundStyle(OMColors.accent)
+                                .accessibilityLabel(String(localized: "打开高级设置"))
+                        }
+                    case .nearFull(let percent):
+                        HStack(alignment: .top, spacing: 6) {
+                            Image.om("triangle-alert", size: 12).foregroundStyle(OMColors.warning).padding(.top, 1)
+                            Text("上下文已用 \(percent)%,建议输入 /compact 压缩,或开启新会话。")
+                                .font(OMFonts.caption).foregroundStyle(OMColors.secondaryText).fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            }
+            .padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(OMColors.accent.opacity(0.07), in: RoundedRectangle(cornerRadius: OMMetrics.controlRadius, style: .continuous))
         }
     }
 

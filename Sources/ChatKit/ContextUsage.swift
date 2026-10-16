@@ -176,3 +176,32 @@ public enum ContextUsageParser {
         return (used, size)
     }
 }
+
+/// 上下文优化建议。
+public enum ContextHint: Sendable, Hashable {
+    /// MCP 工具定义占用窗口的比例(百分比,四舍五入)偏高,可开启按需加载或停用不常用服务器
+    case mcpHeavy(percent: Int)
+    /// 总占用接近上限,建议压缩或开新会话
+    case nearFull(percent: Int)
+}
+
+/// 上下文优化建议生成(纯逻辑)。
+public enum ContextAdvisor {
+    /// MCP 工具占比超过该值(窗口的 10%,与 Claude Code 自动启用工具搜索的阈值一致)时给出建议
+    public static let mcpThreshold = 0.10
+
+    /// 按分类明细给出优化建议。
+    /// - Parameter usage: 上下文用量明细
+    /// - Returns: 建议列表(可能为空),按重要性排序
+    public static func hints(for usage: ContextUsage) -> [ContextHint] {
+        guard usage.maxTokens > 0 else { return [] }
+        var result: [ContextHint] = []
+        let mcpTokens = usage.categories
+            .filter { $0.kind == .used && $0.name.lowercased().contains("mcp") }
+            .reduce(0) { $0 + $1.tokens }
+        let mcpFraction = Double(mcpTokens) / Double(usage.maxTokens)
+        if mcpFraction > mcpThreshold { result.append(.mcpHeavy(percent: Int((mcpFraction * 100).rounded()))) }
+        if usage.fraction >= ContextTone.warnFraction { result.append(.nearFull(percent: usage.percent)) }
+        return result
+    }
+}

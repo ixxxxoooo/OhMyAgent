@@ -95,6 +95,39 @@ public enum ChatWidth: String, Sendable, CaseIterable, Identifiable {
     }
 }
 
+/// MCP 工具按需加载模式(对应 Claude Code 的 `ENABLE_TOOL_SEARCH`)。
+///
+/// 开启后 MCP 工具定义不再一次性塞进上下文,而是由模型按需搜索加载,可显著降低启动占用。
+/// Claude Code 默认只在直连官方 API 且 MCP 工具超过窗口 10% 时才自动启用;经第三方网关(自定义 `ANTHROPIC_BASE_URL`)时默认关闭。
+public enum McpToolSearch: String, Sendable, CaseIterable, Identifiable {
+    /// 保持 Claude Code 默认行为(不注入变量)
+    case auto
+    /// 强制开启(`ENABLE_TOOL_SEARCH=true`):第三方网关需支持 tool_reference,否则可能报错
+    case on
+    /// 强制关闭(`ENABLE_TOOL_SEARCH=false`):所有 MCP 工具定义启动即加载
+    case off
+
+    public var id: String { rawValue }
+
+    /// 注入进程的环境变量值;`auto` 不注入。
+    public var environmentValue: String? {
+        switch self {
+        case .auto: return nil
+        case .on: return "true"
+        case .off: return "false"
+        }
+    }
+
+    /// 设置页显示名。
+    public var displayName: String {
+        switch self {
+        case .auto: return String(localized: "自动(默认)")
+        case .on: return String(localized: "始终按需加载")
+        case .off: return String(localized: "启动时全部加载")
+        }
+    }
+}
+
 /// 设置页内容宽度档位(所有设置页统一使用,外观页可配置)。`custom` 使用 `settings.widthCustom`(点数)。
 public enum SettingsContentWidth: String, Sendable, CaseIterable, Identifiable {
     case compact, standard, wide, full, custom
@@ -158,6 +191,8 @@ public struct SessionOptions: Equatable, Sendable {
     public var appendPrompt = ""
     /// 是否加载 CLAUDE.md(记忆文件)
     public var loadClaudeMemory = true
+    /// MCP 工具按需加载模式
+    public var mcpToolSearch = McpToolSearch.auto
 
     public init() {}
 
@@ -169,6 +204,7 @@ public struct SessionOptions: Equatable, Sendable {
         timeoutSeconds = max(defaults.integer(forKey: ClientPrefs.Key.requestTimeout), 0)
         appendPrompt = defaults.string(forKey: ClientPrefs.Key.appendPrompt) ?? ""
         loadClaudeMemory = defaults.object(forKey: ClientPrefs.Key.loadClaudeMemory) as? Bool ?? true
+        mcpToolSearch = McpToolSearch(rawValue: defaults.string(forKey: ClientPrefs.Key.mcpToolSearch) ?? "") ?? .auto
     }
 
     /// 规范化后的代理 URL;模式为 `system`/`off` 或地址无效时返回 nil。
@@ -201,6 +237,7 @@ public struct SessionOptions: Equatable, Sendable {
         }
         if timeoutSeconds > 0 { env["API_TIMEOUT_MS"] = String(timeoutSeconds * 1000) }
         if !loadClaudeMemory { env["CLAUDE_CODE_DISABLE_CLAUDE_MDS"] = "1" }
+        if let value = mcpToolSearch.environmentValue { env["ENABLE_TOOL_SEARCH"] = value }
         return env
     }
 

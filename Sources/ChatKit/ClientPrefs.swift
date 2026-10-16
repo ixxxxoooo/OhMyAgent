@@ -39,6 +39,8 @@ public enum ClientPrefs {
         public static let chatWidth = "chat.width"
         /// 自定义聊天宽度(点),`chat.width == custom` 时生效
         public static let chatWidthCustom = "chat.widthCustom"
+        /// MCP 工具按需加载(Claude Code 的 ENABLE_TOOL_SEARCH):auto / on / off
+        public static let mcpToolSearch = "mcp.toolSearch"
         /// 设置页内容宽度档位(compact/standard/wide/full/custom)
         public static let settingsWidth = "settings.width"
         /// 自定义设置页宽度(点),`settings.width == custom` 时生效

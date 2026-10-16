@@ -47,6 +47,7 @@ struct AdvancedPage: View {
     @AppStorage(ClientPrefs.Key.featureFileSystem) private var fileSystem = false
     @AppStorage(ClientPrefs.Key.featureTerminal) private var terminal = false
     @AppStorage(ClientPrefs.Key.featureElicitation) private var elicitation = true
+    @AppStorage(ClientPrefs.Key.mcpToolSearch) private var mcpToolSearch = McpToolSearch.auto.rawValue
     @State private var tools: LocatedTools?
     @State private var envText = ""
     @State private var envDirty = false
@@ -64,6 +65,17 @@ struct AdvancedPage: View {
                     if let version = tools?.nodeVersion { Text("node \(version)").font(OMFonts.small).foregroundStyle(OMColors.secondaryText) }
                 }
                 Note("修改后对新建会话生效;已打开的会话保持原有进程。")
+            }
+            Section("上下文优化") {
+                Picker("MCP 工具按需加载", selection: $mcpToolSearch) {
+                    ForEach(McpToolSearch.allCases) { mode in Text(mode.displayName).tag(mode.rawValue) }
+                }
+                Note("开启后 MCP 工具定义不再启动即全部载入上下文,而是由模型按需搜索加载,MCP 较多时能明显降低初始占用。「自动」沿用 Claude Code 默认:直连官方 API 且 MCP 工具超过窗口 10% 时才启用。")
+                if mcpToolSearch == McpToolSearch.on.rawValue {
+                    Label("经第三方网关或模型映射使用时,网关必须支持 tool_reference 内容块,否则请求可能报错;遇到问题请改回「自动」。", om: "triangle-alert")
+                        .font(OMFonts.caption).foregroundStyle(OMColors.warning)
+                }
+                Note("对新建或恢复的会话生效。对应环境变量 ENABLE_TOOL_SEARCH。")
             }
             Section("MCP 运行参数") {
                 ScopeHeader(model: model)

@@ -45,3 +45,56 @@ struct AgentNotifyTests {
         #expect(!TurnEndHeuristics.looksTruncated(isClaude: false, reason: .endTurn, lastKind: nil))
     }
 }
+
+@Suite("上下文优化建议与 MCP 按需加载")
+struct ContextAdvisorTests {
+    private func usage(mcp: Int, total: Int, max: Int = 200_000) -> ContextUsage {
+        ContextUsage(totalTokens: total, maxTokens: max, categories: [
+            ContextCategory(name: "System prompt", tokens: 2_000, kind: .used),
+            ContextCategory(name: "MCP tools", tokens: mcp, kind: .used),
+            ContextCategory(name: "Free space", tokens: max - total, kind: .free),
+        ])
+    }
+
+    @Test("MCP 工具占比超过窗口 10% 才给出建议")
+    func mcpThreshold() {
+        #expect(ContextAdvisor.hints(for: usage(mcp: 25_000, total: 30_000)) == [.mcpHeavy(percent: 13)])
+        #expect(ContextAdvisor.hints(for: usage(mcp: 20_000, total: 30_000)).isEmpty)   // 恰好 10% 不触发
+        #expect(ContextAdvisor.hints(for: usage(mcp: 5_000, total: 30_000)).isEmpty)
+    }
+
+    @Test("总占用接近上限时提示压缩;窗口无效时无建议")
+    func nearFull() {
+        #expect(ContextAdvisor.hints(for: usage(mcp: 0, total: 170_000)) == [.nearFull(percent: 85)])
+        #expect(ContextAdvisor.hints(for: ContextUsage(totalTokens: 10, maxTokens: 0)).isEmpty)
+    }
+
+    @Test("MCP 按需加载:auto 不注入,on/off 注入 ENABLE_TOOL_SEARCH")
+    func toolSearchEnvironment() {
+        var options = SessionOptions()
+        #expect(options.environment["ENABLE_TOOL_SEARCH"] == nil)
+        options.mcpToolSearch = .on
+        #expect(options.environment["ENABLE_TOOL_SEARCH"] == "true")
+        options.mcpToolSearch = .off
+        #expect(options.environment["ENABLE_TOOL_SEARCH"] == "false")
+        #expect(!options.isDefault)
+    }
+
+    @Test("提供商已显式设置的 ENABLE_TOOL_SEARCH 优先于客户端偏好")
+    func providerWins() throws {
+        var options = SessionOptions()
+        options.mcpToolSearch = .on
+        let base: JSONValue = ["claudeCode": ["options": ["env": ["ENABLE_TOOL_SEARCH": "false"]]]]
+        let merged = try #require(options.merged(into: base))
+        #expect(merged["claudeCode"]?["options"]?["env"]?["ENABLE_TOOL_SEARCH"]?.stringValue == "false")
+    }
+
+    @Test("从偏好读取:未知值回退自动")
+    func fromDefaults() throws {
+        let suite = try #require(UserDefaults(suiteName: "oma-test-\(UUID().uuidString)"))
+        suite.set("on", forKey: ClientPrefs.Key.mcpToolSearch)
+        #expect(SessionOptions(defaults: suite).mcpToolSearch == .on)
+        suite.set("乱写", forKey: ClientPrefs.Key.mcpToolSearch)
+        #expect(SessionOptions(defaults: suite).mcpToolSearch == .auto)
+    }
+}
