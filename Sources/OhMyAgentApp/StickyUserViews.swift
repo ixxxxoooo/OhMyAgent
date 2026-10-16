@@ -151,7 +151,11 @@ struct UserMessageEditor: View {
     let onClose: () -> Void
     @State private var text: String
     @State private var modelPickerShown = false
-    @FocusState private var focused: Bool
+    /// 文本区高度:随内容增长(最小一行,超过 `maxEditorHeight` 才滚动)
+    @State private var editorHeight: CGFloat = 34
+    /// 编辑区最大高度
+    private let maxEditorHeight: CGFloat = 320
+    @State private var controller = ComposerController()
 
     init(model: SessionModel, entry: TimelineEntry, maxWidth: CGFloat, onClose: @escaping () -> Void) {
         self.model = model
@@ -159,6 +163,15 @@ struct UserMessageEditor: View {
         self.maxWidth = maxWidth
         self.onClose = onClose
         _text = State(initialValue: entry.text)
+    }
+
+    /// 作为新消息重新发送(原消息与回复保留)。
+    private func resend() {
+        guard canResend else { return }
+        let images = entry.attachments
+        let prompt = text
+        onClose()
+        model.send(prompt, images: images)
     }
 
     private var canResend: Bool {
@@ -180,7 +193,7 @@ struct UserMessageEditor: View {
         }
         .transition(.opacity)
         .onExitCommand(perform: onClose)
-        .onAppear { focused = true }
+        .onAppear { controller.focus() }
     }
 
     private var card: some View {
@@ -190,11 +203,12 @@ struct UserMessageEditor: View {
                     HStack(spacing: 8) { ForEach(entry.attachments) { AttachmentThumbnail(attachment: $0, size: 56) } }
                 }
             }
-            TextEditor(text: $text)
-                .font(OMFonts.reading)
-                .scrollContentBackground(.hidden)
-                .focused($focused)
-                .frame(minHeight: 120, maxHeight: 320)
+            // 与底部输入框同一套文本视图:高度随内容自适应,不再固定
+            ComposerTextView(
+                text: $text, height: $editorHeight, placeholder: "", maxHeight: maxEditorHeight,
+                onSubmit: resend, onEscape: onClose, controller: controller
+            )
+            .frame(height: editorHeight)
             if model.isRunning {
                 Text("回合进行中,结束后才能重新发送。").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
             }
@@ -206,12 +220,7 @@ struct UserMessageEditor: View {
                     .font(OMFonts.small)
                     .foregroundStyle(OMColors.secondaryText)
                     .keyboardShortcut(.cancelAction)
-                Button {
-                    let images = entry.attachments
-                    let prompt = text
-                    onClose()
-                    model.send(prompt, images: images)
-                } label: {
+                Button(action: resend) {
                     Image.om("arrow.up", size: 12, weight: .bold).frame(width: 26, height: 26)
                 }
                 .buttonStyle(.glassProminent)

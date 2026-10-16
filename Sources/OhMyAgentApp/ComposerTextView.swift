@@ -15,6 +15,15 @@ enum CompletionKey { case up, down, accept, dismiss }
 final class ComposerController {
     weak var textView: SubmitTextView?
 
+    /// 让文本视图成为第一响应者(视图刚出现时文本视图可能还没挂上窗口,稍等一帧再试)。
+    func focus() {
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(50))
+            guard let textView = self?.textView else { return }
+            textView.window?.makeFirstResponder(textView)
+        }
+    }
+
     /// 在当前选区处插入文本(与前一个字符粘连时自动补一个空格),光标落在插入内容之后。
     /// - Parameter string: 要插入的文本
     func insertAtSelection(_ string: String) {
