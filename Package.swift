@@ -36,6 +36,8 @@ let package = Package(
         .target(name: "GitKit", dependencies: ["DiffKit", "OMLog"]),
         // LSP 客户端:Content-Length 分帧、客户端 actor、服务器定位与管理(复用 ACPKit 的 JSON-RPC 连接,无 UI)
         .target(name: "LSPKit", dependencies: ["ACPKit", "OMLog"]),
+        // 演示模式数据:确定性生成演示项目、Git 仓库、历史会话与演示用 Claude 配置(无视图)
+        .target(name: "DemoKit", dependencies: ["OMLog"]),
         // Liquid Glass 设计系统
         .target(name: "DesignSystem", dependencies: ["IconKit"]),
         // 聊天核心:时间线模型、事件合并、Markdown 解析、会话模型(不含视图)
@@ -45,7 +47,7 @@ let package = Package(
         // 应用本体
         .executableTarget(
             name: "OhMyAgentApp",
-            dependencies: ["ACPKit", "AgentHost", "ChatKit", "ClaudeConfigKit", "DiffKit", "EditorKit", "DesignSystem", "IconKit", "MermaidKit", "GitKit", "LSPKit", "OMLog", "WorkbenchKit",
+            dependencies: ["ACPKit", "AgentHost", "ChatKit", "ClaudeConfigKit", "DiffKit", "EditorKit", "DesignSystem", "IconKit", "MermaidKit", "GitKit", "LSPKit", "DemoKit", "OMLog", "WorkbenchKit",
                            .product(name: "SwiftTerm", package: "SwiftTerm")]
         ),
         // 脚本化 ACP Agent,用于测试与预览
@@ -61,6 +63,7 @@ let package = Package(
         .testTarget(name: "AgentHostTests", dependencies: ["AgentHost", "ACPKit", "FakeAgent"]),
         .testTarget(name: "ChatKitTests", dependencies: ["ChatKit", "ACPKit", "AgentHost", "FakeAgent"]),
         .testTarget(name: "ClaudeConfigKitTests", dependencies: ["ClaudeConfigKit"]),
+        .testTarget(name: "DemoKitTests", dependencies: ["DemoKit", "GitKit", "ClaudeConfigKit"]),
         .testTarget(name: "DiffKitTests", dependencies: ["DiffKit"]),
         .testTarget(name: "GitKitTests", dependencies: ["GitKit", "DiffKit"]),
         .testTarget(name: "IconKitTests", dependencies: ["IconKit"]),
