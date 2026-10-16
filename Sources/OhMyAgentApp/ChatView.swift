@@ -20,51 +20,67 @@ struct ChatView: View {
 
     private var contentMaxWidth: CGFloat { (ChatWidth(rawValue: chatWidth) ?? .standard).points }
 
+    /// 新会话(时间线为空):输入区居中显示,对齐 kuku/Cursor 的新对话首屏。
+    private var isEmptySession: Bool { model.timeline.entries.isEmpty }
+
     var body: some View {
         ZStack {
             OMColors.surface.ignoresSafeArea()
-            timeline
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(spacing: 8) {
-                ForEach(model.pendingPermissions) { prompt in
-                    PermissionCard(prompt: prompt) { optionId in
-                        model.resolve(prompt, optionId: optionId)
-                    }
+            // 输入区在两种布局下处于同一结构位置,发送首条消息时不会被重建(保留焦点与草稿)
+            VStack(spacing: 0) {
+                if isEmptySession {
+                    Spacer(minLength: 0)
+                    EmptyStateView(model: model)
+                        .padding(.bottom, 28)
+                } else {
+                    timeline
                 }
-                // 提问按队列逐个呈现(先到先答),其余以「还有 N 个待回答」提示
-                if let prompt = model.pendingElicitations.first {
-                    ElicitationCard(prompt: prompt, queued: model.pendingElicitations.count - 1) { model.dismiss(prompt) }
-                        .id(prompt.id)
+                composerStack
+                if isEmptySession {
+                    Spacer(minLength: 0)
+                    // 视觉重心略微上移(对齐 kuku 的 pb-20)
+                    Color.clear.frame(height: 72)
                 }
-                if case .failed(let message) = model.phase {
-                    ConnectionFailureCard(message: message) { model.reconnect() }
-                }
-                PlanDock(model: model)
-                GoalChip(model: model)
-                if usageOpen {
-                    ContextUsagePanel(model: model) { omWithAnimation { usageOpen = false } }
-                        .transition(.opacity.combined(with: .offset(y: 6)))
-                }
-                ComposerDockView(model: model, workbench: AppEnvironment.shared.workbench)
-                ComposerView(model: model)
-                ComposerFooter(model: model, usageOpen: $usageOpen)
             }
-            .frame(maxWidth: contentMaxWidth)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 12)
-            .frame(maxWidth: .infinity)
         }
         .task(id: ObjectIdentifier(model)) { ChatBindings.bind(model) }
+    }
+
+    /// 底部(新会话时居中)的输入区栈:权限/提问/连接失败卡、计划与目标、用量面板、输入框与页脚。
+    private var composerStack: some View {
+        VStack(spacing: 8) {
+            ForEach(model.pendingPermissions) { prompt in
+                PermissionCard(prompt: prompt) { optionId in
+                    model.resolve(prompt, optionId: optionId)
+                }
+            }
+            // 提问按队列逐个呈现(先到先答),其余以「还有 N 个待回答」提示
+            if let prompt = model.pendingElicitations.first {
+                ElicitationCard(prompt: prompt, queued: model.pendingElicitations.count - 1) { model.dismiss(prompt) }
+                    .id(prompt.id)
+            }
+            if case .failed(let message) = model.phase {
+                ConnectionFailureCard(message: message) { model.reconnect() }
+            }
+            PlanDock(model: model)
+            GoalChip(model: model)
+            if usageOpen {
+                ContextUsagePanel(model: model) { omWithAnimation { usageOpen = false } }
+                    .transition(.opacity.combined(with: .offset(y: 6)))
+            }
+            ComposerDockView(model: model, workbench: AppEnvironment.shared.workbench)
+            ComposerView(model: model)
+            ComposerFooter(model: model, usageOpen: $usageOpen)
+        }
+        .frame(maxWidth: contentMaxWidth)
+        .padding(.horizontal, 16)
+        .padding(.bottom, isEmptySession ? 0 : 12)
+        .frame(maxWidth: .infinity)
     }
 
     private var timeline: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: AppearanceModel.shared.isCompact ? 7 : 14) {
-                if model.timeline.entries.isEmpty {
-                    EmptyStateView(model: model)
-                        .padding(.top, 80)
-                }
                 ForEach(TimelineGrouping.group(model.timeline.entries)) { item in
                     TimelineItemView(item: item)
                 }
