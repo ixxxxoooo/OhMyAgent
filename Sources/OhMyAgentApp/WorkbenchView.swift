@@ -58,8 +58,10 @@ struct WorkbenchView: View {
                         .navigationSplitViewColumnWidth(min: CGFloat(PanelMetrics.leftRange.lowerBound), ideal: CGFloat(workbench.layout.leftWidth), max: CGFloat(PanelMetrics.leftRange.upperBound))
                 } detail: {
                     CenterColumn(workbench: workbench)
+                        // 窗口标题仅保留给系统(Mission Control/辅助功能),界面上不再占一行:
+                        // 会话名已在标签栏显示,项目路径在侧栏与状态栏可见。
                         .navigationTitle(title)
-                        .navigationSubtitle(subtitle)
+                        .toolbar(removing: .title)
                         .toolbar { WorkbenchToolbar(workbench: workbench, switchAgent: switchAgent) }
                 }
                 .inspector(isPresented: $workbench.layout.rightVisible) {
@@ -88,10 +90,6 @@ struct WorkbenchView: View {
 
     private var title: String {
         workbench.activeSession?.sessionTitle ?? workbench.selectedProject?.name ?? "OhMyAgent"
-    }
-
-    private var subtitle: String {
-        workbench.selectedProject.map { ($0.id as NSString).abbreviatingWithTildeInPath } ?? ""
     }
 
     private var columnVisibility: Binding<NavigationSplitViewVisibility> {

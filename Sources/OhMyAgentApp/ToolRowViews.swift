@@ -258,14 +258,11 @@ struct ToolRowView: View {
 
     /// 默认展开:有 Diff、失败、运行中的终端、运行中的子 Agent。
     private func defaultExpanded(_ tool: ToolCall, _ p: ToolPresentation) -> Bool {
+        // 运行中(子 Agent、终端输出等)一律默认折叠,由用户自己展开;
+        // 只有失败(需要看到原因)与已产生的 Diff 结果默认可见。
         if DebugFlags.expandAll || tool.status == .failed { return true }
-        if entry.childStore != nil, !tool.status.isTerminal { return true }
         for content in tool.content {
-            switch content {
-            case .diff: return true
-            case .terminal(let id): if model.terminals[id]?.isRunning ?? false { return true }
-            default: continue
-            }
+            if case .diff = content { return true }
         }
         return false
     }
@@ -559,14 +556,14 @@ struct TimelineItemView: View {
     }
 }
 
-/// 连续浏览步骤的折叠分组:运行中展开,结束后自动折叠(失败时保持展开)。
+/// 连续浏览步骤的折叠分组:默认折叠(运行中也不自动展开),失败时展开以便查看原因。
 struct ExploreGroupView: View {
     let group: ExploreGroup
     @State private var expanded: Bool?
     @State private var hovering = false
 
     var body: some View {
-        let isExpanded = expanded ?? (DebugFlags.expandAll || group.isRunning || group.hasFailure)
+        let isExpanded = expanded ?? (DebugFlags.expandAll || group.hasFailure)
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 7) {
                 Image.om("text.magnifyingglass", size: 11.5)

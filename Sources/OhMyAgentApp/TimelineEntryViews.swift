@@ -119,15 +119,10 @@ struct AssistantMessageView: View {
     }
 }
 
-/// 思维面板:流式时展开并计时,结束后自动折叠。
+/// 思维面板:默认始终折叠(流式中也不自动展开),仅显示计时;是否展开完全由用户决定。
 struct ThoughtView: View {
     let entry: TimelineEntry
-    @State private var expanded: Bool
-
-    init(entry: TimelineEntry) {
-        self.entry = entry
-        _expanded = State(initialValue: entry.isStreaming)
-    }
+    @State private var expanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -157,9 +152,6 @@ struct ThoughtView: View {
                     .padding(.leading, 15)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-        }
-        .onChange(of: entry.isStreaming) { _, streaming in
-            if !streaming { omWithAnimation(.snappy(duration: 0.25)) { expanded = false } }
         }
     }
 }

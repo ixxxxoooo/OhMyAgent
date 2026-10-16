@@ -122,6 +122,7 @@ struct OhMyAgentApp: App {
             WorkbenchView(workbench: AppEnvironment.shared.workbench)
         }
         .defaultSize(width: 1280, height: 820)
+        .windowToolbarStyle(.unifiedCompact(showsTitle: false))
         .commands { WorkbenchCommands() }
     }
 }
