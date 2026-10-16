@@ -227,7 +227,7 @@ private struct SCMContent: View {
                     }
 
                 Button {
-                    Task { await model.generateCommitMessage() }
+                    Task { await model.generateCommitMessage(gateway: workbench.activeSession?.utilityGateway) }
                 } label: {
                     if model.isGeneratingCommitMessage {
                         ProgressView()
@@ -241,47 +241,55 @@ private struct SCMContent: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(model.isGeneratingCommitMessage || (model.status.changes.isEmpty && model.status.untrackedChanges.isEmpty))
-                .omTooltip("智能生成提交说明 (AI)", icon: "sparkles")
+                .omTooltip("根据改动与最近提交风格生成提交说明", icon: "sparkles")
             }
             .padding(8)
             .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(OMColors.hairline.opacity(0.6), lineWidth: 0.5))
 
-            HStack(spacing: 2) {
-                Button { requestCommit(push: false) } label: {
-                    HStack(spacing: 5) {
-                        Image.om("check", size: 12)
-                        Text(model.amend ? String(localized: "修补提交") : (model.status.stagedChanges.isEmpty ? String(localized: "Commit") : String(localized: "Commit (Staged)")))
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.omPrimary)
-                .controlSize(.small)
-                .disabled(!canCommit)
-                .keyboardShortcut(.return, modifiers: [.command])
-
-                Menu {
-                    Button("Commit & Push") { requestCommit(push: true) }
-                    Button(model.amend ? "取消修补" : "修补上一条提交 (Amend)") {
-                        Task { await model.setAmend(!model.amend) }
-                    }
-                    Button("暂存全部并提交") {
-                        Task {
-                            await model.stageAll()
-                            await model.commit(push: false)
+            if syncMode {
+                // 提交完成后(与 Cursor/VS Code 一致):主按钮变成「同步更改」,再点一次即拉取并推送到远端
+                syncChangesButton
+                Button("修补上一条提交") { Task { await model.setAmend(true) } }
+                    .buttonStyle(.omPlain)
+                    .disabled(model.busy != nil)
+            } else {
+                HStack(spacing: 2) {
+                    Button { requestCommit(push: false) } label: {
+                        HStack(spacing: 5) {
+                            Image.om("check", size: 12)
+                            Text(model.amend ? String(localized: "修补提交") : (model.status.stagedChanges.isEmpty ? String(localized: "Commit") : String(localized: "Commit (Staged)")))
                         }
+                        .frame(maxWidth: .infinity)
                     }
-                } label: {
-                    Image.om("chevron-down", size: 10)
-                        .frame(width: 22, height: 24)
-                        .contentShape(Rectangle())
+                    .buttonStyle(.omPrimary)
+                    .controlSize(.small)
+                    .disabled(!canCommit)
+                    .keyboardShortcut(.return, modifiers: [.command])
+
+                    Menu {
+                        Button("Commit & Push") { requestCommit(push: true) }
+                        Button(model.amend ? "取消修补" : "修补上一条提交 (Amend)") {
+                            Task { await model.setAmend(!model.amend) }
+                        }
+                        Button("暂存全部并提交") {
+                            Task {
+                                await model.stageAll()
+                                await model.commit(push: false)
+                            }
+                        }
+                    } label: {
+                        Image.om("chevron-down", size: 10)
+                            .frame(width: 22, height: 24)
+                            .contentShape(Rectangle())
+                    }
+                    .menuStyle(.borderlessButton)
+                    .menuIndicator(.hidden)
+                    .fixedSize()
+                    .background(canCommit ? OMColors.accent : OMColors.subtleFill)
+                    .foregroundStyle(canCommit ? OMColors.onAccent : OMColors.tertiaryText)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .fixedSize()
-                .background(canCommit ? OMColors.accent : OMColors.subtleFill)
-                .foregroundStyle(canCommit ? OMColors.onAccent : OMColors.tertiaryText)
-                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             }
             if model.amend, model.status.ahead == 0, model.status.upstream != nil {
                 Text("上一次提交已推送,修补后需要强制推送。").font(OMFonts.caption).foregroundStyle(OMColors.warning)
@@ -291,6 +299,41 @@ private struct SCMContent: View {
             }
         }
         .padding(10)
+    }
+
+    /// 没有可提交的内容、也不在修补提交时:有待同步的提交(或分支尚未发布)就进入「同步」模式。
+    private var syncMode: Bool {
+        guard model.committableCount == 0, !model.amend, model.status.conflicts.isEmpty,
+              model.commitMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              model.status.branch != nil else { return false }
+        if model.status.upstream != nil { return model.status.ahead > 0 || model.status.behind > 0 }
+        return model.branches.contains { $0.isRemote }
+    }
+
+    /// 「同步更改 ↓n ↑m」/「发布分支」主按钮。
+    private var syncChangesButton: some View {
+        let published = model.status.upstream != nil
+        return Button { Task { await model.sync() } } label: {
+            HStack(spacing: 6) {
+                if model.busy != nil {
+                    ProgressView().controlSize(.mini)
+                } else {
+                    Image.om(published ? "refresh-cw" : "arrow-up", size: 12)
+                }
+                Text(published ? String(localized: "同步更改") : String(localized: "发布分支"))
+                if published {
+                    HStack(spacing: 3) {
+                        if model.status.behind > 0 { Text("↓\(model.status.behind)") }
+                        if model.status.ahead > 0 { Text("↑\(model.status.ahead)") }
+                    }
+                    .font(OMFonts.caption)
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.omPrimary)
+        .disabled(model.busy != nil)
+        .help(published ? String(localized: "先拉取远端新提交,再推送本地提交") : String(localized: "把当前分支推送到远程并建立跟踪"))
     }
 
     /// 提交:没有暂存内容时先确认「将提交全部改动」,避免静默 `git add -A`。

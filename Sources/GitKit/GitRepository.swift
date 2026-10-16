@@ -120,11 +120,45 @@ public struct GitRepository: Sendable {
         return stats
     }
 
-    /// 获取当前未提交差异的统计摘要 (用于生成提交信息)
+    /// 获取当前未提交差异的统计摘要(用于生成提交说明的兜底)。
     public func rawDiffSummary() async throws -> String {
         let staged = (try? await git(["diff", "--cached", "--stat"]).text) ?? ""
         if !staged.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return staged }
         return (try? await git(["diff", "HEAD", "--stat"]).text) ?? ""
+    }
+
+    /// 收集生成提交说明所需的材料:待提交内容的补丁、文件清单与行数、最近提交的标题(用来学习风格)。
+    /// 有暂存内容时只看暂存区(与 `git commit` 一致),否则看相对 HEAD 的全部改动,并附上未跟踪文件的开头几行。
+    /// - Parameters:
+    ///   - untracked: 未跟踪文件(仅在没有暂存内容时纳入)
+    ///   - patchLimit: 补丁字符数上限(超出截断,避免把超大 diff 发给模型)
+    ///   - recentLimit: 取最近多少条提交标题
+    /// - Returns: 材料;读取失败的部分留空
+    public func commitMessageMaterial(untracked: [GitFileChange] = [], patchLimit: Int = 60_000, recentLimit: Int = 10) async -> CommitMessageMaterial {
+        let hasHead = (try? await git(["rev-parse", "--verify", "-q", "HEAD"])) != nil
+        var base: [String] = []
+        let stagedNames = (try? await git(["diff", "--cached", "--name-only"]).text) ?? ""
+        let useStaged = !stagedNames.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        if useStaged { base = ["diff", "--cached"] } else if hasHead { base = ["diff", "HEAD"] } else { base = ["diff", "--cached"] }
+        let common = ["--no-color", "--no-ext-diff"]
+        var patch = (try? await git(base + common + ["--unified=2"], timeout: 30).text) ?? ""
+        let nameStatus = (try? await git(base + common + ["--name-status"]).text) ?? ""
+        let numstat = (try? await git(base + common + ["--numstat"]).text) ?? ""
+        var extraFiles: [String] = []
+        if !useStaged {
+            for file in untracked.prefix(20) {
+                let url = root.appendingPathComponent(file.path)
+                guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+                      (attributes[.size] as? Int ?? 0) < 200_000,
+                      let data = try? Data(contentsOf: url), !Self.isBinary(data) else { continue }
+                let head = String(decoding: data, as: UTF8.self).split(separator: "\n", omittingEmptySubsequences: false).prefix(40)
+                patch += "\ndiff --git a/\(file.path) b/\(file.path)\nnew file mode 100644\n--- /dev/null\n+++ b/\(file.path)\n" + head.map { "+\($0)" }.joined(separator: "\n") + "\n"
+                extraFiles.append(file.path)
+            }
+        }
+        if patch.count > patchLimit { patch = String(patch.prefix(patchLimit)) }
+        let recent = ((try? await log(limit: recentLimit)) ?? []).map(\.subject)
+        return CommitMessageMaterial(patch: patch, nameStatus: nameStatus, numstat: numstat, untrackedPaths: extraFiles, recentSubjects: recent, usedStaged: useStaged)
     }
 
     // MARK: Diff

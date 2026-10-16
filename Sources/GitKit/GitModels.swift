@@ -195,3 +195,29 @@ public enum GitError: Error, Sendable, Equatable, LocalizedError {
         }
     }
 }
+
+
+/// 生成提交说明用的原材料(由 `GitRepository.commitMessageMaterial` 收集)。
+public struct CommitMessageMaterial: Sendable, Equatable {
+    /// 统一 diff 补丁(已按上限截断,含未跟踪文件的开头几行)
+    public var patch: String
+    /// `git diff --name-status` 输出(每行 `状态<TAB>路径`)
+    public var nameStatus: String
+    /// `git diff --numstat` 输出(每行 `新增<TAB>删除<TAB>路径`)
+    public var numstat: String
+    /// 以补丁形式附上的未跟踪文件
+    public var untrackedPaths: [String]
+    /// 最近提交的标题(新到旧)
+    public var recentSubjects: [String]
+    /// 是否只取了暂存区
+    public var usedStaged: Bool
+
+    public init(patch: String = "", nameStatus: String = "", numstat: String = "", untrackedPaths: [String] = [], recentSubjects: [String] = [], usedStaged: Bool = false) {
+        self.patch = patch
+        self.nameStatus = nameStatus
+        self.numstat = numstat
+        self.untrackedPaths = untrackedPaths
+        self.recentSubjects = recentSubjects
+        self.usedStaged = usedStaged
+    }
+}

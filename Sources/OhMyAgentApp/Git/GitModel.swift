@@ -188,54 +188,39 @@ final class GitModel {
         await refresh(full: true)
     }
 
-    /// 智能生成提交说明 (对标 Cursor Sparkle 按钮)
-    func generateCommitMessage() async {
+    /// 智能生成提交说明(对标 Cursor 的 Sparkle 按钮):
+    /// 收集待提交补丁、文件清单与最近提交的标题,优先交给小模型生成「标题 + 要点」;
+    /// 没有可用网关或请求失败时,退回基于补丁内容的启发式。
+    /// - Parameter gateway: 本机模型网关与小模型别名(来自当前会话);nil 直接用启发式
+    func generateCommitMessage(gateway: (url: URL, alias: String)?) async {
         guard !isGeneratingCommitMessage, let repo else { return }
         isGeneratingCommitMessage = true
         defer { isGeneratingCommitMessage = false }
+        guard !status.changes.isEmpty || !status.untrackedChanges.isEmpty else { return }
 
-        let files = status.changes.map(\.path)
-        guard !files.isEmpty else { return }
-
-        // 获取当前工作区或暂存区的 diff 摘要
-        let stat = (try? await repo.rawDiffSummary()) ?? ""
-
-        self.commitMessage = fallbackCommitMessage(files: files, stat: stat)
+        let material = await repo.commitMessageMaterial(untracked: status.untrackedChanges)
+        var files = CommitMessageGenerator.parseFiles(nameStatus: material.nameStatus, numstat: material.numstat, untracked: material.untrackedPaths)
+        if files.isEmpty {
+            // 兜底:补丁读取失败时直接用状态里的文件列表
+            files = (status.changes + status.untrackedChanges).map { CommitFileChange(path: $0.path, status: "M") }
+        }
+        let context = CommitContext(branch: status.branch ?? "", files: files, patch: material.patch, recentSubjects: material.recentSubjects)
+        if let gateway, let generated = await CommitMessageGenerator.generate(gateway: gateway.url, model: gateway.alias, context: context) {
+            commitMessage = generated
+            return
+        }
+        commitMessage = CommitMessageGenerator.heuristic(for: context)
     }
 
-    private func fallbackCommitMessage(files: [String], stat: String) -> String {
-        var scopes: Set<String> = []
-        var hasFix = false
-        var hasFeat = false
-
-        for file in files {
-            let lower = file.lowercased()
-            if lower.contains("theme") || lower.contains("palette") {
-                scopes.insert("theme")
-                hasFeat = true
-            } else if lower.contains("search") || lower.contains("hub") {
-                scopes.insert("search")
-                hasFeat = true
-            } else if lower.contains("git") || lower.contains("scm") {
-                scopes.insert("git")
-            } else if lower.contains("chat") || lower.contains("composer") || lower.contains("timeline") {
-                scopes.insert("chat")
-                hasFix = true
-            } else if lower.contains("status") || lower.contains("tray") {
-                scopes.insert("tray")
-                hasFix = true
-            } else if lower.contains("test") {
-                scopes.insert("tests")
-            } else {
-                let name = (file as NSString).lastPathComponent.replacingOccurrences(of: ".swift", with: "")
-                scopes.insert(name)
-            }
+    /// 同步更改(对标 VS Code/Cursor 的「Sync Changes」):先拉取落后的提交,再推送领先的提交;没有上游时发布分支。
+    func sync() async {
+        let current = status
+        let needsPull = current.behind > 0
+        await perform(String(localized: "同步")) { repo in
+            if needsPull { try await repo.pull(rebase: false) }
+            let latest = try await repo.status()
+            if latest.upstream == nil || latest.ahead > 0 { try await repo.push(status: latest) }
         }
-
-        let scopeList = Array(scopes.prefix(2)).sorted().joined(separator: ", ")
-        let scopeStr = scopeList.isEmpty ? "workspace" : scopeList
-        let action = hasFix ? "fix" : (hasFeat ? "feat" : "refactor")
-        return "\(action)(\(scopeStr)): update \(files.count) file\(files.count > 1 ? "s" : "")"
     }
 }
 

@@ -42,6 +42,32 @@ private struct Fixture {
 
 @Suite("GitRepository", .serialized)
 struct GitRepositoryTests {
+    @Test("提交说明材料:优先暂存区,否则相对 HEAD 并附未跟踪文件;带最近提交标题")
+    func commitMessageMaterial() async throws {
+        let f = try await Fixture.make()
+        defer { f.cleanup() }
+        try f.write("a.txt", "one\n")
+        try await f.repo.stageAll()
+        _ = try await f.repo.commit(message: "feat: 初始提交")
+        try f.write("a.txt", "one\ntwo\n")
+        try f.write("b.txt", "new file\n")
+        let status = try await f.repo.status()
+        // 没有暂存:取相对 HEAD 的改动 + 未跟踪文件
+        let all = await f.repo.commitMessageMaterial(untracked: status.untrackedChanges)
+        #expect(!all.usedStaged)
+        #expect(all.patch.contains("+two"))
+        #expect(all.patch.contains("+new file"))
+        #expect(all.untrackedPaths == ["b.txt"])
+        #expect(all.recentSubjects == ["feat: 初始提交"])
+        // 暂存 a.txt 后只看暂存区
+        try await f.repo.stage(["a.txt"])
+        let staged = await f.repo.commitMessageMaterial(untracked: status.untrackedChanges)
+        #expect(staged.usedStaged)
+        #expect(staged.patch.contains("+two"))
+        #expect(!staged.patch.contains("new file"))
+        #expect(staged.nameStatus.contains("a.txt"))
+    }
+
     @Test("发现仓库:子目录向上、非仓库返回 nil")
     func discover() async throws {
         let f = try await Fixture.make()
