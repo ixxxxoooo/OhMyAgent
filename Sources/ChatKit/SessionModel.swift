@@ -397,7 +397,7 @@ public final class SessionModel {
                 let prepared = await self.prepareMCPServers(registry: registry, environment: tools.environment)
                 self.mcpServers = prepared.servers
                 self.bridge = prepared.bridge
-                let setup = try await client.newSession(cwd: cwd, mcpServers: prepared.servers, meta: self.effectiveMeta())
+                let setup = try await self.newSessionAuthenticating(client: client, methods: result.authMethods, servers: prepared.servers)
                 self.sessionId = setup.sessionId
                 self.configOptions = setup.configOptions
                 self.phase = .ready
@@ -415,6 +415,29 @@ public final class SessionModel {
                 self.connectTask = nil
                 self.phase = .failed(error.localizedDescription)
             }
+        }
+    }
+
+    /// 建会话;若 Agent 要求先登录(如 Antigravity),按其声明的认证方式调用 `authenticate` 后重试一次。
+    /// - Parameters:
+    ///   - client: ACP 客户端
+    ///   - methods: `initialize` 返回的认证方式
+    ///   - servers: MCP 服务器配置
+    private func newSessionAuthenticating(client: ACPClient, methods: [AuthMethod], servers: [MCPServerConfig]) async throws -> SessionSetup {
+        let cwd = workspace.path
+        do {
+            return try await client.newSession(cwd: cwd, mcpServers: servers, meta: effectiveMeta())
+        } catch let error as JSONRPCError where error.isAuthRequired {
+            guard let method = methods.first else { throw error }
+            log.info("Agent 需要登录,开始认证", ["agent": descriptor.id, "method": method.id])
+            timeline.appendNotice(String(localized: "「\(descriptor.name)」需要登录,正在按「\(method.name)」认证…"), detail: method.description)
+            do {
+                try await client.authenticate(methodId: method.id)
+            } catch {
+                log.error("认证失败", error: error, ["agent": descriptor.id, "method": method.id])
+                throw AuthenticationFailure(agent: descriptor.name, reason: error.localizedDescription)
+            }
+            return try await client.newSession(cwd: cwd, mcpServers: servers, meta: effectiveMeta())
         }
     }
 
@@ -1678,4 +1701,14 @@ public struct GoalState: Sendable, Equatable {
     public var startedAt: Date
     /// 目标仍在推进(所在轮次未结束)
     public var isActive: Bool
+}
+
+/// Agent 要求登录但认证失败。
+struct AuthenticationFailure: Error, LocalizedError {
+    let agent: String
+    let reason: String
+
+    var errorDescription: String? {
+        String(localized: "「\(agent)」登录失败:\(reason)。请先在终端里完成该 Agent 的登录(例如 Antigravity 运行 `agy`),再点击「重试」。")
+    }
 }

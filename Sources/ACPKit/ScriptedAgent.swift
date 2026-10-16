@@ -11,6 +11,10 @@ public actor ScriptedAgent: ACPRequestHandler {
     var modes: [String: String] = [:]
     var models: [String: String] = [:]
     var sessionCounter = 0
+    /// 模拟登录状态(`OMA_FAKE_AUTH=1` 时 session/new 需要先 authenticate)
+    var authenticated = false
+    /// 是否要求先登录(默认读 `OMA_FAKE_AUTH`;测试可直接传参,避免修改进程环境变量)
+    let requireAuth: Bool
     var editCounter = 0
     /// 演示场景运行序号(用于让每次运行的工具卡 ID 唯一)
     var demoRunCounter = 0
@@ -35,8 +39,10 @@ public actor ScriptedAgent: ACPRequestHandler {
     ///   - transport: 传输
     ///   - chunkDelayMillis: 分片间隔
     ///   - demoHistory: 是否提供演示历史会话目录
+    ///   - requireAuth: 是否要求 session/new 前先 authenticate
     ///   - onClose: 连接关闭回调
-    public init(transport: any ACPTransport, chunkDelayMillis: Int = 15, demoHistory: Bool = false, onClose: (@Sendable () -> Void)? = nil) {
+    public init(transport: any ACPTransport, chunkDelayMillis: Int = 15, demoHistory: Bool = false, requireAuth: Bool = ProcessInfo.processInfo.environment["OMA_FAKE_AUTH"] == "1", onClose: (@Sendable () -> Void)? = nil) {
+        self.requireAuth = requireAuth
         self.demoHistory = demoHistory
         self.onClose = onClose
         self.connection = ACPConnection(transport: transport)
@@ -88,6 +94,10 @@ public actor ScriptedAgent: ACPRequestHandler {
                 "_meta": ["steering": ["supported": true]],
             ]
         case "session/new":
+            // 模拟需要登录的 Agent(如 Antigravity):未认证前拒绝建会话,`authenticate` 之后放行
+            if requireAuth, !authenticated {
+                throw JSONRPCError(code: -32000, message: "Authentication required")
+            }
             sessionCounter += 1
             let id = "scripted-\(sessionCounter)"
             sessions[id] = p["cwd"]?.stringValue ?? "/"
@@ -99,7 +109,11 @@ public actor ScriptedAgent: ACPRequestHandler {
             if demoHistory { return demoSessionList(cwd: p["cwd"]?.stringValue) }
             let list = sessions.keys.sorted().map { id -> JSONValue in ["sessionId": .string(id), "cwd": .string(sessions[id] ?? "/"), "title": .string("脚本会话 \(id)"), "updatedAt": "2026-10-16T01:00:00Z"] }
             return ["sessions": .array(list)]
-        case "authenticate", "logout":
+        case "authenticate":
+            authenticated = true
+            return .object([:])
+        case "logout":
+            authenticated = false
             return .object([:])
         case "session/load", "session/resume":
             guard let id = p["sessionId"]?.stringValue else {

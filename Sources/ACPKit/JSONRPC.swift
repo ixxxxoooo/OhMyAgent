@@ -41,6 +41,13 @@ public struct JSONRPCError: Error, LocalizedError, Sendable, Codable, Hashable {
     /// (否则界面只会显示「ACPKit.JSONRPCError 错误 1」这种毫无信息量的文案)。
     public var errorDescription: String? { message }
 
+    /// 是否为「需要先认证」类错误:ACP 约定的 -32000,或消息明确表示未登录。
+    public var isAuthRequired: Bool {
+        if code == -32000 { return true }
+        let text = message.lowercased()
+        return ["authentication required", "not authenticated", "unauthenticated", "please log in", "please sign in", "login required"].contains { text.contains($0) }
+    }
+
     public var code: Int
     public var message: String
     public var data: JSONValue?

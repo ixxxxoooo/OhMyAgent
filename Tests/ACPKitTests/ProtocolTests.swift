@@ -148,6 +148,34 @@ struct EndToEndTests {
         await client.close()
     }
 
+    @Test("需要登录的 Agent:未认证拒绝建会话,authenticate 后放行")
+    func authenticationRequired() async throws {
+        let (a, b) = LoopbackTransport.makePair()
+        let agent = ScriptedAgent(transport: b, chunkDelayMillis: 1, requireAuth: true)
+        try await agent.start()
+        let client = ACPClient(transport: a, delegate: TestDelegate())
+        try await client.start()
+        let result = try await client.initialize()
+        #expect(result.authMethods.map(\.id) == ["fake-login"])
+        do {
+            _ = try await client.newSession(cwd: "/tmp")
+            Issue.record("未认证时不应创建会话")
+        } catch let error as JSONRPCError {
+            #expect(error.isAuthRequired)
+        }
+        try await client.authenticate(methodId: "fake-login")
+        let setup = try await client.newSession(cwd: "/tmp")
+        #expect(setup.sessionId.hasPrefix("scripted-"))
+        await client.close()
+    }
+
+    @Test("isAuthRequired 识别 -32000 与登录类文案,不误伤其他错误")
+    func authErrorDetection() {
+        #expect(JSONRPCError(code: -32000, message: "x").isAuthRequired)
+        #expect(JSONRPCError(code: 1, message: "Please log in first").isAuthRequired)
+        #expect(!JSONRPCError(code: JSONRPCError.invalidParams, message: "缺少 sessionId").isAuthRequired)
+    }
+
     @Test("流式文本与思维被分别投递且顺序正确")
     func streaming() async throws {
         let (client, _) = try await makePair()
