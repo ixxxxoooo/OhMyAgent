@@ -128,7 +128,6 @@ struct OhMyAgentApp: App {
     var body: some Scene {
         Window("OhMyAgent", id: "main") {
             WorkbenchView(workbench: AppEnvironment.shared.workbench)
-                .overlay(alignment: .top) { if DemoLaunch.isActive { DemoBadgeView().padding(.top, 6) } }
         }
         .defaultSize(width: 1280, height: 820)
         // 不再使用 unifiedCompact 空工具栏:它的 NSTitlebarView 横跨顶部 32pt 并吞掉所有点击,

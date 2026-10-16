@@ -213,6 +213,7 @@ struct ProjectTreeView: View {
             .foregroundStyle(OMColors.secondaryText)
             .help("设置 (⌘,)")
             .accessibilityLabel("设置")
+            if DemoLaunch.isActive { DemoBadgeView() }
             Spacer()
         }
         .padding(.horizontal, 10)

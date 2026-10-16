@@ -30,10 +30,10 @@ enum DemoLaunch {
     }
 }
 
-/// 窗口顶部的「演示模式」徽标,提醒当前数据来自沙盒、Agent 为脚本化演示 Agent。
+/// 左侧栏底部(设置按钮右侧)的「演示」徽章,提醒当前数据来自沙盒、Agent 为脚本化演示 Agent。
 struct DemoBadgeView: View {
     var body: some View {
-        Text("演示模式")
+        Text("演示")
             .font(OMFonts.caption.weight(.semibold))
             .foregroundStyle(OMColors.warning)
             .padding(.horizontal, 8)

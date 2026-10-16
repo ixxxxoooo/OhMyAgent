@@ -44,7 +44,8 @@ struct FileHeaderBar: View {
         }
         .padding(.horizontal, 14)
         .frame(height: 30)
-        .overlay(alignment: .bottom) { Rectangle().fill(OMColors.hairline.opacity(0.6)).frame(height: 0.5) }
+        // 与内容区同色(OMColors.surface),不再画底部分隔线
+        .background(OMColors.surface)
     }
 
     // MARK: 面包屑

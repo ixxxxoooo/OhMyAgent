@@ -107,7 +107,6 @@ struct TabGroupView: View {
                 trailingInset: edges.top && edges.right && workbench.layout.visibleColumns(on: .right).isEmpty
                     ? TitlebarMetrics.rightClusterWidth(toggles: workbench.layout.toggleCount(on: .right)) : 0
             )
-            Divider()
             GeometryReader { proxy in
                 content
                     .frame(width: proxy.size.width, height: proxy.size.height)

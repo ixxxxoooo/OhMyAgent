@@ -33,7 +33,6 @@ struct ExplorerView: View {
                     toolButton("refresh-cw", "刷新") { model.bump(); WorkspaceIndexModel.shared.refresh(root: project.id) }
                 }
                 .padding(.horizontal, 10).padding(.vertical, 6)
-                Divider()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         DirectoryChildren(path: project.id, depth: 0, workbench: workbench, root: project.id)

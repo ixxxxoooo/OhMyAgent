@@ -17,7 +17,6 @@ struct RightPaneView: View {
     var body: some View {
         VStack(spacing: 0) {
             paneBar
-            Divider()
             switch workbench.layout.rightPane {
             case .git: SCMView(workbench: workbench)
             case .search: SearchPaneView(workbench: workbench)
