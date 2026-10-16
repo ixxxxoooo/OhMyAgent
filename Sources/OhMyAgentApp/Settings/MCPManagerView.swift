@@ -25,8 +25,20 @@ struct MCPSettingsPage: View {
             subtitle: String(localized: "通过 Model Context Protocol 给 Claude 接入外部工具与数据源。配置写入 ~/.claude.json 或项目的 .mcp.json。"),
             errorKey: "MCP"
         ) {
-            Button { Task { await center.checkMCPHealth() } } label: { Label("检测连接", om: "waveform.path.ecg") }
-                .disabled(!center.canRunCLI || center.isBusy)
+            Button { Task { await center.checkMCPHealth() } } label: {
+                // 原位替换:检测中图标换成转圈、文字换成「检测中…」,按钮宽度保持不变,页面不会被挤动
+                HStack(spacing: 6) {
+                    if center.isCheckingMCP {
+                        ProgressView().controlSize(.small).scaleEffect(0.7).frame(width: 14, height: 14)
+                        Text("检测中…")
+                    } else {
+                        Image.om("waveform.path.ecg", size: 14)
+                        Text("检测连接")
+                    }
+                }
+                .frame(minWidth: 84)
+            }
+                .disabled(!center.canRunCLI || center.isBusy || center.isCheckingMCP)
                 .help("运行 claude mcp list 检测各服务器连接状态")
             Button { center.reload() } label: { Image.om("arrow.clockwise") }
                 .help("重新读取配置")
@@ -148,7 +160,9 @@ struct MCPSettingsPage: View {
 
     @ViewBuilder
     private func healthLabel(_ entry: MCPServerEntry) -> some View {
-        if let health = center.mcpHealth[entry.config.name] {
+        if center.isCheckingMCP {
+            ProgressView().controlSize(.small).scaleEffect(0.7).frame(width: 14, height: 14)
+        } else if let health = center.mcpHealth[entry.config.name] {
             HStack(spacing: 5) {
                 healthDot(health)
                 Text(verbatim: healthText(health)).font(OMFonts.caption).foregroundStyle(OMColors.secondaryText)

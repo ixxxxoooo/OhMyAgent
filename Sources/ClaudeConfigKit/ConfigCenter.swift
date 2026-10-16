@@ -23,6 +23,8 @@ public struct ConfigSnapshot: Sendable {
 public final class ConfigCenter {
     public private(set) var snapshot = ConfigSnapshot()
     public private(set) var mcpHealth: [String: MCPHealthStatus] = [:]
+    /// 是否正在检测 MCP 连接:由触发按钮原位展示进度,不占用整行忙碌横幅(避免内容被挤下去)
+    public private(set) var isCheckingMCP = false
     public private(set) var isBusy = false
     public private(set) var busyMessage: String?
     /// 最近一次操作的错误(界面以提示条展示)
@@ -150,9 +152,9 @@ public final class ConfigCenter {
             lastError = String(localized: "没有找到 claude 命令行工具")
             return
         }
-        isBusy = true
-        busyMessage = String(localized: "正在检测 MCP 服务器连接…")
-        defer { isBusy = false; busyMessage = nil }
+        guard !isCheckingMCP else { return }
+        isCheckingMCP = true
+        defer { isCheckingMCP = false }
         let result = await runner.run(["mcp", "list"], in: paths.workspace, timeout: 60)
         guard result.succeeded else { lastError = result.failureMessage; return }
         mcpHealth = Dictionary(MCPStore.parseHealth(result.standardOutput).map { ($0.name, $0) }, uniquingKeysWith: { _, last in last })
