@@ -289,13 +289,20 @@ public final class TimelineStore {
         return nil
     }
 
-    /// 全部子 Agent 条目(深度优先,附带嵌套深度),用于侧栏缩进展示与子 Agent 标签。
+    /// 全部子 Agent 条目(深度优先,附带嵌套深度),用于侧栏缩进展示、任务坞与子 Agent 标签。
+    ///
+    /// 判定:已有内部时间线的工具,**或**本身就是子 Agent 启动工具(Task/Agent)的工具。
+    /// 只看内部时间线会漏掉「刚启动、还没产出任何内容」与「不回传内部过程」的子 Agent,
+    /// 表现为任务坞偶尔不显示正在运行的子 Agent。
     public func subagentEntries(depth: Int = 0) -> [(entry: TimelineEntry, depth: Int)] {
         var result: [(TimelineEntry, Int)] = []
         for entry in entries where entry.kind == .tool {
-            guard let child = entry.childStore else { continue }
-            result.append((entry, depth))
-            result.append(contentsOf: child.subagentEntries(depth: depth + 1))
+            if let child = entry.childStore {
+                result.append((entry, depth))
+                result.append(contentsOf: child.subagentEntries(depth: depth + 1))
+            } else if let tool = entry.tool, ToolPresentation.isSubagentLaunch(tool) {
+                result.append((entry, depth))
+            }
         }
         return result
     }

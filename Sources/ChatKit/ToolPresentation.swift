@@ -27,6 +27,13 @@ public struct ToolPresentation: Sendable, Equatable {
     /// 对象是否为文件路径(视图据此显示文件图标并支持点击打开)。
     public var subjectIsPath: Bool
 
+    /// 工具调用是否是子 Agent 启动工具(Claude Code 的 Task/Agent,OpenCode 的 task;名称不区分大小写)。
+    /// - Parameter tool: 工具调用
+    public static func isSubagentLaunch(_ tool: ToolCall) -> Bool {
+        guard let name = tool.name?.lowercased() else { return false }
+        return name == "task" || name == "agent"
+    }
+
     /// 由工具调用推导呈现信息。
     /// - Parameters:
     ///   - tool: 工具调用
@@ -51,7 +58,7 @@ public struct ToolPresentation: Sendable, Equatable {
             subject = input.map(Self.briefInput) ?? ""
             return
         }
-        if hasChild || name == "Task" || name == "Agent" {
+        if hasChild || Self.isSubagentLaunch(tool) {
             category = .subagent
             verb = String(localized: "子任务")
             subject = input?["description"]?.stringValue ?? tool.title

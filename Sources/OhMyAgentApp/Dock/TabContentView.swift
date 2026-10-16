@@ -343,6 +343,8 @@ struct SubagentTabView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .defaultScrollAnchor(.top)
+                Divider()
+                SubagentStatusFooter(entry: entry, tool: tool)
             }
             .environment(model)
             .background(OMColors.surface)
@@ -369,6 +371,65 @@ struct SubagentTabView: View {
         }
         .padding(.horizontal, 16)
         .frame(height: 38)
+    }
+}
+
+/// 子 Agent 标签底部的状态行:运行中与主会话一致(动画字符 + 动词 + 耗时),
+/// 结束后显示终态与统计(用时、工具调用次数、token——结果里带才显示)并可复制。
+struct SubagentStatusFooter: View {
+    let entry: TimelineEntry
+    let tool: ToolCall
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Group {
+            if tool.status.isTerminal { finished } else { running }
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 34)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// 运行中:不提示 Esc(子 Agent 不能单独中断,只能在主会话停止本轮)。
+    private var running: some View {
+        ActiveTimeline(interval: reduceMotion ? 1 : 0.15, start: entry.startedAt) { date in
+            let seconds = Int(date.timeIntervalSince(entry.startedAt))
+            let tick = Int(date.timeIntervalSinceReferenceDate / 0.15)
+            HStack(spacing: 8) {
+                Text(reduceMotion ? "✻" : WorkingStatus.glyph(tick: tick))
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(OMColors.accent)
+                    .frame(width: 16)
+                Text(WorkingStatus.line(verb: WorkingStatus.verb(seed: Int(entry.startedAt.timeIntervalSince1970)), seconds: seconds, canInterrupt: false))
+                    .font(OMFonts.small)
+                    .foregroundStyle(OMColors.secondaryText)
+                    .monospacedDigit()
+                Spacer(minLength: 0)
+            }
+            .accessibilityElement(children: .combine)
+        }
+        .help("子 Agent 不能单独中断:在主会话点「停止」会停止本轮及其所有子 Agent")
+    }
+
+    /// 已结束:终态 + 统计 + 复制。
+    @ViewBuilder
+    private var finished: some View {
+        let failed = tool.status == .failed
+        HStack(spacing: 8) {
+            Image.om(failed ? "circle-x" : "circle-check", size: 13)
+                .foregroundStyle(failed ? OMColors.danger : OMColors.success)
+                .frame(width: 16)
+            if let summary = SubagentSummary.make(entry: entry) {
+                Text(([failed ? String(localized: "已失败") : String(localized: "已完成")] + summary.parts).joined(separator: " · "))
+                    .font(OMFonts.small)
+                    .foregroundStyle(OMColors.secondaryText)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                ModelCopyButton(text: summary.copyText, label: String(localized: "复制统计信息"))
+            }
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .contain)
     }
 }
 

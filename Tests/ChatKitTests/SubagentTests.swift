@@ -58,4 +58,41 @@ struct SubagentTests {
         store.apply(.toolCall(ToolCall(toolCallId: "t", title: "读取", kind: .read, status: .completed)))
         #expect(store.subagentEntries().isEmpty)
     }
+
+    @Test("刚启动、还没有内部内容的 Task 也算子 Agent(任务坞不能漏掉)")
+    func launchWithoutChildIsListed() {
+        let store = TimelineStore()
+        store.apply(.toolCall(ToolCall(toolCallId: "t1", name: "Task", title: "审计依赖", kind: .other, status: .inProgress)))
+        store.apply(.toolCall(ToolCall(toolCallId: "t2", name: "task", title: "OpenCode 子任务", kind: .other, status: .inProgress)))
+        store.apply(.toolCall(ToolCall(toolCallId: "t3", name: "TaskCreate", title: "待办", kind: .other, status: .inProgress)))
+        #expect(store.subagentEntries().map { $0.entry.tool?.toolCallId } == ["t1", "t2"])
+    }
+
+    @Test("子 Agent 统计:工具次数取内部时间线,usage 文本覆盖耗时与 token")
+    func summaryFromTimelineAndUsage() throws {
+        let store = makeStore()
+        let entry = try #require(store.toolEntry(id: "sub_1"))
+        let plain = try #require(SubagentSummary.make(entry: entry))
+        #expect(plain.toolUses == 3)   // r1、sub_2、g1
+        #expect(plain.totalTokens == nil)
+
+        store.apply(.toolCallUpdate(toolCallId: "sub_1", raw: [
+            "status": "completed",
+            "content": [["type": "content", "content": ["type": "text", "text": "完成\n<usage>total_tokens: 3400\ntool_uses: 7\nduration_ms: 72000</usage>"]]],
+        ]))
+        let finished = try #require(store.toolEntry(id: "sub_1"))
+        let done = try #require(SubagentSummary.make(entry: finished))
+        #expect(done.toolUses == 7)
+        #expect(done.totalTokens == 3400)
+        #expect(done.durationSeconds == 72)
+        #expect(done.parts.contains { $0.contains("3.4K") })
+    }
+
+    @Test("usage 解析与紧凑数字")
+    func usageParsing() {
+        let usage = SubagentSummary.parseUsage(from: "total_tokens: 12\ntool_uses: 2")
+        #expect(usage.totalTokens == 12 && usage.toolUses == 2 && usage.durationMs == nil)
+        #expect(SubagentSummary.compact(950) == "950")
+        #expect(SubagentSummary.compact(1_200_000) == "1.2M")
+    }
 }
