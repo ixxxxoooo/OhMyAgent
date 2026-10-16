@@ -54,13 +54,6 @@ struct ChatView: View {
         }
         .task(id: ObjectIdentifier(model)) { ChatBindings.bind(model) }
         .environment(\.stickyUser, sticky)
-        .overlay {
-            // 图3 风格:就地展开的编辑卡片(不再用系统 sheet)
-            if let entry = sticky.editing {
-                UserMessageEditor(model: model, entry: entry, maxWidth: contentMaxWidth) { sticky.editing = nil }
-                    .id(entry.id)
-            }
-        }
         .animation(omShouldReduceMotion() ? nil : .easeOut(duration: 0.15), value: sticky.editing?.id)
         .onAppear { sticky.bind(model) }
     }

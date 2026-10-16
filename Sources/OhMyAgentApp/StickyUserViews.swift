@@ -27,7 +27,7 @@ final class StickyUserState {
     var editing: TimelineEntry?
     /// 用户刚展开/折叠了某一行:暂停「贴底自动跟随」,避免内容增高把视口拽走(滚回底部后自动恢复)
     @ObservationIgnored var followSuspended = false
-    @ObservationIgnored private weak var model: SessionModel?
+    @ObservationIgnored private(set) weak var model: SessionModel?
 
     /// 绑定会话模型。
     func bind(_ model: SessionModel) { self.model = model }
@@ -74,7 +74,9 @@ struct StickyUserOverlay: View {
     let maxWidth: CGFloat
 
     var body: some View {
-        if let target = state.target, let entry = model.timeline.entries.first(where: { $0.id == target.stickyID }) {
+        // 正在就地编辑的那条不再吸顶,避免与行内编辑卡重复
+        if let target = state.target, target.stickyID != state.editing?.id,
+           let entry = model.timeline.entries.first(where: { $0.id == target.stickyID }) {
             let push = StickyUser.pushOffset(nextMinY: target.nextID.flatMap { state.userMinY[$0] }, cardHeight: state.cardHeight)
             StickyUserCard(entry: entry)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { state.cardHeight = $0 }
@@ -142,7 +144,7 @@ struct StickyUserCard: View {
     }
 }
 
-/// 编辑并重新发送(图3 风格):在会话流上方就地展开的大输入卡片,
+/// 编辑并重新发送(图3 风格):在原消息位置就地向下展开的输入卡片(不再是悬浮窗),
 /// 版式与底部输入框一致——上方附件与文本,底部左侧模型选择,右侧取消与圆形发送按钮。
 struct UserMessageEditor: View {
     let model: SessionModel
@@ -179,21 +181,11 @@ struct UserMessageEditor: View {
     }
 
     var body: some View {
-        ZStack(alignment: .top) {
-            // 点击空白处关闭;轻微压暗,突出编辑卡片
-            OMColors.scrim.opacity(0.3)
-                .contentShape(Rectangle())
-                .onTapGesture(perform: onClose)
-                .accessibilityHidden(true)
-            card
-                .frame(maxWidth: maxWidth)
-                .padding(.horizontal, 20)
-                .padding(.top, 12)
-                .frame(maxWidth: .infinity)
-        }
-        .transition(.opacity)
-        .onExitCommand(perform: onClose)
-        .onAppear { controller.focus() }
+        // 就地展开:占据原消息行的位置,随内容向下延展,会话流内容自然被推开
+        card
+            .transition(.opacity.combined(with: .scale(scale: 0.985, anchor: .top)))
+            .onExitCommand(perform: onClose)
+            .onAppear { controller.focus() }
     }
 
     private var card: some View {
@@ -234,7 +226,6 @@ struct UserMessageEditor: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .omGlass(in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .omFloatShadow()
     }
 
     /// 模型切换按钮(没有可切换的模型时不显示)。

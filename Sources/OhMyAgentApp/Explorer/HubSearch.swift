@@ -189,7 +189,9 @@ struct HubOverlay: View {
     var body: some View {
         if hub.isPresented {
             ZStack(alignment: .top) {
+                // 遮罩延伸到安全区之外,把顶部标题栏/标签条一并盖住
                 OMColors.scrim
+                    .ignoresSafeArea()
                     .contentShape(Rectangle())
                     .onTapGesture { hub.dismiss() }
                     .accessibilityHidden(true)
@@ -211,9 +213,9 @@ struct HubOverlay: View {
             footer
         }
         .frame(width: 720)
-        .background(OMColors.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(OMColors.hairline))
-        .omFloatShadow()
+        .omGlass(in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .omFloatShadow(cornerRadius: 22)
         .onAppear { focused = true }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("搜索")
@@ -249,7 +251,7 @@ struct HubOverlay: View {
                         .foregroundStyle(hub.segment == item ? OMColors.primaryText : OMColors.secondaryText)
                         .padding(.horizontal, 10)
                         .frame(height: 24)
-                        .background(hub.segment == item ? OMColors.pressedFill : .clear, in: Capsule())
+                        .background(hub.segment == item ? OMColors.selectedFill : .clear, in: Capsule())
                         .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)

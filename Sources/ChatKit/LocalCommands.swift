@@ -161,6 +161,8 @@ public enum TranscriptExporter {
                 out += [String(localized: "### 计划"), "", entry.text, ""]
             case .turnSummary:
                 out += ["> \(entry.text)", ""]
+            case .modelSwitch:
+                out += ["> " + String(localized: "模型由 \(entry.text) 切换为 \(entry.detail ?? "")"), ""]
             }
         }
         return out.joined(separator: "\n")

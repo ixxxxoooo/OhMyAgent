@@ -22,7 +22,37 @@ struct TimelineEntryView: View {
         case .changes: ChangesSummaryView(entry: entry)
         case .planDoc: PlanDocView(entry: entry)
         case .turnSummary: TurnSummaryView(entry: entry)
+        case .modelSwitch: ModelSwitchDividerView(entry: entry)
         }
+    }
+}
+
+/// 模型切换分割线:两侧细线 + 居中「由 X 切换为 Y」。
+struct ModelSwitchDividerView: View {
+    let entry: TimelineEntry
+
+    var body: some View {
+        let from = entry.text
+        let to = entry.detail ?? ""
+        HStack(spacing: 10) {
+            line
+            HStack(spacing: 5) {
+                Image.om("arrow-left-right", size: 12)
+                Text("由 \(from) 切换为 \(to)")
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            .font(OMFonts.caption)
+            .foregroundStyle(OMColors.tertiaryText)
+            line
+        }
+        .padding(.vertical, 6)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(String(localized: "模型由 \(from) 切换为 \(to)"))
+    }
+
+    private var line: some View {
+        Rectangle().fill(OMColors.hairline).frame(height: 0.5)
     }
 }
 
@@ -62,6 +92,16 @@ struct UserMessageView: View {
     @Environment(\.stickyUser) private var sticky
 
     var body: some View {
+        if let sticky, let model = sticky.model, sticky.editing?.id == entry.id {
+            // 就地编辑:原位置展开为输入卡片
+            UserMessageEditor(model: model, entry: entry, maxWidth: .infinity) { sticky.editing = nil }
+                .id(entry.id)
+        } else {
+            messageCard
+        }
+    }
+
+    private var messageCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             if entry.isSteered {
                 Label("运行中引导", om: "corner-down-right")
@@ -96,7 +136,7 @@ struct UserMessageView: View {
             if !entry.isSteered { Button("编辑并重新发送…") { sticky?.editing = entry } }
         }
         // 被吸顶卡接管时隐藏原行(保留布局,位置继续上报)
-        .opacity(sticky?.target?.stickyID == entry.id ? 0 : 1)
+        .opacity(sticky?.target?.stickyID == entry.id && sticky?.editing?.id != entry.id ? 0 : 1)
         .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(chatScrollSpace)).minY } action: { sticky?.report(entry.id, minY: $0) }
         .onDisappear { sticky?.forget(entry.id) }
         .accessibilityElement(children: .combine)

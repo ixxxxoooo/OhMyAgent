@@ -683,8 +683,8 @@ public final class SessionModel {
             timeline.appendNotice(String(localized: "没有名为「\(name)」的模型。"), detail: String(localized: "可选:\(names)"), severity: "warning")
             return
         }
+        // 切换成功后由 setConfigOption 在时间线插入「由 X 切换为 Y」分割线
         setConfigOption(option.id, value: match.value)
-        timeline.appendNotice(String(localized: "模型已切换为 \(match.name)。"))
     }
 
     /// `/model` 无参数时的模型列表。
@@ -1318,14 +1318,29 @@ public final class SessionModel {
     ///   - value: 新值
     public func setConfigOption(_ optionId: String, value: String) {
         guard let client, let sessionId else { return }
+        // 切换模型时记录切换前的显示名,成功后在时间线插入分割线
+        let isModel = configOptions.first { $0.id == optionId }?.category == "model"
+        let previous = isModel ? modelLabel(forValue: configOptions.first { $0.id == optionId }?.currentValue.stringValue) : nil
         Task { [weak self] in
             do {
                 let updated = try await client.setConfigOption(sessionId: sessionId, configId: optionId, value: .string(value))
                 if !updated.isEmpty { self?.configOptions = updated }
+                if let self, let previous {
+                    let next = self.modelLabel(forValue: value)
+                    if next != previous { self.timeline.appendModelSwitch(from: previous, to: next) }
+                }
             } catch {
                 self?.timeline.appendNotice(String(localized: "设置失败:\(error.localizedDescription)"), isError: true)
             }
         }
+    }
+
+    /// 模型值对应的展示名:启用映射时取「映射名 · 槽位」,否则取选项名,找不到则回退原值。
+    /// - Parameter value: 选项值(可为 nil)
+    private func modelLabel(forValue value: String?) -> String {
+        guard let value else { return "" }
+        if let slot = ModelSlot(optionValue: value), let mapped = mappedModels[slot] { return "\(mapped.displayName) · \(slot.title)" }
+        return option(category: "model")?.options.first { $0.value == value }?.name ?? value
     }
 
     /// 按类别取配置选项(`mode` / `model` / `thought_level`)。

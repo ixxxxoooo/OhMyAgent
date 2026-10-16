@@ -18,6 +18,8 @@ public final class TimelineEntry: Identifiable {
         case planDoc
         /// 回合结束语:模型、耗时、token、tps
         case turnSummary
+        /// 模型切换分割线:`text` 为切换前模型名,`detail` 为切换后模型名
+        case modelSwitch
     }
 
     public nonisolated let id = UUID()
@@ -201,6 +203,18 @@ public final class TimelineStore {
         entry.isError = isError || severity == "error"
         entry.severity = severity ?? (isError ? "error" : "info")
         entry.detail = detail
+        entries.append(entry)
+        revision += 1
+    }
+
+    /// 追加模型切换分割线(时间线中显示「由 X 切换为 Y」)。
+    /// - Parameters:
+    ///   - from: 切换前的模型名
+    ///   - to: 切换后的模型名
+    public func appendModelSwitch(from: String, to: String) {
+        finishStreaming()
+        let entry = TimelineEntry(kind: .modelSwitch, text: from)
+        entry.detail = to
         entries.append(entry)
         revision += 1
     }
