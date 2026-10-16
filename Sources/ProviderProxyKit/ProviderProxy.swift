@@ -296,12 +296,7 @@ public actor ProviderProxy {
     /// 上游非 2xx:状态码透传,正文改写成 Anthropic 错误格式(OpenCode 免费层拒绝第三方客户端时给出明确提示)。
     static func upstreamFailure(status: Int, body: Data) -> HTTPResult {
         var message = ProtocolMapping.upstreamMessage(from: body)
-        if String(data: body, encoding: .utf8)?.contains("FreeTierError") == true {
-            message = String(localized: "该免费模型仅限 OpenCode 官方客户端使用(FreeTierError)。请改用 OpenCode Go 或自己的付费 API Key。")
-        }
-        if String(data: body, encoding: .utf8)?.contains("error code: 1010") == true {
-            message = String(localized: "上游(Cloudflare)拦截了该请求(1010):该端点不接受第三方客户端,请换用其他提供商或自己的 API Key。")
-        }
+        if let hint = UpstreamHints.message(for: body) { message = hint }
         message = LogRedactor.redact(message)
         return error(status: status, message: message.isEmpty ? "upstream error \(status)" : message)
     }

@@ -8,6 +8,7 @@
 // 不改动用户的 `~/.claude/settings.json`。
 
 import ACPKit
+import CryptoKit
 import Foundation
 import OMLog
 import ProviderProxyKit
@@ -262,19 +263,26 @@ public enum ProviderLaunch {
 
 /// 提供商 → 会话的桥接:把映射注册到本机网关。
 public enum ProviderBridge {
-    /// 本次进程内稳定的 OpenCode 会话标识。
-    private static let opencodeSession = "ses_\(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(24))"
+    /// 自有客户端标识(OpenCode 文档要求第三方客户端用自己的 UA,而不是伪装成官方客户端)。
+    public static var userAgent: String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+        return "OhMyAgent/\(version)"
+    }
 
-    /// OpenCode 兼容请求头(尽力模拟其官方客户端;免费层可能仍拒绝第三方)。
+    /// 由会话路由键派生稳定的 OpenCode 会话标识:同一对话恒定,不同对话互不相同(`ses_` + 24 位十六进制)。
+    /// - Parameter sessionKey: 会话级路由键;空串时视为一次性请求,返回随机标识
+    /// - Returns: `x-opencode-session` 的值
+    public static func opencodeSessionID(for sessionKey: String) -> String {
+        guard !sessionKey.isEmpty else { return "ses_" + UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased().prefix(24) }
+        let digest = SHA256.hash(data: Data(sessionKey.utf8))
+        return "ses_" + digest.map { String(format: "%02x", $0) }.joined().prefix(24)
+    }
+
+    /// OpenCode 兼容请求头:自有 UA + 稳定的 `x-opencode-session`(Go / Zen 端点据此路由与限流)。
+    /// - Parameter sessionKey: 会话级路由键(见 `opencodeSessionID(for:)`)
     /// - Returns: 请求头字典
-    public static func opencodeHeaders() -> [String: String] {
-        [
-            "User-Agent": "opencode/1.0.0",
-            "x-opencode-client": "cli",
-            "x-opencode-session": opencodeSession,
-            "x-opencode-request": "req_\(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(24))",
-            "x-opencode-project": "global",
-        ]
+    public static func opencodeHeaders(sessionKey: String = "") -> [String: String] {
+        ["User-Agent": userAgent, "x-opencode-session": opencodeSessionID(for: sessionKey)]
     }
 
     /// 为提供商构造代理路由(上游地址、密钥、附加头)。
@@ -282,10 +290,10 @@ public enum ProviderBridge {
     ///   - provider: 提供商
     ///   - key: 密钥(可空)
     /// - Returns: 路由;地址无效返回 nil
-    public static func route(for provider: ModelProvider, key: String) -> ProxyRoute? {
+    public static func route(for provider: ModelProvider, key: String, sessionKey: String = "") -> ProxyRoute? {
         guard let url = provider.url else { return nil }
         var headers: [String: String] = [:]
-        if provider.opencodeCompat == true { headers.merge(opencodeHeaders()) { _, new in new } }
+        if provider.opencodeCompat == true { headers.merge(opencodeHeaders(sessionKey: sessionKey)) { _, new in new } }
         for line in ModelProvider.headerLines(provider.customHeaders ?? "") {
             guard let colon = line.firstIndex(of: ":") else { continue }
             let name = line[line.startIndex..<colon].trimmingCharacters(in: .whitespaces)
@@ -296,8 +304,8 @@ public enum ProviderBridge {
     }
 
     /// 把一个已解析的槽位目标变成网关目标。
-    static func target(for resolved: ResolvedTarget) -> ProxyTarget? {
-        guard let route = route(for: resolved.provider, key: resolved.key) else { return nil }
+    static func target(for resolved: ResolvedTarget, sessionKey: String = "") -> ProxyTarget? {
+        guard let route = route(for: resolved.provider, key: resolved.key, sessionKey: sessionKey) else { return nil }
         return ProxyTarget(wire: resolved.provider.isOpenAIProtocol ? .openAI : .anthropic, route: route, model: resolved.model,
                            label: "\(resolved.provider.id)/\(resolved.slot.rawValue)")
     }
@@ -312,7 +320,7 @@ public enum ProviderBridge {
     public static func activate(_ mapping: ResolvedMapping, sessionKey: String, proxy: ProviderProxy = .shared) async throws -> ActivatedMapping {
         var targets: [String: ProxyTarget] = [:]
         for (slot, resolved) in mapping.all {
-            guard let target = target(for: resolved) else { throw ModelProvider.ValidationError.invalidBaseURL }
+            guard let target = target(for: resolved, sessionKey: sessionKey) else { throw ModelProvider.ValidationError.invalidBaseURL }
             targets[slot.alias] = target
         }
         guard let fallback = targets[ModelSlot.main.alias] else { throw ModelProvider.ValidationError.invalidBaseURL }

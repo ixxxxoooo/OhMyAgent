@@ -65,7 +65,7 @@ struct ProviderModelListTests {
             #expect(ProviderPreset.all.contains { $0.id == id }, "缺少预设 \(id)")
         }
         let free = try #require(ProviderPreset.all.first { $0.id == "opencode-free" }).makeProvider()
-        #expect(free.isOpenAIProtocol && free.opencodeCompat == true && !free.requiresKey)
+        #expect(free.isOpenAIProtocol && free.opencodeCompat == true && free.baseURL == "https://opencode.ai/zen/go/v1")
         for item in ProviderPreset.all { #expect(throws: Never.self) { try item.makeProvider().validate() } }
     }
 }
@@ -132,7 +132,7 @@ struct ProviderBridgeTests {
         var custom = provider
         custom.customHeaders = "X-Org: abc"
         let route = try #require(ProviderBridge.route(for: custom, key: "k"))
-        #expect(route.extraHeaders["x-opencode-client"] == "cli")
+        #expect(route.extraHeaders["x-opencode-session"]?.hasPrefix("ses_") == true)
         #expect(route.extraHeaders["X-Org"] == "abc")
         #expect(route.apiKey == "k")
     }

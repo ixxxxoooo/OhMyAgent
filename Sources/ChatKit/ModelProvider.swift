@@ -10,6 +10,7 @@
 
 import ACPKit
 import Foundation
+import ProviderProxyKit
 import OMLog
 
 /// 模型提供商配置(不含密钥)。
@@ -152,14 +153,14 @@ public struct ProviderPreset: Identifiable, Sendable {
         ProviderPreset(id: "kimi", name: "Kimi(Moonshot)", baseURL: "https://api.moonshot.cn/anthropic", models: ["kimi-k2-turbo-preview", "kimi-k2-0905-preview"], hint: String(localized: "海外可改用 api.moonshot.ai/anthropic")),
         ProviderPreset(id: "minimax", name: "MiniMax", baseURL: "https://api.minimaxi.com/anthropic", models: ["MiniMax-M2"], hint: String(localized: "海外可改用 api.minimax.io/anthropic")),
         ProviderPreset(id: "qwen", name: String(localized: "阿里云百炼(Qwen)"), baseURL: "https://dashscope.aliyuncs.com/apps/anthropic", models: ["qwen3-coder-plus", "qwen3-coder-flash"], hint: String(localized: "Coding Plan 用户端点略有不同,可手动修改")),
-        ProviderPreset(id: "opencode", name: "OpenCode Zen", baseURL: "https://opencode.ai/zen", models: ["claude-sonnet-4-5", "qwen3-coder", "kimi-k2"], hint: String(localized: "OpenCode Zen 网关的 Anthropic 兼容端点;模型名以其控制台为准,可用「获取模型列表」同步。"), opencodeCompat: true, apiKeyHeader: true),
+        ProviderPreset(id: "opencode", name: "OpenCode Zen", baseURL: "https://opencode.ai/zen", models: ["claude-sonnet-4-5", "qwen3-coder", "kimi-k2"], hint: String(localized: "OpenCode Zen 网关的 Anthropic 兼容端点(按量付费模型);免费模型请改用「OpenCode 免费模型(Go)」或「OpenCode Go」。"), opencodeCompat: true, apiKeyHeader: true),
         ProviderPreset(id: "openai", name: "OpenAI", baseURL: "https://api.openai.com/v1", models: ["gpt-4.1", "gpt-4o", "o4-mini"], hint: String(localized: "OpenAI 协议:经本机内置的协议代理转换后交给 Claude Code。"), protocolKind: .openai),
         ProviderPreset(id: "openrouter", name: "OpenRouter", baseURL: "https://openrouter.ai/api/v1", models: ["anthropic/claude-sonnet-4.5", "openai/gpt-4.1", "google/gemini-2.5-pro"], hint: String(localized: "聚合多家模型的 OpenAI 协议网关;模型名形如 厂商/模型。"), protocolKind: .openai),
         ProviderPreset(id: "gemini", name: "Google Gemini", baseURL: "https://generativelanguage.googleapis.com/v1beta/openai", models: ["gemini-2.5-pro", "gemini-2.5-flash"], hint: String(localized: "Gemini 的 OpenAI 兼容端点,使用 Google AI Studio 的 API Key。"), protocolKind: .openai),
         ProviderPreset(id: "ollama", name: "Ollama", baseURL: "http://localhost:11434/v1", models: ["qwen3-coder"], hint: String(localized: "本机 Ollama 的 OpenAI 兼容端点,无需密钥;模型需要支持工具调用。"), protocolKind: .openai, keyOptional: true),
         ProviderPreset(id: "lmstudio", name: "LM Studio", baseURL: "http://localhost:1234/v1", models: ["local-model"], hint: String(localized: "本机 LM Studio 的 OpenAI 兼容端点,无需密钥;请在 LM Studio 中先加载模型。"), protocolKind: .openai, keyOptional: true),
         ProviderPreset(id: "opencode-go", name: "OpenCode Go", baseURL: "https://opencode.ai/zen/go/v1", models: ["glm-4.6"], hint: String(localized: "OpenCode Go 订阅的 OpenAI 协议端点;模型名以其控制台为准,可用「获取模型列表」同步。"), protocolKind: .openai, opencodeCompat: true),
-        ProviderPreset(id: "opencode-free", name: String(localized: "OpenCode Zen 免费模型"), baseURL: "https://opencode.ai/zen/v1", models: ["big-pickle"], hint: String(localized: "OpenCode 的免费模型(OpenAI 协议)。官方可能只允许 OpenCode 自家客户端调用;若被拒绝会给出明确提示,可改用 OpenCode Go 或付费 Key。"), protocolKind: .openai, keyOptional: true, opencodeCompat: true),
+        ProviderPreset(id: "opencode-free", name: String(localized: "OpenCode 免费模型(Go)"), baseURL: "https://opencode.ai/zen/go/v1", models: ["longcat-2.5-preview-free"], hint: String(localized: "OpenCode 的限时免费模型(LongCat、Cat Jam 等)走 Go 端点,需要 OpenCode 账号的 API Key;Zen 端点的免费层仅限官方客户端。"), protocolKind: .openai, opencodeCompat: true),
     ]
 
     /// 由预设生成提供商。
@@ -410,7 +411,7 @@ public enum ProviderTester {
                 request.setValue("Bearer \(trimmed)", forHTTPHeaderField: "Authorization")
             }
         }
-        guard provider.isOpenAIProtocol else { return }
+        // 兼容头对两种协议都生效(Anthropic 协议的 Zen 端点同样需要 UA 与会话头);测试请求用一次性会话
         if provider.opencodeCompat == true {
             for (name, value) in ProviderBridge.opencodeHeaders() { request.setValue(value, forHTTPHeaderField: name) }
         }
@@ -423,9 +424,7 @@ public enum ProviderTester {
     /// 把 HTTP 状态翻译成可操作的提示(正文仅取前 160 字,且经脱敏)。
     static func describe(status: Int, body: Data) -> String {
         let snippet = LogRedactor.redact(String(String(data: body, encoding: .utf8)?.prefix(160) ?? ""))
-        if String(data: body, encoding: .utf8)?.contains("FreeTierError") == true {
-            return String(localized: "该免费模型仅限 OpenCode 官方客户端使用(FreeTierError)。请改用 OpenCode Go 或自己的付费 API Key。")
-        }
+        if let special = UpstreamHints.message(for: body) { return special }
         let head: String
         switch status {
         case 401, 403: head = String(localized: "鉴权失败(\(status)):请检查 API Key 是否正确、是否有该模型权限")

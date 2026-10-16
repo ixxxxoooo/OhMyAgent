@@ -72,7 +72,7 @@ struct ProviderAdvancedTests {
         let migrated = old.migrated()
         #expect(migrated.usesAPIKeyHeader == true && migrated.opencodeCompat == true)
         let route = try #require(ProviderBridge.route(for: migrated, key: "k"))
-        #expect(route.usesAPIKeyHeader && route.extraHeaders["User-Agent"]?.hasPrefix("opencode/") == true)
+        #expect(route.usesAPIKeyHeader && route.extraHeaders["User-Agent"]?.hasPrefix("OhMyAgent/") == true && route.extraHeaders["x-opencode-session"]?.hasPrefix("ses_") == true)
         // 用户显式关闭过的不覆盖
         var custom = old
         custom.usesAPIKeyHeader = false
@@ -144,5 +144,51 @@ extension ProviderTesterTests {
         StubURLProtocol.handler = { _ in (401, Data()) }
         let denied = await ProviderModelFetcher.fetch(provider, key: "bad", session: Self.session())
         if case .failure(let error) = denied { #expect(error.message.contains("鉴权失败")) } else { Issue.record("应失败") }
+    }
+}
+
+@Suite("OpenCode 会话头")
+struct OpenCodeSessionHeaderTests {
+    @Test("同一会话键的会话 id 恒定,不同键不同;格式为 ses_ + 24 位十六进制")
+    func stableSession() {
+        let a1 = ProviderBridge.opencodeSessionID(for: "chat-a")
+        let a2 = ProviderBridge.opencodeSessionID(for: "chat-a")
+        let b = ProviderBridge.opencodeSessionID(for: "chat-b")
+        #expect(a1 == a2 && a1 != b)
+        #expect(a1.hasPrefix("ses_") && a1.count == 28)
+        #expect(ProviderBridge.opencodeSessionID(for: "") != ProviderBridge.opencodeSessionID(for: ""), "空键为一次性随机 id")
+    }
+
+    @Test("兼容头使用自有 UA,不伪装成 opencode 官方客户端")
+    func ownUserAgent() {
+        let headers = ProviderBridge.opencodeHeaders(sessionKey: "k")
+        #expect(headers["User-Agent"]?.hasPrefix("OhMyAgent/") == true)
+        #expect(headers["x-opencode-session"] == ProviderBridge.opencodeSessionID(for: "k"))
+        #expect(headers.keys.allSatisfy { $0 == "User-Agent" || $0 == "x-opencode-session" })
+    }
+
+    @Test("路由按会话键派生会话头;两种协议的测试请求都带兼容头")
+    func routeAndTesterHeaders() throws {
+        var provider = ModelProvider(id: "o", name: "O", baseURL: "https://opencode.ai/zen/go/v1", model: "m", protocolKind: .openai, opencodeCompat: true)
+        let route1 = try #require(ProviderBridge.route(for: provider, key: "k", sessionKey: "chat-a"))
+        let route2 = try #require(ProviderBridge.route(for: provider, key: "k", sessionKey: "chat-b"))
+        #expect(route1.extraHeaders["x-opencode-session"] != route2.extraHeaders["x-opencode-session"])
+        for kind in [ProviderProtocol.openai, .anthropic] {
+            provider.protocolKind = kind == .openai ? .openai : nil
+            var request = URLRequest(url: try #require(URL(string: "https://opencode.ai/x")))
+            ProviderTester.applyAuth(&request, provider: provider, key: "k")
+            #expect(request.value(forHTTPHeaderField: "x-opencode-session") != nil)
+            #expect(request.value(forHTTPHeaderField: "User-Agent")?.hasPrefix("OhMyAgent/") == true)
+        }
+    }
+
+    @Test("旧「Zen 免费模型」预设迁移到 Go 端点;错误码有可操作提示")
+    func freePresetMigration() {
+        let old = ModelProvider(id: "f", name: "F", baseURL: "https://opencode.ai/zen/v1/", model: "big-pickle", presetId: "opencode-free", protocolKind: .openai, keyOptional: true)
+        let migrated = old.migrated()
+        #expect(migrated.baseURL == "https://opencode.ai/zen/go/v1" && migrated.requiresKey && migrated.opencodeCompat == true)
+        #expect(ProviderTester.describe(status: 403, body: Data(#"{"error":{"type":"FreeTierError"}}"#.utf8)).contains("OpenCode Go"))
+        #expect(ProviderTester.describe(status: 400, body: Data(#"{"error":{"type":"MissingSessionID"}}"#.utf8)).contains("x-opencode-session"))
+        #expect(ProviderTester.describe(status: 400, body: Data(#"{"error":{"type":"ModelProtocolUnsupported"}}"#.utf8)).contains("协议"))
     }
 }

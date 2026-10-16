@@ -94,6 +94,12 @@ extension ModelProvider {
         // (旧版预设没有这两项,导致 401 / 1010)
         if presetId == "opencode", usesAPIKeyHeader == nil { copy.usesAPIKeyHeader = true }
         if presetId == "opencode", opencodeCompat == nil { copy.opencodeCompat = true }
+        // 旧版「Zen 免费模型」预设指向 zen/v1(免费层仅限官方客户端,必然 FreeTierError):改指 Go 端点
+        if presetId == "opencode-free", baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/")) == "https://opencode.ai/zen/v1" {
+            copy.baseURL = "https://opencode.ai/zen/go/v1"
+            copy.keyOptional = nil
+            copy.opencodeCompat = true
+        }
         return copy
     }
 
