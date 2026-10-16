@@ -10,7 +10,7 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 不做账号登录 UI:直接使用本机 `claude` 自带的凭据。
 
 ### 模块地图(`Sources/`)
-- `ACPKit`:JSON-RPC、ACP v1 模型、连接 actor、脚本化 Agent(测试用)。
+- `ACPKit`:JSON-RPC、ACP v1 模型、连接 actor、脚本化 Agent(测试用)与声明式场景引擎(`ScenarioEngine`、演示场景目录 `DemoScenarios`、演示历史会话 `DemoHistory`)。
 - `AgentHost`:子进程、工具链定位、Agent 注册表、Bridge。
 - `ChatKit`:会话模型(含运行中引导/排队/图片/目标)、时间线、补全(来源徽标、@子 Agent)、等待文案(`WorkingStatus`)、AskUserQuestion 向导模型(`ElicitationQuestions`)、客户端斜杠命令(`LocalCommands`)、Markdown 解析、更新检查、AttentionCenter(运行/未读状态)、RecentStore(无视图)。
 - `WorkbenchKit`:工作台模型(多项目、项目→会话树、布局与状态持久化、标签页 LRU 保活 `TabKeepAlive`、侧栏尺寸与分隔条几何 `PanelDividers`,无视图)。
@@ -22,12 +22,14 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 - `IconKit`:Lucide 功能图标(生成数据 + SVG path 解析 + `Image.om`)与彩色文件类型图标(`OMFileIcon`,Material Icon Theme);界面禁止再用 SF Symbol(`Scripts/gen-icons.py`、`Scripts/gen-file-icons.py` 重新生成)。
 - `DesignSystem`:设计令牌(含 `OMDiffPalette` 不透明 Diff 配色)、玻璃材质、标签活动状态(`TabActivity`)。
 - `OhMyAgentApp`:应用本体(SwiftUI/AppKit 视图)。
+- `DemoKit`:演示模式(无视图):沙盒路径、隔离层 `DemoEnvironment`、确定性生成演示项目与 Git 仓库、预置工作台状态与演示 `.claude`。
 - `FakeAgent` / `OhMyAgentBridge`:辅助可执行文件。
 - 新增模块请登记在本节与「开发进度.md」的代码索引中。
 
 ## 2. 常用命令
 - 构建并组装应用:`Scripts/bundle.sh [debug|release]`
-- 重启应用(结束旧进程 → 构建 → 启动):`Scripts/restart.sh`(`OMA_AGENT=fake` 使用脚本化 Agent)
+- 重启应用(结束旧进程 → 构建 → 启动):`Scripts/restart.sh`(`OMA_AGENT=fake` 使用脚本化 Agent;`OMA_DEMO=1` 进入演示模式)
+- 演示模式(隔离沙盒 + 脚本化 Agent,测试会话流/工具卡/子 Agent/Git 的首选方式):`Scripts/demo.sh [--reset] [--scenario <名>]`
 - 本地 CI(零警告构建 + 全部测试):`Scripts/ci.sh`
 - 性能门槛:`Scripts/perf.sh`;发布:`Scripts/release.sh`
 - 日志:`Scripts/logs.sh`(P1 之后可用)
@@ -65,6 +67,7 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 
 ## 6. UI 验证约定(不抢焦点)
 - 启动:`open -g -n build/OhMyAgent.app --env OMA_AGENT=fake --env OMA_PROJECT_ROOT=$PWD`。
+- 演示模式:`OMA_DEMO=1`、`OMA_DEMO_ROOT`、`OMA_DEMO_RESET=1`、`OMA_DEMO_SCENARIO=<场景名>`;输入框 `/demo-<场景名>` 或命令面板「演示场景」运行场景;新增工具卡/条目类型必须补演示场景(覆盖守卫测试会失败提醒)。
 - 调试钩子:`OMA_DRAFT`、`OMA_OPEN_SETTINGS`、`OMA_SETTINGS_PAGE`、`OMA_AGENT=fake|direct`、`OMA_LSP_PROBE=行:列`、`OMA_AUTOALLOW`(自动批准权限)、`OMA_USAGE_PANEL`(展开上下文用量面板)、`OMA_BRANCH_MENU`(展开分支切换弹层)、`OMA_PERF_OUT`。
 - 截图用 `screencapture -x -o -l<windowId>`;禁止用 osascript 发送按键;验证后删除截图。
 - 每次改动后重启应用与适配器子进程,确认修改在运行时真实生效。
