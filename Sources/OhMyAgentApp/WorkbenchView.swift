@@ -192,6 +192,7 @@ struct WorkbenchView: View {
                 SearchModel.shared.query = query
             }
         }
+        if env["OMA_OPEN_AUTOMATION"] != nil { workbench.openAutomation() }
         if let mode = env["OMA_PALETTE"] {
             // 调试:打开命令面板/快速打开,可预填查询
             PaletteModel.present(mode == "commands" ? .commands : .files, workbench: workbench)

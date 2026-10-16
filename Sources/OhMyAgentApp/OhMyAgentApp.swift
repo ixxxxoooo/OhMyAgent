@@ -40,6 +40,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if !DemoLaunch.isActive { AppNotifier.shared.install() }
         AppEnvironment.shared.bootstrap()
+        AutomationService.shared.start()
         StatusItemController.shared.start()
         AppearanceModel.shared.applyAll()
         Task { await Toolchain.shared.setOverrides(ClientPrefs.pathOverrides()) }

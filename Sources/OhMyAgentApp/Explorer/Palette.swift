@@ -72,6 +72,7 @@ enum PaletteCommands {
             workbench.layout.placement.terminal == .bottom
                 ? PaletteCommand(id: "bottom", title: workbench.layout.bottomVisible ? String(localized: "隐藏底部面板") : String(localized: "显示底部面板"), icon: "panel-bottom", shortcut: key(.togglePanel)) { workbench.toggleBottom() }
                 : PaletteCommand(id: "bottom", title: workbench.isTerminalShown ? String(localized: "隐藏终端") : String(localized: "显示终端"), icon: "square-terminal", shortcut: key(.togglePanel)) { workbench.toggleTerminal() },
+            PaletteCommand(id: "automation", title: String(localized: "打开自动化"), icon: "workflow", shortcut: nil) { workbench.openAutomation() },
             PaletteCommand(id: "output", title: workbench.isOutputShown ? String(localized: "隐藏输出面板") : String(localized: "显示输出面板"), icon: "panel-bottom", shortcut: nil) {
                 workbench.toggleOutput()
             },

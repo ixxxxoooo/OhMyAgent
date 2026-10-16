@@ -702,10 +702,25 @@ public final class WorkbenchModel {
         layout.clamp()
     }
 
+    // MARK: 自动化页
+
+    /// 自动化页在编辑区里的标签标识(预览类标签)。
+    public nonisolated static let automationTabID = "oma-automation"
+
+    /// 打开(或切到)自动化页标签。
+    @discardableResult
+    public func openAutomation() -> UUID {
+        mode = .workspace
+        let tab = dock.open(.preview(id: Self.automationTabID), title: String(localized: "自动化"))
+        dock.activate(tab)
+        syncSelectionFromDock()
+        return tab
+    }
+
     // MARK: 输出面板
 
     /// 输出面板在编辑区里的标签标识(放在编辑区时作为预览类标签)。
-    public static let outputTabID = "oma-output"
+    public nonisolated static let outputTabID = "oma-output"
 
     /// 编辑区中的输出标签。
     private var outputTabs: [WorkbenchTab] {

@@ -24,7 +24,13 @@ struct TabContentView: View {
         case .changes(let projectID): ChangesTabView(workbench: workbench, projectID: projectID)
         case .subagent(let projectID, let toolCallID): SubagentTabView(workbench: workbench, projectID: projectID, toolCallID: toolCallID)
         case .preview(let id):
-            if id == WorkbenchModel.outputTabID { LogViewerView() } else { PreviewTabView(id: id) }
+            if id == WorkbenchModel.outputTabID {
+                LogViewerView()
+            } else if id == WorkbenchModel.automationTabID {
+                AutomationPage(workbench: workbench)
+            } else {
+                PreviewTabView(id: id)
+            }
         case .history(let projectID, let path): GitHistoryTabView(workbench: workbench, projectID: projectID, path: path)
         case .blame(let path): GitBlameTabView(workbench: workbench, path: path)
         case .agentTerminal(let projectID, let terminalID): AgentTerminalTabView(workbench: workbench, projectID: projectID, terminalID: terminalID)

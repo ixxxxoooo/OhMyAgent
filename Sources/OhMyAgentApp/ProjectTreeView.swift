@@ -132,7 +132,7 @@ struct ProjectTreeView: View {
 
     // MARK: 顶部主操作
 
-    /// 主操作区:新对话、搜索(点击展开输入框)、自定义(进入设置)。
+    /// 主操作区:新对话、搜索(点击展开输入框)、自动化(打开自动化页)。
     private var navigation: some View {
         VStack(spacing: 2) {
             NavRow(title: "新对话", icon: "square.and.pencil", shortcut: ShortcutStore.shared.binding(for: .newConversation).display) {
@@ -142,7 +142,7 @@ struct ProjectTreeView: View {
             NavRow(title: "搜索", icon: "magnifyingglass", shortcut: ShortcutStore.shared.binding(for: .hubSearch).display) {
                 HubModel.shared.present(.all, workbench: workbench)
             }
-            NavRow(title: "自定义", icon: "slider.horizontal.3", shortcut: nil) { AppActions.shared.openSettings() }
+            NavRow(title: "自动化", icon: "workflow", shortcut: nil) { workbench.openAutomation() }
         }
         .padding(.horizontal, 10)
         .padding(.bottom, 8)
