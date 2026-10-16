@@ -268,12 +268,12 @@ private struct CommitDetailView: View {
                     }
                     if let diff {
                         Divider().padding(.vertical, 6)
-                        Picker("显示模式", selection: $sideBySide) {
-                            Text("并排").tag(true)
-                            Text("统一").tag(false)
-                        }
-                        .pickerStyle(.segmented).labelsHidden().frame(width: 100).padding(.horizontal, 12)
-                        .accessibilityLabel("Diff 显示模式")
+                        OMCompactSegmented(
+                            options: [(value: true, title: "并排"), (value: false, title: "统一")],
+                            selection: $sideBySide,
+                            accessibilityName: String(localized: "Diff 显示模式")
+                        )
+                        .padding(.horizontal, 12)
                         Group {
                             if sideBySide { SideBySideDiffView(diff: diff) } else { DiffView(diff: diff) }
                         }

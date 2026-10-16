@@ -146,7 +146,7 @@ private struct ExplorerRow: View {
                     if let chevron { Image.om(chevron, size: 10) } else { Color.clear }
                 }
                 .frame(width: 12)
-                OMFileIcon(name: name, isDirectory: isDirectory, expanded: expanded, size: 16)
+                OMFileIcon(name: name, isDirectory: isDirectory, expanded: expanded, size: OMMetrics.fileIconList)
                 Text(name).font(OMFonts.small).lineLimit(1).truncationMode(.middle)
                     .foregroundStyle(decoration.map(Self.tint) ?? Color.primary)
                 Spacer(minLength: 0)

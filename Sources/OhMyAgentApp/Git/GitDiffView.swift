@@ -65,19 +65,18 @@ struct GitFileDiffView: View {
                 Text("−\(diff.removed)").foregroundStyle(OMColors.diffRemoved)
             }
             Spacer()
-            Picker("范围", selection: $scope) {
-                Text("全部").tag(GitDiffScope.workingTree)
-                Text("已暂存").tag(GitDiffScope.staged)
-                Text("未暂存").tag(GitDiffScope.unstaged)
-            }
-            .pickerStyle(.segmented).labelsHidden().frame(width: 170)
-            .accessibilityLabel("Diff 范围")
-            Picker("显示模式", selection: $sideBySide) {
-                Text("并排").tag(true)
-                Text("统一").tag(false)
-            }
-            .pickerStyle(.segmented).labelsHidden().frame(width: 100)
-            .accessibilityLabel("Diff 显示模式")
+            OMCompactSegmented(
+                options: [(value: GitDiffScope.workingTree, title: "全部"), (value: .staged, title: "已暂存"), (value: .unstaged, title: "未暂存")],
+                selection: $scope,
+                accessibilityName: String(localized: "Diff 范围")
+            )
+            // 与上一组之间留出间距,避免两组控件挤成一条
+            Spacer().frame(width: 8)
+            OMCompactSegmented(
+                options: [(value: true, title: "并排"), (value: false, title: "统一")],
+                selection: $sideBySide,
+                accessibilityName: String(localized: "Diff 显示模式")
+            )
             hunkNavigator
             if !embedded {
                 Button("在编辑器中打开") { workbench.openFile(path, preview: false) }

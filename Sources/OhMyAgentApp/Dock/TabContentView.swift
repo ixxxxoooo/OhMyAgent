@@ -258,14 +258,11 @@ struct DiffTabView: View {
                         Text("+\(found.change.diff.added)").foregroundStyle(OMColors.diffAdded)
                         Text("−\(found.change.diff.removed)").foregroundStyle(OMColors.diffRemoved)
                         Spacer()
-                        Picker("显示模式", selection: $sideBySide) {
-                            Text("并排").tag(true)
-                            Text("统一").tag(false)
-                        }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
-                        .frame(width: 100)
-                        .accessibilityLabel("Diff 显示模式")
+                        OMCompactSegmented(
+                            options: [(value: true, title: "并排"), (value: false, title: "统一")],
+                            selection: $sideBySide,
+                            accessibilityName: String(localized: "Diff 显示模式")
+                        )
                         Button("在编辑器中打开") { workbench.openFile(path, line: found.change.diff.hunks.first?.newStart, preview: false) }
                             .controlSize(.small)
                         if found.change.status == .pending || found.change.status == .partiallyReverted {

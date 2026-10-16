@@ -379,7 +379,7 @@ private struct HubRow: View {
     private var icon: some View {
         switch item.candidate.icon {
         case .symbol(let name): Image.om(name, size: 14).foregroundStyle(OMColors.secondaryText)
-        case .file(let name, let isDirectory): OMFileIcon(name: name, isDirectory: isDirectory, size: 16)
+        case .file(let name, let isDirectory): OMFileIcon(name: name, isDirectory: isDirectory, size: OMMetrics.fileIconList)
         }
     }
 

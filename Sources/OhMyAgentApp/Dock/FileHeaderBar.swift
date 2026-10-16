@@ -114,33 +114,19 @@ private struct HeaderIconButton: View {
     }
 }
 
-/// 显示模式切换:紧凑的分段控件,选中项有轻量底色(替代系统分段控件的厚重外观)。
+/// 显示模式切换:使用统一的紧凑分段控件 `OMCompactSegmented`。
 private struct ModeSwitch: View {
     let modes: [FileViewMode]
     let mode: FileViewMode
     let onMode: (FileViewMode) -> Void
 
     var body: some View {
-        HStack(spacing: 2) {
-            ForEach(modes) { item in
-                Button { onMode(item) } label: {
-                    Text(item.title)
-                        .font(OMFonts.caption)
-                        .foregroundStyle(item == mode ? Color.primary : OMColors.secondaryText)
-                        .padding(.horizontal, 9)
-                        .frame(height: 20)
-                        .background(Capsule().fill(item == mode ? Color.primary.opacity(0.1) : .clear))
-                        .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(item == mode ? [.isButton, .isSelected] : .isButton)
-            }
-        }
-        .padding(2)
-        .background(Capsule().fill(Color.primary.opacity(0.04)))
-        .overlay(Capsule().strokeBorder(OMColors.hairline.opacity(0.6), lineWidth: 0.5))
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(String(localized: "文件显示模式"))
+        OMCompactSegmented(
+            options: modes.map { (value: $0, title: $0.title) },
+            selection: mode,
+            accessibilityName: String(localized: "文件显示模式"),
+            onSelect: onMode
+        )
     }
 }
 
