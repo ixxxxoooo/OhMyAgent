@@ -14,7 +14,8 @@ final class AppEnvironment {
     let workbench: WorkbenchModel
 
     private init() {
-        workbench = WorkbenchModel { url in
+        let store = DemoLaunch.environment.map { WorkbenchStore(fileURL: $0.workbenchStoreURL) } ?? WorkbenchStore()
+        workbench = WorkbenchModel(store: store) { url in
             AppEnvironment.makeSession(workspace: url, descriptor: Toolchain.defaultDescriptor())
         }
     }
@@ -22,7 +23,8 @@ final class AppEnvironment {
     /// 创建会话模型并接入应用层能力(系统通知)。
     static func makeSession(workspace: URL, descriptor: AgentDescriptor) -> SessionModel {
         let model = SessionModel(workspace: workspace, descriptor: descriptor)
-        model.notifier = { title, message in AppNotifier.send(title: title, message: message) }
+        // 演示模式不发系统通知
+        if !DemoLaunch.isActive { model.notifier = { title, message in AppNotifier.send(title: title, message: message) } }
         return model
     }
 
@@ -32,6 +34,12 @@ final class AppEnvironment {
         let env = ProcessInfo.processInfo.environment
         if let list = env["OMA_OPEN_PROJECTS"], !list.isEmpty {
             for path in list.split(separator: ":") { workbench.openProject(URL(fileURLWithPath: String(path))) }
+        } else if DemoLaunch.isActive {
+            // 演示模式:工作台为空(首次或重置)时打开全部演示项目,首个项目为当前项目
+            if workbench.projects.isEmpty {
+                let ids = DemoLaunch.projects.compactMap { workbench.openProject(URL(fileURLWithPath: $0.path)) }
+                if let first = ids.first { workbench.select(project: first) }
+            }
         } else if workbench.projects.isEmpty,
                   let legacy = UserDefaults.standard.string(forKey: "lastWorkspacePath"),
                   legacy != NSHomeDirectory() {

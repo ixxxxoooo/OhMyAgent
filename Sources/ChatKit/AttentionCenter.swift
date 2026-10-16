@@ -3,6 +3,7 @@
 // 规则:运行时点闪烁;运行结束后未被查看则常亮;用户打开对应会话或点击通知后消失。
 
 import Foundation
+import os
 import Observation
 import OMLog
 
@@ -148,15 +149,27 @@ public enum RecentStore {
     static let sessionsKey = "recent.sessions"
     static let projectsKey = "recent.projects"
 
+    private static let suiteName = OSAllocatedUnfairLock<String?>(initialState: nil)
+
+    /// 默认存储:未指定 suite 时为 `UserDefaults.standard`;演示模式启动时改用独立 suite,避免污染真实的最近项目/会话。
+    public static var defaults: UserDefaults {
+        guard let name = suiteName.withLock({ $0 }) else { return .standard }
+        return UserDefaults(suiteName: name) ?? .standard
+    }
+
+    /// 切换默认存储所用的 suite。
+    /// - Parameter name: suite 名称;nil 恢复为 `UserDefaults.standard`
+    public static func useSuite(_ name: String?) { suiteName.withLock { $0 = name } }
+
     /// 读取最近会话(新→旧)。
     /// - Parameter defaults: 存储
-    public static func sessions(_ defaults: UserDefaults = .standard) -> [RecentSession] {
+    public static func sessions(_ defaults: UserDefaults = RecentStore.defaults) -> [RecentSession] {
         guard let data = defaults.data(forKey: sessionsKey), let list = try? JSONDecoder().decode([RecentSession].self, from: data) else { return [] }
         return list.sorted { $0.date > $1.date }
     }
 
     /// 记录一次会话(同 sessionId 去重,最多保留 20 条)。
-    public static func record(_ session: RecentSession, _ defaults: UserDefaults = .standard) {
+    public static func record(_ session: RecentSession, _ defaults: UserDefaults = RecentStore.defaults) {
         guard !session.sessionId.isEmpty, !session.workspacePath.isEmpty else { return }
         var list = sessions(defaults).filter { $0.sessionId != session.sessionId }
         list.insert(session, at: 0)
@@ -164,16 +177,16 @@ public enum RecentStore {
     }
 
     /// 清空最近会话。
-    public static func clearSessions(_ defaults: UserDefaults = .standard) { defaults.removeObject(forKey: sessionsKey) }
+    public static func clearSessions(_ defaults: UserDefaults = RecentStore.defaults) { defaults.removeObject(forKey: sessionsKey) }
 
     /// 读取最近项目路径(新→旧,已不存在的目录会被过滤)。
-    public static func projects(_ defaults: UserDefaults = .standard) -> [String] {
+    public static func projects(_ defaults: UserDefaults = RecentStore.defaults) -> [String] {
         let list = defaults.stringArray(forKey: projectsKey) ?? []
         return list.filter { FileManager.default.fileExists(atPath: $0) }
     }
 
     /// 记录项目(去重置顶,最多 12 个)。
-    public static func recordProject(_ path: String, _ defaults: UserDefaults = .standard) {
+    public static func recordProject(_ path: String, _ defaults: UserDefaults = RecentStore.defaults) {
         guard !path.isEmpty else { return }
         var list = (defaults.stringArray(forKey: projectsKey) ?? []).filter { $0 != path }
         list.insert(path, at: 0)
@@ -181,5 +194,5 @@ public enum RecentStore {
     }
 
     /// 清空最近项目。
-    public static func clearProjects(_ defaults: UserDefaults = .standard) { defaults.removeObject(forKey: projectsKey) }
+    public static func clearProjects(_ defaults: UserDefaults = RecentStore.defaults) { defaults.removeObject(forKey: projectsKey) }
 }

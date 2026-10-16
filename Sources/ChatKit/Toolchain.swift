@@ -54,10 +54,13 @@ public actor Toolchain {
         return nil
     }
 
-    /// 选择默认 Agent 描述符:`OMA_AGENT=fake` 时使用与可执行文件同目录的 FakeAgent(用于 UI 开发与测试)。
+    /// 是否处于演示模式(`OMA_DEMO=1`):强制使用脚本化 Agent,避免误连真实 Claude。
+    public nonisolated static var isDemoMode: Bool { ProcessInfo.processInfo.environment["OMA_DEMO"] == "1" }
+
+    /// 选择默认 Agent 描述符:演示模式或 `OMA_AGENT=fake` 时使用与可执行文件同目录的 FakeAgent(用于 UI 开发与测试)。
     /// - Returns: 描述符
     public nonisolated static func defaultDescriptor() -> AgentDescriptor {
-        if ProcessInfo.processInfo.environment["OMA_AGENT"] == "fake" {
+        if isDemoMode || ProcessInfo.processInfo.environment["OMA_AGENT"] == "fake" {
             let dir = URL(fileURLWithPath: Bundle.main.executablePath ?? CommandLine.arguments[0]).deletingLastPathComponent()
             let path = dir.appendingPathComponent("FakeAgent").path
             return AgentDescriptor(id: "fake", name: "Fake Agent", kind: .genericACP, command: path, summary: "脚本化测试 Agent")

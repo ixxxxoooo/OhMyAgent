@@ -38,15 +38,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             UserDefaults.standard.removeObject(forKey: ClientPrefs.Key.showMenuBar)
             UserDefaults.standard.set(true, forKey: "migration.trayDefaultOn")
         }
-        AppNotifier.shared.install()
+        if !DemoLaunch.isActive { AppNotifier.shared.install() }
         AppEnvironment.shared.bootstrap()
         StatusItemController.shared.start()
         AppearanceModel.shared.applyAll()
         Task { await Toolchain.shared.setOverrides(ClientPrefs.pathOverrides()) }
         // 首帧之后再做自动更新检查,不占用启动关键路径
-        Task { @MainActor in
-            try? await Task.sleep(for: .seconds(8))
-            UpdateModel.shared.autoCheckIfNeeded()
+        if !DemoLaunch.isActive {
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(8))
+                UpdateModel.shared.autoCheckIfNeeded()
+            }
         }
         // 由脚本启动(open -g)时不抢占前台焦点
         if ProcessInfo.processInfo.environment["OMA_DRAFT"] == nil && ProcessInfo.processInfo.environment["OMA_OPEN_SETTINGS"] == nil { NSApp.activate() }
@@ -114,12 +116,14 @@ struct OhMyAgentApp: App {
 
     init() {
         Log.bootstrap(process: "app")
+        DemoLaunch.activateIfRequested()
         DiagnosticsStore.shared.markLaunch()
     }
 
     var body: some Scene {
         Window("OhMyAgent", id: "main") {
             WorkbenchView(workbench: AppEnvironment.shared.workbench)
+                .overlay(alignment: .top) { if DemoLaunch.isActive { DemoBadgeView().padding(.top, 6) } }
         }
         .defaultSize(width: 1280, height: 820)
         .windowToolbarStyle(.unifiedCompact(showsTitle: false))

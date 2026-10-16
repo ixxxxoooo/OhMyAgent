@@ -891,3 +891,5 @@
 "展开" = "Expand";
 "演示模式" = "Demo Mode";
 "演示模式:数据来自沙盒,Agent 为脚本化演示 Agent,不会触碰真实项目与账号" = "Demo mode: data comes from a sandbox and the agent is a scripted demo agent; real projects and accounts are untouched";
+"演示模式" = "Demo Mode";
+"演示模式:数据来自沙盒,Agent 为脚本化演示 Agent,不会触碰真实项目与账号" = "Demo mode: data comes from a sandbox and the agent is a scripted demo agent; real projects and accounts are untouched";
