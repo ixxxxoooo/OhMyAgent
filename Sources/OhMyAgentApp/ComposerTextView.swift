@@ -15,6 +15,21 @@ enum CompletionKey { case up, down, accept, dismiss }
 final class ComposerController {
     weak var textView: SubmitTextView?
 
+    /// 在当前选区处插入文本(与前一个字符粘连时自动补一个空格),光标落在插入内容之后。
+    /// - Parameter string: 要插入的文本
+    func insertAtSelection(_ string: String) {
+        guard let textView, !string.isEmpty else { return }
+        let ns = textView.string as NSString
+        let selection = textView.selectedRange()
+        var text = string
+        if selection.location > 0, selection.location <= ns.length {
+            let previous = ns.character(at: selection.location - 1)
+            if let scalar = Unicode.Scalar(previous), !CharacterSet.whitespacesAndNewlines.contains(scalar) { text = " " + text }
+        }
+        textView.window?.makeFirstResponder(textView)
+        textView.insertText(text, replacementRange: selection)
+    }
+
     /// 替换指定范围的文本,光标落在替换内容之后。
     /// - Parameters:
     ///   - range: UTF-16 范围
@@ -41,6 +56,8 @@ final class SubmitTextView: NSTextView {
     var onImages: (([ImageAttachment]) -> Void)?
     /// 是否接受图片(Agent 不支持图片时不接管粘贴)
     var acceptsImages: () -> Bool = { false }
+    /// 粘贴/拖入非图片文件或文件夹:由外部转成 `@路径` 提及
+    var onFileURLs: (([URL]) -> Void)?
     var placeholder: String = "" { didSet { refreshPlaceholder() } }
 
     override func keyDown(with event: NSEvent) {
@@ -84,32 +101,51 @@ final class SubmitTextView: NSTextView {
         super.keyDown(with: event)
     }
 
-    /// 粘贴:剪贴板含图片时作为附件,否则按纯文本粘贴。
+    /// 粘贴:剪贴板含图片时作为附件,含文件/文件夹时转成 `@路径`,否则按纯文本粘贴。
     override func paste(_ sender: Any?) {
         if acceptsImages(), ImageIntake.prefersImage(.general) {
             let images = ImageIntake.attachments(from: .general)
             if !images.isEmpty {
                 onImages?(images)
+                // 同一次粘贴里的非图片文件也一并引用
+                let others = ImageIntake.nonImageFileURLs(from: .general)
+                if !others.isEmpty { onFileURLs?(others) }
                 return
             }
+        }
+        let files = ImageIntake.nonImageFileURLs(from: .general)
+        if !files.isEmpty, onFileURLs != nil {
+            onFileURLs?(files)
+            return
         }
         pasteAsPlainText(sender)
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        if acceptsImages(), ImageIntake.hasImage(sender.draggingPasteboard) { return .copy }
+        let board = sender.draggingPasteboard
+        if acceptsImages(), ImageIntake.hasImage(board) { return .copy }
+        if onFileURLs != nil, ImageIntake.hasFileURLs(board) { return .copy }
         return super.draggingEntered(sender)
     }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        if acceptsImages(), ImageIntake.hasImage(sender.draggingPasteboard) {
-            let images = ImageIntake.attachments(from: sender.draggingPasteboard)
+        let board = sender.draggingPasteboard
+        var handled = false
+        if acceptsImages(), ImageIntake.hasImage(board) {
+            let images = ImageIntake.attachments(from: board)
             if !images.isEmpty {
                 onImages?(images)
-                return true
+                handled = true
             }
         }
-        return super.performDragOperation(sender)
+        if onFileURLs != nil {
+            let files = ImageIntake.nonImageFileURLs(from: board)
+            if !files.isEmpty {
+                onFileURLs?(files)
+                handled = true
+            }
+        }
+        return handled ? true : super.performDragOperation(sender)
     }
 
     // MARK: 占位文字
@@ -190,6 +226,7 @@ struct ComposerTextView: NSViewRepresentable {
     var onSubmitAfterTurn: (() -> Void)?
     var onImages: (([ImageAttachment]) -> Void)?
     var acceptsImages: () -> Bool = { false }
+    var onFileURLs: (([URL]) -> Void)?
     /// 文本或光标变化(未处于输入法组合态时)
     var onEdit: ((String, Int) -> Void)?
     /// 选中文字变化(无选中为 nil)
@@ -221,7 +258,8 @@ struct ComposerTextView: NSViewRepresentable {
         textView.onSubmitAfterTurn = { [coordinator = context.coordinator] in coordinator.parent.onSubmitAfterTurn?() }
         textView.onImages = { [coordinator = context.coordinator] images in coordinator.parent.onImages?(images) }
         textView.acceptsImages = { [coordinator = context.coordinator] in coordinator.parent.acceptsImages() }
-        textView.registerForDraggedTypes([.fileURL, .png, .tiff])
+        textView.onFileURLs = { [coordinator = context.coordinator] urls in coordinator.parent.onFileURLs?(urls) }
+        textView.registerForDraggedTypes([.fileURL] + ImageIntake.acceptedTypes.map { NSPasteboard.PasteboardType($0.identifier) })
         textView.setAccessibilityLabel(String(localized: "消息输入框"))
         controller?.textView = textView
 

@@ -69,3 +69,14 @@ struct ImageIntakeTests {
         #expect(!ImageIntake.hasImage(text))
     }
 }
+
+@Suite("图片预览命名")
+struct ImagePreviewNamingTests {
+    @Test("补全缺失或不匹配的扩展名")
+    func suggestedName() {
+        #expect(ImagePreviewNaming.suggestedName("截图", mimeType: "image/png") == "截图.png")
+        #expect(ImagePreviewNaming.suggestedName("a.png", mimeType: "image/png") == "a.png")
+        #expect(ImagePreviewNaming.suggestedName("a.jpg", mimeType: "image/jpeg") == "a.jpg")
+        #expect(ImagePreviewNaming.suggestedName("x/y", mimeType: "image/png") == "x-y.png")
+    }
+}

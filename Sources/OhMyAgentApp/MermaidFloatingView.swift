@@ -353,7 +353,7 @@ private struct MermaidFloatingPanel: View {
 }
 
 /// 标题栏图标按钮。
-private struct FloatingIconButton: View {
+struct FloatingIconButton: View {
     let icon: String
     let help: LocalizedStringKey
     var active = false
@@ -470,11 +470,13 @@ private struct MermaidViewportView: View {
 }
 
 /// 事件层:接管鼠标/触控板/键盘,转成平移与缩放回调。
-private struct MermaidInteractionLayer: NSViewRepresentable {
+struct MermaidInteractionLayer: NSViewRepresentable {
     let onPan: @MainActor (CGPoint) -> Void
     let onZoom: @MainActor (Double, CGPoint) -> Void
     let onDoubleClick: @MainActor () -> Void
     let onClose: @MainActor () -> Void
+    /// 单击(未拖动)回调,参数为视口坐标;灯箱用它实现「点空白处关闭」
+    var onClick: (@MainActor (CGPoint) -> Void)?
 
     func makeNSView(context: Context) -> EventView {
         let view = EventView()
@@ -489,6 +491,7 @@ private struct MermaidInteractionLayer: NSViewRepresentable {
         view.onZoom = onZoom
         view.onDoubleClick = onDoubleClick
         view.onClose = onClose
+        view.onClick = onClick
     }
 
     final class EventView: NSView {
@@ -496,6 +499,8 @@ private struct MermaidInteractionLayer: NSViewRepresentable {
         var onZoom: (@MainActor (Double, CGPoint) -> Void)?
         var onDoubleClick: (@MainActor () -> Void)?
         var onClose: (@MainActor () -> Void)?
+        var onClick: (@MainActor (CGPoint) -> Void)?
+        private var moved = false
         private var lastPoint: CGPoint?
         private var dragging = false
         /// 打开前的第一响应者:关闭后还给它(通常是输入框)
@@ -536,6 +541,7 @@ private struct MermaidInteractionLayer: NSViewRepresentable {
                 return
             }
             dragging = true
+            moved = false
             lastPoint = point(event)
             window?.invalidateCursorRects(for: self)
         }
@@ -544,11 +550,16 @@ private struct MermaidInteractionLayer: NSViewRepresentable {
             let current = point(event)
             guard let last = lastPoint else { lastPoint = current; return }
             lastPoint = current
+            moved = true
             let delta = CGPoint(x: current.x - last.x, y: current.y - last.y)
             MainActor.assumeIsolated { onPan?(delta) }
         }
 
         override func mouseUp(with event: NSEvent) {
+            if !moved, event.clickCount == 1 {
+                let location = point(event)
+                MainActor.assumeIsolated { onClick?(location) }
+            }
             dragging = false
             lastPoint = nil
             window?.invalidateCursorRects(for: self)

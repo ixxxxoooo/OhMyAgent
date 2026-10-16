@@ -61,36 +61,46 @@ struct UserMessageView: View {
 }
 
 /// 图片附件缩略图(解码结果缓存,避免滚动时重复解码)。
+/// 点击在灯箱中查看原图;输入框里的缩略图在悬停时于右上角出现移除按钮(对标 Cursor)。
 struct AttachmentThumbnail: View {
     let attachment: ImageAttachment
     var size: CGFloat = 56
-    /// 非 nil 时在右上角显示移除按钮
+    /// 非 nil 时悬停显示右上角移除按钮
     var onRemove: (() -> Void)?
+    @State private var hovering = false
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            Group {
-                if let image = AttachmentImageCache.image(for: attachment) {
-                    Image(nsImage: image).resizable().scaledToFill()
-                } else {
-                    Image.om("image", size: 18).foregroundStyle(OMColors.secondaryText)
+            Button { ImagePreviewStore.shared.present(attachment) } label: {
+                Group {
+                    if let image = AttachmentImageCache.image(for: attachment) {
+                        Image(nsImage: image).resizable().scaledToFill()
+                    } else {
+                        Image.om("image", size: 18).foregroundStyle(OMColors.secondaryText)
+                    }
                 }
+                .frame(width: size, height: size)
+                .background(OMColors.card)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(hovering ? OMColors.accent.opacity(0.6) : OMColors.hairline))
+                .contentShape(RoundedRectangle(cornerRadius: 8))
             }
-            .frame(width: size, height: size)
-            .background(OMColors.card)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(OMColors.hairline))
+            .buttonStyle(.plain)
+            .help("点击查看原图")
             .accessibilityLabel("图片 \(attachment.name)")
-            if let onRemove {
+            .accessibilityHint("查看原图")
+            if let onRemove, hovering {
                 Button(action: onRemove) {
                     Image.om("circle-x", size: 14)
-                        .foregroundStyle(.white, Color.black.opacity(0.6))
+                        .foregroundStyle(.white, Color.black.opacity(0.65))
                 }
                 .buttonStyle(.plain)
                 .padding(2)
                 .accessibilityLabel("移除图片")
+                .transition(.opacity)
             }
         }
+        .onHover { hovering = $0 }
     }
 }
 

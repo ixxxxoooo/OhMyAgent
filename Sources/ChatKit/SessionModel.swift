@@ -727,7 +727,7 @@ public final class SessionModel {
     private func promptBlocks(_ prompt: String, images: [ImageAttachment]) -> [ContentBlock] {
         var blocks: [ContentBlock] = prompt.isEmpty ? [] : [.text(prompt)]
         if capabilities.imagePrompts { blocks += images.map(\.contentBlock) }
-        for url in CompletionEngine.mentionedFiles(in: prompt, workspace: workspace) {
+        for url in CompletionEngine.mentionedFiles(in: prompt, workspace: workspace, includeDirectories: true) {
             blocks.append(.resourceLink(uri: url.absoluteString, name: url.lastPathComponent, mimeType: nil, title: nil))
         }
         return blocks

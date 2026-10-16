@@ -11,7 +11,7 @@ import UniformTypeIdentifiers
 @MainActor
 enum ImageIntake {
     /// 接受的图片类型。
-    static let acceptedTypes: [UTType] = [.png, .jpeg, .gif, .webP, .heic, .tiff]
+    static let acceptedTypes: [UTType] = [.png, .jpeg, .gif, .webP, .heic, .tiff, .bmp]
 
     /// 从粘贴板读取图片:优先文件 URL(Finder 拖拽/复制),其次直接的图片数据(截图)。
     /// - Parameter pasteboard: 粘贴板
@@ -49,6 +49,50 @@ enum ImageIntake {
         ])
         if hasImageFile { return true }
         return (pasteboard.string(forType: .string) ?? "").isEmpty
+    }
+
+    /// 粘贴板里的文件 URL(不限类型)。
+    static func fileURLs(from pasteboard: NSPasteboard) -> [URL] {
+        pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
+    }
+
+    /// 粘贴板是否含文件 URL。
+    static func hasFileURLs(_ pasteboard: NSPasteboard) -> Bool {
+        pasteboard.canReadObject(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true])
+    }
+
+    /// 粘贴板里的非图片文件/文件夹(图片文件走附件,不在此列)。
+    static func nonImageFileURLs(from pasteboard: NSPasteboard) -> [URL] {
+        DropClassifier.classify(fileURLs(from: pasteboard)).filter { $0.kind != .image }.map(\.url)
+    }
+
+    /// 把拖放的提供者分成「图片附件」与「非图片文件/文件夹 URL」。
+    /// - Parameter providers: 提供者
+    /// - Returns: 图片附件与需要转成 `@路径` 的 URL
+    static func split(from providers: [NSItemProvider]) async -> (images: [ImageAttachment], files: [URL]) {
+        var images: [ImageAttachment] = []
+        var urls: [URL] = []
+        for provider in providers {
+            if provider.canLoadObject(ofClass: URL.self), let url = await loadURL(provider), url.isFileURL {
+                urls.append(url)
+                continue
+            }
+            for type in acceptedTypes where provider.hasItemConformingToTypeIdentifier(type.identifier) {
+                if let data = await loadData(provider, type: type), let item = attachment(fromData: data, name: String(localized: "拖入的图片"), preferredType: type) {
+                    images.append(item)
+                    break
+                }
+            }
+        }
+        var files: [URL] = []
+        for item in DropClassifier.classify(urls) {
+            if item.kind == .image {
+                if let attachment = attachment(from: item.url) { images.append(attachment) }
+            } else {
+                files.append(item.url)
+            }
+        }
+        return (images, files)
     }
 
     /// 从拖放/粘贴的 `NSItemProvider` 异步读取图片(文件 URL 或图片数据)。
@@ -145,17 +189,5 @@ enum ImageIntake {
         rep.draw(in: NSRect(origin: .zero, size: size))
         NSGraphicsContext.restoreGraphicsState()
         return target
-    }
-
-    /// 弹出文件选择面板选择图片。
-    /// - Returns: 选中的图片
-    static func pickImages() -> [ImageAttachment] {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = acceptedTypes
-        panel.allowsMultipleSelection = true
-        panel.canChooseDirectories = false
-        panel.message = String(localized: "选择要发送的图片")
-        guard panel.runModal() == .OK else { return [] }
-        return panel.urls.compactMap { attachment(from: $0) }
     }
 }

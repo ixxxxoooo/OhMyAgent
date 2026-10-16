@@ -91,7 +91,7 @@ struct TabGroupView: View {
                     .frame(width: proxy.size.width, height: proxy.size.height)
                     .clipped()
                     .overlay { DropOverlay(zone: zone).allowsHitTesting(false) }
-                    .onDrop(of: [.plainText], delegate: GroupDropDelegate(workbench: workbench, groupID: group.id, size: proxy.size, zone: $zone))
+                    .onDrop(of: [.plainText, .fileURL], delegate: GroupDropDelegate(workbench: workbench, groupID: group.id, size: proxy.size, zone: $zone))
             }
         }
         .contentShape(Rectangle())
@@ -154,6 +154,35 @@ private struct DropOverlay: View {
     }
 }
 
+
+/// 把从 Finder/资源管理器拖入的文件在标签区打开。
+@MainActor
+enum DockFileDrop {
+    /// 是否为外部文件拖入(不是应用内标签拖拽)。
+    static func isFileDrop(_ info: DropInfo) -> Bool {
+        DockDrag.shared.tabID == nil && info.hasItemsConforming(to: [.fileURL])
+    }
+
+    /// 读取拖入的文件 URL,过滤出存在的普通文件后回调。
+    /// - Parameters:
+    ///   - info: 放下信息
+    ///   - completion: 主线程回调(文件路径列表)
+    static func loadFiles(_ info: DropInfo, completion: @escaping @MainActor ([String]) -> Void) {
+        let providers = info.itemProviders(for: [.fileURL])
+        Task { @MainActor in
+            var urls: [URL] = []
+            for provider in providers {
+                let url: URL? = await withCheckedContinuation { continuation in
+                    _ = provider.loadObject(ofClass: URL.self) { url, _ in continuation.resume(returning: url) }
+                }
+                if let url { urls.append(url) }
+            }
+            let files = DropClassifier.classify(urls).filter { $0.kind != .directory }.map(\.url.path)
+            completion(files)
+        }
+    }
+}
+
 /// 内容区落点代理:实时计算落点并在放下时分屏/并入。
 struct GroupDropDelegate: DropDelegate {
     let workbench: WorkbenchModel
@@ -162,14 +191,14 @@ struct GroupDropDelegate: DropDelegate {
     @Binding var zone: DockDropZone?
 
     func validateDrop(info: DropInfo) -> Bool {
-        info.hasItemsConforming(to: [.plainText]) && DockDrag.shared.tabID != nil
+        (info.hasItemsConforming(to: [.plainText]) && DockDrag.shared.tabID != nil) || DockFileDrop.isFileDrop(info)
     }
 
     func dropEntered(info: DropInfo) { zone = DockDropZone.zone(at: info.location, in: size) }
 
     func dropUpdated(info: DropInfo) -> DropProposal? {
         zone = DockDropZone.zone(at: info.location, in: size)
-        return DropProposal(operation: .move)
+        return DropProposal(operation: DockFileDrop.isFileDrop(info) ? .copy : .move)
     }
 
     func dropExited(info: DropInfo) { zone = nil }
@@ -177,6 +206,19 @@ struct GroupDropDelegate: DropDelegate {
     func performDrop(info: DropInfo) -> Bool {
         let target = zone ?? DockDropZone.zone(at: info.location, in: size)
         zone = nil
+        if DockFileDrop.isFileDrop(info) {
+            let model = workbench, group = groupID
+            DockFileDrop.loadFiles(info) { paths in
+                model.dock.focus(group: group)
+                for path in paths {
+                    let id = model.openFile(path, preview: false)
+                    // 落在边缘:新建分屏;落在中心:并入该组
+                    model.dock.drop(id, onGroup: group, zone: target)
+                }
+                model.syncSelectionFromDock()
+            }
+            return true
+        }
         guard let provider = info.itemProviders(for: [.plainText]).first else { return false }
         let model = workbench, group = groupID
         _ = provider.loadObject(ofClass: String.self) { text, _ in
@@ -199,12 +241,26 @@ struct TabStripDropDelegate: DropDelegate {
     let index: Int?
 
     func validateDrop(info: DropInfo) -> Bool {
-        info.hasItemsConforming(to: [.plainText]) && DockDrag.shared.tabID != nil
+        (info.hasItemsConforming(to: [.plainText]) && DockDrag.shared.tabID != nil) || DockFileDrop.isFileDrop(info)
     }
 
-    func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .move) }
+    func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: DockFileDrop.isFileDrop(info) ? .copy : .move) }
 
     func performDrop(info: DropInfo) -> Bool {
+        if DockFileDrop.isFileDrop(info) {
+            let model = workbench, group = groupID, at = index
+            DockFileDrop.loadFiles(info) { paths in
+                model.dock.focus(group: group)
+                var position = at
+                for path in paths {
+                    let id = model.openFile(path, preview: false)
+                    model.dock.move(id, toGroup: group, at: position)
+                    position = position.map { $0 + 1 }
+                }
+                model.syncSelectionFromDock()
+            }
+            return true
+        }
         guard let provider = info.itemProviders(for: [.plainText]).first else { return false }
         let model = workbench, group = groupID, at = index
         _ = provider.loadObject(ofClass: String.self) { text, _ in

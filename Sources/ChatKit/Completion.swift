@@ -219,27 +219,73 @@ public enum CompletionEngine {
         return String(path[..<colon])
     }
 
-    /// 文本中的 `@路径` 提及,解析为工作区内真实存在的文件。
+    /// 提取文本中的 `@路径` 令牌:`@` 必须位于开头或空白之后;支持 `@"含 空白 的路径"`。
+    /// - Parameter text: 用户输入
+    /// - Returns: `@` 之后的路径文本(按出现顺序,未去重)
+    public static func mentionTokens(in text: String) -> [String] {
+        var tokens: [String] = []
+        let chars = Array(text)
+        var index = 0
+        while index < chars.count {
+            let atStart = index == 0 || chars[index - 1].isWhitespace
+            guard chars[index] == "@", atStart else { index += 1; continue }
+            var cursor = index + 1
+            if cursor < chars.count, chars[cursor] == "\"" {
+                // 带引号:读到下一个引号;没有闭合则忽略
+                cursor += 1
+                let begin = cursor
+                while cursor < chars.count, chars[cursor] != "\"" { cursor += 1 }
+                if cursor < chars.count {
+                    tokens.append(String(chars[begin..<cursor]))
+                    cursor += 1
+                }
+            } else {
+                let begin = cursor
+                while cursor < chars.count, !chars[cursor].isWhitespace { cursor += 1 }
+                if cursor > begin { tokens.append(String(chars[begin..<cursor])) }
+            }
+            index = max(cursor, index + 1)
+        }
+        return tokens
+    }
+
+    /// 文本中的 `@路径` 提及,解析为真实存在的文件(可选包含文件夹)。
     /// - Parameters:
     ///   - text: 用户输入
     ///   - workspace: 工作区目录
-    /// - Returns: 去重后的文件 URL 列表(按出现顺序)
-    public static func mentionedFiles(in text: String, workspace: URL) -> [URL] {
+    ///   - includeDirectories: 为 true 时文件夹提及也返回
+    /// - Returns: 去重后的 URL 列表(按出现顺序)
+    public static func mentionedFiles(in text: String, workspace: URL, includeDirectories: Bool = false) -> [URL] {
         var result: [URL] = []
         var seen = Set<String>()
-        let words = text.split(whereSeparator: { $0.isWhitespace })
-        for word in words where word.hasPrefix("@") {
-            var path = String(word.dropFirst())
-            while let last = path.last, ",.;:!?)）。，；：！？".contains(last), !FileManager.default.fileExists(atPath: workspace.appendingPathComponent(path).path) {
-                path.removeLast()
+        let quoted = Set(quotedTokens(in: text))
+        for token in mentionTokens(in: text) {
+            var path = token
+            if !quoted.contains(token) {
+                while let last = path.last, ",.;:!?)）。，；：！？".contains(last), !FileManager.default.fileExists(atPath: workspace.appendingPathComponent(path).path) {
+                    path.removeLast()
+                }
             }
             guard !path.isEmpty else { continue }
             path = stripLineSuffix(path, workspace: workspace)
             let url = path.hasPrefix("/") ? URL(fileURLWithPath: path) : workspace.appendingPathComponent(path)
             var isDirectory: ObjCBool = false
-            if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory), !isDirectory.boolValue, seen.insert(url.path).inserted {
-                result.append(url)
-            }
+            guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) else { continue }
+            if isDirectory.boolValue, !includeDirectories { continue }
+            if seen.insert(url.standardizedFileURL.path).inserted { result.append(url) }
+        }
+        return result
+    }
+
+    /// 带引号的 `@"…"` 令牌集合(这类路径不做末尾标点裁剪)。
+    private static func quotedTokens(in text: String) -> [String] {
+        var result: [String] = []
+        var rest = Substring(text)
+        while let start = rest.range(of: "@\"") {
+            let after = rest[start.upperBound...]
+            guard let end = after.firstIndex(of: "\"") else { break }
+            result.append(String(after[..<end]))
+            rest = after[after.index(after: end)...]
         }
         return result
     }

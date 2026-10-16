@@ -44,13 +44,13 @@ struct TabBarView: View {
                         ForEach(Array(group.tabs.enumerated()), id: \.element.id) { index, tab in
                             TabItemView(workbench: workbench, group: group, tab: tab, isActive: tab.id == group.activeID, isFocused: isFocused)
                                 .id(tab.id)
-                                .onDrop(of: [.plainText], delegate: TabStripDropDelegate(workbench: workbench, groupID: group.id, index: index))
+                                .onDrop(of: [.plainText, .fileURL], delegate: TabStripDropDelegate(workbench: workbench, groupID: group.id, index: index))
                         }
                         if isMainGroup { newConversationButton }
                         Color.clear
                             .frame(minWidth: 24, maxWidth: .infinity)
                             .contentShape(Rectangle())
-                            .onDrop(of: [.plainText], delegate: TabStripDropDelegate(workbench: workbench, groupID: group.id, index: nil))
+                            .onDrop(of: [.plainText, .fileURL], delegate: TabStripDropDelegate(workbench: workbench, groupID: group.id, index: nil))
                     }
                     .padding(.horizontal, 8)
                 }

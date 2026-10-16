@@ -83,6 +83,7 @@ private struct FolderRow: View {
             ExplorerRow(depth: depth, name: entry.name, isDirectory: true, expanded: expanded, chevron: expanded ? "chevron-down" : "chevron-right", isActive: false) {
                 expanded.toggle()
             }
+            .onDrag { NSItemProvider(object: URL(fileURLWithPath: entry.path) as NSURL) }
             .contextMenu { ExplorerMenu(entry: entry, root: root, workbench: workbench) }
             if expanded {
                 DirectoryChildren(path: entry.path, depth: depth + 1, workbench: workbench, root: root)
@@ -104,6 +105,8 @@ private struct FileRow: View {
             workbench.openFile(entry.path, preview: true)
         }
         .simultaneousGesture(TapGesture(count: 2).onEnded { workbench.openFile(entry.path, preview: false) })
+        // 拖到输入框 = 引用 @路径;拖到标签栏/内容区 = 打开
+        .onDrag { NSItemProvider(object: URL(fileURLWithPath: entry.path) as NSURL) }
         .contextMenu { ExplorerMenu(entry: entry, root: root, workbench: workbench) }
     }
 

@@ -49,6 +49,7 @@ struct ComposerView: View {
                 onImages: { images in images.forEach { model.addAttachment($0) } },
                 // 不再在这里按能力拦截:不支持图片时由 addAttachment 给出提示,而不是悄悄吞掉粘贴/拖入
                 acceptsImages: { true },
+                onFileURLs: { urls in insertMentions(for: urls) },
                 onEdit: updateCompletion,
                 onSelectionText: { model.selectedText = $0 }
             )
@@ -58,15 +59,6 @@ struct ComposerView: View {
                 ProviderMenu(model: model)
                 OptionMenu(model: model, category: "model", icon: "cpu")
                 OptionMenu(model: model, category: "thought_level", icon: "brain")
-                Button {
-                    ImageIntake.pickImages().forEach { model.addAttachment($0) }
-                } label: {
-                    Image.om("image-plus", size: 12).foregroundStyle(OMColors.secondaryText)
-                }
-                .buttonStyle(.plain)
-                .opacity(model.canAttachImages ? 1 : 0.4)
-                .help(model.canAttachImages ? "添加图片(也可粘贴或拖入)" : "当前 Agent 不支持图片输入")
-                .accessibilityLabel("添加图片")
                 MCPPanelButton(model: model)
                 Spacer(minLength: 8)
                 if let queued = model.queuedPrompt {
@@ -99,10 +91,31 @@ struct ComposerView: View {
         }
         .onDrop(of: [.fileURL, .image], isTargeted: $dropTargeted) { providers in
             Task { @MainActor in
-                for image in await ImageIntake.attachments(from: providers) { model.addAttachment(image) }
+                let dropped = await ImageIntake.split(from: providers)
+                for image in dropped.images { model.addAttachment(image) }
+                if !dropped.files.isEmpty { insertMentions(for: dropped.files) }
             }
             return true
         }
+        .overlay(alignment: .top) {
+            if dropTargeted {
+                Text("松开以添加图片或引用文件")
+                    .font(OMFonts.caption).foregroundStyle(.white)
+                    .padding(.horizontal, 10).padding(.vertical, 4)
+                    .background(OMColors.accent, in: Capsule())
+                    .offset(y: -12)
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+            }
+        }
+    }
+
+    /// 把拖入/粘贴的文件与文件夹转成 `@路径` 提及并插入光标处。
+    /// - Parameter urls: 文件或文件夹 URL
+    private func insertMentions(for urls: [URL]) {
+        let text = DropClassifier.mentions(for: DropClassifier.classify(urls), workspace: model.workspace)
+        guard !text.isEmpty else { return }
+        controller.insertAtSelection(text)
     }
 
     // MARK: - 补全
