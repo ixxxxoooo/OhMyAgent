@@ -30,6 +30,9 @@ final class HubModel {
     /// 候选缓存:打开窗口时构建一次(文件索引完成后重建),输入时只做排序
     @ObservationIgnored private var candidates: [HubCandidate] = []
 
+    /// 记录打开时的初始主题,用户取消(Escape)时回滚
+    private var initialThemeID: String?
+
     /// 平铺的结果(键盘选择用)。
     var flatItems: [HubItem] { sections.flatMap(\.items) }
 
@@ -42,6 +45,7 @@ final class HubModel {
         self.workbench = workbench
         self.segment = segment
         self.query = query
+        self.initialThemeID = AppearanceModel.shared.themeID
         selection = 0
         isPresented = true
         if WorkspaceIndexModel.shared.root != workbench.selectedProjectID || WorkspaceIndexModel.shared.files.isEmpty {
@@ -51,8 +55,19 @@ final class HubModel {
         Log.ui.info("打开中央搜索", ["segment": segment.rawValue])
     }
 
+    /// 直达主题切换器(VS Code 风格)
+    func presentThemes(workbench: WorkbenchModel) {
+        present(.themes, workbench: workbench, query: "")
+    }
+
     /// 关闭搜索窗。
-    func dismiss() { isPresented = false }
+    func dismiss() {
+        if let initial = initialThemeID {
+            AppearanceModel.shared.themeID = initial
+            initialThemeID = nil
+        }
+        isPresented = false
+    }
 
     /// 文件索引或工作台数据变化后重建候选。
     func rebuildCandidates() {
@@ -66,7 +81,16 @@ final class HubModel {
     /// 重新排序。
     private func recompute() {
         sections = HubSearchEngine.sections(query: query, segment: segment, candidates: candidates)
-        if selection >= flatItems.count { selection = max(flatItems.count - 1, 0) }
+        if segment == .themes && query.isEmpty {
+            if let cur = flatItems.firstIndex(where: { $0.candidate.action == .theme(id: AppearanceModel.shared.themeID) }) {
+                selection = cur
+            } else {
+                selection = 0
+            }
+        } else if selection >= flatItems.count {
+            selection = max(flatItems.count - 1, 0)
+        }
+        updateLivePreview()
     }
 
     /// 移动选中项(循环)。
@@ -74,6 +98,26 @@ final class HubModel {
         let count = flatItems.count
         guard count > 0 else { return }
         selection = ((selection + step) % count + count) % count
+        updateLivePreview()
+    }
+
+    /// 悬停选中某项并实时预览。
+    func select(_ item: HubItem) {
+        if let index = flatItems.firstIndex(of: item), index != selection {
+            selection = index
+            updateLivePreview()
+        }
+    }
+
+    /// 实时预览(VS Code 交互:光标经过时即时生效全局主题)。
+    private func updateLivePreview() {
+        let items = flatItems
+        guard items.indices.contains(selection) else { return }
+        if case .theme(let id) = items[selection].candidate.action {
+            AppearanceModel.shared.themeID = id
+        } else if let initial = initialThemeID, AppearanceModel.shared.themeID != initial {
+            AppearanceModel.shared.themeID = initial
+        }
     }
 
     /// 执行当前选中项。
@@ -85,6 +129,11 @@ final class HubModel {
 
     /// 执行某一项并关闭窗口。
     func run(_ item: HubItem) {
+        let isTheme = if case .theme = item.candidate.action { true } else { false }
+        if isTheme {
+            // 用户显式选用该主题:提交并不再还原
+            initialThemeID = nil
+        }
         dismiss()
         guard let workbench else { return }
         switch item.candidate.action {
@@ -98,6 +147,8 @@ final class HubModel {
             commands[id]?.run()
         case .settings(let page):
             AppActions.shared.openSettings(page: SettingsPage.resolve(page))
+        case .theme(let id):
+            AppearanceModel.shared.themeID = id
         }
     }
 }
@@ -153,6 +204,22 @@ enum HubCandidateBuilder {
                     id: "settings:\(page.rawValue)", segment: .settings, title: page.title, subtitle: group.title, trailing: nil,
                     icon: .symbol(page.icon), keywords: page.keywords, action: .settings(page: page.rawValue)))
             }
+        }
+        // 主题:全部预置与自定义主题
+        for package in ThemePackage.all {
+            let tagline = ThemePersonality.tagline(for: package)
+            let tone = package.tone.displayName
+            let keywords = [
+                package.group.title,
+                package.tone.displayName,
+                "主题", "theme", "color", "配色", "外观",
+                package.tone == .dark ? "深色" : (package.tone == .light ? "浅色" : "跟随系统"),
+                package.tone == .dark ? "暗黑" : "明亮",
+                package.id,
+            ]
+            result.append(HubCandidate(
+                id: "theme:\(package.id)", segment: .themes, title: package.name, subtitle: tagline, trailing: tone,
+                icon: .symbol("paintbrush"), keywords: keywords, action: .theme(id: package.id)))
         }
         return (result, table)
     }
@@ -226,7 +293,7 @@ struct HubOverlay: View {
     private var searchField: some View {
         HStack(spacing: 10) {
             Image.om("search", size: 18).foregroundStyle(OMColors.secondaryText)
-            TextField("搜索会话、项目、文件、操作与设置", text: $hub.query)
+            TextField(searchPlaceholder, text: $hub.query)
                 .textFieldStyle(.plain)
                 .font(OMFonts.custom(18))
                 .focused($focused)
@@ -238,6 +305,18 @@ struct HubOverlay: View {
         }
         .padding(.horizontal, 18)
         .frame(height: 56)
+    }
+
+    private var searchPlaceholder: String {
+        switch hub.segment {
+        case .themes: return String(localized: "搜索主题 (如 Cursor, Dracula, Tokyo, 浅色…)")
+        case .files: return String(localized: "搜索文件 (如文件名或路径…)")
+        case .actions: return String(localized: "搜索操作与快捷键…")
+        case .settings: return String(localized: "搜索设置项…")
+        case .sessions: return String(localized: "搜索历史会话…")
+        case .projects: return String(localized: "搜索项目…")
+        case .all: return String(localized: "搜索会话、项目、文件、操作、设置与主题")
+        }
     }
 
     // MARK: 分类
@@ -289,6 +368,9 @@ struct HubOverlay: View {
                                 HubRow(item: item, selected: isSelected(item))
                                     .id(item.id)
                                     .onTapGesture { hub.run(item) }
+                                    .onHover { hovered in
+                                        if hovered { hub.select(item) }
+                                    }
                                     .accessibilityElement(children: .combine)
                                     .accessibilityAddTraits(isSelected(item) ? [.isButton, .isSelected] : .isButton)
                             }
@@ -306,6 +388,9 @@ struct HubOverlay: View {
     }
 
     private var emptyMessage: String {
+        if hub.segment == .themes && hub.query.isEmpty == false {
+            return String(localized: "未找到匹配的主题 (支持搜索主题名、配色、深浅等)")
+        }
         if hub.segment == .files || hub.segment == .all, WorkspaceIndexModel.shared.isLoading, hub.query.isEmpty == false {
             return String(localized: "正在建立文件索引…")
         }
@@ -313,9 +398,14 @@ struct HubOverlay: View {
     }
 
     private func listHeight(_ sections: [HubSection]) -> CGFloat {
-        let rows = sections.reduce(0) { $0 + $1.items.count }
+        let rowsHeight = sections.reduce(CGFloat(0)) { total, section in
+            total + section.items.reduce(CGFloat(0)) { rowTotal, item in
+                if case .theme = item.candidate.action { return rowTotal + 50 }
+                return rowTotal + 36
+            }
+        }
         let headers = sections.filter { !$0.title.isEmpty }.count
-        return CGFloat(rows) * 36 + CGFloat(headers) * 26 + 8
+        return rowsHeight + CGFloat(headers) * 26 + 8
     }
 
     private func isSelected(_ item: HubItem) -> Bool {
@@ -328,9 +418,9 @@ struct HubOverlay: View {
     private var footer: some View {
         HStack(spacing: 14) {
             hint("↑↓", "选择")
-            hint("↩", "打开")
+            hint("↵", hub.segment == .themes ? "选用主题" : "打开")
             hint("⇥", "切换分类")
-            hint("esc", "关闭")
+            hint("esc", hub.segment == .themes ? "取消并还原" : "关闭")
             Spacer()
         }
         .padding(.horizontal, 18)
@@ -358,6 +448,15 @@ private struct HubRow: View {
     let selected: Bool
 
     var body: some View {
+        if case .theme(let themeID) = item.candidate.action,
+           let package = ThemePackage.all.first(where: { $0.id == themeID }) {
+            HubThemeRow(item: item, package: package, selected: selected)
+        } else {
+            standardRow
+        }
+    }
+
+    private var standardRow: some View {
         HStack(spacing: 10) {
             icon.frame(width: 20)
             Text(titleText).font(OMFonts.body).lineLimit(1)
@@ -386,6 +485,92 @@ private struct HubRow: View {
     }
 
     /// 标题:命中的字符加粗并着色。
+    private var titleText: AttributedString {
+        var text = AttributedString(item.title)
+        guard !item.positions.isEmpty else { return text }
+        var cursor = text.startIndex
+        for index in 0..<item.title.count {
+            let next = text.index(afterCharacter: cursor)
+            if item.positions.contains(index) {
+                text[cursor..<next].font = OMFonts.custom(13.5, weight: .bold)
+                text[cursor..<next].foregroundColor = OMColors.accent
+            }
+            cursor = next
+        }
+        return text
+    }
+}
+
+/// 主题行:专为主题设计的生动视觉行(生活化文案、明暗微标、四色圆点色盘、当前使用打勾)。
+private struct HubThemeRow: View {
+    let item: HubItem
+    let package: ThemePackage
+    let selected: Bool
+    private var isCurrent: Bool { AppearanceModel.shared.themeID == package.id }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image.om("paintbrush", size: 14)
+                .foregroundStyle(package.palette?.accent.color ?? OMColors.accent)
+                .frame(width: 20)
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(titleText)
+                        .font(OMFonts.body.weight(.medium))
+                        .lineLimit(1)
+
+                    let badge = ThemePersonality.toneBadge(for: package)
+                    Text(badge.text)
+                        .font(OMFonts.custom(10.5, weight: .medium))
+                        .foregroundStyle(badge.fg)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1.5)
+                        .background(badge.bg, in: Capsule())
+
+                    if isCurrent {
+                        Text("当前使用")
+                            .font(OMFonts.custom(10, weight: .medium))
+                            .foregroundStyle(OMColors.accent)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(OMColors.accent.opacity(0.12), in: Capsule())
+                    }
+                }
+
+                Text(ThemePersonality.tagline(for: package))
+                    .font(OMFonts.small)
+                    .foregroundStyle(OMColors.secondaryText)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+
+            // 4 个色块圆点预览
+            HStack(spacing: 4) {
+                ForEach(Array(ThemePersonality.swatches(for: package).enumerated()), id: \.offset) { _, color in
+                    Circle()
+                        .fill(color)
+                        .frame(width: 13, height: 13)
+                        .overlay(Circle().strokeBorder(OMColors.hairline.opacity(0.6), lineWidth: 0.5))
+                }
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+            .background(OMColors.surface.opacity(0.6), in: Capsule())
+            .overlay(Capsule().strokeBorder(OMColors.hairline.opacity(0.4), lineWidth: 0.5))
+
+            if isCurrent {
+                Image.om("check", size: 12)
+                    .foregroundStyle(OMColors.accent)
+            }
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 50)
+        .background(selected ? OMColors.accent.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .contentShape(Rectangle())
+    }
+
     private var titleText: AttributedString {
         var text = AttributedString(item.title)
         guard !item.positions.isEmpty else { return text }

@@ -442,9 +442,14 @@ public final class SessionModel {
     }
 
     /// 本轮是否记录了该文件的改动。
-    func hasTurnChange(at path: String) -> Bool {
+    public func hasTurnChange(at path: String) -> Bool {
         guard let item = turnChanges[path] else { return false }
         return item.original != item.current
+    }
+
+    /// 本轮记录的该文件改动(原始内容与当前内容)。
+    public func turnChange(at path: String) -> (original: String?, current: String)? {
+        turnChanges[path]
     }
 
     private var isFailed: Bool {
@@ -990,7 +995,7 @@ public final class SessionModel {
             // 让出一次,使 flush 产生的批次先被应用
             await Task.yield()
             guard let self else { return }
-            self.timeline.finishStreaming()
+            self.timeline.finishTurn()
             if let stall = self.stallMessage {
                 self.stallMessage = nil
                 self.timeline.appendNotice(stall, isError: true)
@@ -1136,6 +1141,33 @@ public final class SessionModel {
             await self?.settleEvents()
             self?.timeline.finishStreaming()
             self?.isReplaying = false
+        }
+    }
+
+    /// 从已有会话克隆时间线与状态 (用于 Fork Chat)
+    public func cloneHistory(from source: SessionModel) {
+        self.timeline.reset(with: source.timeline.entries)
+        self.turnNumber = source.turnNumber
+        self.sessionTitle = source.sessionTitle
+        self.titleSource = source.titleSource
+    }
+
+    /// 执行服务端分叉 (若后端支持)
+    public func forkFrom(source: SessionModel) async {
+        guard let client, let srcSessionId = source.sessionId, source.capabilities.canFork else {
+            return
+        }
+        let cwd = workspace.path
+        let servers = mcpServers
+        let meta = effectiveMeta()
+        do {
+            let setup = try await client.forkSession(sessionId: srcSessionId, cwd: cwd, mcpServers: servers, meta: meta)
+            self.sessionId = setup.sessionId
+            self.timeline.appendNotice(ChatL10n.t("已分叉为新会话，后续操作不会影响原会话。"))
+            if !setup.configOptions.isEmpty { self.configOptions = setup.configOptions }
+            self.refreshHistory()
+        } catch {
+            self.log.warning("服务端分叉失败，保留本地克隆", ["error": "\(error)"])
         }
     }
 

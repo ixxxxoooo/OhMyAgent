@@ -362,7 +362,7 @@ struct ComposerTextView: NSViewRepresentable {
         textView.onImages = { [coordinator = context.coordinator] images in coordinator.parent.onImages?(images) }
         textView.acceptsImages = { [coordinator = context.coordinator] in coordinator.parent.acceptsImages() }
         textView.onFileURLs = { [coordinator = context.coordinator] urls in coordinator.parent.onFileURLs?(urls) }
-        textView.onWidthChange = { [coordinator = context.coordinator] in coordinator.updateHeight() }
+        textView.onWidthChange = { [coordinator = context.coordinator] in coordinator.updateHeight(immediate: true) }
         textView.registerForDraggedTypes([.fileURL] + ImageIntake.acceptedTypes.map { NSPasteboard.PasteboardType($0.identifier) })
         textView.setAccessibilityLabel(String(localized: "消息输入框"))
         controller?.textView = textView
@@ -411,7 +411,7 @@ struct ComposerTextView: NSViewRepresentable {
             textView.reconcileMentions()
             let plain = textView.plainText
             if parent.text != plain { parent.text = plain }
-            updateHeight()
+            updateHeight(immediate: true)
         }
 
         /// chip 与相邻文字之间自动补空格:否则紧贴 chip 输入会让记号变形(`@a.swiftx`),chip 被打回文字。
@@ -428,7 +428,7 @@ struct ComposerTextView: NSViewRepresentable {
         }
 
         /// 根据内容计算高度并回写。
-        func updateHeight() {
+        func updateHeight(immediate: Bool = false) {
             guard let textView, let layoutManager = textView.textLayoutManager,
                   let contentManager = layoutManager.textContentManager else { return }
             layoutManager.ensureLayout(for: contentManager.documentRange)
@@ -438,7 +438,11 @@ struct ComposerTextView: NSViewRepresentable {
             let limit = windowHeight > 0 ? min(max(windowHeight * 0.4, 120), 320) : parent.maxHeight
             let target = min(max(used + textView.textContainerInset.height * 2, 34), limit)
             if abs(parent.height - target) > 0.5 {
-                DispatchQueue.main.async { [weak self] in self?.parent.height = target }
+                if immediate {
+                    parent.height = target
+                } else {
+                    DispatchQueue.main.async { [weak self] in self?.parent.height = target }
+                }
             }
             textView.enclosingScrollView?.hasVerticalScroller = used + textView.textContainerInset.height * 2 > limit
         }

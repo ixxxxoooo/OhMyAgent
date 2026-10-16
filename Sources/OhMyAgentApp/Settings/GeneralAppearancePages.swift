@@ -127,6 +127,7 @@ struct AppearancePage: View {
     @AppStorage(ClientPrefs.Key.workingVerbStyle) private var verbStyle = WorkingVerbStyle.classic.rawValue
     @AppStorage(ClientPrefs.Key.scrollbarVisibility) private var scrollbar = ScrollbarVisibility.system.rawValue
     @Bindable private var workbench = AppEnvironment.shared.workbench
+    @State private var themeFilter = ""
 
     var body: some View {
         SettingsForm {
@@ -137,11 +138,53 @@ struct AppearancePage: View {
                     .clipShape(RoundedRectangle(cornerRadius: OMMetrics.cardRadius, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: OMMetrics.cardRadius, style: .continuous).strokeBorder(OMColors.hairline))
                     .accessibilityLabel(Text("主题预览"))
-                ForEach(ThemeGroup.allCases.filter { $0 != .custom }, id: \.self) { group in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(group.title).font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
+
+                HStack(spacing: 8) {
+                    Image.om("search", size: 12).foregroundStyle(OMColors.tertiaryText)
+                    TextField("快速筛选主题 (支持名称、深浅、风格…)", text: $themeFilter)
+                        .textFieldStyle(.plain)
+                        .font(OMFonts.small)
+                    if !themeFilter.isEmpty {
+                        Button { themeFilter = "" } label: {
+                            Image.om("circle-x", size: 12).foregroundStyle(OMColors.tertiaryText)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .frame(height: 28)
+                .background(RoundedRectangle(cornerRadius: 7).fill(OMColors.hoverFill))
+
+                if themeFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    ForEach(ThemeGroup.allCases.filter { $0 != .custom }, id: \.self) { group in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(group.title).font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 170, maximum: 240), spacing: 8)], alignment: .leading, spacing: 8) {
+                                ForEach(ThemePackage.all.filter { $0.group == group }) { package in
+                                    ThemeCardPublic(package: package, selected: appearance.themeID == package.id) {
+                                        appearance.themeID = package.id
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    let key = themeFilter.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let matched = ThemePackage.all.filter { package in
+                        package.name.localizedCaseInsensitiveContains(key)
+                            || package.group.title.localizedCaseInsensitiveContains(key)
+                            || package.tone.displayName.localizedCaseInsensitiveContains(key)
+                            || ThemePersonality.tagline(for: package).localizedCaseInsensitiveContains(key)
+                    }
+                    if matched.isEmpty {
+                        Text("未找到与「\(themeFilter)」匹配的主题")
+                            .font(OMFonts.small)
+                            .foregroundStyle(OMColors.secondaryText)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.vertical, 12)
+                    } else {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 170, maximum: 240), spacing: 8)], alignment: .leading, spacing: 8) {
-                            ForEach(ThemePackage.all.filter { $0.group == group }) { package in
+                            ForEach(matched) { package in
                                 ThemeCardPublic(package: package, selected: appearance.themeID == package.id) {
                                     appearance.themeID = package.id
                                 }
@@ -154,7 +197,9 @@ struct AppearancePage: View {
                     .disabled(appearance.themePackage.tone != .system)
                 Note("「模式」只在主题为「跟随系统」时可选;其余主题自带明暗。")
             }
-            CustomThemeSection()
+            if themeFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                CustomThemeSection()
+            }
             Section("强调色") {
                 AccentPicker(title: "主强调色", choice: $appearance.accent, hex: $appearance.customAccentHex)
                 AccentPicker(title: "第二强调色", choice: $appearance.accent2, hex: $appearance.customAccent2Hex)
@@ -328,6 +373,7 @@ struct ThemeCardPublic: View {
         .buttonStyle(.plain)
         .accessibilityLabel(package.name)
         .accessibilityAddTraits(selected ? [.isSelected] : [])
+        .help("\(package.name) · \(ThemePersonality.tagline(for: package))")
     }
 }
 

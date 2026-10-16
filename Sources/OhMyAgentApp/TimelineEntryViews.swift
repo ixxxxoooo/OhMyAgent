@@ -56,28 +56,70 @@ struct ModelSwitchDividerView: View {
     }
 }
 
-/// 回合结束语:模型 · 耗时 · token · tps,右侧纯图标复制按钮。
+/// 回合结束语与操作栏 (对标 Cursor 图 6: 点赞、点踩、复制、Fork Chat、时间、模型信息)。
 struct TurnSummaryView: View {
     let entry: TimelineEntry
+    @Environment(SessionModel.self) private var model
+    @State private var feedback: Int? = nil
 
     var body: some View {
         if let summary = entry.summary {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
+                // 点赞按钮
+                Button {
+                    feedback = feedback == 1 ? nil : 1
+                } label: {
+                    Image.om("thumbs-up", size: 12)
+                        .foregroundStyle(feedback == 1 ? OMColors.accent : OMColors.tertiaryText)
+                        .frame(width: 22, height: 22)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .omTooltip(feedback == 1 ? "已赞" : "有帮助", icon: "thumbs-up")
+
+                // 点踩按钮
+                Button {
+                    feedback = feedback == -1 ? nil : -1
+                } label: {
+                    Image.om("thumbs-down", size: 12)
+                        .foregroundStyle(feedback == -1 ? OMColors.danger : OMColors.tertiaryText)
+                        .frame(width: 22, height: 22)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .omTooltip(feedback == -1 ? "已踩" : "需要改进", icon: "thumbs-down")
+
+                // 复制按钮
+                if !summary.outputText.isEmpty {
+                    OMCopyButton(help: String(localized: "复制回复"), size: 12) { summary.outputText }
+                }
+
+                // Fork Chat 分叉按钮 (支持从本条回复分叉出会话)
+                Button {
+                    AppEnvironment.shared.workbench.forkConversation(from: model)
+                } label: {
+                    Image.om("git-branch", size: 12)
+                        .foregroundStyle(OMColors.tertiaryText)
+                        .frame(width: 22, height: 22)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .omTooltip("分叉出新会话 (Fork Chat)", icon: "git-branch")
+
+                Spacer(minLength: 4)
+
+                // 品牌与模型、耗时元数据
                 if let hint = summary.brand {
-                    BrandIconView(BrandIcon.resolve(modelId: hint.modelId, providerPreset: hint.providerPreset, providerName: hint.providerName), size: 13)
+                    BrandIconView(BrandIcon.resolve(modelId: hint.modelId, providerPreset: hint.providerPreset, providerName: hint.providerName), size: 12)
                 }
                 Text(verbatim: summary.parts.joined(separator: "  ·  "))
                     .font(OMFonts.caption)
                     .foregroundStyle(OMColors.tertiaryText)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                Spacer(minLength: 8)
-                // 复制的是本轮输出正文(不是这一行元数据);没有正文时不显示按钮
-                if !summary.outputText.isEmpty {
-                    OMCopyButton(help: String(localized: "复制本轮输出")) { summary.outputText }
-                }
             }
-            .padding(.horizontal, 2)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 2)
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .contain)
             .accessibilityLabel(summary.copyText)
@@ -85,11 +127,12 @@ struct TurnSummaryView: View {
     }
 }
 
-/// 用户消息:纯色卡片(可带图片缩略图;运行中引导的消息带「引导」标记)。
+/// 用户消息:与底部输入框、吸顶卡一致的 Liquid Glass 圆角卡片(可带图片缩略图;运行中引导的消息带「引导」标记)。
 /// 双击放大编辑(见 `UserMessageEditor`);为让双击生效,这里不启用文字选择,复制走右键菜单。
 struct UserMessageView: View {
     let entry: TimelineEntry
     @Environment(\.stickyUser) private var sticky
+    @State private var hovering = false
 
     var body: some View {
         if let sticky, let model = sticky.model, sticky.editing?.id == entry.id {
@@ -125,8 +168,22 @@ struct UserMessageView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .omSolidCard()
-        .contentShape(Rectangle())
+        .padding(.trailing, 18)
+        .omGlass(in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(alignment: .bottomTrailing) {
+            if !entry.isSteered {
+                Button { sticky?.editing = entry } label: {
+                    Image.om("square-pen", size: 12).foregroundStyle(OMColors.secondaryText).frame(width: 24, height: 24).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .opacity(hovering ? 1 : 0)
+                .padding(8)
+                .help("放大编辑(双击)")
+                .accessibilityLabel("放大编辑")
+            }
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .onHover { hovering = $0 }
         .onTapGesture(count: 2) { if !entry.isSteered { sticky?.editing = entry } }
         .contextMenu {
             Button("复制") {

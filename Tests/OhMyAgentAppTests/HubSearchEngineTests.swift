@@ -66,7 +66,15 @@ struct HubSearchEngineTests {
     @Test("分段按 Tab 循环切换")
     func segmentCycle() {
         #expect(HubSegment.all.next(by: 1) == .sessions)
-        #expect(HubSegment.settings.next(by: 1) == .all)
-        #expect(HubSegment.all.next(by: -1) == .settings)
+        #expect(HubSegment.themes.next(by: 1) == .all)
+        #expect(HubSegment.all.next(by: -1) == .themes)
+    }
+
+    @Test("主题候选可被单独或全局检索")
+    func themeSearch() {
+        let theme = candidate("t-dracula", .themes, "Dracula", keywords: ["深色", "暗黑", "主题"])
+        let sections = HubSearchEngine.sections(query: "dracula", segment: .all, candidates: fixtures + [theme])
+        #expect(sections.map(\.id).contains("themes"))
+        #expect(sections.first { $0.id == "themes" }?.items.first?.id == "t-dracula")
     }
 }

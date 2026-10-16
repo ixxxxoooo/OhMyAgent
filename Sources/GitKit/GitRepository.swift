@@ -120,6 +120,13 @@ public struct GitRepository: Sendable {
         return stats
     }
 
+    /// 获取当前未提交差异的统计摘要 (用于生成提交信息)
+    public func rawDiffSummary() async throws -> String {
+        let staged = (try? await git(["diff", "--cached", "--stat"]).text) ?? ""
+        if !staged.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return staged }
+        return (try? await git(["diff", "HEAD", "--stat"]).text) ?? ""
+    }
+
     // MARK: Diff
 
     /// 数据是否像二进制(前 8000 字节含 NUL)。
@@ -137,6 +144,14 @@ public struct GitRepository: Sendable {
     ///   - path: 相对仓库根的路径
     ///   - scope: 对比范围
     /// - Returns: 差异;任一侧为二进制时返回 nil
+    /// 仓库的主分支名 (优先 main、次之 master、次之 origin/main)
+    public func defaultBranch() async -> String {
+        if (try? await git(["rev-parse", "--verify", "-q", "main"])) != nil { return "main" }
+        if (try? await git(["rev-parse", "--verify", "-q", "master"])) != nil { return "master" }
+        if (try? await git(["rev-parse", "--verify", "-q", "origin/main"])) != nil { return "origin/main" }
+        return "main"
+    }
+
     public func fileDiff(path: String, scope: GitDiffScope = .workingTree) async throws -> FileDiff? {
         try validatePaths([path])
         let worktree = try? Data(contentsOf: root.appendingPathComponent(path))
@@ -145,6 +160,9 @@ public struct GitRepository: Sendable {
         case .workingTree: (old, new) = (await blob("HEAD:\(path)"), worktree)
         case .staged: (old, new) = (await blob("HEAD:\(path)"), await blob(":\(path)"))
         case .unstaged: (old, new) = (await blob(":\(path)"), worktree)
+        case .mainBranch:
+            let main = await defaultBranch()
+            (old, new) = (await blob("\(main):\(path)"), worktree)
         }
         if let old, Self.isBinary(old) { return nil }
         if let new, Self.isBinary(new) { return nil }

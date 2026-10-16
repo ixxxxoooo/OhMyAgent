@@ -78,6 +78,7 @@ enum PaletteCommands {
             },
             PaletteCommand(id: "resetLayout", title: String(localized: "恢复默认布局"), icon: "undo-2", shortcut: nil) { workbench.resetLayout() },
             PaletteCommand(id: "settings", title: String(localized: "设置…"), icon: "settings", shortcut: "⌘,") { AppActions.shared.openSettings() },
+            PaletteCommand(id: "themePicker", title: String(localized: "切换颜色主题…"), icon: "paintbrush", shortcut: nil) { HubModel.shared.presentThemes(workbench: workbench) },
             PaletteCommand(id: "tools", title: String(localized: "工具与扩展…"), icon: "puzzle", shortcut: key(.extensions)) { AppActions.shared.openSettings(page: .mcp) },
             PaletteCommand(id: "shortcuts", title: String(localized: "快捷键设置"), icon: "keyboard", shortcut: nil) { AppActions.shared.openSettings(page: .shortcuts) },
         ]

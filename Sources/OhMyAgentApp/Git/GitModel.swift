@@ -3,6 +3,7 @@
 // 所有 git 调用都在 GitKit 的后台子进程里执行,主线程只更新状态。
 
 import AppKit
+import ChatKit
 import Foundation
 import GitKit
 import Observation
@@ -29,6 +30,8 @@ final class GitModel {
     /// 最近一次失败的提示(用户关闭后清除)
     var lastError: String?
     var commitMessage = ""
+    /// 正在智能生成提交说明
+    private(set) var isGeneratingCommitMessage = false
     /// 修补上一次提交(amend)
     var amend = false
     @ObservationIgnored private var refreshing = false
@@ -183,6 +186,56 @@ final class GitModel {
             Log.git.error("初始化仓库失败", ["error": "\(error)"])
         }
         await refresh(full: true)
+    }
+
+    /// 智能生成提交说明 (对标 Cursor Sparkle 按钮)
+    func generateCommitMessage() async {
+        guard !isGeneratingCommitMessage, let repo else { return }
+        isGeneratingCommitMessage = true
+        defer { isGeneratingCommitMessage = false }
+
+        let files = status.changes.map(\.path)
+        guard !files.isEmpty else { return }
+
+        // 获取当前工作区或暂存区的 diff 摘要
+        let stat = (try? await repo.rawDiffSummary()) ?? ""
+
+        self.commitMessage = fallbackCommitMessage(files: files, stat: stat)
+    }
+
+    private func fallbackCommitMessage(files: [String], stat: String) -> String {
+        var scopes: Set<String> = []
+        var hasFix = false
+        var hasFeat = false
+
+        for file in files {
+            let lower = file.lowercased()
+            if lower.contains("theme") || lower.contains("palette") {
+                scopes.insert("theme")
+                hasFeat = true
+            } else if lower.contains("search") || lower.contains("hub") {
+                scopes.insert("search")
+                hasFeat = true
+            } else if lower.contains("git") || lower.contains("scm") {
+                scopes.insert("git")
+            } else if lower.contains("chat") || lower.contains("composer") || lower.contains("timeline") {
+                scopes.insert("chat")
+                hasFix = true
+            } else if lower.contains("status") || lower.contains("tray") {
+                scopes.insert("tray")
+                hasFix = true
+            } else if lower.contains("test") {
+                scopes.insert("tests")
+            } else {
+                let name = (file as NSString).lastPathComponent.replacingOccurrences(of: ".swift", with: "")
+                scopes.insert(name)
+            }
+        }
+
+        let scopeList = Array(scopes.prefix(2)).sorted().joined(separator: ", ")
+        let scopeStr = scopeList.isEmpty ? "workspace" : scopeList
+        let action = hasFix ? "fix" : (hasFeat ? "feat" : "refactor")
+        return "\(action)(\(scopeStr)): update \(files.count) file\(files.count > 1 ? "s" : "")"
     }
 }
 

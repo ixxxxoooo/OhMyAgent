@@ -6,7 +6,7 @@ import WorkbenchKit
 
 /// 搜索分类(窗口顶部的分段)。
 enum HubSegment: String, CaseIterable, Identifiable {
-    case all, sessions, projects, files, actions, settings
+    case all, sessions, projects, files, actions, settings, themes
     var id: String { rawValue }
 
     /// 分段标题。
@@ -18,6 +18,7 @@ enum HubSegment: String, CaseIterable, Identifiable {
         case .files: return String(localized: "文件")
         case .actions: return String(localized: "操作")
         case .settings: return String(localized: "设置")
+        case .themes: return String(localized: "主题")
         }
     }
 
@@ -39,6 +40,7 @@ enum HubAction: Equatable {
     case file(root: String, relativePath: String)
     case command(id: String)
     case settings(page: String)
+    case theme(id: String)
 }
 
 /// 候选图标。
@@ -83,7 +85,7 @@ struct HubSection: Identifiable, Equatable {
 /// 搜索引擎:按分类与查询对候选排序、分组。
 enum HubSearchEngine {
     /// 分组展示顺序。
-    static let order: [HubSegment] = [.sessions, .projects, .files, .actions, .settings]
+    static let order: [HubSegment] = [.sessions, .projects, .files, .actions, .settings, .themes]
 
     /// 排序并分组。
     /// - Parameters:

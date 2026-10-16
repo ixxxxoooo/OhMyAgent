@@ -124,10 +124,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             starPath(center: NSPoint(x: 8.2, y: 9.8), radius: 7.2).fill()
             starPath(center: NSPoint(x: 13.6, y: 14.2), radius: 3.0).fill()
             if let color = dotColor(indicator), dotVisible {
-                let dotRect = NSRect(x: rect.maxX - 8.2, y: 0.4, width: 7.4, height: 7.4)
+                let dotRect = NSRect(x: rect.maxX - 5.8, y: 0.6, width: 4.8, height: 4.8)
                 // 点外围留一圈细描边,在深浅菜单栏上都清晰
                 (dark ? NSColor(OMColors.maskInk).withAlphaComponent(0.55) : NSColor(OMColors.onAccent).withAlphaComponent(0.7)).setFill()
-                NSBezierPath(ovalIn: dotRect.insetBy(dx: -0.9, dy: -0.9)).fill()
+                NSBezierPath(ovalIn: dotRect.insetBy(dx: -0.6, dy: -0.6)).fill()
                 color.setFill()
                 NSBezierPath(ovalIn: dotRect).fill()
             }
@@ -206,6 +206,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             let entry = item(Self.sessionTitle(live.title, project: live.project)) {
                 AppActions.shared.openSession(workspacePath: live.workspacePath, sessionId: live.sessionId, title: live.title, uid: live.id)
             }
+            entry.toolTip = "\(live.title) — \(live.project)"
             entry.image = Self.dotImage(Self.dotColor(Self.indicator(of: live.state)))
             menu.addItem(entry)
             if let sid = live.sessionId { shown.insert(sid) }
@@ -216,6 +217,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             let entry = item(Self.sessionTitle(recent.title, project: project)) {
                 AppActions.shared.openSession(workspacePath: recent.workspacePath, sessionId: recent.sessionId, title: recent.title)
             }
+            entry.toolTip = "\(recent.title) — \(project)"
             entry.image = Self.dotImage(nil)
             menu.addItem(entry)
             count += 1
@@ -245,7 +247,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     }
 
     private static func sessionTitle(_ title: String, project: String) -> String {
-        let clipped = title.count > 36 ? String(title.prefix(36)) + "…" : title
+        let maxLen = 18
+        let clipped = title.count > maxLen ? String(title.prefix(maxLen)) + "…" : title
         return "\(clipped) — \(project)"
     }
 

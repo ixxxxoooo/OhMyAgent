@@ -168,7 +168,7 @@ struct SettingsView: View {
                         .padding(10).background(OMColors.danger.opacity(0.1))
                 }
                 page
-                    .id(appearance.renderKey)
+                    .id(router.page)
                     .frame(maxWidth: contentWidth)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(OMColors.surface)

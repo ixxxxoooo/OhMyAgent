@@ -44,27 +44,6 @@ private struct CollapsibleHeader<Actions: View>: View {
     }
 }
 
-/// 「本轮 Agent 改动」分区:没有改动汇总时不显示。
-struct AgentChangesSection: View {
-    let workbench: WorkbenchModel
-    @State private var expanded = true
-
-    var body: some View {
-        if let model = workbench.activeSession,
-           let entry = model.timeline.entries.last(where: { $0.kind == .changes && !$0.changes.isEmpty }) {
-            VStack(alignment: .leading, spacing: 0) {
-                CollapsibleHeader(title: "本轮 Agent 改动", count: entry.changes.count, expanded: $expanded) { EmptyView() }
-                if expanded {
-                    ChangesSummaryView(entry: entry)
-                        .environment(model)
-                        .padding(.horizontal, 8)
-                        .padding(.bottom, 8)
-                }
-            }
-        }
-    }
-}
-
 /// 「提交图谱」分区:最近 30 个提交(含所有分支)的泳道图;
 /// 点击一行在原地展开该提交的文件列表,点文件再展开内联差异(对标 VS Code 的 Source Control Graph);
 /// 右上角按钮才打开完整历史标签。

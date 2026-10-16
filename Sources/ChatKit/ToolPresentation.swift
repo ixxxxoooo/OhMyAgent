@@ -89,6 +89,7 @@ public struct ToolPresentation: Sendable, Equatable {
             verb = isNew ? String(localized: "写入") : String(localized: "编辑")
             subject = path ?? Self.stripVerb(tool.title)
             subjectIsPath = path != nil
+            detail = Self.lineRange(input: input, location: tool.locations.first)
         case .delete:
             category = .delete
             verb = String(localized: "删除")
@@ -151,13 +152,36 @@ public struct ToolPresentation: Sendable, Equatable {
         return title
     }
 
-    /// 读取范围:优先 offset/limit,其次位置行号。
+    /// 读取/编辑范围:支持 StartLine/EndLine、start_line/end_line、offset/limit、行号等。
     static func lineRange(input: JSONValue?, location: ToolLocation?) -> String? {
-        if let offset = input?["offset"]?.intValue {
-            if let limit = input?["limit"]?.intValue { return "L\(offset)-\(offset + limit - 1)" }
-            return String(localized: "L\(offset)起")
+        let start = input?["StartLine"]?.intValue
+            ?? input?["start_line"]?.intValue
+            ?? input?["first_line"]?.intValue
+            ?? input?["Start"]?.intValue
+            ?? input?["start"]?.intValue
+            ?? input?["offset"]?.intValue
+        let end = input?["EndLine"]?.intValue
+            ?? input?["end_line"]?.intValue
+            ?? input?["last_line"]?.intValue
+            ?? input?["End"]?.intValue
+            ?? input?["end"]?.intValue
+        let limit = input?["limit"]?.intValue
+
+        if let start, let end {
+            return "L\(start)-\(end)"
         }
-        if let limit = input?["limit"]?.intValue { return String(localized: "前 \(limit) 行") }
+        if let start, let limit {
+            return "L\(start)-\(start + limit - 1)"
+        }
+        if let start {
+            return String(localized: "L\(start)起")
+        }
+        if let end {
+            return String(localized: "至 L\(end)")
+        }
+        if let limit {
+            return String(localized: "前 \(limit) 行")
+        }
         if let line = location?.line, line > 0 { return "L\(line)" }
         return nil
     }
@@ -190,7 +214,21 @@ public struct ToolPresentation: Sendable, Equatable {
                 removed += diff.removed
             }
         }
-        return found ? (added, removed) : nil
+        if found { return (added, removed) }
+
+        // 回退:从 rawInput 中解析改动统计 (Edit / Write / replace_file_content)
+        if let input = tool.rawInput {
+            let oldText = input["old_string"]?.stringValue ?? input["oldText"]?.stringValue ?? input["TargetContent"]?.stringValue
+            let newText = input["new_string"]?.stringValue ?? input["newText"]?.stringValue ?? input["ReplacementContent"]?.stringValue
+                ?? input["CodeContent"]?.stringValue ?? input["content"]?.stringValue
+            if let newText {
+                let diff = LineDiff.diff(old: oldText, new: newText)
+                if diff.added > 0 || diff.removed > 0 {
+                    return (diff.added, diff.removed)
+                }
+            }
+        }
+        return nil
     }
 
     static func lineCount(_ text: String) -> Int {

@@ -88,7 +88,22 @@ public enum ToolStatus: String, Sendable, Hashable {
     case pending, inProgress = "in_progress", completed, failed
 
     public init(rawOrPending raw: String?) {
-        self = raw.flatMap(ToolStatus.init(rawValue:)) ?? .pending
+        guard let raw = raw?.lowercased() else {
+            self = .pending
+            return
+        }
+        switch raw {
+        case "completed", "complete", "success", "succeeded", "done", "finished", "ok":
+            self = .completed
+        case "failed", "error", "cancelled", "canceled", "aborted":
+            self = .failed
+        case "in_progress", "inprogress", "running":
+            self = .inProgress
+        case "pending":
+            self = .pending
+        default:
+            self = ToolStatus(rawValue: raw) ?? .pending
+        }
     }
 
     /// 是否已结束。
@@ -188,7 +203,10 @@ public struct ToolCall: Sendable, Hashable, Identifiable {
         if let value = json["content"]?.arrayValue { content = value.map(ToolCallContent.init(json:)) }
         if json["locations"]?.arrayValue != nil { locations = Self.parseLocations(json["locations"]) }
         if let value = json["rawInput"], !value.isNull { rawInput = value }
-        if let value = json["rawOutput"], !value.isNull { rawOutput = value }
+        if let value = json["rawOutput"], !value.isNull {
+            rawOutput = value
+            if !status.isTerminal { status = .completed }
+        }
         if let value = json["_meta"]?["claudeCode"]?["parentToolUseId"]?.stringValue { parentToolCallId = value }
         if name == nil, let value = json["_meta"]?["claudeCode"]?["toolName"]?.stringValue { name = value }
     }

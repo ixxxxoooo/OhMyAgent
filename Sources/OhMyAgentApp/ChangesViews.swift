@@ -8,100 +8,109 @@ import DiffKit
 import EditorKit
 import SwiftUI
 
-/// 本轮改动汇总卡片。
+/// 本轮改动汇总卡片 (对标 Cursor 图 6 风格: 回合结束后展示，点击行直接打开差异对比标签页)。
 struct ChangesSummaryView: View {
     let entry: TimelineEntry
     @Environment(SessionModel.self) private var model
 
     var body: some View {
-        let added = entry.changes.reduce(0) { $0 + $1.diff.added }
-        let removed = entry.changes.reduce(0) { $0 + $1.diff.removed }
-        let hasPending = entry.changes.contains { $0.status == .pending || $0.status == .partiallyReverted }
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 8) {
-                Image.om("file-text").foregroundStyle(OMColors.secondaryText)
-                Text("本轮修改了 \(entry.changes.count) 个文件").font(OMFonts.small.weight(.semibold))
-                Text("+\(added)").foregroundStyle(OMColors.diffAdded).font(OMFonts.small)
-                Text("−\(removed)").foregroundStyle(OMColors.diffRemoved).font(OMFonts.small)
-                Spacer()
-                if hasPending {
-                    Button("全部撤销") { model.revertAll(in: entry) }
-                        .buttonStyle(.omSecondary)
-                        .controlSize(.small)
+        if model.isRunning {
+            EmptyView()
+        } else {
+            let count = entry.changes.count
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 8) {
+                    Text("\(count) \(count == 1 ? "File Changed" : "Files Changed")")
+                        .font(OMFonts.small.weight(.semibold))
+                        .foregroundStyle(OMColors.primaryText)
+                    Spacer()
+                    Button {
+                        if let first = entry.changes.first {
+                            AppEnvironment.shared.workbench.openDiff(first.path)
+                        } else {
+                            AppEnvironment.shared.workbench.openChanges(project: model.workspace.path)
+                        }
+                    } label: {
+                        Text("Review")
+                            .font(OMFonts.caption.weight(.medium))
+                            .foregroundStyle(OMColors.secondaryText)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(OMColors.hoverFill, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .omTooltip(String(localized: "审查全部差异"), icon: "file-diff")
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+
+                ForEach(entry.changes) { change in
+                    Divider().overlay(OMColors.hairline.opacity(0.5))
+                    FileChangeRow(change: change)
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            ForEach(entry.changes) { change in
-                Divider()
-                FileChangeRow(change: change)
-            }
+            .omSolidCard(cornerRadius: 10)
         }
-        .omSolidCard(cornerRadius: 10)
     }
 }
 
-/// 单个文件改动行,可展开查看差异。
+/// 单个文件改动行 (对标 Cursor 图 6: 点击直接在标签页打开差异对比)。
 struct FileChangeRow: View {
     let change: FileChange
     @Environment(SessionModel.self) private var model
-    @State private var expanded = false
+    @State private var hovering = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 8) {
-                Button {
-                    omWithAnimation(.snappy(duration: 0.2)) { expanded.toggle() }
-                } label: {
-                    HStack(spacing: 8) {
-                        Image.om("chevron.right", size: 9, weight: .bold)
-                            .rotationEffect(.degrees(expanded ? 90 : 0))
-                            .foregroundStyle(OMColors.tertiaryText)
-                        OMFileIcon(name: change.fileName, size: 14)
-                        Text(change.fileName).font(OMFonts.small.weight(.medium))
-                        if change.original == nil { OMTag(String(localized: "新建"), tint: OMColors.success) }
-                        Text("+\(change.diff.added)").foregroundStyle(OMColors.diffAdded)
-                        Text("−\(change.diff.removed)").foregroundStyle(OMColors.diffRemoved)
-                        Spacer(minLength: 0)
-                    }
-                    .font(OMFonts.small)
-                    .contentShape(Rectangle())
+        HStack(spacing: 8) {
+            Button {
+                AppEnvironment.shared.workbench.openDiff(change.path)
+            } label: {
+                HStack(spacing: 8) {
+                    OMFileIcon(name: change.fileName, size: 14)
+                    Text(change.fileName)
+                        .font(OMFonts.small.weight(.medium))
+                        .foregroundStyle(OMColors.primaryText)
+                        .lineLimit(1)
+                    if change.original == nil { OMTag(String(localized: "新建"), tint: OMColors.success) }
+                    Spacer(minLength: 4)
                 }
-                .buttonStyle(.plain)
-                statusLabel
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            statusLabel
+
+            if hovering {
                 Button {
                     model.viewerRequest = FileViewRequest(path: change.path, line: change.diff.hunks.first?.newStart)
                 } label: {
-                    Image.om("arrow.up.forward.square")
+                    Image.om("arrow.up.forward.square", size: 13)
+                        .foregroundStyle(OMColors.secondaryText)
                 }
                 .buttonStyle(.plain)
-                .help("在编辑器中打开")
-                .accessibilityLabel("在编辑器中打开 \(change.path)")
-                Button {
-                    AppEnvironment.shared.workbench.openDiff(change.path)
-                } label: {
-                    Image.om("file-diff")
-                }
-                .buttonStyle(.plain)
-                .help("在标签中查看差异")
-                .accessibilityLabel("在标签中查看差异 \(change.path)")
+                .omTooltip("在编辑器中打开", icon: "arrow.up.forward.square")
+
                 if change.status == .pending || change.status == .partiallyReverted {
-                    Button("撤销") { model.revert(change) }
-                        .buttonStyle(.plain)
-                        .font(OMFonts.small)
-                        .foregroundStyle(OMColors.accent)
+                    Button {
+                        model.revert(change)
+                    } label: {
+                        Image.om("undo-2", size: 12)
+                            .foregroundStyle(OMColors.accent)
+                    }
+                    .buttonStyle(.plain)
+                    .omTooltip("撤销修改", icon: "undo-2")
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            if expanded {
-                DiffView(diff: change.diff, onRevertHunk: change.status == .reverted ? nil : { hunkId in
-                    model.revert(change, hunks: [hunkId])
-                })
-                .padding(.horizontal, 12)
-                .padding(.bottom, 10)
-            }
+
+            Text("+\(change.diff.added)").foregroundStyle(OMColors.diffAdded).font(OMFonts.small)
+            Text("−\(change.diff.removed)").foregroundStyle(OMColors.diffRemoved).font(OMFonts.small)
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(hovering ? OMColors.hoverFill : .clear)
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
+        .omTooltip("点击打开标签查看差异", icon: "file-diff")
     }
 
     @ViewBuilder

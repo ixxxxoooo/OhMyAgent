@@ -148,7 +148,7 @@ struct ToolRowView: View {
                 }
                 .font(OMFonts.monoSmall)
             }
-            if p.category == .terminal { durationText(tool) }
+            durationText(tool)
             statusView(tool.status)
             if canExpand {
                 Image.om("chevron.right", size: 9, weight: .bold)
@@ -273,6 +273,15 @@ struct ToolRowView: View {
         if !tool.content.isEmpty || entry.childStore != nil { return true }
         if p.category == .mcp, tool.rawInput != nil { return true }
         if p.category == .terminal, let command = tool.rawInput?["command"]?.stringValue, command.contains("\n") || command.count > 80 { return true }
+        if [.edit, .write].contains(p.category) {
+            if tool.rawInput?["new_string"] != nil || tool.rawInput?["newText"] != nil
+                || tool.rawInput?["ReplacementContent"] != nil || tool.rawInput?["CodeContent"] != nil
+                || tool.rawInput?["content"] != nil {
+                return true
+            }
+            let path = p.subjectIsPath ? p.subject : (tool.locations.first?.path ?? "")
+            if !path.isEmpty && model.hasTurnChange(at: path) { return true }
+        }
         return false
     }
 
@@ -320,6 +329,10 @@ struct ToolDetailsView: View {
             ForEach(Array(tool.content.enumerated()), id: \.offset) { _, content in
                 contentView(content)
             }
+            if !hasDiffContent, [.edit, .write].contains(presentation.category),
+               let diff = fallbackDiff {
+                SnippetDiffView(path: diff.path, oldText: diff.oldText, newText: diff.newText, showHeader: false)
+            }
             if let child = entry.childStore, !child.entries.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(TimelineGrouping.group(child.entries)) { item in
@@ -337,6 +350,31 @@ struct ToolDetailsView: View {
 
     private var hasTerminalContent: Bool {
         tool.content.contains { if case .terminal = $0 { return true } else { return false } }
+    }
+
+    private var hasDiffContent: Bool {
+        tool.content.contains { if case .diff = $0 { return true } else { return false } }
+    }
+
+    private var fallbackDiff: (path: String, oldText: String?, newText: String)? {
+        let path = presentation.subjectIsPath ? presentation.subject : (tool.locations.first?.path ?? "")
+        if let input = tool.rawInput {
+            let oldText = input["old_string"]?.stringValue
+                ?? input["oldText"]?.stringValue
+                ?? input["TargetContent"]?.stringValue
+            let newText = input["new_string"]?.stringValue
+                ?? input["newText"]?.stringValue
+                ?? input["ReplacementContent"]?.stringValue
+                ?? input["CodeContent"]?.stringValue
+                ?? input["content"]?.stringValue
+            if let newText {
+                return (path: path, oldText: oldText, newText: newText)
+            }
+        }
+        if !path.isEmpty, let change = model.turnChange(at: path) {
+            return (path: path, oldText: change.original, newText: change.current)
+        }
+        return nil
     }
 
     /// 文本类内容拼接。

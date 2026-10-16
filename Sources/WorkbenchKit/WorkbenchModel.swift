@@ -437,6 +437,28 @@ public final class WorkbenchModel {
         scheduleSave()
     }
 
+    /// 分叉会话并在新标签页中打开 (对标 Cursor Fork Chat)
+    @discardableResult
+    public func forkConversation(from source: SessionModel) -> UUID? {
+        guard let projectID = selectedProjectID ?? projects.first?.id,
+              let project = projects.first(where: { $0.id == projectID }) else { return nil }
+        mode = .workspace
+        let slot = UUID().uuidString
+        let baseTitle = (source.sessionTitle?.isEmpty == false) ? source.sessionTitle! : project.name
+        let tab = dock.open(.chat(projectID: projectID, slot: slot), title: String(localized: "分支") + " · " + baseTitle)
+        dock.activate(tab)
+        lastSlot[projectID] = .some(slot)
+        if let newSession = ensureSession(project: projectID, slot: slot) {
+            newSession.cloneHistory(from: source)
+            Task {
+                await newSession.forkFrom(source: source)
+            }
+        }
+        closeSubagentTabs(in: projectID)
+        scheduleSave()
+        return tab
+    }
+
     /// 在项目下打开历史会话:已经在某个标签里打开的直接切过去;否则新开一个标签承载。
     public func openHistory(project id: String, sessionId: String, title: String?) {
         guard let project = projects.first(where: { $0.id == id }) else { return }

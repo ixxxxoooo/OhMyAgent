@@ -165,6 +165,8 @@ public enum GitDiffScope: Sendable, Hashable {
     case staged
     /// 工作区相对暂存区
     case unstaged
+    /// 相对主分支 (main/master)
+    case mainBranch
 }
 
 /// 冲突解决方式。

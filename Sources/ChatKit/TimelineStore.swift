@@ -168,6 +168,17 @@ public final class TimelineStore {
         revision += 1
     }
 
+    /// 用给定的条目列表重设时间线 (用于 Fork 会话)
+    public func reset(with entries: [TimelineEntry]) {
+        self.entries = entries
+        self.toolIndex.removeAll()
+        for entry in entries where entry.kind == .tool {
+            if let tool = entry.tool { toolIndex[tool.id] = entry }
+        }
+        self.planEntry = entries.last { $0.kind == .plan }
+        self.revision += 1
+    }
+
     /// 追加用户消息(本地发送)。
     /// - Parameters:
     ///   - text: 用户输入
@@ -226,6 +237,19 @@ public final class TimelineStore {
         last.finishedAt = Date()
     }
 
+    /// 轮次结束时收尾:结束流式并确保所有未终结的工具调用标记为完成。
+    public func finishTurn() {
+        finishStreaming()
+        for entry in entries where entry.kind == .tool {
+            guard let tool = entry.tool, !tool.status.isTerminal else { continue }
+            var updated = tool
+            updated.status = .completed
+            entry.tool = updated
+            if entry.finishedAt == nil { entry.finishedAt = Date() }
+            onToolChange?(updated)
+        }
+    }
+
     /// 应用一个会话更新;与时间线无关的更新会被忽略。
     /// - Parameter update: 协议更新
     public func apply(_ update: SessionUpdate) {
@@ -240,10 +264,12 @@ public final class TimelineStore {
             finishStreaming()
             if let existing = toolIndex[call.toolCallId] {
                 existing.tool = call
+                if call.status.isTerminal, existing.finishedAt == nil { existing.finishedAt = Date() }
                 onToolChange?(call)
             } else {
                 let entry = TimelineEntry(kind: .tool, isStreaming: false)
                 entry.tool = call
+                if call.status.isTerminal, entry.finishedAt == nil { entry.finishedAt = Date() }
                 toolIndex[call.toolCallId] = entry
                 entries.append(entry)
                 onToolChange?(call)
@@ -259,6 +285,7 @@ public final class TimelineStore {
                 let entry = TimelineEntry(kind: .tool)
                 let call = ToolCall(json: raw)
                 entry.tool = call
+                if call.status.isTerminal, entry.finishedAt == nil { entry.finishedAt = Date() }
                 toolIndex[toolCallId] = entry
                 entries.append(entry)
                 onToolChange?(call)

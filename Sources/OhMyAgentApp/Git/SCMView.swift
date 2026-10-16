@@ -217,31 +217,72 @@ private struct SCMContent: View {
                 Spacer()
             }
             .font(OMFonts.small)
-            TextField("提交信息", text: $model.commitMessage, axis: .vertical)
-                .lineLimit(2...5)
-                .textFieldStyle(.plain)
-                .font(OMFonts.small)
-                .padding(8)
-                .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-            HStack(spacing: 6) {
+            HStack(alignment: .bottom, spacing: 4) {
+                TextField("Message (⌘↩ to commit on \"\(branchTitle)\")", text: $model.commitMessage, axis: .vertical)
+                    .lineLimit(2...5)
+                    .textFieldStyle(.plain)
+                    .font(OMFonts.small)
+                    .onSubmit {
+                        if canCommit { requestCommit(push: false) }
+                    }
+
+                Button {
+                    Task { await model.generateCommitMessage() }
+                } label: {
+                    if model.isGeneratingCommitMessage {
+                        ProgressView()
+                            .controlSize(.mini)
+                            .frame(width: 20, height: 20)
+                    } else {
+                        Image.om("sparkles", size: 13)
+                            .foregroundStyle(OMColors.accent)
+                            .frame(width: 20, height: 20)
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(model.isGeneratingCommitMessage || (model.status.changes.isEmpty && model.status.untrackedChanges.isEmpty))
+                .omTooltip("智能生成提交说明 (AI)", icon: "sparkles")
+            }
+            .padding(8)
+            .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(OMColors.hairline.opacity(0.6), lineWidth: 0.5))
+
+            HStack(spacing: 2) {
                 Button { requestCommit(push: false) } label: {
-                    Text(model.amend ? String(localized: "修补提交") : (model.status.stagedChanges.isEmpty ? String(localized: "提交全部") : String(localized: "提交"))).frame(maxWidth: .infinity)
+                    HStack(spacing: 5) {
+                        Image.om("check", size: 12)
+                        Text(model.amend ? String(localized: "修补提交") : (model.status.stagedChanges.isEmpty ? String(localized: "Commit") : String(localized: "Commit (Staged)")))
+                    }
+                    .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.omPrimary)
                 .controlSize(.small)
                 .disabled(!canCommit)
-                Button { requestCommit(push: true) } label: {
-                    Text("提交并推送")
+                .keyboardShortcut(.return, modifiers: [.command])
+
+                Menu {
+                    Button("Commit & Push") { requestCommit(push: true) }
+                    Button(model.amend ? "取消修补" : "修补上一条提交 (Amend)") {
+                        Task { await model.setAmend(!model.amend) }
+                    }
+                    Button("暂存全部并提交") {
+                        Task {
+                            await model.stageAll()
+                            await model.commit(push: false)
+                        }
+                    }
+                } label: {
+                    Image.om("chevron-down", size: 10)
+                        .frame(width: 22, height: 24)
+                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.omSecondary)
-                .controlSize(.small)
-                .disabled(!canCommit)
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .background(canCommit ? OMColors.accent : OMColors.subtleFill)
+                .foregroundStyle(canCommit ? OMColors.onAccent : OMColors.tertiaryText)
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             }
-            Toggle("修补上一次提交(amend)", isOn: Binding(get: { model.amend }, set: { value in Task { await model.setAmend(value) } }))
-                .toggleStyle(.checkbox)
-                .controlSize(.small)
-                .font(OMFonts.caption)
-                .disabled(model.status.headOID == nil)
             if model.amend, model.status.ahead == 0, model.status.upstream != nil {
                 Text("上一次提交已推送,修补后需要强制推送。").font(OMFonts.caption).foregroundStyle(OMColors.warning)
             }
@@ -275,7 +316,6 @@ private struct SCMContent: View {
     private var changeList: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                AgentChangesSection(workbench: workbench)
                 let conflicts = model.status.conflicts
                 if !conflicts.isEmpty {
                     SectionHeader(title: "冲突", count: conflicts.count, tint: OMColors.warning) { EmptyView() }
@@ -293,6 +333,9 @@ private struct SCMContent: View {
                 let unstaged = model.status.unstagedChanges
                 if !unstaged.isEmpty {
                     SectionHeader(title: "更改", count: unstaged.count) {
+                        iconButton("arrow-left-right", "与主分支对比") {
+                            workbench.openDiff(model.absolutePath(unstaged[0].path))
+                        }
                         iconButton("undo-2", "放弃全部更改") {
                             if GitDialogs.confirmDestructive(title: String(localized: "放弃全部 \(unstaged.count) 个文件的更改?"), message: String(localized: "此操作不可撤销。"), button: String(localized: "放弃更改")) {
                                 Task { await model.discard(unstaged.map(\.path)) }
@@ -315,11 +358,12 @@ private struct SCMContent: View {
         }
     }
 
-    private func iconButton(_ icon: String, _ help: LocalizedStringKey, action: @escaping () -> Void) -> some View {
+    private func iconButton(_ icon: String, _ help: String, action: @escaping () -> Void) -> some View {
         Button(action: action) { Image.om(icon, size: 12) }
             .buttonStyle(.plain).foregroundStyle(OMColors.secondaryText)
             .disabled(model.busy != nil)
-            .help(help).accessibilityLabel(Text(help))
+            .omTooltip(help, icon: icon)
+            .accessibilityLabel(help)
     }
 
     // MARK: 其他状态
@@ -440,6 +484,7 @@ private struct ChangeRow: View {
 
     @ViewBuilder
     private var actions: some View {
+        rowButton("arrow.up.forward.square", "在编辑器中打开") { workbench.openFile(model.absolutePath(change.path), preview: false) }
         switch section {
         case .staged:
             rowButton("minus", "取消暂存") { Task { await model.unstage([change.path]) } }
@@ -464,11 +509,12 @@ private struct ChangeRow: View {
         }
     }
 
-    private func rowButton(_ icon: String, _ help: LocalizedStringKey, action: @escaping () -> Void) -> some View {
+    private func rowButton(_ icon: String, _ help: String, action: @escaping () -> Void) -> some View {
         Button(action: action) { Image.om(icon, size: 12) }
             .buttonStyle(.plain).foregroundStyle(OMColors.secondaryText)
             .disabled(model.busy != nil)
-            .help(help).accessibilityLabel(Text(help))
+            .omTooltip(help, icon: icon)
+            .accessibilityLabel(help)
     }
 
     private var badge: some View {

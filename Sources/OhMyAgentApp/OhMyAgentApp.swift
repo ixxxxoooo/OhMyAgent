@@ -193,6 +193,7 @@ struct WorkbenchCommands: Commands {
         CommandGroup(replacing: .appSettings) {
             Button("设置…") { AppActions.shared.openSettings() }
                 .keyboardShortcut(",", modifiers: .command)
+            Button("切换颜色主题…") { HubModel.shared.presentThemes(workbench: workbench) }
         }
         CommandGroup(after: .appInfo) {
             Button("检查更新…") { UpdateModel.shared.checkInteractively() }

@@ -54,6 +54,7 @@ struct GitFileDiffView: View {
         case .workingTree: return "all"
         case .staged: return "staged"
         case .unstaged: return "unstaged"
+        case .mainBranch: return "main"
         }
     }
 
@@ -66,7 +67,7 @@ struct GitFileDiffView: View {
             }
             Spacer()
             OMCompactSegmented(
-                options: [(value: GitDiffScope.workingTree, title: "全部"), (value: .staged, title: "已暂存"), (value: .unstaged, title: "未暂存")],
+                options: [(value: GitDiffScope.workingTree, title: "全部"), (value: .staged, title: "已暂存"), (value: .unstaged, title: "未暂存"), (value: .mainBranch, title: "主分支")],
                 selection: $scope,
                 accessibilityName: String(localized: "Diff 范围")
             )
@@ -118,7 +119,7 @@ struct GitFileDiffView: View {
     /// 块级操作:仅「未暂存」与「已暂存」范围(其基线与索引一致)支持。
     private func hunkActions(for diff: FileDiff) -> [DiffHunkAction] {
         switch scope {
-        case .workingTree: return []
+        case .workingTree, .mainBranch: return []
         case .unstaged:
             return [
                 DiffHunkAction(title: String(localized: "暂存此块")) { id in apply(.stage, diff: diff, hunk: id) },
