@@ -745,8 +745,10 @@ public final class SessionModel {
     /// 会话 `_meta`:提供商元数据 + 客户端选项(代理/超时/追加提示词/CLAUDE.md);仅对真实 Claude 通道合并。
     private func effectiveMeta() -> JSONValue? {
         guard activeDescriptor.kind == .claudeACP else { return providerMeta }
-        return SessionOptions(defaults: .standard).merged(into: providerMeta)
+        return SessionOptions(defaults: .standard).merged(into: providerMeta ?? defaultGatewayMeta)
     }
+    /// 未启用提供商、但 ~/.claude 配置了第三方网关时,仅含「关闭服务端 auto 分类器探测」开关的 `_meta`
+    @ObservationIgnored private var defaultGatewayMeta: JSONValue?
     /// 提供商地址(发送前探测用)
     @ObservationIgnored private var providerURL: URL?
     /// 提供商目录(测试可注入;默认 Application Support)
@@ -777,6 +779,7 @@ public final class SessionModel {
         providerModel = nil
         providerMeta = nil
         providerURL = nil
+        defaultGatewayMeta = nil
         guard descriptor.kind == .claudeACP else { return }
         let directory = providerDirectory
         let environment = providerEnvironment
@@ -795,7 +798,11 @@ public final class SessionModel {
             providerURL = resolved.provider.url
             log.info("使用模型提供商", ["provider": resolved.provider.id, "model": resolved.provider.model, "baseURL": ModelGateway.origin(of: resolved.provider.url ?? workspace)])
         case .success(nil):
-            break
+            // 默认配置:若 ~/.claude/settings.json 里走第三方网关,同样关闭服务端 auto 分类器探测(后台读盘)
+            defaultGatewayMeta = await Task.detached(priority: .utility) { () -> JSONValue? in
+                let settingsEnv = ModelGateway.loadSettingsEnv()
+                return NoticeFilter.gatewayMeta(gateway: ModelGateway.baseURL(settingsEnv: settingsEnv, processEnv: environment), settingsEnv: settingsEnv, processEnv: environment)
+            }.value
         case .failure(let error):
             log.warning("模型提供商不可用,回退默认配置", ["reason": error.localizedDescription])
             timeline.appendNotice(error.localizedDescription, isError: true)

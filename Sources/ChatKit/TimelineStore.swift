@@ -254,6 +254,8 @@ public final class TimelineStore {
                 entries.append(entry)
             }
         case .notice(let severity, let title, let detail):
+            // 网关场景下 Claude Code 的「auto 模式分类器计费」警告与用户操作无关,直接丢弃
+            if NoticeFilter.isClassifierBillingNotice(title: title, detail: detail) { return }
             appendNotice(title, detail: detail?.isEmpty == false ? detail : nil, severity: severity)
         case .planMarkdown(let markdown):
             finishStreaming()

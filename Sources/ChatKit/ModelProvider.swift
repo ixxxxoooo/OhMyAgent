@@ -169,6 +169,8 @@ public enum ProviderLaunch {
         if let value = provider.maxOutputTokens, value > 0 { env["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] = String(value) }
         if let value = provider.contextWindow, value > 0 { env["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] = String(value) }
         if let value = nonEmpty(provider.effort) { env["CLAUDE_CODE_EFFORT_LEVEL"] = value }
+        // 第三方网关(DeepSeek/GLM/Kimi 等)不会返回服务端 auto 模式检查结果,关闭探测以免出现「分类器计费」警告
+        if NoticeFilter.isThirdPartyGateway(provider.normalizedBaseURL) { env[NoticeFilter.autoModeServerKey] = "0" }
         return env
     }
 
