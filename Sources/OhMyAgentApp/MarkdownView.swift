@@ -124,11 +124,14 @@ struct CodeBlockView: View {
                         copied = false
                     }
                 } label: {
-                    Label(copied ? String(localized: "已复制") : String(localized: "复制"), om: copied ? "checkmark" : "doc.on.doc")
-                        .font(OMFonts.caption)
+                    Image.om(copied ? "check" : "copy", size: 13)
+                        .frame(width: 22, height: 22)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(OMColors.secondaryText)
+                .foregroundStyle(copied ? OMColors.success : OMColors.secondaryText)
+                .help(copied ? String(localized: "已复制") : String(localized: "复制代码"))
+                .accessibilityLabel(copied ? String(localized: "已复制") : String(localized: "复制代码"))
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
