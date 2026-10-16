@@ -21,6 +21,8 @@ public final class WorkbenchModel {
     /// 停靠布局:标签组与分屏(持久化)。
     public var dock: DockLayout { didSet { if dock != oldValue { scheduleSave() } } }
 
+    /// 最近关闭的标签(⌘⇧T 恢复,不持久化)。
+    @ObservationIgnored private var closedTabs = ClosedTabStack()
     @ObservationIgnored private let store: WorkbenchStore
     @ObservationIgnored private let makeSession: @MainActor (URL) -> SessionModel
     @ObservationIgnored private var saveTask: Task<Void, Never>?
@@ -252,10 +254,41 @@ public final class WorkbenchModel {
         syncSelectionFromDock()
     }
 
-    /// 关闭标签;关闭后焦点落到相邻标签时同步当前项目。
+    /// 关闭标签;关闭后焦点落到相邻标签时同步当前项目。记入关闭栈以便 ⌘⇧T 恢复。
     public func closeTab(_ id: UUID) {
+        if let tab = dock.tab(id) { closedTabs.push(tab) }
         dock.close(id)
         syncSelectionFromDock()
+    }
+
+    /// 重新打开最近关闭的标签(会话标签对应的项目已移除时跳过,继续弹出下一项)。
+    /// - Returns: 是否成功恢复了一个标签
+    @discardableResult
+    public func reopenClosedTab() -> Bool {
+        while let closed = closedTabs.pop() {
+            if case .chat(let projectID) = closed.kind, !projects.contains(where: { $0.id == projectID }) { continue }
+            mode = .workspace
+            let id = dock.open(closed.kind, title: closed.title, preview: false, line: closed.line)
+            dock.activate(id)
+            syncSelectionFromDock()
+            return true
+        }
+        return false
+    }
+
+    /// 在聚焦组内切换到第 `number` 个标签(1–9,9 为最后一个)。
+    public func selectTab(number: Int) {
+        guard let group = dock.focusedGroup, let index = TabNavigation.index(forShortcut: number, count: group.tabs.count) else { return }
+        activateTab(group.tabs[index].id)
+    }
+
+    /// 在聚焦组内循环切换标签。
+    /// - Parameter delta: +1 下一个,-1 上一个
+    public func cycleTab(by delta: Int) {
+        guard let group = dock.focusedGroup else { return }
+        let current = group.tabs.firstIndex { $0.id == group.activeID } ?? 0
+        guard let index = TabNavigation.cycled(from: current, delta: delta, count: group.tabs.count) else { return }
+        activateTab(group.tabs[index].id)
     }
 
     /// 聚焦组内激活标签若为会话,则把它所属项目设为当前项目。

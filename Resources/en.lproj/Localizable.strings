@@ -1447,3 +1447,12 @@
 "文件夹" = "Folders";
 "打开用量与花费统计" = "Open usage and cost statistics";
 "例如 `/compact`、`/init`、`/review`、`/goal <目标>`、`/context`。" = "For example `/compact`, `/init`, `/review`, `/goal <goal>`, `/context`.";
+"重新打开已关闭的标签" = "Reopen Closed Tab";
+"标签" = "Tabs";
+"下一个标签" = "Next Tab";
+"上一个标签" = "Previous Tab";
+"最后一个标签" = "Last Tab";
+"第 %lld 个标签" = "Tab %lld";
+"显示同级文件" = "Show sibling files";
+"返回上一级" = "Back";
+"空文件夹" = "Empty folder";

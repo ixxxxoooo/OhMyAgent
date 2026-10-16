@@ -10,6 +10,7 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
     case newConversation, openWorkspace, extensions, send
     case toggleSidebar, toggleInspector, togglePanel
     case saveFile, quickOpen, commandPalette, globalSearch, newTerminal
+    case closeTab, reopenTab, nextTab, previousTab
     var id: String { rawValue }
 
     var title: String {
@@ -26,6 +27,10 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
         case .commandPalette: return String(localized: "命令面板")
         case .globalSearch: return String(localized: "在文件中搜索")
         case .newTerminal: return String(localized: "新建终端标签")
+        case .closeTab: return String(localized: "关闭标签")
+        case .reopenTab: return String(localized: "重新打开已关闭的标签")
+        case .nextTab: return String(localized: "下一个标签")
+        case .previousTab: return String(localized: "上一个标签")
         }
     }
 
@@ -44,6 +49,10 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
         case .commandPalette: return ShortcutBinding(key: "p", modifiers: ["command", "shift"])
         case .globalSearch: return ShortcutBinding(key: "f", modifiers: ["command", "shift"])
         case .newTerminal: return ShortcutBinding(key: "`", modifiers: ["control", "shift"])
+        case .closeTab: return ShortcutBinding(key: "w", modifiers: ["command"])
+        case .reopenTab: return ShortcutBinding(key: "t", modifiers: ["command", "shift"])
+        case .nextTab: return ShortcutBinding(key: "tab", modifiers: ["control"])
+        case .previousTab: return ShortcutBinding(key: "tab", modifiers: ["control", "shift"])
         }
     }
 }
@@ -63,7 +72,11 @@ struct ShortcutBinding: Equatable, Codable, Sendable {
     }
 
     var keyEquivalent: KeyEquivalent {
-        key == "return" ? .return : KeyEquivalent(key.first ?? " ")
+        switch key {
+        case "return": return .return
+        case "tab": return .tab
+        default: return KeyEquivalent(key.first ?? " ")
+        }
     }
 
     var keyboardShortcut: KeyboardShortcut { KeyboardShortcut(keyEquivalent, modifiers: eventModifiers) }
@@ -75,7 +88,7 @@ struct ShortcutBinding: Equatable, Codable, Sendable {
         if modifiers.contains("option") { text += "⌥" }
         if modifiers.contains("shift") { text += "⇧" }
         if modifiers.contains("command") { text += "⌘" }
-        return text + (key == "return" ? "↩" : key.uppercased())
+        return text + (key == "return" ? "↩" : key == "tab" ? "⇥" : key.uppercased())
     }
 
     /// 从按键事件构造;没有 ⌘/⌃/⌥ 修饰键时返回 nil(避免吞掉普通输入)。
@@ -84,6 +97,7 @@ struct ShortcutBinding: Equatable, Codable, Sendable {
         guard flags.contains(.command) || flags.contains(.control) || flags.contains(.option) else { return nil }
         let name: String
         if event.keyCode == 36 || event.keyCode == 76 { name = "return" }
+        else if event.keyCode == 48 { name = "tab" }
         else if let character = event.charactersIgnoringModifiers?.lowercased(), character.count == 1, character.unicodeScalars.first!.value >= 0x20 { name = character }
         else { return nil }
         var list: [String] = []
@@ -111,7 +125,7 @@ final class ShortcutStore {
 
     /// 系统保留,不允许占用。
     static let reserved: [ShortcutBinding] = [
-        ShortcutBinding(key: "q", modifiers: ["command"]), ShortcutBinding(key: "w", modifiers: ["command"]),
+        ShortcutBinding(key: "q", modifiers: ["command"]),
         ShortcutBinding(key: "h", modifiers: ["command"]), ShortcutBinding(key: "m", modifiers: ["command"]),
         ShortcutBinding(key: ",", modifiers: ["command"]), ShortcutBinding(key: "c", modifiers: ["command"]),
         ShortcutBinding(key: "v", modifiers: ["command"]), ShortcutBinding(key: "x", modifiers: ["command"]),

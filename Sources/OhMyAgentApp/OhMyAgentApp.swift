@@ -157,6 +157,22 @@ struct WorkbenchCommands: Commands {
                 .keyboardShortcut(shortcuts.shortcut(for: .saveFile))
             Button("全部保存") { AppActions.shared.saveAllFiles() }
                 .keyboardShortcut("s", modifiers: [.command, .option])
+            Divider()
+            Button("关闭标签") { AppActions.shared.closeActiveTabOrWindow() }
+                .keyboardShortcut(shortcuts.shortcut(for: .closeTab))
+            Button("重新打开已关闭的标签") { workbench.reopenClosedTab() }
+                .keyboardShortcut(shortcuts.shortcut(for: .reopenTab))
+        }
+        CommandMenu("标签") {
+            Button("下一个标签") { workbench.cycleTab(by: 1) }
+                .keyboardShortcut(shortcuts.shortcut(for: .nextTab))
+            Button("上一个标签") { workbench.cycleTab(by: -1) }
+                .keyboardShortcut(shortcuts.shortcut(for: .previousTab))
+            Divider()
+            ForEach(1...9, id: \.self) { number in
+                Button(number == 9 ? String(localized: "最后一个标签") : String(localized: "第 \(number) 个标签")) { workbench.selectTab(number: number) }
+                    .keyboardShortcut(KeyEquivalent(Character("\(number)")), modifiers: .command)
+            }
         }
         CommandGroup(after: .textEditing) {
             Button("快速打开文件…") { PaletteModel.shared.present(.files, workbench: workbench) }
