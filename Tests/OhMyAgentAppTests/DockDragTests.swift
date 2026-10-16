@@ -14,7 +14,10 @@ struct DockDragTests {
         let id = UUID()
         drag.begin(id)
         #expect(drag.tabID == id)
-        try await Task.sleep(for: .milliseconds(900))
+        // 复位依赖主线程轮询(约 0.5 秒);并行测试较多时可能被推迟,轮询等待最多 5 秒而不是固定睡眠,避免偶发失败
+        for _ in 0..<100 where drag.tabID != nil {
+            try await Task.sleep(for: .milliseconds(50))
+        }
         #expect(drag.tabID == nil)
     }
 
