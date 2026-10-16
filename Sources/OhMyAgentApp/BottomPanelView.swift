@@ -11,11 +11,21 @@ struct BottomPanelView: View {
     @Bindable var workbench: WorkbenchModel
     @State private var dragStartHeight: Double?
 
+    /// 底部面板可用的视图:终端不在底部时只剩「输出」。
+    private var panes: [BottomPane] {
+        workbench.layout.placement.terminal == .bottom ? BottomPane.available : BottomPane.available.filter { $0 != .terminal }
+    }
+
+    /// 实际显示的视图(终端不在底部时强制为输出)。
+    private var currentPane: BottomPane {
+        panes.contains(workbench.layout.bottomPane) ? workbench.layout.bottomPane : .output
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             resizeHandle
             HStack(spacing: 4) {
-                ForEach(BottomPane.available, id: \.self) { pane in
+                ForEach(panes, id: \.self) { pane in
                     Button(Self.title(pane)) { workbench.layout.bottomPane = pane }
                         .buttonStyle(.plain)
                         .font(OMFonts.small.weight(workbench.layout.bottomPane == pane ? .semibold : .regular))
@@ -30,9 +40,10 @@ struct BottomPanelView: View {
                     .accessibilityLabel("关闭底部面板")
             }
             .padding(.horizontal, 10).padding(.vertical, 4)
+            .background { if currentPane == .terminal { Color.clear.terminalDragHandle(workbench) } }
             Divider()
             Group {
-                switch workbench.layout.bottomPane {
+                switch currentPane {
                 case .output: LogViewerView()
                 case .terminal:
                     // 底部面板使用项目级常驻终端;面板隐藏/切换标签都不会结束其中的进程

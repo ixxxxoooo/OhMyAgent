@@ -460,6 +460,105 @@ public final class WorkbenchModel {
         layout.rightVisible = true
     }
 
+    // MARK: 面板摆放
+
+    /// 项目级常驻终端的标识(与终端存储一致;面板位置变化时进程保持存活)。
+    public var residentTerminalID: String { "bottom:" + (selectedProjectID ?? NSHomeDirectory()) }
+
+    /// 编辑区中的常驻终端标签(终端放在编辑区时存在)。
+    private var residentTerminalTabs: [WorkbenchTab] {
+        dock.allTabs.filter { if case .terminal(let id) = $0.kind { return id.hasPrefix("bottom:") } else { return false } }
+    }
+
+    /// 终端当前是否显示在界面上。
+    public var isTerminalShown: Bool {
+        switch layout.placement.terminal {
+        case .bottom: return layout.bottomVisible && layout.bottomPane == .terminal
+        case .left, .right: return layout.terminalVisible
+        case .editor: return !residentTerminalTabs.isEmpty
+        }
+    }
+
+    /// 显示终端(按当前摆放位置)。
+    public func showTerminal() {
+        switch layout.placement.terminal {
+        case .bottom: showBottom(.terminal)
+        case .left, .right: layout.terminalVisible = true
+        case .editor:
+            let id = residentTerminalID
+            let tab = dock.open(.terminal(id: id), title: String(localized: "终端"))
+            mode = .workspace
+            dock.activate(tab)
+            syncSelectionFromDock()
+        }
+    }
+
+    /// 隐藏终端(进程保持存活;编辑区终端标签会被关闭,进程仍由终端存储保留)。
+    public func hideTerminal() {
+        switch layout.placement.terminal {
+        case .bottom: layout.bottomVisible = false
+        case .left, .right: layout.terminalVisible = false
+        case .editor:
+            for tab in residentTerminalTabs { dock.close(tab.id) }
+            syncSelectionFromDock()
+        }
+    }
+
+    /// 切换终端显隐(⌘J):终端在底部时与旧行为一致(整个底部面板显隐)。
+    public func toggleTerminal() {
+        if layout.placement.terminal == .bottom { toggleBottom(); return }
+        if isTerminalShown { hideTerminal() } else { showTerminal() }
+    }
+
+    /// 把终端移动到新位置:保持其显示状态与进程(终端标识不变),并清理旧位置的残留。
+    /// - Parameter target: 目标位置
+    public func setTerminalPlacement(_ target: TerminalPlacement) {
+        var next = layout.placement
+        next.terminal = target
+        applyPlacement(next)
+    }
+
+    /// 设置项目栏所在侧。
+    public func setSidebarSide(_ side: PanelSide) {
+        var next = layout.placement
+        next.sidebarSide = side
+        applyPlacement(next)
+    }
+
+    /// 设置工具栏(文件/搜索/Git)所在侧。
+    public func setToolsSide(_ side: PanelSide) {
+        var next = layout.placement
+        next.toolsSide = side
+        applyPlacement(next)
+    }
+
+    /// 恢复默认布局:终端在底部,项目栏在左,工具栏在右,各面板恢复默认尺寸。
+    public func resetLayout() {
+        applyPlacement(PanelPlacement())
+        layout.leftWidth = PanelMetrics.leftDefault
+        layout.rightWidth = PanelMetrics.rightDefault
+        layout.terminalWidth = PanelMetrics.terminalDefault
+        layout.bottomHeight = 240
+    }
+
+    /// 应用新的摆放配置;终端位置变化时迁移其显示状态。
+    private func applyPlacement(_ next: PanelPlacement) {
+        let wasShown = isTerminalShown
+        let old = layout.placement.terminal
+        guard next != layout.placement else { return }
+        layout.placement = next
+        if next.terminal != old {
+            // 清理旧位置:编辑区标签关闭(不进入「最近关闭」),底部/侧栏显隐复位
+            if old == .editor { for tab in residentTerminalTabs { dock.close(tab.id) } }
+            if old == .bottom, layout.bottomPane == .terminal { layout.bottomPane = .output; layout.bottomVisible = false }
+            if old.isSide { layout.terminalVisible = false }
+            layout.clamp()
+            if wasShown { showTerminal() }
+            syncSelectionFromDock()
+        }
+        layout.clamp()
+    }
+
     /// 显示底部面板并切换到某视图。
     public func showBottom(_ pane: BottomPane) {
         layout.bottomPane = pane

@@ -10,7 +10,12 @@ import WorkbenchKit
 struct PanelResizer: View {
     /// 被调整的宽度(绑定到 `WorkbenchLayout`)
     @Binding var width: Double
+    /// 该列所在的物理一侧(决定拖动方向)
     let side: PanelSide
+    /// 允许的宽度范围
+    let range: ClosedRange<Double>
+    /// 双击恢复的默认宽度
+    let defaultWidth: Double
     /// 开始拖动时的宽度(拖动期间面板自身在移动,所以用全局坐标计算位移)
     @State private var base: Double?
 
@@ -28,18 +33,18 @@ struct PanelResizer: View {
                             .onChanged { value in
                                 let start = base ?? width
                                 if base == nil { base = start }
-                                width = PanelMetrics.resized(base: start, translation: Double(value.translation.width), side: side)
+                                width = PanelMetrics.resized(base: start, translation: Double(value.translation.width), side: side, range: range)
                             }
                             .onEnded { _ in base = nil }
                     )
-                    .onTapGesture(count: 2) { width = PanelMetrics.defaultWidth(for: side) }
+                    .onTapGesture(count: 2) { width = defaultWidth }
             }
             .accessibilityLabel(side == .left ? String(localized: "调整左栏宽度") : String(localized: "调整右栏宽度"))
             .accessibilityAdjustableAction { direction in
                 let step: Double = 20
                 switch direction {
-                case .increment: width = PanelMetrics.clamp(width + step, side: side)
-                case .decrement: width = PanelMetrics.clamp(width - step, side: side)
+                case .increment: width = min(max(width + step, range.lowerBound), range.upperBound)
+                case .decrement: width = min(max(width - step, range.lowerBound), range.upperBound)
                 @unknown default: break
                 }
             }

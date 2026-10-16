@@ -126,6 +126,79 @@ struct WorkbenchTests {
         model.shutdownAll()
     }
 
+    @Test("终端在各位置间移动:显示状态保持,终端标识不变,旧位置被清理,摆放持久化")
+    func terminalPlacementMigration() throws {
+        let env = try makeEnvironment()
+        defer { try? FileManager.default.removeItem(at: env.root) }
+        let model = makeModel(env.store)
+        let project = try #require(model.openProject(env.dirs[0]))
+        let terminalID = model.residentTerminalID
+        #expect(terminalID == "bottom:" + project)
+
+        // 底部 → 编辑区:底部面板关闭,出现同一标识的终端标签
+        model.showTerminal()
+        #expect(model.isTerminalShown && model.layout.bottomPane == .terminal)
+        model.setTerminalPlacement(.editor)
+        #expect(model.layout.bottomVisible == false && model.layout.bottomPane == .output)
+        #expect(model.dock.allTabs.contains { $0.kind == .terminal(id: terminalID) })
+        #expect(model.isTerminalShown)
+
+        // 编辑区 → 右栏:标签关闭,侧栏显示
+        model.setTerminalPlacement(.right)
+        #expect(!model.dock.allTabs.contains { $0.kind == .terminal(id: terminalID) })
+        #expect(model.layout.terminalVisible && model.layout.visibleColumns(on: .right) == [.terminal])
+
+        // 右栏 → 底部:侧栏隐藏,底部面板显示终端
+        model.setTerminalPlacement(.bottom)
+        #expect(!model.layout.terminalVisible)
+        #expect(model.layout.bottomVisible && model.layout.bottomPane == .terminal)
+
+        // 未显示的终端移动后仍保持未显示
+        model.hideTerminal()
+        model.setTerminalPlacement(.left)
+        #expect(!model.isTerminalShown)
+
+        // 持久化
+        model.setSidebarSide(.right)
+        model.setToolsSide(.left)
+        model.saveNow()
+        model.shutdownAll()
+        let restored = makeModel(env.store)
+        #expect(restored.layout.placement == PanelPlacement(terminal: .left, sidebarSide: .right, toolsSide: .left))
+
+        // 恢复默认布局
+        restored.layout.leftWidth = 400
+        restored.resetLayout()
+        #expect(restored.layout.placement == PanelPlacement())
+        #expect(restored.layout.leftWidth == PanelMetrics.leftDefault)
+        restored.shutdownAll()
+    }
+
+    @Test("切换终端:底部沿用整个底部面板显隐,其他位置只切换终端")
+    func terminalToggle() throws {
+        let env = try makeEnvironment()
+        defer { try? FileManager.default.removeItem(at: env.root) }
+        let model = makeModel(env.store)
+        _ = model.openProject(env.dirs[0])
+        model.toggleTerminal()
+        #expect(model.layout.bottomVisible)
+        model.toggleTerminal()
+        #expect(!model.layout.bottomVisible)
+
+        model.setTerminalPlacement(.left)
+        model.toggleTerminal()
+        #expect(model.layout.terminalVisible && !model.layout.bottomVisible)
+        model.toggleTerminal()
+        #expect(!model.layout.terminalVisible)
+
+        model.setTerminalPlacement(.editor)
+        model.toggleTerminal()
+        #expect(model.isTerminalShown)
+        model.toggleTerminal()
+        #expect(!model.isTerminalShown)
+        model.shutdownAll()
+    }
+
     @Test("折叠、面板切换与历史缓存")
     func panesAndCache() throws {
         let env = try makeEnvironment()

@@ -5,6 +5,7 @@ import AppKit
 import ChatKit
 import DesignSystem
 import SwiftUI
+import WorkbenchKit
 
 /// 通用。
 struct GeneralPage: View {
@@ -121,6 +122,7 @@ struct AppearancePage: View {
     @Bindable private var appearance = AppearanceModel.shared
     @AppStorage(ClientPrefs.Key.chatWidth) private var chatWidth = ChatWidth.standard.rawValue
     @AppStorage(ClientPrefs.Key.chatWidthCustom) private var chatWidthCustom = ChatWidth.customDefault
+    @Bindable private var workbench = AppEnvironment.shared.workbench
 
     var body: some View {
         SettingsForm {
@@ -181,9 +183,47 @@ struct AppearancePage: View {
                 Toggle("紧凑密度", isOn: $appearance.isCompact)
                 Note("系统「减少透明度」「减少动态效果」始终优先。代码、Diff、编辑器等阅读区域恒为纯色,不受影响。")
             }
+            layoutSection
             Section {
                 Button("恢复默认主题") { appearance.reset(); chatWidth = ChatWidth.standard.rawValue; chatWidthCustom = ChatWidth.customDefault }
             }
+        }
+    }
+}
+
+extension AppearancePage {
+    /// 布局:终端位置、项目栏与工具栏所在侧(也可直接拖动终端标题条换位置)。
+    @ViewBuilder
+    fileprivate var layoutSection: some View {
+        Section("布局") {
+            Picker("终端位置", selection: Binding(
+                get: { workbench.layout.placement.terminal },
+                set: { workbench.setTerminalPlacement($0) }
+            )) {
+                Text("底部").tag(TerminalPlacement.bottom)
+                Text("右栏").tag(TerminalPlacement.right)
+                Text("左栏").tag(TerminalPlacement.left)
+                Text("编辑区").tag(TerminalPlacement.editor)
+            }
+            .pickerStyle(.segmented)
+            Picker("项目栏位置", selection: Binding(
+                get: { workbench.layout.placement.sidebarSide },
+                set: { workbench.setSidebarSide($0) }
+            )) {
+                Text("左侧").tag(PanelSide.left)
+                Text("右侧").tag(PanelSide.right)
+            }
+            .pickerStyle(.segmented)
+            Picker("文件 / 搜索 / Git 位置", selection: Binding(
+                get: { workbench.layout.placement.toolsSide },
+                set: { workbench.setToolsSide($0) }
+            )) {
+                Text("左侧").tag(PanelSide.left)
+                Text("右侧").tag(PanelSide.right)
+            }
+            .pickerStyle(.segmented)
+            Note("终端标题条可以直接拖到窗口的左侧、右侧、底部或中间来换位置;换位置不会中断终端里正在运行的进程。")
+            Button("恢复默认布局") { workbench.resetLayout() }
         }
     }
 }

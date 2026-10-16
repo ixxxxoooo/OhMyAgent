@@ -46,17 +46,49 @@ public struct WorkbenchLayout: Codable, Equatable, Sendable {
     public var leftPane: LeftPane = .sessions
     public var rightPane: RightPane = .files
     public var bottomPane: BottomPane = .output
+    /// 各面板的摆放位置(终端位置、项目栏与工具栏所在侧)
+    public var placement = PanelPlacement()
+    /// 终端侧栏是否可见(终端放到左/右侧时有效)
+    public var terminalVisible = false
+    /// 终端侧栏宽度
+    public var terminalWidth: Double = PanelMetrics.terminalDefault
 
     public init() {}
 
-    /// 限制各尺寸在合理范围内(防止损坏的状态文件导致不可见的面板)。
+    private enum CodingKeys: String, CodingKey {
+        case leftVisible, rightVisible, bottomVisible, leftWidth, rightWidth, bottomHeight
+        case leftPane, rightPane, bottomPane, placement, terminalVisible, terminalWidth
+    }
+
+    /// 容错解码:新增字段缺失或取值未知时使用默认值,旧版本状态文件可继续读取。
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        leftVisible = try c.decodeIfPresent(Bool.self, forKey: .leftVisible) ?? true
+        rightVisible = try c.decodeIfPresent(Bool.self, forKey: .rightVisible) ?? false
+        bottomVisible = try c.decodeIfPresent(Bool.self, forKey: .bottomVisible) ?? false
+        leftWidth = try c.decodeIfPresent(Double.self, forKey: .leftWidth) ?? PanelMetrics.leftDefault
+        rightWidth = try c.decodeIfPresent(Double.self, forKey: .rightWidth) ?? PanelMetrics.rightDefault
+        bottomHeight = try c.decodeIfPresent(Double.self, forKey: .bottomHeight) ?? 240
+        leftPane = (try? c.decodeIfPresent(LeftPane.self, forKey: .leftPane)) ?? .sessions
+        rightPane = (try? c.decodeIfPresent(RightPane.self, forKey: .rightPane)) ?? .files
+        bottomPane = (try? c.decodeIfPresent(BottomPane.self, forKey: .bottomPane)) ?? .output
+        placement = (try? c.decodeIfPresent(PanelPlacement.self, forKey: .placement)) ?? PanelPlacement()
+        terminalVisible = try c.decodeIfPresent(Bool.self, forKey: .terminalVisible) ?? false
+        terminalWidth = try c.decodeIfPresent(Double.self, forKey: .terminalWidth) ?? PanelMetrics.terminalDefault
+    }
+
+    /// 限制各尺寸在合理范围内(防止损坏的状态文件导致不可见的面板),并校正与摆放位置相关的状态。
     public mutating func clamp() {
         leftWidth = min(max(leftWidth, PanelMetrics.leftRange.lowerBound), PanelMetrics.leftRange.upperBound)
         rightWidth = min(max(rightWidth, PanelMetrics.rightRange.lowerBound), PanelMetrics.rightRange.upperBound)
+        terminalWidth = min(max(terminalWidth, PanelMetrics.terminalRange.lowerBound), PanelMetrics.terminalRange.upperBound)
         bottomHeight = min(max(bottomHeight, 120), 600)
         if !LeftPane.available.contains(leftPane) { leftPane = .sessions }
         if !RightPane.available.contains(rightPane) { rightPane = .files }
         if !BottomPane.available.contains(bottomPane) { bottomPane = .output }
+        // 终端不在底部时,底部面板只剩「输出」;终端不在左/右侧时,侧栏不可见
+        if placement.terminal != .bottom && bottomPane == .terminal { bottomPane = .output }
+        if !placement.terminal.isSide { terminalVisible = false }
     }
 }
 

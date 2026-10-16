@@ -18,11 +18,16 @@ enum TitlebarMetrics {
     /// 浮层图标按钮的边长与按钮间距。
     static let buttonSize: CGFloat = 26
     static let buttonSpacing: CGFloat = 2
-    /// 侧栏收起时,标签栏左侧需为浮层(回退/前进/侧栏开关 3 个按钮)预留的宽度:88 + 26×3 + 2×2 = 170(对齐 kuku)。
-    /// 修改浮层按钮构成时必须同步此值。
-    static let collapsedLeadingInset: CGFloat = trafficLightInset + buttonSize * 3 + buttonSpacing * 2
-    /// 右栏开关占用的宽度(右栏头部与标签栏为其预留)。
-    static let trailingInset: CGFloat = 34
+    /// 左上浮层(红绿灯让位 + 回退/前进 + `toggles` 个面板开关)的总宽度:`toggles == 1` 时为 170(对齐 kuku)。
+    /// 修改浮层按钮构成时必须同步此函数。
+    static func leftClusterWidth(toggles: Int) -> CGFloat {
+        trafficLightInset + buttonSize * CGFloat(2 + toggles) + buttonSpacing * CGFloat(1 + toggles)
+    }
+
+    /// 右上浮层(`toggles` 个面板开关 + 边距)占用的宽度:`toggles == 1` 时为 34;没有开关时为 0。
+    static func rightClusterWidth(toggles: Int) -> CGFloat {
+        toggles <= 0 ? 0 : buttonSize * CGFloat(toggles) + buttonSpacing * CGFloat(toggles - 1) + 8
+    }
 }
 
 /// 浮层按钮:图标 + 悬停底色;不可用时弱化且不响应。
@@ -49,9 +54,10 @@ private struct OverlayButton: View {
     }
 }
 
-/// 顶部浮层:左上「回退 / 前进 / 侧栏开关」,右上右栏开关。
+/// 顶部浮层:左上「回退 / 前进」+ 位于左侧的面板开关,右上位于右侧的面板开关。
 /// 刻意做成整个工作区上的浮层(而不是塞进侧栏或标签栏):面板展开/收起时按钮坐标恒定,
 /// 且窗口使用隐藏标题栏(不再有 NSTitlebarView 横跨顶部吞掉点击),按钮可直接点击。
+/// 项目栏、工具栏的开关跟随各自所在的一侧(设置 → 主题 → 布局)。
 struct TitlebarOverlay: View {
     @Bindable var workbench: WorkbenchModel
 
@@ -60,25 +66,67 @@ struct TitlebarOverlay: View {
             HStack(spacing: TitlebarMetrics.buttonSpacing) {
                 OverlayButton(icon: "arrow-left", label: String(localized: "回退"), enabled: workbench.nav.canGoBack) { workbench.goBack() }
                 OverlayButton(icon: "arrow-right", label: String(localized: "前进"), enabled: workbench.nav.canGoForward) { workbench.goForward() }
-                OverlayButton(
-                    icon: "panel-left",
-                    label: workbench.layout.leftVisible
-                        ? String(localized: "隐藏左栏") + " (\(ShortcutStore.shared.binding(for: .toggleSidebar).display))"
-                        : String(localized: "显示左栏") + " (\(ShortcutStore.shared.binding(for: .toggleSidebar).display))"
-                ) { workbench.toggleLeft() }
+                ForEach(toggles(on: .left)) { toggleButton($0, side: .left) }
             }
             .padding(.leading, TitlebarMetrics.trafficLightInset)
             Spacer(minLength: 0)
-            OverlayButton(
-                icon: "panel-right",
-                label: workbench.layout.rightVisible
-                    ? String(localized: "隐藏右栏") + " (\(ShortcutStore.shared.binding(for: .toggleInspector).display))"
-                    : String(localized: "显示右栏") + " (\(ShortcutStore.shared.binding(for: .toggleInspector).display))"
-            ) { workbench.toggleRight() }
+            HStack(spacing: TitlebarMetrics.buttonSpacing) {
+                // 右侧由内向外:工具栏在项目栏内侧
+                ForEach(toggles(on: .right).reversed()) { toggleButton($0, side: .right) }
+            }
             .padding(.trailing, 4)
         }
         .frame(height: TitlebarMetrics.height)
         .frame(maxWidth: .infinity, alignment: .top)
+    }
+
+    /// 某一侧的面板开关(项目栏、工具栏),由外向内。
+    private func toggles(on side: PanelSide) -> [PanelColumn] {
+        workbench.layout.columns(on: side).filter { $0 != .terminal }
+    }
+
+    /// 单个面板开关按钮:图标随所在侧变化,提示与快捷键随面板变化。
+    private func toggleButton(_ column: PanelColumn, side: PanelSide) -> some View {
+        let isSidebar = column == .sidebar
+        let visible = workbench.layout.isVisible(column)
+        let shortcut = ShortcutStore.shared.binding(for: isSidebar ? .toggleSidebar : .toggleInspector).display
+        let name = WorkbenchPanelNames.toggleTitle(column, visible: visible)
+        return OverlayButton(
+            icon: side == .left ? "panel-left" : "panel-right",
+            label: name + " (\(shortcut))"
+        ) {
+            if isSidebar { workbench.toggleLeft() } else { workbench.toggleRight() }
+        }
+    }
+}
+
+/// 面板开关的本地化文案(标题栏按钮、菜单、命令面板共用)。
+enum WorkbenchPanelNames {
+    /// 面板开关的标题。
+    /// - Parameters:
+    ///   - column: 项目栏或工具栏
+    ///   - visible: 当前是否可见(可见时文案为「隐藏」)
+    /// - Returns: 本地化标题
+    static func toggleTitle(_ column: PanelColumn, visible: Bool) -> String {
+        switch (column, visible) {
+        case (.sidebar, true): return String(localized: "隐藏项目栏")
+        case (.sidebar, false): return String(localized: "显示项目栏")
+        case (_, true): return String(localized: "隐藏工具栏")
+        case (_, false): return String(localized: "显示工具栏")
+        }
+    }
+}
+
+extension WorkbenchLayout {
+    /// 面板列顶部为标题栏浮层让出的(前,后)边距:仅当它是某一侧最外侧的可见列时才需要
+    /// (项目栏顶部本来就是空白,无需让位)。
+    /// - Parameter column: 面板列
+    /// - Returns: 前缘与后缘的让位宽度
+    func titlebarInsets(for column: PanelColumn) -> (leading: CGFloat, trailing: CGFloat) {
+        guard column != .sidebar, let side = side(of: column), visibleColumns(on: side).first == column else { return (0, 0) }
+        return side == .left
+            ? (TitlebarMetrics.leftClusterWidth(toggles: toggleCount(on: .left)), 0)
+            : (0, TitlebarMetrics.rightClusterWidth(toggles: toggleCount(on: .right)))
     }
 }
 

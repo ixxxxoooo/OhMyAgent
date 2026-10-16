@@ -51,34 +51,59 @@ struct WorkbenchView: View {
         .task { await runDebugHooks() }
     }
 
-    /// 工作台主体:左栏 + 中栏 + 右栏(自绘布局,无原生 NavigationSplitView);
-    /// 顶部浮层(回退/前进/侧栏开关/右栏开关)盖在整个工作区之上,按钮位置恒定且可点击。
+    /// 工作台主体:左侧各列 + 中栏 + 右侧各列(自绘布局,无原生 NavigationSplitView);
+    /// 项目栏、工具栏、终端侧栏落在哪一侧由 `layout.placement` 决定(设置 → 主题 → 布局)。
+    /// 顶部浮层(回退/前进/面板开关)盖在整个工作区之上,按钮位置恒定且可点击。
     private var workspaceBody: some View {
         HStack(spacing: 0) {
-            if workbench.layout.leftVisible {
-                ProjectTreeView(workbench: workbench)
-                    .id(appearance.renderKey)
-                    .frame(width: CGFloat(workbench.layout.leftWidth))
-                    .clipped()
-                    .background(SidebarBackground())
-                PanelResizer(width: $workbench.layout.leftWidth, side: .left)
-            }
+            ForEach(workbench.layout.visibleColumns(on: .left)) { panelColumn($0, side: .left) }
             CenterColumn(workbench: workbench)
                 .frame(minWidth: 320, maxWidth: .infinity)
-            if workbench.layout.rightVisible {
-                PanelResizer(width: $workbench.layout.rightWidth, side: .right)
-                RightPaneView(workbench: workbench)
-                    .id(appearance.themeRevision)
-                    .frame(width: CGFloat(workbench.layout.rightWidth))
-                    .clipped()
-            }
+            // 右侧由内向外排列
+            ForEach(workbench.layout.visibleColumns(on: .right).reversed()) { panelColumn($0, side: .right) }
         }
         .overlay(alignment: .top) { TitlebarOverlay(workbench: workbench) }
+        .overlay { TerminalDropOverlay() }
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { TerminalDragState.shared.workspaceFrame = $0 }
         .ignoresSafeArea(.container, edges: .top)
         // 无标题栏窗口:窗口标题仅保留给系统(Mission Control/辅助功能)。
         .navigationTitle(title)
         .onAppear { workbench.recordNavigation() }
         .onChange(of: navigationSignature) { _, _ in workbench.recordNavigation() }
+    }
+
+    /// 一列面板 + 它与中栏之间的分隔条(分隔条总在靠近中栏的一侧)。
+    @ViewBuilder
+    private func panelColumn(_ column: PanelColumn, side: PanelSide) -> some View {
+        let width = Binding<Double>(
+            get: { workbench.layout.width(of: column) },
+            set: { value in
+                switch column {
+                case .sidebar: workbench.layout.leftWidth = value
+                case .tools: workbench.layout.rightWidth = value
+                case .terminal: workbench.layout.terminalWidth = value
+                }
+            }
+        )
+        let range = column == .sidebar ? PanelMetrics.leftRange : (column == .tools ? PanelMetrics.rightRange : PanelMetrics.terminalRange)
+        let defaultWidth = column == .sidebar ? PanelMetrics.leftDefault : (column == .tools ? PanelMetrics.rightDefault : PanelMetrics.terminalDefault)
+        if side == .right { PanelResizer(width: width, side: side, range: range, defaultWidth: defaultWidth) }
+        Group {
+            switch column {
+            case .sidebar:
+                ProjectTreeView(workbench: workbench)
+                    .id(appearance.renderKey)
+                    .background(SidebarBackground())
+            case .tools:
+                RightPaneView(workbench: workbench)
+                    .id(appearance.themeRevision)
+            case .terminal:
+                TerminalSidePanel(workbench: workbench)
+            }
+        }
+        .frame(width: CGFloat(width.wrappedValue))
+        .clipped()
+        if side == .left { PanelResizer(width: width, side: side, range: range, defaultWidth: defaultWidth) }
     }
 
     /// 导航历史的触发信号:聚焦组的激活标签与标签总数(关闭标签时需要清理历史)。
@@ -207,6 +232,11 @@ struct WorkbenchView: View {
                 workbench.dock.drop(id, onGroup: group, zone: zone)
             }
         }
+        // 调试:面板摆放(OMA_TERMINAL_PLACEMENT=bottom|right|left|editor、OMA_SIDEBAR_SIDE/OMA_TOOLS_SIDE=left|right、OMA_SHOW_TERMINAL=1)
+        if let value = env["OMA_TERMINAL_PLACEMENT"].flatMap(TerminalPlacement.init(rawValue:)) { workbench.setTerminalPlacement(value) }
+        if let value = env["OMA_SIDEBAR_SIDE"].flatMap(PanelSide.init(rawValue:)) { workbench.setSidebarSide(value) }
+        if let value = env["OMA_TOOLS_SIDE"].flatMap(PanelSide.init(rawValue:)) { workbench.setToolsSide(value) }
+        if env["OMA_SHOW_TERMINAL"] != nil { workbench.showTerminal() }
         if env["OMA_SHOW_RIGHT"] != nil { workbench.layout.rightVisible = true }
         if env["OMA_SHOW_BOTTOM"] != nil { workbench.layout.bottomVisible = true }
         if let pane = env["OMA_BOTTOM_PANE"].flatMap(BottomPane.init(rawValue:)) { workbench.layout.bottomPane = pane }

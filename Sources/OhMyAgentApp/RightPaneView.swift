@@ -54,9 +54,9 @@ struct RightPaneView: View {
                 .foregroundStyle(OMColors.secondaryText)
                 .lineLimit(1)
         }
-        .padding(.leading, 8)
-        // 右上角留给右栏开关浮层
-        .padding(.trailing, TitlebarMetrics.trailingInset)
+        // 位于最外侧时,顶部角落留给面板开关浮层
+        .padding(.leading, max(8, workbench.layout.titlebarInsets(for: .tools).leading))
+        .padding(.trailing, workbench.layout.titlebarInsets(for: .tools).trailing)
         .frame(height: TitlebarMetrics.height)
         .background(WindowDragArea())
     }

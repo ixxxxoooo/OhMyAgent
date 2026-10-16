@@ -192,12 +192,19 @@ struct WorkbenchCommands: Commands {
             Button("检查更新…") { UpdateModel.shared.checkInteractively() }
         }
         CommandGroup(replacing: .sidebar) {
-            Button(workbench.layout.leftVisible ? String(localized: "隐藏左栏") : String(localized: "显示左栏")) { workbench.toggleLeft() }
+            Button(WorkbenchPanelNames.toggleTitle(.sidebar, visible: workbench.layout.leftVisible)) { workbench.toggleLeft() }
                 .keyboardShortcut(shortcuts.shortcut(for: .toggleSidebar))
-            Button(workbench.layout.rightVisible ? String(localized: "隐藏右栏") : String(localized: "显示右栏")) { workbench.toggleRight() }
+            Button(WorkbenchPanelNames.toggleTitle(.tools, visible: workbench.layout.rightVisible)) { workbench.toggleRight() }
                 .keyboardShortcut(shortcuts.shortcut(for: .toggleInspector))
-            Button(workbench.layout.bottomVisible ? String(localized: "隐藏底部面板") : String(localized: "显示底部面板")) { workbench.toggleBottom() }
-                .keyboardShortcut(shortcuts.shortcut(for: .togglePanel))
+            if workbench.layout.placement.terminal == .bottom {
+                Button(workbench.layout.bottomVisible ? String(localized: "隐藏底部面板") : String(localized: "显示底部面板")) { workbench.toggleBottom() }
+                    .keyboardShortcut(shortcuts.shortcut(for: .togglePanel))
+            } else {
+                // 终端不在底部时:快捷键切换终端,输出面板另设入口
+                Button(workbench.isTerminalShown ? String(localized: "隐藏终端") : String(localized: "显示终端")) { workbench.toggleTerminal() }
+                    .keyboardShortcut(shortcuts.shortcut(for: .togglePanel))
+                Button(workbench.layout.bottomVisible ? String(localized: "隐藏输出面板") : String(localized: "显示输出面板")) { workbench.toggleBottom() }
+            }
             Divider()
             Button("工具与扩展…") {
                 AppActions.shared.openSettings(page: .tools)

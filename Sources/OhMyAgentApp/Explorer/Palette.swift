@@ -133,9 +133,15 @@ enum PaletteCommands {
             PaletteCommand(id: "changesTab", title: String(localized: "在标签中查看本轮改动"), icon: "file-diff", shortcut: nil) {
                 if let id = workbench.selectedProjectID { workbench.openChanges(project: id) }
             },
-            PaletteCommand(id: "left", title: workbench.layout.leftVisible ? String(localized: "隐藏左栏") : String(localized: "显示左栏"), icon: "panel-left", shortcut: key(.toggleSidebar)) { workbench.toggleLeft() },
-            PaletteCommand(id: "right", title: workbench.layout.rightVisible ? String(localized: "隐藏右栏") : String(localized: "显示右栏"), icon: "panel-right", shortcut: key(.toggleInspector)) { workbench.toggleRight() },
-            PaletteCommand(id: "bottom", title: workbench.layout.bottomVisible ? String(localized: "隐藏底部面板") : String(localized: "显示底部面板"), icon: "panel-bottom", shortcut: key(.togglePanel)) { workbench.toggleBottom() },
+            PaletteCommand(id: "left", title: WorkbenchPanelNames.toggleTitle(.sidebar, visible: workbench.layout.leftVisible), icon: workbench.layout.placement.sidebarSide == .left ? "panel-left" : "panel-right", shortcut: key(.toggleSidebar)) { workbench.toggleLeft() },
+            PaletteCommand(id: "right", title: WorkbenchPanelNames.toggleTitle(.tools, visible: workbench.layout.rightVisible), icon: workbench.layout.placement.toolsSide == .left ? "panel-left" : "panel-right", shortcut: key(.toggleInspector)) { workbench.toggleRight() },
+            workbench.layout.placement.terminal == .bottom
+                ? PaletteCommand(id: "bottom", title: workbench.layout.bottomVisible ? String(localized: "隐藏底部面板") : String(localized: "显示底部面板"), icon: "panel-bottom", shortcut: key(.togglePanel)) { workbench.toggleBottom() }
+                : PaletteCommand(id: "bottom", title: workbench.isTerminalShown ? String(localized: "隐藏终端") : String(localized: "显示终端"), icon: "square-terminal", shortcut: key(.togglePanel)) { workbench.toggleTerminal() },
+            PaletteCommand(id: "output", title: workbench.layout.bottomVisible && workbench.layout.bottomPane == .output ? String(localized: "隐藏输出面板") : String(localized: "显示输出面板"), icon: "panel-bottom", shortcut: nil) {
+                if workbench.layout.bottomVisible && workbench.layout.bottomPane == .output { workbench.layout.bottomVisible = false } else { workbench.showBottom(.output) }
+            },
+            PaletteCommand(id: "resetLayout", title: String(localized: "恢复默认布局"), icon: "undo-2", shortcut: nil) { workbench.resetLayout() },
             PaletteCommand(id: "settings", title: String(localized: "设置…"), icon: "settings", shortcut: "⌘,") { AppActions.shared.openSettings() },
             PaletteCommand(id: "tools", title: String(localized: "工具与扩展…"), icon: "puzzle", shortcut: key(.extensions)) { AppActions.shared.openSettings(page: .tools) },
             PaletteCommand(id: "shortcuts", title: String(localized: "快捷键设置"), icon: "keyboard", shortcut: nil) { AppActions.shared.openSettings(page: .shortcuts) },

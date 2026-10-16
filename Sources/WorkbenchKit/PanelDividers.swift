@@ -4,7 +4,7 @@
 import Foundation
 
 /// 侧栏所属一侧。
-public enum PanelSide: Equatable, Sendable {
+public enum PanelSide: String, Codable, Equatable, Sendable {
     case left, right
 }
 
@@ -14,6 +14,9 @@ public enum PanelMetrics {
     public static let rightRange: ClosedRange<Double> = 240...800
     public static let leftDefault: Double = 260
     public static let rightDefault: Double = 340
+    /// 终端侧栏宽度范围与默认值(终端放到左/右侧时使用)
+    public static let terminalRange: ClosedRange<Double> = 240...900
+    public static let terminalDefault: Double = 420
 
     /// 某一侧栏允许的宽度范围。
     public static func range(for side: PanelSide) -> ClosedRange<Double> {
@@ -43,5 +46,17 @@ public enum PanelMetrics {
     /// - Returns: 限制后的新宽度
     public static func resized(base: Double, translation: Double, side: PanelSide) -> Double {
         clamp(side == .left ? base + translation : base - translation, side: side)
+    }
+
+    /// 通用的分隔条宽度换算:列在左侧时向右拖变宽,在右侧时向左拖变宽,结果限制在 `range` 内。
+    /// - Parameters:
+    ///   - base: 开始拖动时的宽度
+    ///   - translation: 水平位移(向右为正)
+    ///   - side: 该列所在的物理一侧
+    ///   - range: 允许的宽度范围
+    /// - Returns: 限制后的新宽度
+    public static func resized(base: Double, translation: Double, side: PanelSide, range: ClosedRange<Double>) -> Double {
+        let raw = side == .left ? base + translation : base - translation
+        return min(max(raw, range.lowerBound), range.upperBound)
     }
 }

@@ -23,6 +23,8 @@ final class TerminalController: Identifiable {
     private(set) var exitCode: Int32?
     /// 渲染视图(AppKit)
     @ObservationIgnored let view: TerminalView
+    /// 当前持有渲染视图的宿主(见 `TerminalHostView.Coordinator`)
+    @ObservationIgnored weak var hostToken: AnyObject?
     @ObservationIgnored private var process: LocalProcess?
     @ObservationIgnored private let executable: String
     @ObservationIgnored private let arguments: [String]

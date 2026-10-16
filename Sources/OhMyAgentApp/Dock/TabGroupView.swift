@@ -82,8 +82,10 @@ struct TabGroupView: View {
         VStack(spacing: 0) {
             TabBarView(
                 workbench: workbench, group: group, isFocused: isFocused,
-                leadingInset: edges.top && edges.left && !workbench.layout.leftVisible ? TitlebarMetrics.collapsedLeadingInset : 0,
-                trailingInset: edges.top && edges.right && !workbench.layout.rightVisible ? TitlebarMetrics.trailingInset : 0
+                leadingInset: edges.top && edges.left && workbench.layout.visibleColumns(on: .left).isEmpty
+                    ? TitlebarMetrics.leftClusterWidth(toggles: workbench.layout.toggleCount(on: .left)) : 0,
+                trailingInset: edges.top && edges.right && workbench.layout.visibleColumns(on: .right).isEmpty
+                    ? TitlebarMetrics.rightClusterWidth(toggles: workbench.layout.toggleCount(on: .right)) : 0
             )
             Divider()
             GeometryReader { proxy in

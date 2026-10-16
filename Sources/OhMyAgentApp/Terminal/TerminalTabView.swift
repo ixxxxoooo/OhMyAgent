@@ -12,8 +12,18 @@ private struct TerminalHostView: NSViewRepresentable {
     /// 出现时是否抢占键盘焦点
     var focusOnAppear = true
 
+    /// 宿主令牌:同一个终端视图先后挂到新旧两个位置(换面板位置)时,
+    /// 旧宿主销毁不能把已经挂到新位置的视图摘走。
+    final class Coordinator {
+        let controller: TerminalController
+        init(controller: TerminalController) { self.controller = controller }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(controller: controller) }
+
     func makeNSView(context: Context) -> TerminalView {
         let view = controller.view
+        controller.hostToken = context.coordinator
         if focusOnAppear {
             Task { @MainActor in view.window?.makeFirstResponder(view) }
         }
@@ -24,8 +34,11 @@ private struct TerminalHostView: NSViewRepresentable {
         nsView.syncTabActive(context.environment.tabIsActive)
     }
 
-    static func dismantleNSView(_ nsView: TerminalView, coordinator: ()) {
+    static func dismantleNSView(_ nsView: TerminalView, coordinator: Coordinator) {
+        // 视图已被新的宿主接管时不再摘除
+        guard coordinator.controller.hostToken === coordinator else { return }
         if nsView.superview != nil { nsView.removeFromSuperview() }
+        coordinator.controller.hostToken = nil
     }
 }
 
