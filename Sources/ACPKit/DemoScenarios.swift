@@ -15,14 +15,27 @@ public struct DemoScenario: Sendable, Identifiable {
     public let title: String
     /// 一句话说明
     public let summary: String
+    /// 运行方式
+    public let behavior: Behavior
     /// 构建步骤(可读取工作区路径等上下文)
     public let build: @Sendable (ScenarioContext) -> [ScenarioStep]
 
-    public init(id: String, group: String, title: String, summary: String, build: @escaping @Sendable (ScenarioContext) -> [ScenarioStep]) {
+    /// 场景的运行方式。
+    public enum Behavior: Sendable, Equatable {
+        /// 自动跑完
+        case auto
+        /// 中途需要用户操作(批准权限、回答问题)
+        case interactive
+        /// 冻结:最后停在某个状态,直到用户取消
+        case frozen
+    }
+
+    public init(id: String, group: String, title: String, summary: String, behavior: Behavior = .auto, build: @escaping @Sendable (ScenarioContext) -> [ScenarioStep]) {
         self.id = id
         self.group = group
         self.title = title
         self.summary = summary
+        self.behavior = behavior
         self.build = build
     }
 

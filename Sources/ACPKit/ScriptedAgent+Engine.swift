@@ -62,9 +62,9 @@ extension ScriptedAgent {
         case .user(let text):
             await emit(sessionId, parent: parent, ["sessionUpdate": "user_message_chunk", "content": ["type": "text", "text": .string(text)]])
         case .tool(let tool):
-            await runTool(tool, sessionId: sessionId, parent: parent)
+            await runTool(tool, ctx: ctx, parent: parent)
         case .permission(let permission):
-            return try await runPermission(permission, sessionId: sessionId, parent: parent)
+            return try await runPermission(permission, ctx: ctx, parent: parent)
         case .subagent(let sub):
             return try await runSubagentStep(sub, ctx: ctx, parent: parent)
         case .parallel(let groups):
@@ -108,11 +108,13 @@ extension ScriptedAgent {
     // MARK: 工具
 
     /// 工具调用:进行中 → 完成/失败;冻结态只发开头。
-    func runTool(_ tool: ScenarioTool, sessionId: String, parent: String?) async {
+    func runTool(_ tool: ScenarioTool, ctx: ScenarioContext, parent: String?) async {
+        let sessionId = ctx.sessionId
+        let toolId = ctx.scoped(tool.id)
         var content = tool.extra
         if let output = tool.output { content.append(["type": "content", "content": ["type": "text", "text": .string(output)]]) }
         var start: [String: JSONValue] = [
-            "sessionUpdate": "tool_call", "toolCallId": .string(tool.id), "title": .string(tool.title), "kind": .string(tool.kind),
+            "sessionUpdate": "tool_call", "toolCallId": .string(toolId), "title": .string(tool.title), "kind": .string(tool.kind),
             "name": .string(tool.name), "status": tool.finish == .pending ? "pending" : "in_progress",
             "rawInput": tool.input, "locations": tool.locations,
         ]
@@ -122,24 +124,26 @@ extension ScriptedAgent {
         await pause()
         guard !frozen else { return }
         await emit(sessionId, parent: parent, [
-            "sessionUpdate": "tool_call_update", "toolCallId": .string(tool.id),
+            "sessionUpdate": "tool_call_update", "toolCallId": .string(toolId),
             "status": tool.finish == .failed ? "failed" : "completed", "content": .array(content),
         ])
         await pause()
     }
 
     /// 需要批准的工具调用:待处理 → 请求权限 → 进行中 → 完成;拒绝/取消则失败。
-    func runPermission(_ permission: ScenarioPermission, sessionId: String, parent: String?) async throws -> ScenarioOutcome {
+    func runPermission(_ permission: ScenarioPermission, ctx: ScenarioContext, parent: String?) async throws -> ScenarioOutcome {
+        let sessionId = ctx.sessionId
         let tool = permission.tool
+        let toolId = ctx.scoped(tool.id)
         await emit(sessionId, parent: parent, [
-            "sessionUpdate": "tool_call", "toolCallId": .string(tool.id), "title": .string(tool.title), "kind": .string(tool.kind),
+            "sessionUpdate": "tool_call", "toolCallId": .string(toolId), "title": .string(tool.title), "kind": .string(tool.kind),
             "name": .string(tool.name), "status": "pending", "rawInput": tool.input, "locations": tool.locations,
         ])
         let options = Self.permissionOptions(permission.options)
         let response = try await connection.request("session/request_permission", params: [
             "sessionId": .string(sessionId),
             "toolCall": [
-                "toolCallId": .string(tool.id), "title": .string(tool.title), "kind": .string(tool.kind),
+                "toolCallId": .string(toolId), "title": .string(tool.title), "kind": .string(tool.kind),
                 "name": .string(tool.name), "rawInput": tool.input, "content": .array(tool.extra),
             ],
             "options": .array(options),
@@ -148,22 +152,22 @@ extension ScriptedAgent {
         let chosenId = response["outcome"]?["optionId"]?.stringValue
         let chosenKind = options.first { $0["optionId"]?.stringValue == chosenId }?["kind"]?.stringValue ?? "reject_once"
         if outcome == "cancelled" || cancelled.contains(sessionId) {
-            await emit(sessionId, parent: parent, ["sessionUpdate": "tool_call_update", "toolCallId": .string(tool.id), "status": "failed"])
+            await emit(sessionId, parent: parent, ["sessionUpdate": "tool_call_update", "toolCallId": .string(toolId), "status": "failed"])
             return .cancelled
         }
         if chosenKind.hasPrefix("reject") {
-            await emit(sessionId, parent: parent, ["sessionUpdate": "tool_call_update", "toolCallId": .string(tool.id), "status": "failed"])
+            await emit(sessionId, parent: parent, ["sessionUpdate": "tool_call_update", "toolCallId": .string(toolId), "status": "failed"])
             if !permission.rejectedText.isEmpty {
                 await emit(sessionId, parent: parent, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": .string(permission.rejectedText)]])
             }
             return .rejected
         }
-        await emit(sessionId, parent: parent, ["sessionUpdate": "tool_call_update", "toolCallId": .string(tool.id), "status": "in_progress"])
+        await emit(sessionId, parent: parent, ["sessionUpdate": "tool_call_update", "toolCallId": .string(toolId), "status": "in_progress"])
         await pause()
         var content = tool.extra
         if let output = tool.output { content.append(["type": "content", "content": ["type": "text", "text": .string(output)]]) }
         await emit(sessionId, parent: parent, [
-            "sessionUpdate": "tool_call_update", "toolCallId": .string(tool.id),
+            "sessionUpdate": "tool_call_update", "toolCallId": .string(toolId),
             "status": tool.finish == .failed ? "failed" : "completed", "content": .array(content),
         ])
         return .finished
@@ -196,17 +200,18 @@ extension ScriptedAgent {
 
     /// 子 Agent:父工具调用 + 带父 ID 的内部更新;`.running` 时父卡片保持进行中(后台子 Agent)。
     func runSubagentStep(_ sub: ScenarioSubagent, ctx: ScenarioContext, parent: String?) async throws -> ScenarioOutcome {
+        let subId = ctx.scoped(sub.id)
         var input: [String: JSONValue] = ["description": .string(sub.title), "run_in_background": .bool(sub.background)]
         if let type = sub.agentType { input["subagent_type"] = .string(type) }
         await emit(ctx.sessionId, parent: parent, [
-            "sessionUpdate": "tool_call", "toolCallId": .string(sub.id), "title": .string(sub.title), "kind": "other",
+            "sessionUpdate": "tool_call", "toolCallId": .string(subId), "title": .string(sub.title), "kind": "other",
             "name": "Task", "status": "in_progress", "rawInput": .object(input),
         ])
-        let outcome = try await runSteps(sub.children, ctx: ctx, parent: sub.id)
+        let outcome = try await runSteps(sub.children, ctx: ctx, parent: subId)
         if outcome == .cancelled { return .cancelled }
         guard sub.finish == .completed || sub.finish == .failed else { return .finished }
         var update: [String: JSONValue] = [
-            "sessionUpdate": "tool_call_update", "toolCallId": .string(sub.id),
+            "sessionUpdate": "tool_call_update", "toolCallId": .string(subId),
             "status": sub.finish == .failed ? "failed" : "completed",
         ]
         if let result = sub.result { update["content"] = [["type": "content", "content": ["type": "text", "text": .string(result)]]] }

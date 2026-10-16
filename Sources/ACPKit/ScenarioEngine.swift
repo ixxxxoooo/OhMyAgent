@@ -10,11 +10,18 @@ public struct ScenarioContext: Sendable {
     public var cwd: String
     /// 会话 ID
     public var sessionId: String
+    /// 工具调用 ID 后缀:同一会话多次运行同一场景时保证卡片不被复用(旧关键字为空,保持原 ID)
+    public var idSuffix: String
 
-    public init(cwd: String, sessionId: String) {
+    public init(cwd: String, sessionId: String, idSuffix: String = "") {
         self.cwd = cwd
         self.sessionId = sessionId
+        self.idSuffix = idSuffix
     }
+
+    /// 给工具调用 ID 追加本次运行的后缀。
+    /// - Parameter id: 场景里写的原始 ID
+    public func scoped(_ id: String) -> String { id + idSuffix }
 }
 
 /// 工具调用的最终状态。

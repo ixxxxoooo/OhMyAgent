@@ -12,6 +12,10 @@ public actor ScriptedAgent: ACPRequestHandler {
     var models: [String: String] = [:]
     var sessionCounter = 0
     var editCounter = 0
+    /// 演示场景运行序号(用于让每次运行的工具卡 ID 唯一)
+    var demoRunCounter = 0
+    /// 内置步骤(终端/长占用)序号,保证重复运行时工具卡 ID 唯一
+    var builtinCounter = 0
     /// 正在处理提示的会话
     var running: Set<String> = []
     /// 各会话收到的引导消息
@@ -255,23 +259,28 @@ public actor ScriptedAgent: ACPRequestHandler {
             await update(sessionId, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": "客户端未声明 terminal 能力。\n\n"]])
             return
         }
+        builtinCounter += 1
+        let toolId = "term_\(builtinCounter)"
         let created = try await connection.request("terminal/create", params: [
             "sessionId": .string(sessionId), "command": "sh", "args": ["-c", "echo hello-from-terminal; sleep 0.4; echo done"],
         ])
         let terminalId = created["terminalId"]?.stringValue ?? ""
         await update(sessionId, [
-            "sessionUpdate": "tool_call", "toolCallId": "term_1", "title": "运行 echo", "kind": "execute", "status": "in_progress",
+            "sessionUpdate": "tool_call", "toolCallId": .string(toolId), "title": "运行 echo", "kind": "execute", "status": "in_progress",
             "content": [["type": "terminal", "terminalId": .string(terminalId)]],
         ])
         _ = try await connection.request("terminal/wait_for_exit", params: ["sessionId": .string(sessionId), "terminalId": .string(terminalId)])
-        await update(sessionId, ["sessionUpdate": "tool_call_update", "toolCallId": "term_1", "status": "completed"])
+        await update(sessionId, ["sessionUpdate": "tool_call_update", "toolCallId": .string(toolId), "status": "completed"])
     }
 
     /// 长时间占用场景(`#hold`):同时挂起一个运行约 20 秒的终端与一个未完成的子 Agent,用于验证输入栏任务坞。
     func runHold(sessionId: String) async throws {
-        let meta: JSONValue = ["claudeCode": ["parentToolUseId": "hold_sub"]]
-        await update(sessionId, ["sessionUpdate": "tool_call", "toolCallId": "hold_sub", "title": "子任务:长时间调研", "kind": "other", "status": "in_progress"])
-        await update(sessionId, ["sessionUpdate": "tool_call", "toolCallId": "hold_read", "title": "读取 Package.swift", "kind": "read", "status": "completed", "_meta": meta])
+        builtinCounter += 1
+        let n = builtinCounter
+        let subId: JSONValue = .string("hold_sub_\(n)")
+        let meta: JSONValue = ["claudeCode": ["parentToolUseId": subId]]
+        await update(sessionId, ["sessionUpdate": "tool_call", "toolCallId": subId, "title": "子任务:长时间调研", "kind": "other", "status": "in_progress"])
+        await update(sessionId, ["sessionUpdate": "tool_call", "toolCallId": .string("hold_read_\(n)"), "title": "读取 Package.swift", "kind": "read", "status": "completed", "_meta": meta])
         await update(sessionId, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": "子 Agent 正在调研…"], "_meta": meta])
         if clientTerminal {
             let created = try await connection.request("terminal/create", params: [
@@ -279,13 +288,13 @@ public actor ScriptedAgent: ACPRequestHandler {
             ])
             let terminalId = created["terminalId"]?.stringValue ?? ""
             await update(sessionId, [
-                "sessionUpdate": "tool_call", "toolCallId": "hold_term", "title": "运行长命令", "kind": "execute", "status": "in_progress",
+                "sessionUpdate": "tool_call", "toolCallId": .string("hold_term_\(n)"), "title": "运行长命令", "kind": "execute", "status": "in_progress",
                 "content": [["type": "terminal", "terminalId": .string(terminalId)]],
             ])
             _ = try await connection.request("terminal/wait_for_exit", params: ["sessionId": .string(sessionId), "terminalId": .string(terminalId)])
-            await update(sessionId, ["sessionUpdate": "tool_call_update", "toolCallId": "hold_term", "status": "completed"])
+            await update(sessionId, ["sessionUpdate": "tool_call_update", "toolCallId": .string("hold_term_\(n)"), "status": "completed"])
         }
-        await update(sessionId, ["sessionUpdate": "tool_call_update", "toolCallId": "hold_sub", "status": "completed"])
+        await update(sessionId, ["sessionUpdate": "tool_call_update", "toolCallId": subId, "status": "completed"])
     }
 
     private func runPrompt(_ p: JSONValue) async throws -> JSONValue {
@@ -349,7 +358,8 @@ public actor ScriptedAgent: ACPRequestHandler {
         if text.contains("#ask") { try await runAsk(sessionId: sessionId) }
         if text.contains("#term") { try await runTerminal(sessionId: sessionId) }
         if text.contains("#hold") { try await runHold(sessionId: sessionId) }
-        let context = ScenarioContext(cwd: sessions[sessionId] ?? "/tmp", sessionId: sessionId)
+        if isDemo { demoRunCounter += 1 }
+        let context = ScenarioContext(cwd: sessions[sessionId] ?? "/tmp", sessionId: sessionId, idSuffix: isDemo ? "-r\(demoRunCounter)" : "")
         for match in matches {
             let outcome = try await runSteps(match.scenario.build(context), ctx: context)
             if outcome == .cancelled { return ["stopReason": "cancelled"] }
@@ -368,7 +378,7 @@ public actor ScriptedAgent: ACPRequestHandler {
         }
 
         // 演示场景自带回复文本,不再追加默认回显
-        if isDemo { return await finishTurn(sessionId: sessionId) }
+        if isDemo { return await finishTurn(sessionId: sessionId, defaultUsage: false) }
 
         // 文本流
         let reply = text.contains("slow")
@@ -383,11 +393,11 @@ public actor ScriptedAgent: ACPRequestHandler {
     }
 
     /// 轮次收尾:补发已收到的引导回显与用量,返回正常结束。
-    private func finishTurn(sessionId: String) async -> JSONValue {
+    private func finishTurn(sessionId: String, defaultUsage: Bool = true) async -> JSONValue {
         for extra in steered.removeValue(forKey: sessionId) ?? [] {
             await update(sessionId, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": .string("(已收到引导:\(extra))")]])
         }
-        await update(sessionId, ["sessionUpdate": "usage_update", "used": 1200, "size": 200_000, "cost": ["amount": 0.0123, "currency": "USD"]])
+        if defaultUsage { await update(sessionId, ["sessionUpdate": "usage_update", "used": 1200, "size": 200_000, "cost": ["amount": 0.0123, "currency": "USD"]]) }
         return ["stopReason": "end_turn"]
     }
 }
