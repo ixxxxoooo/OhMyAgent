@@ -12,24 +12,45 @@ struct RightPaneView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker("", selection: $workbench.layout.rightPane) {
-                ForEach(RightPane.available, id: \.self) { pane in
-                    Text(Self.title(pane)).tag(pane)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .padding(10)
+            paneBar
             Divider()
             switch workbench.layout.rightPane {
             case .changes: ChangesPane(workbench: workbench)
             case .files: ExplorerView(workbench: workbench)
             case .search: SearchPaneView(workbench: workbench)
+            case .git: SCMView(workbench: workbench)
+            case .terminal: RightTerminalPane(workbench: workbench)
             default: sessionContent
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(OMColors.surface)
+    }
+
+    /// 图标分段条:右栏窄时也能放下 6 个视图;当前视图的标题显示在右侧。
+    private var paneBar: some View {
+        HStack(spacing: 2) {
+            ForEach(RightPane.available, id: \.self) { pane in
+                let selected = workbench.layout.rightPane == pane
+                Button { workbench.layout.rightPane = pane } label: {
+                    Image.om(Self.icon(pane), size: 14)
+                        .frame(width: 28, height: 24)
+                        .background(selected ? OMColors.accent.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 6))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(selected ? OMColors.accent : OMColors.secondaryText)
+                .help(Self.title(pane))
+                .accessibilityLabel(Self.title(pane))
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+            Spacer(minLength: 4)
+            Text(Self.title(workbench.layout.rightPane))
+                .font(OMFonts.small.weight(.semibold))
+                .foregroundStyle(OMColors.secondaryText)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 8).padding(.vertical, 6)
     }
 
     @ViewBuilder
@@ -56,7 +77,7 @@ struct RightPaneView: View {
             } else {
                 ContentUnavailableView { Label("暂无计划", om: "checklist", size: 28) } description: { Text("Agent 制定任务计划后会显示在这里。") }
             }
-        case .outline, .problems, .files, .search, .changes:
+        case .outline, .problems, .files, .search, .changes, .git, .terminal:
             EmptyView()
         }
     }
@@ -70,6 +91,8 @@ struct RightPaneView: View {
         case .problems: return "triangle-alert"
         case .files: return "folder"
         case .search: return "search"
+        case .git: return "git-branch"
+        case .terminal: return "terminal"
         }
     }
 
@@ -81,6 +104,8 @@ struct RightPaneView: View {
         case .problems: return String(localized: "问题")
         case .files: return String(localized: "文件")
         case .search: return String(localized: "搜索")
+        case .git: return String(localized: "Git")
+        case .terminal: return String(localized: "终端")
         }
     }
 }
@@ -121,35 +146,31 @@ struct RightRail: View {
     }
 }
 
-/// 「改动」页:未提交的 Git 改动 / 本轮 Agent 改动 二选一。
+/// 「改动」页:本轮 Agent 的文件改动汇总(未提交的 Git 改动见「Git」页)。
 struct ChangesPane: View {
     let workbench: WorkbenchModel
-    @AppStorage("changes.source") private var source = "git"
 
     var body: some View {
-        VStack(spacing: 0) {
-            Picker("", selection: $source) {
-                Text("未提交").tag("git")
-                Text("本轮 Agent").tag("agent")
+        if let model = workbench.activeSession,
+           let entry = model.timeline.entries.last(where: { $0.kind == .changes && !$0.changes.isEmpty }) {
+            ScrollView {
+                ChangesSummaryView(entry: entry)
+                    .environment(model)
+                    .padding(10)
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .controlSize(.small)
-            .padding(.horizontal, 10).padding(.vertical, 6)
-            .accessibilityLabel("改动来源")
-            Divider()
-            if source == "git" {
-                SCMView(workbench: workbench)
-            } else if let model = workbench.activeSession,
-                      let entry = model.timeline.entries.last(where: { $0.kind == .changes && !$0.changes.isEmpty }) {
-                ScrollView {
-                    ChangesSummaryView(entry: entry)
-                        .environment(model)
-                        .padding(10)
-                }
-            } else {
-                ContentUnavailableView { Label("暂无改动", om: "doc.on.doc", size: 28) } description: { Text("Agent 修改文件后,这里会列出每个文件的差异。") }
-            }
+        } else {
+            ContentUnavailableView { Label("暂无改动", om: "doc.on.doc", size: 28) } description: { Text("Agent 修改文件后,这里会列出每个文件的差异;提交与分支请到 Git 页。") }
         }
+    }
+}
+
+/// 右栏终端:项目级常驻 shell(与底部面板、终端标签相互独立),切换分段不会结束进程。
+struct RightTerminalPane: View {
+    let workbench: WorkbenchModel
+
+    var body: some View {
+        let root = workbench.selectedProjectID ?? NSHomeDirectory()
+        TerminalTabView(id: "right:\(root)", fallbackDirectory: root, focusOnAppear: false)
+            .id(root)
     }
 }
