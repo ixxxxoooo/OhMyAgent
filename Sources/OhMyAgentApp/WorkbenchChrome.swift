@@ -97,7 +97,10 @@ struct UsageButton: View {
 
     var body: some View {
         Button { omWithAnimation { isOpen.toggle() } } label: {
-            UsageRing(fraction: fraction).frame(width: 22, height: 18)
+            // 圆环本身只有 2pt 描边可命中;整块矩形都要可点,否则点圆心或空隙没有反应
+            UsageRing(fraction: fraction)
+                .frame(width: 28, height: 24)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help(fraction.map { String(localized: "上下文 \(Int(($0 * 100).rounded()))%") } ?? String(localized: "上下文用量"))
