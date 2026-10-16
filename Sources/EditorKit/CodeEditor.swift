@@ -22,6 +22,10 @@ public struct CodeEditor: NSViewRepresentable {
     /// Markdown 显示模式(仅 `.markdown` 语言有效)
     public var markdownMode: MarkdownEditorMode
 
+    /// 字号与字体族偏好:仅用于让设置页的修改触发已打开编辑器刷新,实际取值经 `EditorFontPrefs` 夹取与回退。
+    @AppStorage(EditorFontPrefs.sizeKey) private var fontSizePref: Double = Double(EditorFontPrefs.defaultSize)
+    @AppStorage(EditorFontPrefs.familyKey) private var fontFamilyPref: String = EditorFontPrefs.systemMonospace
+
     /// 创建编辑器。
     /// - Parameters:
     ///   - text: 文本内容
@@ -76,6 +80,13 @@ public struct CodeEditor: NSViewRepresentable {
 
     public func updateNSView(_ view: CodeEditorView, context: Context) {
         view.syncTabActive(context.environment.tabIsActive)
+        // 字体或字号偏好变化:只在字体真的不同时才换主题,避免每次刷新都重排
+        let font = EditorFontPrefs.font(family: fontFamilyPref, size: EditorFontPrefs.clampedSize(fontSizePref))
+        if view.theme.font != font {
+            var theme = view.theme
+            theme.font = font
+            view.apply(theme: theme)
+        }
         view.markdownMode = markdownMode
         context.coordinator.onChange = onChange
         wire(view, context.coordinator)

@@ -608,6 +608,7 @@ struct ExploreGroupView: View {
 /// Agent 终端输出:命令行、ANSI 彩色输出、退出码、耗时、复制与中断。
 struct TerminalOutputView: View {
     let session: TerminalSession
+    var fillHeight = false
     var onInterrupt: (() -> Void)?
     @AppStorage(ClientPrefs.Key.terminalFontSize) private var outputFontSize = 11.5
     @State private var copied = false
@@ -639,7 +640,7 @@ struct TerminalOutputView: View {
                     ANSITextView(raw: session.output, fontSize: outputFontSize)
                         .id("tail")
                 }
-                .frame(maxHeight: 240)
+                .frame(maxHeight: fillHeight ? .infinity : 240)
                 .onChange(of: session.output) { proxy.scrollTo("tail", anchor: .bottom) }
             }
             if session.truncated {
@@ -647,6 +648,7 @@ struct TerminalOutputView: View {
             }
         }
         .padding(10)
+        .frame(maxHeight: fillHeight ? .infinity : nil, alignment: .top)
         .background(Color.black.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 }

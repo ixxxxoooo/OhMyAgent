@@ -1,24 +1,66 @@
 // @author ygw
 // 设置页:编辑器、终端。
 
+import AppKit
 import ChatKit
 import ClaudeConfigKit
 import DesignSystem
+import EditorKit
 import SwiftUI
 
 /// 编辑器。
 struct EditorPage: View {
-    @AppStorage(ClientPrefs.Key.editorFontSize) private var fontSize = 12.5
+    @AppStorage(ClientPrefs.Key.editorFontSize) private var fontSize = Double(EditorFontPrefs.defaultSize)
+    @AppStorage(ClientPrefs.Key.editorFontFamily) private var fontFamily = EditorFontPrefs.systemMonospace
+    /// 自定义字体输入框的草稿,回车或失焦时提交
+    @State private var customFamily = ""
     @AppStorage(ClientPrefs.Key.editorWrap) private var wrap = true
     @AppStorage(ClientPrefs.Key.editorLargeFileLines) private var largeFileLines = 20_000
     @AppStorage(ClientPrefs.Key.editorLSP) private var lspEnabled = true
     @AppStorage(ClientPrefs.Key.editorFollowAgent) private var followAgent = false
 
+    /// 下拉选项:系统等宽 + 本机已安装的预置字体;当前值若不在其中(自定义字体)也要列出,否则选择器显示为空。
+    private var fontOptions: [(value: String, title: String)] {
+        let current = EditorFontPrefs.normalizedFamily(fontFamily)
+        var options = EditorFontPrefs.presets
+            .filter { EditorFontPrefs.isInstalled($0.value) }
+            .map { (value: $0.value, title: "\($0.value) · \(omLocalized($0.note))") }
+        if !options.contains(where: { $0.value == current }) { options.append((value: current, title: current)) }
+        return options
+    }
+
+    /// 预览用字体(与编辑器同一套解析与回退)。
+    private var previewFont: NSFont {
+        EditorFontPrefs.font(family: fontFamily, size: EditorFontPrefs.clampedSize(fontSize))
+    }
+
+    /// 提交自定义字体:空串恢复系统等宽,否则写入规整后的字体族名。
+    private func commitCustomFamily() {
+        fontFamily = EditorFontPrefs.normalizedFamily(customFamily)
+        customFamily = fontFamily == EditorFontPrefs.systemMonospace ? "" : fontFamily
+    }
+
     var body: some View {
         SettingsForm {
             Section("文件查看器") {
-                LabeledContent("字号 \(String(format: "%.1f", fontSize)) pt") {
-                    Slider(value: $fontSize, in: 9...28, step: 0.5).frame(width: 220)
+                Picker("代码字体", selection: Binding(
+                    get: { EditorFontPrefs.normalizedFamily(fontFamily) },
+                    set: { fontFamily = $0; customFamily = $0 == EditorFontPrefs.systemMonospace ? "" : $0 }
+                )) {
+                    ForEach(fontOptions, id: \.value) { option in
+                        Text(option.title).tag(option.value)
+                    }
+                }
+                LabeledContent {
+                    TextField(EditorFontPrefs.systemMonospace, text: $customFamily)
+                        .frame(width: 220)
+                        .onSubmit(commitCustomFamily)
+                } label: {
+                    Text("自定义字体")
+                }
+                Note("下拉里只列出本机已安装的预置字体;也可以手动填写任意已安装的字体族名,回车生效,留空恢复系统等宽。字体未安装时自动回退到系统等宽。")
+                LabeledContent("字号 \(Int(EditorFontPrefs.clampedSize(fontSize))) pt") {
+                    Slider(value: $fontSize, in: EditorFontPrefs.sizeRange, step: 1).frame(width: 220)
                 }
                 Toggle("自动换行", isOn: $wrap)
                 LabeledContent("大文件模式起点(行)") {
@@ -36,7 +78,8 @@ struct EditorPage: View {
             }
             Section("预览") {
                 Text(verbatim: "func greet(name: String) -> String {\n    return \"Hello, \\(name)\"\n}")
-                    .font(.system(size: fontSize, design: .monospaced))
+                    .font(Font(previewFont))
+                    .lineSpacing(EditorFontPrefs.lineSpacing(for: previewFont))
                     .padding(8).frame(maxWidth: .infinity, alignment: .leading)
                     .background(OMColors.surface, in: RoundedRectangle(cornerRadius: 8))
                     .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(OMColors.hairline))
@@ -44,6 +87,10 @@ struct EditorPage: View {
             Section {
                 Note("编辑器用于查看 Agent 改动的文件;保存时处理(去尾随空白等)将在编辑能力开放后提供。")
             }
+        }
+        .onAppear {
+            let current = EditorFontPrefs.normalizedFamily(fontFamily)
+            customFamily = current == EditorFontPrefs.systemMonospace ? "" : current
         }
     }
 }

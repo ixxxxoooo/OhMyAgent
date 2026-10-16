@@ -233,8 +233,9 @@ public final class SessionModel {
     public private(set) var isRunning = false { didSet { if isRunning != oldValue { publishAttention() } } }
     /// 当前轮次开始时间(用于等待文案的计时;不运行时为空)。
     public private(set) var turnStartedAt: Date?
-    /// 输入栏上方「后台子 Agent」面板是否折叠(按会话保存)。
-    public var backgroundPanelCollapsed = false
+    /// 输入栏上方任务坞:用户选中的分区与是否收起面板(按会话保存)。
+    public var dockSelection: ComposerDockSection?
+    public var dockHidden = false
     public private(set) var agentName: String
     public private(set) var configOptions: [SessionConfigOption] = []
     public private(set) var availableCommands: [AvailableCommand] = []
@@ -557,6 +558,15 @@ public final class SessionModel {
     /// - Parameter id: 排队消息 ID
     public func removeFollowUp(_ id: UUID) {
         followUps.removeAll { $0.id == id }
+    }
+
+    /// 把某条排队消息取回输入框编辑(文字追加到草稿,图片并入附件),并从队列移除。
+    /// - Parameter id: 排队消息 ID
+    public func editFollowUp(_ id: UUID) {
+        guard let item = followUps.first(where: { $0.id == id }) else { return }
+        followUps.removeAll { $0.id == id }
+        draft = draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? item.text : draft + "\n" + item.text
+        attachments.append(contentsOf: item.images)
     }
 
     /// 立即发送某条排队消息:运行中引导注入,空闲时直接发送。

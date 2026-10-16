@@ -113,7 +113,7 @@ public final class CodeEditorView: NSView {
         textView.drawsBackground = true
         textView.backgroundColor = theme.background
         textView.textColor = theme.foreground
-        textView.font = theme.font
+        applyFontMetrics()
         textView.textContainerInset = NSSize(width: 6, height: 8)
         textView.minSize = NSSize(width: 0, height: 0)
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
@@ -173,7 +173,7 @@ public final class CodeEditorView: NSView {
             storage.removeAttribute(.underlineColor, range: all)
         }
         textView.textColor = theme.foreground
-        textView.font = theme.font
+        applyFontMetrics()
         // 先用文本长度粗判大文件(平均每行 40 字符),随后用精确行数修正
         let roughLarge = text.utf16.count / 40 > Self.largeFileLineThreshold
         applyLargeFileMode(roughLarge)
@@ -397,12 +397,26 @@ public final class CodeEditorView: NSView {
         scrollView.contentView.backgroundColor = theme.background
         textView.backgroundColor = theme.background
         textView.textColor = theme.foreground
-        textView.font = theme.font
+        applyFontMetrics()
         ruler.theme = theme
         highlightedRange = NSRange(location: 0, length: 0)
         scheduleHighlight()
         markdown.layout = nil
         scheduleMarkdownRender(delay: .zero)
+    }
+
+    /// 把主题里的字体与行高写入文本视图、默认段落样式和已有文本。
+    /// Markdown 样式由 `MarkdownStyler` 逐块铺属性,此处只处理非 Markdown 内容。
+    private func applyFontMetrics() {
+        let style = theme.paragraphStyle
+        textView.font = theme.font
+        textView.defaultParagraphStyle = style
+        var typing = textView.typingAttributes
+        typing[.font] = theme.font
+        typing[.paragraphStyle] = style
+        textView.typingAttributes = typing
+        guard !usesMarkdownStyling, let storage = textView.textStorage, storage.length > 0 else { return }
+        storage.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: storage.length))
     }
 
     // MARK: - 大文件模式

@@ -267,6 +267,27 @@ public actor ScriptedAgent: ACPRequestHandler {
         await update(sessionId, ["sessionUpdate": "tool_call_update", "toolCallId": "term_1", "status": "completed"])
     }
 
+    /// 长时间占用场景(`#hold`):同时挂起一个运行约 20 秒的终端与一个未完成的子 Agent,用于验证输入栏任务坞。
+    private func runHold(sessionId: String) async throws {
+        let meta: JSONValue = ["claudeCode": ["parentToolUseId": "hold_sub"]]
+        await update(sessionId, ["sessionUpdate": "tool_call", "toolCallId": "hold_sub", "title": "子任务:长时间调研", "kind": "other", "status": "in_progress"])
+        await update(sessionId, ["sessionUpdate": "tool_call", "toolCallId": "hold_read", "title": "读取 Package.swift", "kind": "read", "status": "completed", "_meta": meta])
+        await update(sessionId, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": "子 Agent 正在调研…"], "_meta": meta])
+        if clientTerminal {
+            let created = try await connection.request("terminal/create", params: [
+                "sessionId": .string(sessionId), "command": "sh", "args": ["-c", "echo start; for i in 1 2 3 4 5 6 7 8 9 10; do echo tick-$i; sleep 2; done"],
+            ])
+            let terminalId = created["terminalId"]?.stringValue ?? ""
+            await update(sessionId, [
+                "sessionUpdate": "tool_call", "toolCallId": "hold_term", "title": "运行长命令", "kind": "execute", "status": "in_progress",
+                "content": [["type": "terminal", "terminalId": .string(terminalId)]],
+            ])
+            _ = try await connection.request("terminal/wait_for_exit", params: ["sessionId": .string(sessionId), "terminalId": .string(terminalId)])
+            await update(sessionId, ["sessionUpdate": "tool_call_update", "toolCallId": "hold_term", "status": "completed"])
+        }
+        await update(sessionId, ["sessionUpdate": "tool_call_update", "toolCallId": "hold_sub", "status": "completed"])
+    }
+
     /// Mermaid 场景:依次输出流程图、时序图、状态图、类图、饼图、甘特图与一个不支持的类型(验证回退)。
     private func runMermaid(sessionId: String) async {
         let blocks = [
@@ -410,6 +431,7 @@ public actor ScriptedAgent: ACPRequestHandler {
         if text.contains("#edit") { try await runEdit(sessionId: sessionId) }
         if text.contains("#ask") { try await runAsk(sessionId: sessionId) }
         if text.contains("#term") { try await runTerminal(sessionId: sessionId) }
+        if text.contains("#hold") { try await runHold(sessionId: sessionId) }
         if text.contains("#sub") { await runSubagent(sessionId: sessionId, nested: text.contains("#sub2")) }
         if text.contains("#showcase") { await runToolsShowcase(sessionId: sessionId) }
         if text.contains("#mermaid") { await runMermaid(sessionId: sessionId) }

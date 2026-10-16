@@ -256,4 +256,18 @@ struct SessionParityTests {
         #expect(await SessionModelTests.wait { !model.isRunning })
         model.shutdown()
     }
+
+    @Test("排队消息可取回输入框编辑:文字并入草稿并从队列移除")
+    func editFollowUp() async throws {
+        let model = try await model()
+        model.enqueueFollowUp("甲")
+        let id = try #require(model.followUps.first?.id)
+        model.draft = ""
+        model.editFollowUp(id)
+        #expect(model.followUps.isEmpty && model.draft == "甲")
+        model.enqueueFollowUp("乙")
+        model.editFollowUp(try #require(model.followUps.first?.id))
+        #expect(model.draft == "甲\n乙")
+        model.shutdown()
+    }
 }

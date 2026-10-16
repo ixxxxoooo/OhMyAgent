@@ -35,3 +35,16 @@ struct WorkingStatusTests {
         #expect(!WorkingStatus.line(verb: "思考中", seconds: 3, canInterrupt: false).contains("Esc"))
     }
 }
+
+@Suite("任务坞分区选择")
+struct ComposerDockSectionTests {
+    @Test("优先用户选中的非空分区;否则回退到第一个非空分区;收起或全空返回 nil")
+    func effective() {
+        let counts: [ComposerDockSection: Int] = [.queued: 0, .subagents: 2, .terminals: 1]
+        #expect(ComposerDockSection.effective(selection: .terminals, hidden: false, counts: counts) == .terminals)
+        #expect(ComposerDockSection.effective(selection: .queued, hidden: false, counts: counts) == .subagents)
+        #expect(ComposerDockSection.effective(selection: nil, hidden: false, counts: counts) == .subagents)
+        #expect(ComposerDockSection.effective(selection: .terminals, hidden: true, counts: counts) == nil)
+        #expect(ComposerDockSection.effective(selection: nil, hidden: false, counts: [:]) == nil)
+    }
+}

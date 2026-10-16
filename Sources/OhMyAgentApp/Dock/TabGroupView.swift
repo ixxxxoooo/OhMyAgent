@@ -44,7 +44,7 @@ func tabIcon(_ kind: TabKind) -> String {
     case .subagent: return "bot"
     case .file: return "file-code"
     case .diff, .changes: return "file-diff"
-    case .terminal: return "square-terminal"
+    case .terminal, .agentTerminal: return "square-terminal"
     case .preview: return "eye"
     case .history: return "git-graph"
     case .blame: return "user"

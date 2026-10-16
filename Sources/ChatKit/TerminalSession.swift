@@ -12,6 +12,8 @@ import Observation
 public final class TerminalSession: Identifiable {
     public nonisolated let id: String
     public let command: String
+    /// 创建时间(任务坞显示已运行时长)
+    public let startedAt = Date()
     public private(set) var output = ""
     public private(set) var truncated = false
     public private(set) var exitCode: Int?

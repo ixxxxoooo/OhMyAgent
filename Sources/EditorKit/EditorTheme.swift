@@ -14,11 +14,11 @@ public struct EditorTheme {
     public var font: NSFont
     public var colors: [SyntaxKind: NSColor]
 
-    /// 用户设置的编辑器字号(键 `editor.fontSize`,默认 12.5,范围 9–28)。
-    public static var preferredFontSize: CGFloat {
-        let value = UserDefaults.standard.object(forKey: "editor.fontSize") as? Double ?? 12.5
-        return CGFloat(min(max(value, 9), 28))
-    }
+    /// 用户设置的编辑器字号(键 `editor.fontSize`,默认 13,范围 11–20,对齐 kuku)。
+    public static var preferredFontSize: CGFloat { EditorFontPrefs.preferredSize }
+
+    /// 编辑器段落样式:按字体换算行高(13pt 时 18pt),行号栏与正文逐行对齐。
+    public var paragraphStyle: NSParagraphStyle { EditorFontPrefs.paragraphStyle(for: font) }
 
     /// 默认主题。
     public static var `default`: EditorTheme {
@@ -38,7 +38,7 @@ public struct EditorTheme {
                                       dark: NSColor(srgbRed: 0.45, green: 0.47, blue: 0.52, alpha: 1)),
             currentLine: dynamic(light: NSColor(srgbRed: 0.93, green: 0.95, blue: 1, alpha: 1),
                                  dark: NSColor(srgbRed: 0.16, green: 0.18, blue: 0.23, alpha: 1)),
-            font: NSFont.monospacedSystemFont(ofSize: Self.preferredFontSize, weight: .regular),
+            font: EditorFontPrefs.preferredFont,
             colors: [
                 .keyword: dynamic(light: NSColor(srgbRed: 0.68, green: 0.12, blue: 0.55, alpha: 1), dark: NSColor(srgbRed: 0.99, green: 0.37, blue: 0.64, alpha: 1)),
                 .string: dynamic(light: NSColor(srgbRed: 0.77, green: 0.10, blue: 0.09, alpha: 1), dark: NSColor(srgbRed: 0.99, green: 0.42, blue: 0.36, alpha: 1)),

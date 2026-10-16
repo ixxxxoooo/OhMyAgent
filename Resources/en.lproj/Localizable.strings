@@ -855,3 +855,27 @@
 "收起" = "Collapse";
 "选中此项目" = "Select this project";
 "切换 Agent" = "Switch agent";
+
+/* 输入栏任务坞(排队 / 子 Agent / 终端) */
+"排队" = "Queued";
+"子 Agent" = "Subagents";
+"收起任务面板" = "Collapse task panel";
+"终止" = "Terminate";
+"引导" = "Steer";
+"在右侧打开" = "Open on the right";
+"%lld 条排队,本轮结束后发送" = "%lld queued, sent after this turn";
+"%lld 个终端运行中" = "%lld terminals running";
+"这个终端已不可用" = "This terminal is no longer available";
+"Agent 正在使用这个终端,只读" = "Agent is using this terminal. It's read-only.";
+"会话被切换或重置后,原来的终端输出不会保留。" = "Terminal output is not kept after the session is switched or reset.";
+"代码字体" = "Code Font";
+"自定义字体" = "Custom Font";
+"下拉里只列出本机已安装的预置字体;也可以手动填写任意已安装的字体族名,回车生效,留空恢复系统等宽。字体未安装时自动回退到系统等宽。" = "Only preset fonts installed on this Mac are listed. You can also type any installed font family name and press Return; leave it empty to use the system monospace font. A font that is not installed falls back to the system monospace font.";
+"系统默认等宽" = "System default monospace";
+"开发者等宽" = "Monospace for developers";
+"支持连字" = "Ligatures supported";
+"Apple 原生等宽" = "Apple's native monospace";
+"macOS 经典等宽" = "Classic macOS monospace";
+"macOS 紧凑等宽" = "Compact macOS monospace";
+"微软连字等宽" = "Microsoft monospace with ligatures";
+"Adobe 开源等宽" = "Adobe's open-source monospace";

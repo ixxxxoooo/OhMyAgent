@@ -26,6 +26,7 @@ struct TabContentView: View {
         case .preview(let id): PreviewTabView(id: id)
         case .history(let projectID, let path): GitHistoryTabView(workbench: workbench, projectID: projectID, path: path)
         case .blame(let path): GitBlameTabView(workbench: workbench, path: path)
+        case .agentTerminal(let projectID, let terminalID): AgentTerminalTabView(workbench: workbench, projectID: projectID, terminalID: terminalID)
         case .terminal(let id):
             TerminalTabView(id: id, fallbackDirectory: workbench.selectedProjectID ?? NSHomeDirectory())
         }
@@ -367,6 +368,37 @@ struct SubagentTabView: View {
         }
         .padding(.horizontal, 16)
         .frame(height: 38)
+    }
+}
+
+/// Agent 终端标签:只读查看 Agent 正在(或刚刚)执行的命令输出。
+struct AgentTerminalTabView: View {
+    let workbench: WorkbenchModel
+    let projectID: String
+    let terminalID: String
+
+    var body: some View {
+        if let model = workbench.sessions[projectID], let session = model.terminals[terminalID] {
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    Image.om("terminal", size: 13).foregroundStyle(OMColors.secondaryText)
+                    Text("Agent 正在使用这个终端,只读").font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .frame(height: 34)
+                Divider()
+                TerminalOutputView(session: session, fillHeight: true) { model.interruptTerminal(terminalID) }
+                    .padding(12)
+            }
+            .background(OMColors.surface)
+        } else {
+            ContentUnavailableView {
+                Label("这个终端已不可用", om: "terminal", size: 28)
+            } description: {
+                Text("会话被切换或重置后,原来的终端输出不会保留。")
+            }
+        }
     }
 }
 

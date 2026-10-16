@@ -98,7 +98,9 @@ extension CodeEditorView {
         guard let storage = textView.textStorage else { return }
         markdown.isApplying = true
         defer { markdown.isApplying = false }
-        let attributes: [NSAttributedString.Key: Any] = [.font: theme.font, .foregroundColor: theme.foreground]
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: theme.font, .foregroundColor: theme.foreground, .paragraphStyle: theme.paragraphStyle,
+        ]
         storage.beginEditing()
         storage.setAttributes(attributes, range: NSRange(location: 0, length: storage.length))
         storage.endEditing()
@@ -163,6 +165,7 @@ struct MarkdownStyler {
             attributes[.paragraphStyle] = paragraph(lineSpacing: 3.5, after: 6)
         } else {
             attributes[.font] = monoFont
+            attributes[.paragraphStyle] = theme.paragraphStyle
         }
         return attributes
     }

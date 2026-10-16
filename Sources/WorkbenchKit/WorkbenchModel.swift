@@ -125,7 +125,7 @@ public final class WorkbenchModel {
     /// 标签内容是否归属某项目(会话/改动按项目 ID,文件/Diff 按路径前缀)。
     static func belongs(_ kind: TabKind, toProject id: String) -> Bool {
         switch kind {
-        case .chat(let p), .changes(let p), .subagent(let p, _), .history(let p, _): return p == id
+        case .chat(let p), .changes(let p), .subagent(let p, _), .history(let p, _), .agentTerminal(let p, _): return p == id
         case .file(let path), .diff(let path), .blame(let path): return path == id || path.hasPrefix(id + "/")
         case .terminal, .preview: return false
         }
@@ -158,6 +158,24 @@ public final class WorkbenchModel {
     public func openSubagent(project projectID: String, toolCallID: String, title: String) -> UUID {
         mode = .workspace
         return dock.open(.subagent(projectID: projectID, toolCallID: toolCallID), title: title)
+    }
+
+    /// 在右侧打开子 Agent 的只读会话(任务坞点击行时使用)。
+    @discardableResult
+    public func openSubagentToSide(project projectID: String, toolCallID: String, title: String) -> UUID {
+        mode = .workspace
+        return dock.openToSide(.subagent(projectID: projectID, toolCallID: toolCallID), title: title)
+    }
+
+    /// 在右侧打开 Agent 终端的只读输出(任务坞点击行时使用)。
+    /// - Parameters:
+    ///   - projectID: 项目
+    ///   - terminalID: Agent 终端 ID
+    ///   - title: 标签标题(通常为命令)
+    @discardableResult
+    public func openAgentTerminalToSide(project projectID: String, terminalID: String, title: String) -> UUID {
+        mode = .workspace
+        return dock.openToSide(.agentTerminal(projectID: projectID, terminalID: terminalID), title: title)
     }
 
     /// 打开预览标签(如放大查看的 Mermaid 图)。
@@ -201,8 +219,10 @@ public final class WorkbenchModel {
     /// 关闭某项目全部子 Agent 标签(会话被替换后它们指向的工具调用已不存在)。
     func closeSubagentTabs(in projectID: String) {
         dock.closeTabs { tab in
-            if case .subagent(let p, _) = tab.kind { return p == projectID }
-            return false
+            switch tab.kind {
+            case .subagent(let p, _), .agentTerminal(let p, _): return p == projectID
+            default: return false
+            }
         }
     }
 

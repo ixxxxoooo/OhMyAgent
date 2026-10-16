@@ -21,6 +21,8 @@ public enum TabKind: Codable, Hashable, Sendable {
     case changes(projectID: String)
     /// 终端
     case terminal(id: String)
+    /// Agent 正在使用的终端(只读查看输出)
+    case agentTerminal(projectID: String, terminalID: String)
     /// 预览(Mermaid / Markdown 放大等)
     case preview(id: String)
     /// Git 提交历史与图(`path` 非空时只看该文件的历史)
@@ -216,6 +218,23 @@ public struct DockLayout: Codable, Equatable, Sendable {
         return new.id
     }
 
+    /// 在「右侧」打开标签:已存在则直接激活;已有多个组时放进最右(最后)一组;只有一组时先向右分屏。
+    /// - Parameters:
+    ///   - kind: 标签类型
+    ///   - title: 标题
+    /// - Returns: 标签 ID
+    @discardableResult
+    public mutating func openToSide(_ kind: TabKind, title: String) -> UUID {
+        if tab(for: kind) != nil { return open(kind, title: title) }
+        let all = groups
+        if all.count >= 2, let last = all.last {
+            return open(kind, title: title, in: last.id)
+        }
+        let id = open(kind, title: title)
+        if let source = location(of: id)?.group { drop(id, onGroup: source, zone: .right) }
+        return id
+    }
+
     /// 激活标签并聚焦其所在组。
     public mutating func activate(_ tabID: UUID) {
         guard let loc = location(of: tabID) else { return }
@@ -364,7 +383,7 @@ public struct DockLayout: Codable, Equatable, Sendable {
         copy.maximizedGroupID = nil
         copy.closeTabs { tab in
             switch tab.kind {
-            case .subagent, .preview, .terminal: return true
+            case .subagent, .preview, .terminal, .agentTerminal: return true
             case .chat(let id), .changes(let id), .history(let id, _): return !projectIDs.contains(id)
             case .file(let path), .diff(let path), .blame(let path):
                 return !projectIDs.contains { path == $0 || path.hasPrefix($0 + "/") } || !FileManager.default.fileExists(atPath: path)

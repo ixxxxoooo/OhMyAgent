@@ -16,6 +16,8 @@ public enum ClientPrefs {
         public static let updateFeedURL = "update.feedURL"
         public static let updateLastCheck = "update.lastCheck"
         public static let editorFontSize = "editor.fontSize"
+        /// 编辑器代码字体族(默认 System monospace)
+        public static let editorFontFamily = "editor.fontFamily"
         public static let editorWrap = "editor.wrap"
         public static let editorLargeFileLines = "editor.largeFileLines"
         /// 编辑器是否启用语言服务器(诊断/悬停/跳转/补全)
