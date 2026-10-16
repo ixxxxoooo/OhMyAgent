@@ -36,6 +36,8 @@ public final class TimelineEntry: Identifiable {
     public var detail: String?
     /// 提示严重程度:info / warning / error(`kind == .notice`)
     public var severity = "info"
+    /// 淡色小字样式(`kind == .notice`):用于第三方 Agent 的指标类通知(如 TPS 行),不抢正文注意力
+    public var isMuted = false
     /// 用户消息附带的图片(`kind == .user`)
     public var attachments: [ImageAttachment] = []
     /// 该用户消息是运行中引导进当前轮次的(`kind == .user`)
@@ -261,6 +263,13 @@ public final class TimelineStore {
             // 网关场景下 Claude Code 的「auto 模式分类器计费」警告与用户操作无关,直接丢弃
             if NoticeFilter.isClassifierBillingNotice(title: title, detail: detail) { return }
             appendNotice(title, detail: detail?.isEmpty == false ? detail : nil, severity: severity)
+        case .agentNotify(let level, let text):
+            // info 级别可在设置里隐藏;warning / error 一律显示
+            if level == "info", !ClientPrefs.showsAgentNotify() { return }
+            let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !clean.isEmpty else { return }
+            appendNotice(clean, severity: level == "warning" || level == "error" ? level : "info")
+            entries.last?.isMuted = level == "info"
         case .planMarkdown(let markdown):
             finishStreaming()
             entries.append(TimelineEntry(kind: .planDoc, text: markdown))

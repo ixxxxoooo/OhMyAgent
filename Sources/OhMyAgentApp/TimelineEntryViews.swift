@@ -265,6 +265,19 @@ struct NoticeView: View {
     }
 
     var body: some View {
+        if entry.isMuted {
+            // 第三方 Agent 的指标类通知(如 TPS):淡色等宽小字,无图标
+            Text(entry.text)
+                .font(OMFonts.monoSmall)
+                .foregroundStyle(OMColors.tertiaryText)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            standard
+        }
+    }
+
+    private var standard: some View {
         VStack(alignment: .leading, spacing: 6) {
             Label(entry.text, om: icon)
                 .font(OMFonts.small)

@@ -16,11 +16,14 @@ struct AgentPreset {
     var args: [String]
     var summary: String
 
+    /// 固定的 pi-acp 版本:npx 不带版本号会随时拉到最新版,适配器行为变化会让 Pi 会话无征兆地异常(中断、重复通知等)。
+    static let piAcpVersion = "0.0.34"
+
     static let all: [AgentPreset] = [
         AgentPreset(id: "gemini", name: "Gemini CLI", command: "gemini", args: ["--experimental-acp"], summary: String(localized: "Google Gemini CLI 的 ACP 模式")),
         AgentPreset(id: "goose", name: "Goose", command: "goose", args: ["acp"], summary: String(localized: "Block 的 Goose Agent")),
         AgentPreset(id: "opencode", name: "OpenCode", command: "opencode", args: ["acp"], summary: String(localized: "OpenCode 的 ACP 模式")),
-        AgentPreset(id: "pi", name: "Pi", command: "npx", args: ["-y", "pi-acp"], summary: String(localized: "Pi 编码 Agent(pi-acp 适配器,经 npx 运行,需已安装 Node.js)")),
+        AgentPreset(id: "pi", name: "Pi", command: "npx", args: ["-y", "pi-acp@\(piAcpVersion)"], summary: String(localized: "Pi 编码 Agent(pi-acp 适配器,经 npx 运行并固定版本,需已安装 Node.js;若已全局安装 pi-acp 会优先使用)")),
         AgentPreset(id: "codex", name: String(localized: "Codex(codex-acp 适配器)"), command: "codex-acp", args: [], summary: String(localized: "需先安装 codex-acp 适配器")),
     ]
 }
@@ -47,12 +50,17 @@ struct AgentDraft: Identifiable {
         isNew = false
     }
 
-    init(_ preset: AgentPreset) {
+    init(_ preset: AgentPreset, path: String = ProcessInfo.processInfo.environment["PATH"] ?? "") {
         id = preset.id
         name = preset.name
         command = preset.command
         args = preset.args.joined(separator: " ")
         summary = preset.summary
+        // Pi:本机已全局安装 pi-acp 时直接用它(启动更快、不依赖网络,版本由用户自己管理)
+        if preset.id == "pi", GenericACPProvider.resolve("pi-acp", path: path) != nil {
+            command = "pi-acp"
+            args = ""
+        }
     }
 
     /// 转为描述符(参数按空白拆分,环境变量按行解析)。
@@ -75,10 +83,15 @@ struct AgentExtensionsPage: View {
     @State private var draft: AgentDraft?
     @State private var mcpDraft: AgentMCPEntry?
     @State private var path = ""
+    @AppStorage(ClientPrefs.Key.showAgentNotify) private var showAgentNotify = true
 
     var body: some View {
         SettingsForm {
             agentsSection
+            Section("Agent 通知") {
+                Toggle("显示第三方 Agent 的通知行", isOn: $showAgentNotify)
+                Note("Pi 等适配器会把扩展通知(如 pi-tps 的「TPS …」)混在消息里发出。开启时以淡色小字单独成行,关闭则隐藏;警告与错误级别始终显示。")
+            }
             mcpSection
             bridgeSection
             Section("配置文件") {
@@ -127,7 +140,7 @@ struct AgentExtensionsPage: View {
             HStack {
                 Button("添加 ACP Agent…") { draft = AgentDraft() }
                 Menu("从预设添加") {
-                    ForEach(AgentPreset.all, id: \.id) { preset in Button(preset.name) { draft = AgentDraft(preset) } }
+                    ForEach(AgentPreset.all, id: \.id) { preset in Button(preset.name) { draft = AgentDraft(preset, path: path) } }
                 }
                 .fixedSize()
             }

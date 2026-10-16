@@ -85,6 +85,9 @@ extension ScriptedAgent {
             var body: [String: JSONValue] = ["sessionUpdate": "notice", "severity": .string(severity), "title": .string(title)]
             if let detail { body["description"] = .string(detail) }
             await emit(sessionId, parent: parent, body)
+        case .agentNotify(let level, let text):
+            await emit(sessionId, parent: parent, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": .string(text)],
+                                                    "_meta": ["piAcp": ["notify": ["level": .string(level)]]]])
         case .usage(let used, let size, let cost):
             var body: [String: JSONValue] = ["sessionUpdate": "usage_update", "used": .int(used), "size": .int(size)]
             if let cost { body["cost"] = ["amount": .double(cost), "currency": "USD"] }

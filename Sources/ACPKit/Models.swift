@@ -316,6 +316,9 @@ public enum SessionUpdate: Sendable {
     case notice(severity: String, title: String, detail: String?)
     /// 计划模式批准后的 Markdown 计划(`plan_update`)
     case planMarkdown(String)
+    /// 适配器把扩展通知(如 pi-acp 转发的 pi `ctx.ui.notify`,例如 pi-tps 的「TPS …」行)当作消息分片发出,
+    /// 但在 `_meta.piAcp.notify` 里标了级别。识别后不再拼进助手正文,由时间线单独成行。
+    case agentNotify(level: String, text: String)
     /// 子 Agent(Task 工具)内部产生的更新,`parent` 为父工具调用 ID
     indirect case childUpdate(parent: String, update: SessionUpdate)
     case unknown(kind: String, raw: JSONValue)
@@ -338,7 +341,11 @@ public enum SessionUpdate: Sendable {
         case "user_message_chunk":
             self = .userMessageChunk(messageId: messageId, content: ContentBlock(json: json["content"] ?? .null))
         case "agent_message_chunk":
-            self = .agentMessageChunk(messageId: messageId, content: ContentBlock(json: json["content"] ?? .null))
+            if let notify = json["_meta"]?["piAcp"]?["notify"], case .text(let text) = ContentBlock(json: json["content"] ?? .null) {
+                self = .agentNotify(level: notify["level"]?.stringValue ?? "info", text: text)
+            } else {
+                self = .agentMessageChunk(messageId: messageId, content: ContentBlock(json: json["content"] ?? .null))
+            }
         case "agent_thought_chunk":
             self = .agentThoughtChunk(messageId: messageId, content: ContentBlock(json: json["content"] ?? .null))
         case "tool_call":

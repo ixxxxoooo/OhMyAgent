@@ -168,6 +168,8 @@ public enum ScenarioStep: Sendable {
     case planDoc(String)
     /// 会话提示
     case notice(severity: String, title: String, detail: String?)
+    /// 第三方 Agent 的扩展通知(pi-acp 以带 `_meta.piAcp.notify` 的消息分片发出,如 pi-tps 的 TPS 行)
+    case agentNotify(level: String, text: String)
     /// 用量更新
     case usage(used: Int, size: Int, cost: Double?)
     /// 会话标题更新

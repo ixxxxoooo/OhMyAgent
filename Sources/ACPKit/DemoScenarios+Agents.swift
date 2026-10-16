@@ -148,6 +148,8 @@ extension DemoScenarios {
             .notice(severity: "info", title: "已切换到 Sonnet", detail: "当前模型因配额回退,响应质量可能略有差异。"),
             .notice(severity: "warning", title: "上下文已压缩", detail: "旧消息已被摘要,可能丢失细节。\n\n- 保留了最近 20 条消息\n- 丢弃了 3 个超长工具输出"),
             .notice(severity: "error", title: "Hook 拦截了本次操作", detail: "`pre-commit` 返回非零:\n\n```\nlint failed: 3 errors\n```"),
+            .text(["这是助手的一段正文,紧随其后是第三方 Agent(如 pi-tps)发来的 TPS 通知行。"]),
+            .agentNotify(level: "info", text: "TPS 42.3 tok/s · 输出 512 tokens · 12.1s"),
             .usage(used: 120_000, size: 200_000, cost: 0.31),
             .delay(300),
             .usage(used: 168_000, size: 200_000, cost: 0.52),

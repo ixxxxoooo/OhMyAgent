@@ -68,6 +68,20 @@ struct ModelTests {
         #expect(kind == "from_the_future")
     }
 
+    @Test("带 piAcp.notify 元数据的消息分片解析为 Agent 通知而非正文")
+    func piNotifyParsing() {
+        let notify = SessionUpdate(json: [
+            "sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": "TPS 40 tok/s"],
+            "_meta": ["piAcp": ["notify": ["level": "info"]]],
+        ])
+        guard case .agentNotify(let level, let text) = notify else { Issue.record("应解析为 agentNotify"); return }
+        #expect(level == "info")
+        #expect(text == "TPS 40 tok/s")
+        // 没有元数据的分片仍是助手正文
+        let plain = SessionUpdate(json: ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": "你好"]])
+        guard case .agentMessageChunk = plain else { Issue.record("应解析为 agentMessageChunk"); return }
+    }
+
     @Test("配置选项容忍当前值不在选项中")
     func configOptionOutsideValue() {
         let option = SessionConfigOption(json: [

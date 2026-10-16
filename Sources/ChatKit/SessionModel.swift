@@ -986,6 +986,13 @@ public final class SessionModel {
                         self.timeline.appendNotice(String(localized: "请求失败:\(error.localizedDescription)"), isError: true)
                     }
                 }
+            } else if TurnEndHeuristics.looksTruncated(isClaude: self.activeDescriptor.kind == .claudeACP, reason: reason,
+                                                       lastKind: TurnEndHeuristics.lastSubstantiveKind(in: self.timeline.entries)) {
+                // 适配器把中断(压缩失败、工具异常等)当作正常结束上报:给出可操作的提示,并指向诊断
+                self.log.warning("回合疑似被适配器提前结束", ["turn": "\(self.turnNumber)", "agent": self.activeDescriptor.id,
+                                                   "lastStderr": LogRedactor.truncate(self.diagnostics.suffix(2).joined(separator: " | "), limit: 300)])
+                let hint = String(localized: "回合可能被提前结束(适配器把中断当作了正常结束)。发送「继续」即可接着往下做;反复出现时请到 设置 → 诊断 查看适配器输出。")
+                self.timeline.appendNotice(hint, severity: "warning")
             } else if reason == .refusal {
                 self.timeline.appendNotice(ChatL10n.t("模型拒绝了该请求。"))
             } else if reason == .maxTokens {

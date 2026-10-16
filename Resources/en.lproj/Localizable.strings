@@ -1690,3 +1690,8 @@
 "选择" = "Select";
 "通过 Model Context Protocol 给 Claude 接入外部工具与数据源。配置写入 ~/.claude.json 或项目的 .mcp.json。" = "Connect Claude to external tools and data sources via the Model Context Protocol. Config is written to ~/.claude.json or the project's .mcp.json.";
 "需要认证" = "Authentication required";
+"Pi 编码 Agent(pi-acp 适配器,经 npx 运行并固定版本,需已安装 Node.js;若已全局安装 pi-acp 会优先使用)" = "Pi coding agent (pi-acp adapter run via npx with a pinned version; requires Node.js. A globally installed pi-acp is preferred)";
+"Agent 通知" = "Agent notifications";
+"显示第三方 Agent 的通知行" = "Show third-party agent notification lines";
+"Pi 等适配器会把扩展通知(如 pi-tps 的「TPS …」)混在消息里发出。开启时以淡色小字单独成行,关闭则隐藏;警告与错误级别始终显示。" = "Adapters such as Pi send extension notifications (e.g. pi-tps's \"TPS …\") mixed into messages. When on, they appear as separate muted lines; when off they are hidden. Warnings and errors are always shown.";
+"回合可能被提前结束(适配器把中断当作了正常结束)。发送「继续」即可接着往下做;反复出现时请到 设置 → 诊断 查看适配器输出。" = "The turn may have ended early (the adapter reported an interruption as a normal end). Send \"continue\" to resume; if it keeps happening, check the adapter output in Settings → Diagnostics.";

@@ -50,6 +50,8 @@ public enum ClientPrefs {
         public static let requestTimeout = "network.timeoutSeconds"
         public static let appendPrompt = "prompt.append"
         public static let loadClaudeMemory = "prompt.loadClaudeMemory"
+        /// 是否显示第三方 Agent 的扩展通知行(如 pi-tps 的「TPS …」),默认显示为淡色小字
+        public static let showAgentNotify = "agent.showNotify"
     }
 
     /// 托盘图标是否启用:菜单栏开关打开,或 Dock 图标被隐藏(此时必须有托盘才能打开窗口)。默认开启。
@@ -72,6 +74,11 @@ public enum ClientPrefs {
     /// 运行中再发送的默认行为,默认引导。
     public static func runningSendMode(_ defaults: UserDefaults = .standard) -> RunningSendMode {
         RunningSendMode(rawValue: defaults.string(forKey: Key.runningSend) ?? "") ?? .steer
+    }
+
+    /// 是否显示第三方 Agent 的扩展通知行(info 级别),默认开启;warning / error 级别始终显示。
+    public static func showsAgentNotify(_ defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: Key.showAgentNotify) as? Bool ?? true
     }
 
     /// 完成通知是否带提示音,默认开启。
