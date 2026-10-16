@@ -12,15 +12,16 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 ### 模块地图(`Sources/`)
 - `ACPKit`:JSON-RPC、ACP v1 模型、连接 actor、脚本化 Agent(测试用)与声明式场景引擎(`ScenarioEngine`、演示场景目录 `DemoScenarios`、演示历史会话 `DemoHistory`)。
 - `AgentHost`:子进程、工具链定位、Agent 注册表、Bridge。
-- `ChatKit`:会话模型(含运行中引导/排队/图片/目标)、时间线、补全(来源徽标、@子 Agent)、等待文案(`WorkingStatus`)、AskUserQuestion 向导模型(`ElicitationQuestions`)、客户端斜杠命令(`LocalCommands`)、Markdown 解析、更新检查、AttentionCenter(运行/未读状态)、RecentStore(无视图)。
-- `WorkbenchKit`:工作台模型(多项目、项目→会话树、布局与状态持久化、标签页 LRU 保活 `TabKeepAlive`、标签导航历史 `NavHistory`、侧栏尺寸 `PanelMetrics`,无视图)。
+- `ChatKit`:会话模型(含运行中引导/排队/图片/目标)、时间线、补全(来源徽标、@子 Agent)、等待文案(`WorkingStatus`)、AskUserQuestion 向导模型(`ElicitationQuestions`)、客户端斜杠命令(`LocalCommands`)、Markdown 解析、更新检查、AttentionCenter(运行/未读状态)、RecentStore(无视图);提供商模型 `ProviderModels`/`ProviderBridge`(代理桥接)/`OpenCodeImporter`(两阶段导入,确认前不读密钥);Claude Code 内置命令清单 `ClaudeBuiltinCommands`。
+- `WorkbenchKit`:工作台模型(多项目、项目→会话树、布局与状态持久化、标签页 LRU 保活 `TabKeepAlive`、标签导航历史 `NavHistory`、侧栏尺寸 `PanelMetrics`、标签快捷操作 `TabShortcuts`、面板摆放 `PanelPlacement`(终端放底部/左右栏/编辑区,项目栏与工具栏可换边;含拖动落点几何),无视图)。
 - `ClaudeConfigKit`:读写 `~/.claude`、`.mcp.json` 等配置。
 - `DiffKit` / `EditorKit`:Diff 与编辑器(含 `CodeHighlighter` 代码高亮缓存、`MarkdownLive` 就地渲染)。
-- `GitKit`:`git` 命令的类型化封装与输出解析(状态、暂存、提交、分支、历史、blame、stash、冲突;无 UI)。
+- `GitKit`:`git` 命令的类型化封装与输出解析(状态、暂存、提交、分支、历史、blame、stash、冲突;块级补丁 `HunkPatch`、图标状态 `GitBadge`;无 UI)。
 - `LSPKit`:LSP 客户端(Content-Length 分帧、`LSPClient` actor、服务器定位、`LSPManager` 懒启动/复用/空闲回收;复用 ACPKit 的 JSON-RPC 连接,无视图)。
+- `ProviderProxyKit`:本机回环协议代理(Anthropic Messages ⇄ OpenAI Chat Completions,含 SSE 流式、工具调用、图片、思考块);路由令牌在 URL 路径里,真实密钥只在代理内存;无视图,日志只记录路由 ID/状态/耗时。
 - `MermaidKit`:Mermaid 原生渲染(纯 Swift):解析 → 分层布局 → 场景(`MScene`)→ SwiftUI Canvas/PNG;支持 flowchart/graph、sequenceDiagram、stateDiagram-v2、classDiagram、pie、gantt。
 - `IconKit`:Lucide 功能图标(生成数据 + SVG path 解析 + `Image.om`)与彩色文件类型图标(`OMFileIcon`,Material Icon Theme);界面禁止再用 SF Symbol(`Scripts/gen-icons.py`、`Scripts/gen-file-icons.py` 重新生成)。
-- `DesignSystem`:设计令牌(含 `OMDiffPalette` 不透明 Diff 配色)、玻璃材质、标签活动状态(`TabActivity`)。
+- `DesignSystem`:设计令牌(含 `OMDiffPalette` 不透明 Diff 配色、主题包 `ThemePackage`)、玻璃材质、标签活动状态(`TabActivity`)。
 - `OhMyAgentApp`:应用本体(SwiftUI/AppKit 视图)。
 - `DemoKit`:演示模式(无视图):沙盒路径、隔离层 `DemoEnvironment`、确定性生成演示项目与 Git 仓库、预置工作台状态与演示 `.claude`。
 - `FakeAgent` / `OhMyAgentBridge`:辅助可执行文件。
@@ -71,7 +72,7 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 ## 6. UI 验证约定(不抢焦点)
 - 启动:`open -g -n build/OhMyAgent.app --env OMA_AGENT=fake --env OMA_PROJECT_ROOT=$PWD`。
 - 演示模式:`OMA_DEMO=1`、`OMA_DEMO_ROOT`、`OMA_DEMO_RESET=1`、`OMA_DEMO_SCENARIO=<场景名>`;输入框 `/demo-<场景名>` 或命令面板「演示场景」运行场景;新增工具卡/条目类型必须补演示场景(覆盖守卫测试会失败提醒)。
-- 调试钩子:`OMA_DRAFT`、`OMA_OPEN_SETTINGS`、`OMA_SETTINGS_PAGE`、`OMA_AGENT=fake|direct`、`OMA_LSP_PROBE=行:列`、`OMA_AUTOALLOW`(自动批准权限)、`OMA_USAGE_PANEL`(展开上下文用量面板)、`OMA_BRANCH_MENU`(展开分支切换弹层)、`OMA_ATTACH_IMAGE=路径1:路径2`(给输入框添加图片附件)、`OMA_PERF_OUT`、`OMA_TOGGLE_LEFT=秒`(延迟切换左栏)、`OMA_TAB_OVERFLOW=1`(标签溢出时自动展开「全部标签」下拉)。
+- 调试钩子:`OMA_DRAFT`、`OMA_OPEN_SETTINGS`、`OMA_SETTINGS_PAGE`、`OMA_AGENT=fake|direct`、`OMA_LSP_PROBE=行:列`、`OMA_AUTOALLOW`(自动批准权限)、`OMA_USAGE_PANEL`(展开上下文用量面板)、`OMA_BRANCH_MENU`(展开分支切换弹层)、`OMA_ATTACH_IMAGE=路径1:路径2`(给输入框添加图片附件)、`OMA_PERF_OUT`、`OMA_TOGGLE_LEFT=秒`(延迟切换左栏)、`OMA_TAB_OVERFLOW=1`(标签溢出时自动展开「全部标签」下拉)、`OMA_TERMINAL_PLACEMENT=bottom|right|left|editor`、`OMA_SIDEBAR_SIDE`/`OMA_TOOLS_SIDE=left|right`、`OMA_SHOW_TERMINAL=1`(面板摆放)。
 - 截图用 `screencapture -x -o -l<windowId>`;禁止用 osascript 发送按键;验证后删除截图。
 - 每次改动后重启应用与适配器子进程,确认修改在运行时真实生效。
 
