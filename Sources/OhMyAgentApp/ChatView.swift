@@ -15,10 +15,12 @@ struct ChatView: View {
     @State private var scrollPhase: ScrollPhase = .idle
     /// 上下文用量面板是否展开
     @State private var usageOpen = ProcessInfo.processInfo.environment["OMA_USAGE_PANEL"] != nil   // 调试钩子:启动即展开
-    /// 聊天内容宽度档位(设置 → 外观)
+    /// 聊天内容宽度档位(设置 → 主题)
     @AppStorage(ClientPrefs.Key.chatWidth) private var chatWidth = ChatWidth.standard.rawValue
 
-    private var contentMaxWidth: CGFloat { (ChatWidth(rawValue: chatWidth) ?? .standard).points }
+    @AppStorage(ClientPrefs.Key.chatWidthCustom) private var chatWidthCustom = ChatWidth.customDefault
+
+    private var contentMaxWidth: CGFloat { ChatWidth.resolve(raw: chatWidth, custom: chatWidthCustom) }
 
     /// 新会话(时间线为空):输入区居中显示,对齐 kuku/Cursor 的新对话首屏。
     private var isEmptySession: Bool { model.timeline.entries.isEmpty }

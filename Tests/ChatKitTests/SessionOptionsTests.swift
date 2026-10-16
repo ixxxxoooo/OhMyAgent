@@ -113,3 +113,33 @@ struct SessionOptionsTests {
         #expect(ChatWidth.full.points == .infinity)
     }
 }
+
+@Suite("聊天宽度档位")
+struct ChatWidthTests {
+    @Test("档位单调递增,铺满不限制")
+    func monotonic() {
+        let presets: [ChatWidth] = [.compact, .narrow, .standard, .comfortable, .wide, .ultra]
+        let points = presets.map(\.points)
+        #expect(points == points.sorted())
+        #expect(Set(points).count == points.count)
+        #expect(ChatWidth.full.points == .infinity)
+    }
+
+    @Test("旧存储值保持兼容,未知值回退标准")
+    func legacy() {
+        #expect(ChatWidth.resolve(raw: "narrow", custom: 900) == 680)
+        #expect(ChatWidth.resolve(raw: "standard", custom: 900) == 820)
+        #expect(ChatWidth.resolve(raw: "wide", custom: 900) == 1000)
+        #expect(ChatWidth.resolve(raw: "full", custom: 900) == .infinity)
+        #expect(ChatWidth.resolve(raw: "乱写", custom: 900) == 820)
+    }
+
+    @Test("自定义宽度夹到范围并对齐步长,非有限值回退默认")
+    func custom() {
+        #expect(ChatWidth.resolve(raw: "custom", custom: 905) == 900)
+        #expect(ChatWidth.resolve(raw: "custom", custom: 10) == 480)
+        #expect(ChatWidth.resolve(raw: "custom", custom: 99_999) == 1600)
+        #expect(ChatWidth.clampedCustom(.nan) == ChatWidth.customDefault)
+        #expect(ChatWidth.clampedCustom(.infinity) == ChatWidth.customDefault)
+    }
+}

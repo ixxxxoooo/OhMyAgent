@@ -37,19 +37,60 @@ public enum RunningSendMode: String, Sendable, CaseIterable, Identifiable {
     public var id: String { rawValue }
 }
 
-/// 聊天内容宽度档位。
+/// 聊天内容宽度档位。`custom` 使用 `chat.widthCustom`(点数)。
 public enum ChatWidth: String, Sendable, CaseIterable, Identifiable {
-    case narrow, standard, wide, full
+    case compact, narrow, standard, comfortable, wide, ultra, full, custom
 
     public var id: String { rawValue }
 
-    /// 最大宽度(点);`full` 为不限制。
+    /// 自定义宽度的范围与步长(点)。
+    public static let customRange: ClosedRange<Double> = 480...1600
+    public static let customStep: Double = 20
+    public static let customDefault: Double = 900
+
+    /// 预设档位的最大宽度(点);`full` 为不限制;`custom` 取默认自定义值。
     public var points: CGFloat {
         switch self {
+        case .compact: return 560
         case .narrow: return 680
         case .standard: return 820
+        case .comfortable: return 920
         case .wide: return 1000
+        case .ultra: return 1200
         case .full: return .infinity
+        case .custom: return CGFloat(Self.customDefault)
+        }
+    }
+
+    /// 由持久化值解析最终宽度:未知回退标准档;自定义值夹到范围内并对齐步长。
+    /// - Parameters:
+    ///   - raw: `chat.width` 存储的档位原始值
+    ///   - custom: `chat.widthCustom` 存储的自定义点数
+    /// - Returns: 最大宽度(点)
+    public static func resolve(raw: String, custom: Double) -> CGFloat {
+        let width = ChatWidth(rawValue: raw) ?? .standard
+        guard width == .custom else { return width.points }
+        return CGFloat(clampedCustom(custom))
+    }
+
+    /// 把自定义宽度夹到范围并对齐步长;非有限值回退默认。
+    public static func clampedCustom(_ value: Double) -> Double {
+        guard value.isFinite else { return customDefault }
+        let clamped = min(max(value, customRange.lowerBound), customRange.upperBound)
+        return (clamped / customStep).rounded() * customStep
+    }
+
+    /// 设置页显示的档位名。
+    public var displayName: String {
+        switch self {
+        case .compact: return String(localized: "紧凑")
+        case .narrow: return String(localized: "较窄")
+        case .standard: return String(localized: "标准")
+        case .comfortable: return String(localized: "较宽")
+        case .wide: return String(localized: "宽")
+        case .ultra: return String(localized: "超宽")
+        case .full: return String(localized: "铺满")
+        case .custom: return String(localized: "自定义")
         }
     }
 }

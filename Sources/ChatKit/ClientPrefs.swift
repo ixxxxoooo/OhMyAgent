@@ -37,6 +37,8 @@ public enum ClientPrefs {
         public static let featureElicitation = "feature.elicitation"
         /// 聊天内容宽度档位(narrow/standard/wide/full)
         public static let chatWidth = "chat.width"
+        /// 自定义聊天宽度(点),`chat.width == custom` 时生效
+        public static let chatWidthCustom = "chat.widthCustom"
         /// 发送键(enter / commandEnter)
         public static let sendKey = "chat.sendKey"
         /// 运行中再发送的默认行为(steer / queue)
