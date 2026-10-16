@@ -13,14 +13,14 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 - `ACPKit`:JSON-RPC、ACP v1 模型、连接 actor、脚本化 Agent(测试用)。
 - `AgentHost`:子进程、工具链定位、Agent 注册表、Bridge。
 - `ChatKit`:会话模型(含运行中引导/排队/图片/目标)、时间线、补全(来源徽标、@子 Agent)、客户端斜杠命令(`LocalCommands`)、Markdown 解析、更新检查、AttentionCenter(运行/未读状态)、RecentStore(无视图)。
-- `WorkbenchKit`:工作台模型(多项目、项目→会话树、布局与状态持久化,无视图)。
+- `WorkbenchKit`:工作台模型(多项目、项目→会话树、布局与状态持久化、标签页 LRU 保活 `TabKeepAlive`、侧栏尺寸与分隔条几何 `PanelDividers`,无视图)。
 - `ClaudeConfigKit`:读写 `~/.claude`、`.mcp.json` 等配置。
-- `DiffKit` / `EditorKit`:Diff 与编辑器。
+- `DiffKit` / `EditorKit`:Diff 与编辑器(含 `CodeHighlighter` 代码高亮缓存、`MarkdownLive` 就地渲染)。
 - `GitKit`:`git` 命令的类型化封装与输出解析(状态、暂存、提交、分支、历史、blame、stash、冲突;无 UI)。
 - `LSPKit`:LSP 客户端(Content-Length 分帧、`LSPClient` actor、服务器定位、`LSPManager` 懒启动/复用/空闲回收;复用 ACPKit 的 JSON-RPC 连接,无视图)。
 - `MermaidKit`:Mermaid 原生渲染(纯 Swift):解析 → 分层布局 → 场景(`MScene`)→ SwiftUI Canvas/PNG;支持 flowchart/graph、sequenceDiagram、stateDiagram-v2、classDiagram、pie、gantt。
 - `IconKit`:Lucide 图标(生成数据 + SVG path 解析 + `Image.om`);界面禁止再用 SF Symbol(`Scripts/gen-icons.py` 重新生成)。
-- `DesignSystem`:设计令牌与玻璃材质。
+- `DesignSystem`:设计令牌(含 `OMDiffPalette` 不透明 Diff 配色)、玻璃材质、标签活动状态(`TabActivity`)。
 - `OhMyAgentApp`:应用本体(SwiftUI/AppKit 视图)。
 - `FakeAgent` / `OhMyAgentBridge`:辅助可执行文件。
 - 新增模块请登记在本节与「开发进度.md」的代码索引中。
