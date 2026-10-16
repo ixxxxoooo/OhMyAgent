@@ -67,6 +67,7 @@ struct PickListContent<Item: PickListItem, Row: View>: View {
         }
         .contentShape(Rectangle())
         .focusable(!showsSearch)
+        .focusEffectDisabled()
         .focused($listFocused)
         .onKeyPress(.upArrow) { state.move(-1); return .handled }
         .onKeyPress(.downArrow) { state.move(1); return .handled }

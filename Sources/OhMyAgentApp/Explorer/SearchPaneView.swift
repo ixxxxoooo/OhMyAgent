@@ -65,7 +65,7 @@ struct SearchPaneView: View {
     }
 
     private func placeholder(_ icon: String, _ title: LocalizedStringKey, _ detail: LocalizedStringKey) -> some View {
-        ContentUnavailableView {
+        OMEmptyState {
             Label(title, om: icon, size: 28)
         } description: {
             Text(detail)

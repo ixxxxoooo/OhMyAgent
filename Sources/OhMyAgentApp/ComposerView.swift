@@ -262,17 +262,28 @@ struct OptionMenu: View {
         let current = option.currentValue.stringValue ?? ""
         let tint = category == "mode" ? Self.color(for: ModeTone.tone(forMode: current)) : OMColors.secondaryText
         if category == "model" { return AnyView(modelPicker(option: option, rows: rows, current: current, tint: tint)) }
-        let entries = rows.map { PickEntry(id: $0.value, title: $0.title) }
-        return AnyView(
-            Button { pickerShown.toggle() } label: { label(option: option, rows: rows, current: current) }
-                .buttonStyle(.plain)
-                .foregroundStyle(tint)
-                .help(option.name)
-                .accessibilityLabel(option.name)
-                .omPicker(isPresented: $pickerShown, entries: entries, selectedID: current, placeholder: String(localized: "搜索"), width: 200) { entry in
-                    model.setConfigOption(option.id, value: entry.id)
+        // 模式/思考强度选项极少,沿用原生 Menu(无搜索),不使用搜索列表(AGENTS.md 4.3 例外)
+        return AnyView(Menu {
+            ForEach(rows) { row in
+                Button {
+                    model.setConfigOption(option.id, value: row.value)
+                } label: {
+                    HStack {
+                        if let mapped = row.mapped { Image(nsImage: Self.menuImage(for: mapped)) }
+                        Text(row.title)
+                        if current == row.value { Image.om("check") }
+                    }
                 }
-        )
+            }
+        } label: {
+            label(option: option, rows: rows, current: current)
+        }
+        .fixedSize()
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .foregroundStyle(tint)
+        .help(option.name)
+        .accessibilityLabel(option.name))
     }
 
     /// 模型选择列表的行(输入区与「编辑并重新发送」共用):映射启用时只列已映射槽位,否则沿用 Agent 自带列表。
@@ -430,7 +441,7 @@ struct CompletionPopup: View {
         .frame(width: 420, height: height)
         .background(OMColors.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(OMColors.hairline))
-        .shadow(color: .black.opacity(0.18), radius: 12, y: 4)
+        .omCardShadow(cornerRadius: 12)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("补全候选")
     }

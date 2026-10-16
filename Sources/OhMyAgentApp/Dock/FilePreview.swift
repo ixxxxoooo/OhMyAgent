@@ -137,7 +137,7 @@ struct SVGPreviewView: View {
         if let image = NSImage(data: Data(text.utf8)), image.size.width > 0 {
             ImageCanvas(image: image)
         } else {
-            ContentUnavailableView {
+            OMEmptyState {
                 Label("无法渲染这个 SVG", om: "image", size: 28)
             } description: {
                 Text("文件内容不是有效的 SVG,请在「源码」中检查。")
@@ -215,7 +215,7 @@ struct BinaryPreviewTab: View {
                 if let image {
                     ImageCanvas(image: image)
                 } else if failed {
-                    ContentUnavailableView {
+                    OMEmptyState {
                         Label("无法打开图片", om: "image", size: 28)
                     } description: {
                         Text("文件已损坏或格式不受支持。")
@@ -315,7 +315,7 @@ struct CSVTableView: View {
     var body: some View {
         Group {
             if rows.isEmpty {
-                ContentUnavailableView { Label("表格为空", om: "columns-2", size: 28) } description: { Text("文件里没有可显示的行。") }
+                OMEmptyState { Label("表格为空", om: "columns-2", size: 28) } description: { Text("文件里没有可显示的行。") }
             } else {
                 let columns = rows.map(\.count).max() ?? 0
                 let widths = columnWidths(columns: columns)

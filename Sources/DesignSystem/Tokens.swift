@@ -183,15 +183,41 @@ public enum OMTerminalPalette {
     }
 }
 
+/// 仅外侧的阴影:阴影只画在卡片轮廓之外,不会透过半透明玻璃/材质在卡片内部形成灰雾。
+private struct OMOuterShadow: ViewModifier {
+    let cornerRadius: CGFloat
+    let opacity: Double
+    let radius: CGFloat
+    let yOffset: CGFloat
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        content.background {
+            shape.fill(OMColors.shadowInk)
+                .shadow(color: OMColors.shadowInk.opacity(opacity * ThemeRuntime.style.shadowScale), radius: radius, y: yOffset)
+                // 把卡片内部抠掉,只留外侧阴影
+                .mask {
+                    Rectangle().padding(-radius * 3)
+                        .overlay { shape.fill(OMColors.maskInk).blendMode(.destinationOut) }
+                        .compositingGroup()
+                }
+        }
+    }
+}
+
 public extension View {
-    /// 卡片级阴影(单层令牌):强度随主题风格;所有悬浮卡片统一使用,不再各自叠阴影。
-    func omCardShadow() -> some View {
-        shadow(color: OMColors.shadowInk.opacity(0.14 * ThemeRuntime.style.shadowScale), radius: 12, y: 4)
+    /// 卡片级外侧阴影(单层令牌):强度随主题风格;所有悬浮卡片统一使用,不再各自叠阴影。
+    /// - Parameters:
+    ///   - cornerRadius: 与卡片一致的圆角
+    ///   - yOffset: 垂直偏移,默认 4(向上弹出的浮层可传负值)
+    func omCardShadow(cornerRadius: CGFloat = OMMetrics.cardRadius, yOffset: CGFloat = 4) -> some View {
+        modifier(OMOuterShadow(cornerRadius: cornerRadius, opacity: 0.16, radius: 12, yOffset: yOffset))
     }
 
-    /// 浮层级阴影(搜索窗、悬浮窗等大块浮层)。
-    func omFloatShadow() -> some View {
-        shadow(color: OMColors.shadowInk.opacity(0.24 * ThemeRuntime.style.shadowScale), radius: 28, y: 10)
+    /// 浮层级外侧阴影(搜索窗、悬浮窗等大块浮层)。
+    /// - Parameter cornerRadius: 与浮层一致的圆角
+    func omFloatShadow(cornerRadius: CGFloat = 22) -> some View {
+        modifier(OMOuterShadow(cornerRadius: cornerRadius, opacity: 0.26, radius: 28, yOffset: 10))
     }
 }
 

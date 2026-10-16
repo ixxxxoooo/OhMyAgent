@@ -17,7 +17,7 @@ struct SCMView: View {
             SCMContent(workbench: workbench, model: GitStore.shared.model(for: project.id))
                 .id(project.id)
         } else {
-            ContentUnavailableView { Label("没有项目", om: "folder", size: 28) } description: { Text("添加一个项目后,这里会显示它的 Git 状态。") }
+            OMEmptyState { Label("没有项目", om: "folder", size: 28) } description: { Text("添加一个项目后,这里会显示它的 Git 状态。") }
         }
     }
 }
@@ -325,7 +325,7 @@ private struct SCMContent: View {
     // MARK: 其他状态
 
     private var notRepository: some View {
-        ContentUnavailableView {
+        OMEmptyState {
             Label("这个文件夹还不是 Git 仓库", om: "git-branch", size: 28)
         } description: {
             Text("初始化后可以查看改动、提交并推送。")

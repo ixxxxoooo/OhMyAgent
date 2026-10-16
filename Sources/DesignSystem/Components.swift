@@ -78,3 +78,49 @@ public struct OMTag: View {
             .background(tint.opacity(0.12), in: Capsule())
     }
 }
+
+// MARK: - 空状态
+
+/// 空状态标签样式:图标在上(三级文字色)、标题在下(`sectionTitle`)。
+struct OMEmptyLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        VStack(spacing: 8) {
+            configuration.icon.foregroundStyle(OMColors.tertiaryText)
+            configuration.title.font(OMFonts.sectionTitle).foregroundStyle(OMColors.primaryText)
+        }
+    }
+}
+
+/// 统一的空状态视图:取代系统 `OMEmptyState`(其标题字号过大、不跟随界面字号与主题)。
+/// 标题用 `sectionTitle`,说明用 `small` + 次要文字色,操作按钮统一 `omSecondary`。
+public struct OMEmptyState<Label: View, Description: View, Actions: View>: View {
+    private let label: Label
+    private let descriptionView: Description
+    private let actions: Actions
+
+    /// 创建空状态。
+    /// - Parameters:
+    ///   - label: 图标 + 标题(一般为 `Label(_:om:size:)`)
+    ///   - description: 说明文字
+    ///   - actions: 可选操作按钮
+    public init(@ViewBuilder label: () -> Label, @ViewBuilder description: () -> Description = { EmptyView() },
+                @ViewBuilder actions: () -> Actions = { EmptyView() }) {
+        self.label = label()
+        self.descriptionView = description()
+        self.actions = actions()
+    }
+
+    public var body: some View {
+        VStack(spacing: 10) {
+            label.labelStyle(OMEmptyLabelStyle())
+            descriptionView
+                .font(OMFonts.small)
+                .foregroundStyle(OMColors.secondaryText)
+                .multilineTextAlignment(.center)
+            actions.buttonStyle(.omSecondary)
+        }
+        .padding(20)
+        .frame(maxWidth: 320)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}

@@ -67,7 +67,7 @@ final class PickerPanelController {
             Color.clear
             card
                 .omGlassCard(cornerRadius: 12)
-                .shadow(color: .black.opacity(0.18), radius: 10, y: placement.isAbove ? -2 : 3)
+                .omCardShadow(cornerRadius: 12, yOffset: placement.isAbove ? -2 : 3)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
                     PickerPanelController.shared.cardHeightChanged(height)
                 }

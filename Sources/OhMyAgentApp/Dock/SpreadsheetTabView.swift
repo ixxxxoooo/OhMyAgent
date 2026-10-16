@@ -39,7 +39,7 @@ struct SpreadsheetTabView: View {
             case .loading:
                 ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
             case .failed(let message):
-                ContentUnavailableView {
+                OMEmptyState {
                     Label("无法打开表格", om: "file-text", size: 28)
                 } description: {
                     Text(message)

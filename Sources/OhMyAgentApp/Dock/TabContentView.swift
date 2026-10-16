@@ -310,7 +310,7 @@ struct ChangesTabView: View {
                     .padding(14)
             }
         } else {
-            ContentUnavailableView {
+            OMEmptyState {
                 Label("暂无改动", om: "file-diff", size: 28)
             } description: {
                 Text("Agent 修改文件后,这里会列出每个文件的差异。")
@@ -354,7 +354,7 @@ struct SubagentTabView: View {
             .environment(model)
             .background(OMColors.surface)
         } else {
-            ContentUnavailableView {
+            OMEmptyState {
                 Label("这个子任务已不可用", om: "bot", size: 28)
             } description: {
                 Text("会话被切换或重置后,原来的子任务内容不会保留。")
@@ -385,6 +385,7 @@ struct SubagentStatusFooter: View {
     let entry: TimelineEntry
     let tool: ToolCall
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage(ClientPrefs.Key.workingVerbStyle) private var verbStyleRaw = WorkingVerbStyle.classic.rawValue
 
     var body: some View {
         Group {
@@ -397,15 +398,16 @@ struct SubagentStatusFooter: View {
 
     /// 运行中:不提示 Esc(子 Agent 不能单独中断,只能在主会话停止本轮)。
     private var running: some View {
-        ActiveTimeline(interval: reduceMotion ? 1 : 0.15, start: entry.startedAt) { date in
+        let style = WorkingVerbStyle.resolve(verbStyleRaw)
+        return ActiveTimeline(interval: reduceMotion ? 1 : 0.15, start: entry.startedAt) { date in
             let seconds = Int(date.timeIntervalSince(entry.startedAt))
             let tick = Int(date.timeIntervalSinceReferenceDate / 0.15)
             HStack(spacing: 8) {
-                Text(reduceMotion ? "✻" : WorkingStatus.glyph(tick: tick))
-                    .font(OMFonts.custom(13, weight: .medium))
+                Text(reduceMotion ? style.restingGlyph : WorkingStatus.glyph(tick: tick, style: style))
+                    .font(OMFonts.body.weight(.medium))
                     .foregroundStyle(OMColors.accent)
                     .frame(width: 16)
-                Text(WorkingStatus.line(verb: WorkingStatus.verb(seed: Int(entry.startedAt.timeIntervalSince1970)), seconds: seconds, canInterrupt: false))
+                Text(WorkingStatus.line(verb: WorkingStatus.verb(seed: Int(entry.startedAt.timeIntervalSince1970), style: style), seconds: seconds, canInterrupt: false))
                     .font(OMFonts.small)
                     .foregroundStyle(OMColors.secondaryText)
                     .monospacedDigit()
@@ -460,7 +462,7 @@ struct AgentTerminalTabView: View {
             }
             .background(OMColors.surface)
         } else {
-            ContentUnavailableView {
+            OMEmptyState {
                 Label("这个终端已不可用", om: "terminal", size: 28)
             } description: {
                 Text("会话被切换或重置后,原来的终端输出不会保留。")

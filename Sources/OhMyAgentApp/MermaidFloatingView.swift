@@ -150,7 +150,7 @@ private struct MermaidFloatingPanel: View {
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 1))
         .overlay { resizeHandles }
-        .shadow(color: .black.opacity(0.28), radius: 24, y: 8)
+        .omFloatShadow(cornerRadius: 12)
         .position(x: frame.midX, y: frame.midY)
         .onAppear {
             frame = (store.frame ?? FloatingPanelGeometry.initialFrame(in: container)).clamped(to: container)

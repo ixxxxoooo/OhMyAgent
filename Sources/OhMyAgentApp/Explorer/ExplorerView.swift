@@ -42,7 +42,7 @@ struct ExplorerView: View {
                 }
             }
         } else {
-            ContentUnavailableView { Label("没有项目", om: "folder", size: 28) } description: { Text("添加一个项目后,这里会显示它的文件。") }
+            OMEmptyState { Label("没有项目", om: "folder", size: 28) } description: { Text("添加一个项目后,这里会显示它的文件。") }
         }
     }
 

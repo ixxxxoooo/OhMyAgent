@@ -29,11 +29,11 @@ struct GitHistoryTabView: View {
             if !loaded {
                 ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let errorMessage {
-                ContentUnavailableView { Label("无法读取历史", om: "triangle-alert", size: 28) } description: { Text(errorMessage) }
+                OMEmptyState { Label("无法读取历史", om: "triangle-alert", size: 28) } description: { Text(errorMessage) }
             } else if repo == nil {
-                ContentUnavailableView { Label("不是 Git 仓库", om: "git-branch", size: 28) } description: { Text("这个项目还没有 Git 历史。") }
+                OMEmptyState { Label("不是 Git 仓库", om: "git-branch", size: 28) } description: { Text("这个项目还没有 Git 历史。") }
             } else if rows.isEmpty {
-                ContentUnavailableView { Label("还没有提交", om: "git-commit-horizontal", size: 28) } description: { Text("提交后这里会显示历史。") }
+                OMEmptyState { Label("还没有提交", om: "git-commit-horizontal", size: 28) } description: { Text("提交后这里会显示历史。") }
             } else {
                 // 上下排布(不用 SplitView:它会按子视图理想宽度撑开,把内容挤出可视区)
                 GeometryReader { proxy in
@@ -117,7 +117,7 @@ struct GitHistoryTabView: View {
         if let repo, let hash = selected, let row = rows.first(where: { $0.commit.hash == hash }) {
             CommitDetailView(repo: repo, commit: row.commit, workbench: workbench).id(hash)
         } else {
-            ContentUnavailableView { Label("选择一个提交", om: "git-commit-horizontal", size: 28) } description: { Text("右侧会显示它改动的文件。") }
+            OMEmptyState { Label("选择一个提交", om: "git-commit-horizontal", size: 28) } description: { Text("右侧会显示它改动的文件。") }
         }
     }
 }

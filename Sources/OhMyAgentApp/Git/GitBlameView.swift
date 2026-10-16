@@ -25,9 +25,9 @@ struct GitBlameTabView: View {
             ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
                 .task { await load() }
         case .notRepository:
-            ContentUnavailableView { Label("不是 Git 仓库", om: "git-branch", size: 28) } description: { Text("文件不在 Git 仓库中,或尚未提交。") }
+            OMEmptyState { Label("不是 Git 仓库", om: "git-branch", size: 28) } description: { Text("文件不在 Git 仓库中,或尚未提交。") }
         case .failed(let message):
-            ContentUnavailableView { Label("无法追溯", om: "triangle-alert", size: 28) } description: { Text(message) }
+            OMEmptyState { Label("无法追溯", om: "triangle-alert", size: 28) } description: { Text(message) }
         case .ready:
             VStack(spacing: 0) {
                 HStack {

@@ -152,18 +152,18 @@ struct GitFileDiffView: View {
         case .loading:
             ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
         case .notRepository:
-            ContentUnavailableView {
+            OMEmptyState {
                 Label("没有这个文件的改动记录", om: "file-diff", size: 28)
             } description: {
                 Text("文件不在 Git 仓库中,Agent 也没有修改过它。")
             }
         case .binary:
-            ContentUnavailableView { Label("二进制文件", om: "file", size: 28) } description: { Text("不显示二进制文件的差异。") }
+            OMEmptyState { Label("二进制文件", om: "file", size: 28) } description: { Text("不显示二进制文件的差异。") }
         case .failed(let message):
-            ContentUnavailableView { Label("无法计算差异", om: "triangle-alert", size: 28) } description: { Text(message) }
+            OMEmptyState { Label("无法计算差异", om: "triangle-alert", size: 28) } description: { Text(message) }
         case .diff(let diff):
             if diff.isEmpty {
-                ContentUnavailableView { Label("没有差异", om: "check", size: 28) } description: { Text("这个范围内文件与对比基线相同。") }
+                OMEmptyState { Label("没有差异", om: "check", size: 28) } description: { Text("这个范围内文件与对比基线相同。") }
             } else {
                 VStack(spacing: 0) {
                     if let actionError {

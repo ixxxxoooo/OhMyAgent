@@ -112,7 +112,7 @@ struct ProjectTreeView: View {
             .scrollIndicators(.never)
             .overlay {
                 if workbench.projects.isEmpty {
-                    ContentUnavailableView {
+                    OMEmptyState {
                         Label("没有项目", om: "folder.badge.plus", size: 28)
                     } description: {
                         Text("添加一个项目目录,或把文件夹拖到这里。")
