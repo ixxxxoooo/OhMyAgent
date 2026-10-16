@@ -5,6 +5,7 @@ import IconKit
 import AppKit
 import ChatKit
 import DesignSystem
+import EditorKit
 import SwiftUI
 
 /// Markdown 视图。
@@ -127,7 +128,7 @@ struct CodeBlockView: View {
             .padding(.vertical, 6)
             Divider()
             ScrollView(.horizontal, showsIndicators: false) {
-                Text(code)
+                Text(CodeHighlighter.attributed(code, fence: language))
                     .font(OMFonts.readingMono)
                     .padding(12)
                     .fixedSize(horizontal: true, vertical: true)
