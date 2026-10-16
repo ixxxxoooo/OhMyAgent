@@ -821,3 +821,30 @@
 "获取模型列表" = "Fetch Model List";
 "尚未获取;输入框的模型菜单将只显示主模型。" = "Not fetched yet; the composer model menu will only show the main model.";
 "已获取 %lld 个模型,点「保存」后生效。" = "Fetched %lld models. Click Save to apply.";
+
+/* 提问向导 / 后台子 Agent 面板 / 等待文案 */
+"提问" = "Question";
+"%lld 题" = "%lld questions";
+"还有 %lld 个待回答" = "%lld more pending";
+"还有 %lld 题未回答" = "%lld unanswered";
+"下一题" = "Next";
+"上一题" = "Previous";
+"展开提问" = "Expand question";
+"收起提问" = "Collapse question";
+"Agent 提问" = "Agent question";
+"可多选" = "Multiple choice";
+"其他…" = "Other…";
+"%lld 个后台子 Agent" = "%lld background subagents";
+"展开后台子 Agent" = "Expand background subagents";
+"收起后台子 Agent" = "Collapse background subagents";
+"停止本轮" = "Stop turn";
+"等待你的回复" = "Waiting for your reply";
+"按 Esc 中断" = "esc to interrupt";
+"思考中" = "Thinking";
+"琢磨中" = "Pondering";
+"推敲中" = "Cogitating";
+"构思中" = "Brewing";
+"斟酌中" = "Mulling";
+"酝酿中" = "Percolating";
+"梳理中" = "Untangling";
+"盘算中" = "Computing";

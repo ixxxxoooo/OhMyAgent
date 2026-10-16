@@ -287,6 +287,40 @@ struct M3ScenarioTests {
         model.shutdown()
     }
 
+    @Test("问卷向导:按题归并字段,单选与自定义输入互斥")
+    func questionWizard() async throws {
+        let ws = try Self.tempWorkspace()
+        defer { try? FileManager.default.removeItem(at: ws) }
+        let model = try await Self.readyModel(workspace: ws)
+        model.send("#ask")
+        #expect(await SessionModelTests.wait { !model.pendingElicitations.isEmpty })
+        let prompt = try #require(model.pendingElicitations.first)
+        let questions = try #require(prompt.questions)
+        #expect(questions.map(\.id) == ["question_0", "question_1"])
+        #expect(questions[0].header == "方案")
+        #expect(questions[0].custom?.id == "question_0_custom")
+        #expect(questions[1].custom == nil)
+        #expect(questions[1].isMulti)
+        #expect(!questions[0].isAnswered)
+        // 单选:选中选项后输入自定义内容 → 清除选项;再选选项 → 清空自定义
+        questions[0].choose("A")
+        #expect(questions[0].isAnswered)
+        questions[0].setCustomText("自己的方案")
+        #expect(questions[0].field.selection.isEmpty)
+        #expect(questions[0].isAnswered)
+        questions[0].choose("B")
+        #expect(questions[0].customText.isEmpty)
+        // 非法选项被忽略;多选可切换
+        questions[1].choose("不存在")
+        #expect(questions[1].field.selection.isEmpty)
+        questions[1].choose("测试")
+        questions[1].choose("测试")
+        #expect(!questions[1].isAnswered)
+        prompt.decline()
+        model.dismiss(prompt)
+        model.shutdown()
+    }
+
     @Test("声明 terminal 能力后命令输出进入终端会话")
     func terminal() async throws {
         let ws = try Self.tempWorkspace()

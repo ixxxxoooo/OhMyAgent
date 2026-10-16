@@ -1,6 +1,7 @@
 // @author ygw
-// 输入区上方的状态卡片:`/goal` 目标条、排队消息面板、运行中的子 Agent 条。
+// 输入区上方的状态卡片:`/goal` 目标条、排队消息面板、后台子 Agent 面板。
 
+import ACPKit
 import ChatKit
 import DesignSystem
 import IconKit
@@ -92,7 +93,9 @@ struct FollowUpQueueView: View {
     }
 }
 
-/// 运行中的子 Agent 条:列出正在执行的子任务,可点击打开其会话,或停止本轮。
+/// 输入栏上方的「后台子 Agent」面板(参考 kuku / Cursor):
+/// 只列运行中的子 Agent,全部结束后整块消失;点标题折叠/展开(按会话保存);
+/// 每行显示 类型 · 最近工具 · 已运行时长,悬停出现「打开」;标题处可停止本轮。
 struct SubagentActivityStrip: View {
     let model: SessionModel
     let workbench: WorkbenchModel
@@ -100,48 +103,122 @@ struct SubagentActivityStrip: View {
     var body: some View {
         let running = model.timeline.subagentEntries().filter { $0.entry.tool.map { !$0.status.isTerminal } ?? false }
         if !running.isEmpty {
+            let collapsed = model.backgroundPanelCollapsed
             VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 6) {
-                    Image.om("bot", size: 11)
-                    Text("子 Agent 运行中 \(running.count)")
-                        .font(OMFonts.small.weight(.medium))
-                    Spacer()
-                    Button("停止") { model.cancel() }
-                        .buttonStyle(.plain)
-                        .font(OMFonts.small)
-                        .help("停止本轮(含所有子 Agent)")
-                }
-                .foregroundStyle(OMColors.secondaryText)
-                .padding(.horizontal, 12)
-                .frame(height: 28)
-                ForEach(Array(running.prefix(4).enumerated()), id: \.element.entry.id) { _, item in
-                    if let tool = item.entry.tool {
-                        let presentation = ToolPresentation(tool: tool, hasChild: true)
-                        HStack(spacing: 6) {
-                            ProgressView().controlSize(.mini)
-                            if let type = presentation.agentType { OMTag(type, tint: OMColors.accent) }
-                            Text(presentation.subject).font(OMFonts.small).lineLimit(1)
-                            Spacer(minLength: 0)
-                            Button {
-                                if let project = workbench.projectID(of: model) {
-                                    workbench.openSubagent(project: project, toolCallID: tool.toolCallId, title: tool.title)
+                header(count: running.count, collapsed: collapsed)
+                if !collapsed {
+                    TimelineView(.periodic(from: .now, by: 1)) { _ in
+                        ScrollView {
+                            VStack(spacing: 1) {
+                                ForEach(running, id: \.entry.id) { item in
+                                    SubagentRow(entry: item.entry, depth: item.depth, model: model, workbench: workbench)
                                 }
-                            } label: {
-                                Image.om("square-arrow-out-up-right", size: 11)
                             }
-                            .buttonStyle(.plain)
-                            .help("在标签中打开子 Agent 会话")
-                            .accessibilityLabel("打开子 Agent 会话")
+                            .padding(.horizontal, 4)
+                            .padding(.bottom, 4)
                         }
-                        .foregroundStyle(OMColors.secondaryText)
-                        .padding(.leading, CGFloat(12 + item.depth * 12))
-                        .padding(.trailing, 12)
-                        .padding(.vertical, 3)
+                        .scrollBounceBehavior(.basedOnSize)
+                        .frame(maxHeight: 196)
                     }
+                    .transition(.opacity)
                 }
             }
-            .padding(.bottom, 4)
             .omSolidCard()
+            .accessibilityElement(children: .contain)
         }
+    }
+
+    private func header(count: Int, collapsed: Bool) -> some View {
+        HStack(spacing: 0) {
+            Button {
+                omWithAnimation(.snappy(duration: 0.18)) { model.backgroundPanelCollapsed.toggle() }
+            } label: {
+                HStack(spacing: 6) {
+                    Image.om("chevron-down", size: 11, weight: .bold)
+                        .rotationEffect(.degrees(collapsed ? -90 : 0))
+                    Text("\(count) 个后台子 Agent")
+                        .font(OMFonts.small)
+                    Spacer(minLength: 0)
+                }
+                .foregroundStyle(OMColors.secondaryText)
+                .padding(.horizontal, 10)
+                .frame(height: 28)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(collapsed ? "展开后台子 Agent" : "收起后台子 Agent")
+            Button("停止本轮") { model.cancel() }
+                .buttonStyle(.plain)
+                .font(OMFonts.caption)
+                .foregroundStyle(OMColors.tertiaryText)
+                .padding(.horizontal, 10)
+                .help("停止本轮(含所有子 Agent)")
+        }
+    }
+}
+
+/// 面板中的一行子 Agent。
+private struct SubagentRow: View {
+    let entry: TimelineEntry
+    let depth: Int
+    let model: SessionModel
+    let workbench: WorkbenchModel
+    @State private var hovering = false
+
+    var body: some View {
+        if let tool = entry.tool {
+            let presentation = ToolPresentation(tool: tool, hasChild: true)
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.mini)
+                Text(presentation.subject)
+                    .font(OMFonts.small)
+                    .foregroundStyle(Color.primary)
+                    .lineLimit(1)
+                if let meta = meta(presentation) {
+                    Text(meta)
+                        .font(OMFonts.monoSmall)
+                        .foregroundStyle(OMColors.tertiaryText)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+                Spacer(minLength: 0)
+                Button {
+                    open(tool)
+                } label: {
+                    Image.om("square-arrow-out-up-right", size: 11)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(OMColors.secondaryText)
+                .opacity(hovering ? 1 : 0)
+                .help("在标签中打开子 Agent 会话")
+                .accessibilityLabel("打开子 Agent 会话")
+            }
+            .padding(.leading, CGFloat(6 + depth * 12))
+            .padding(.trailing, 6)
+            .frame(height: 28)
+            .background(hovering ? Color.primary.opacity(0.05) : Color.clear, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .contentShape(Rectangle())
+            .onHover { hovering = $0 }
+            .onTapGesture { open(tool) }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityLabel(presentation.subject)
+        }
+    }
+
+    /// 灰色元信息:子 Agent 类型 · 最近工具 · 已运行时长。
+    private func meta(_ presentation: ToolPresentation) -> String? {
+        var parts: [String] = []
+        if let type = presentation.agentType { parts.append(type) }
+        if let last = entry.childStore?.entries.last(where: { $0.kind == .tool })?.tool?.title, !last.isEmpty {
+            parts.append(last)
+        }
+        parts.append(WorkingStatus.elapsed(Int(entry.elapsedSeconds)))
+        return parts.joined(separator: " · ")
+    }
+
+    private func open(_ tool: ToolCall) {
+        guard let project = workbench.projectID(of: model) else { return }
+        workbench.openSubagent(project: project, toolCallID: tool.toolCallId, title: tool.title)
     }
 }

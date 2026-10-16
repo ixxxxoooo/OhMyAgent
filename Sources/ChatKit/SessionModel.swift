@@ -231,6 +231,10 @@ public final class SessionModel {
 
     public private(set) var phase: SessionPhase = .idle
     public private(set) var isRunning = false { didSet { if isRunning != oldValue { publishAttention() } } }
+    /// 当前轮次开始时间(用于等待文案的计时;不运行时为空)。
+    public private(set) var turnStartedAt: Date?
+    /// 输入栏上方「后台子 Agent」面板是否折叠(按会话保存)。
+    public var backgroundPanelCollapsed = false
     public private(set) var agentName: String
     public private(set) var configOptions: [SessionConfigOption] = []
     public private(set) var availableCommands: [AvailableCommand] = []
@@ -795,6 +799,7 @@ public final class SessionModel {
         timeline.appendUser(prompt, attachments: images)
         turnNumber += 1
         turnStart = ContinuousClock.now
+        turnStartedAt = Date()
         lastActivity = .now
         log.info("发送提示", ["turn": "\(turnNumber)", "chars": "\(prompt.count)", "blocks": "\(blocks.count)", "images": "\(images.count)"])
         turnChanges.removeAll()
@@ -878,6 +883,7 @@ public final class SessionModel {
             }
             self.publishTurnChanges()
             self.isRunning = false
+            self.turnStartedAt = nil
             self.promptTask = nil
             if self.goal?.isActive == true { self.goal?.isActive = false }
             self.refreshHistory()

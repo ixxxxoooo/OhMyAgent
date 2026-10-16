@@ -30,8 +30,10 @@ struct ChatView: View {
                         model.resolve(prompt, optionId: optionId)
                     }
                 }
-                ForEach(model.pendingElicitations) { prompt in
-                    ElicitationCard(prompt: prompt) { model.dismiss(prompt) }
+                // 提问按队列逐个呈现(先到先答),其余以「还有 N 个待回答」提示
+                if let prompt = model.pendingElicitations.first {
+                    ElicitationCard(prompt: prompt, queued: model.pendingElicitations.count - 1) { model.dismiss(prompt) }
+                        .id(prompt.id)
                 }
                 if case .failed(let message) = model.phase {
                     ConnectionFailureCard(message: message) { model.reconnect() }
@@ -61,6 +63,7 @@ struct ChatView: View {
                 ForEach(TimelineGrouping.group(model.timeline.entries)) { item in
                     TimelineItemView(item: item)
                 }
+                WorkingIndicatorView(model: model)
                 Color.clear.frame(height: 24).id("bottom")
             }
             .frame(maxWidth: contentMaxWidth)

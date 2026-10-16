@@ -97,8 +97,24 @@ struct AutoHeightScroll<Content: View>: View {
 
 // MARK: - 提问表单
 
-/// Agent 提问卡片(AskUserQuestion / MCP 表单 / URL)。
+/// Agent 提问卡片入口:AskUserQuestion 形态走逐题向导;其余(MCP 表单 / URL)走通用表单。
 struct ElicitationCard: View {
+    let prompt: ElicitationPrompt
+    /// 排在后面等待的提问数量
+    var queued = 0
+    let onFinish: () -> Void
+
+    var body: some View {
+        if let questions = prompt.questions {
+            QuestionWizardCard(prompt: prompt, questions: questions, queued: queued, onFinish: onFinish)
+        } else {
+            GenericElicitationCard(prompt: prompt, onFinish: onFinish)
+        }
+    }
+}
+
+/// 通用表单提问卡片(MCP 表单 / URL 模式)。
+struct GenericElicitationCard: View {
     let prompt: ElicitationPrompt
     let onFinish: () -> Void
     @Environment(\.openURL) private var openURL
