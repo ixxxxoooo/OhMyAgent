@@ -20,6 +20,7 @@ struct ChatView: View {
     @State private var sticky = StickyUserState()
     /// 分组结果缓存(输入区等无关状态变化时不重复分组)
     @State private var itemsCache = TimelineItemsCache()
+    @AppStorage(ClientPrefs.Key.toolDensity) private var toolDensityRaw = ToolDensity.standard.rawValue
     /// 上下文用量面板是否展开
     @State private var usageOpen = ProcessInfo.processInfo.environment["OMA_USAGE_PANEL"] != nil   // 调试钩子:启动即展开
     /// 聊天内容宽度档位(设置 → 主题)
@@ -93,7 +94,7 @@ struct ChatView: View {
     private var timeline: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: AppearanceModel.shared.isCompact ? 7 : 14) {
-                ForEach(itemsCache.items(for: model.timeline)) { item in
+                ForEach(itemsCache.items(for: model.timeline, density: ToolDensity(rawValue: toolDensityRaw) ?? .standard)) { item in
                     // Equatable:结构不变时不因父视图重新求值而重建行(行内容由条目自身的可观察状态驱动)
                     TimelineItemView(item: item).equatable()
                 }

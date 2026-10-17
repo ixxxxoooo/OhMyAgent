@@ -68,6 +68,10 @@ struct ToolRowView: View {
     @State private var expanded: Bool?
     @State private var hovering = false
     @State private var stats: DiffStats?
+    @AppStorage(ClientPrefs.Key.toolDensity) private var densityRaw = ToolDensity.standard.rawValue
+
+    /// 工具调用详细程度。
+    private var density: ToolDensity { ToolDensity(rawValue: densityRaw) ?? .standard }
 
     /// 新增/删除行统计。
     struct DiffStats: Equatable { var added: Int; var removed: Int }
@@ -80,7 +84,7 @@ struct ToolRowView: View {
             VStack(alignment: .leading, spacing: 0) {
                 row(tool, presentation, canExpand: canExpand, isExpanded: isExpanded)
                 if isExpanded {
-                    ToolDetailsView(entry: entry, tool: tool, presentation: presentation)
+                    detailsBlock(tool, presentation)
                         .padding(.leading, 23)
                         .padding(.top, 4)
                         .padding(.bottom, 8)
@@ -94,6 +98,32 @@ struct ToolRowView: View {
             }
         }
     }
+
+    // MARK: 详情(含「详细」档的内联预览)
+
+    /// 详情区:「详细」档下默认展开的编辑/写入/命令只显示前一段预览(底部渐隐 + 「显示全部」),用户点开后显示完整内容。
+    @ViewBuilder
+    private func detailsBlock(_ tool: ToolCall, _ p: ToolPresentation) -> some View {
+        let details = ToolDetailsView(entry: entry, tool: tool, presentation: p)
+        if expanded == nil, density == .detailed, !DebugFlags.expandAll {
+            VStack(alignment: .leading, spacing: 4) {
+                details
+                    .frame(maxHeight: Self.previewHeight, alignment: .top)
+                    .clipped()
+                    .mask(
+                        LinearGradient(stops: [.init(color: OMColors.surface, location: 0.75), .init(color: OMColors.surface.opacity(0), location: 1)], startPoint: .top, endPoint: .bottom) // ui-lint:allow 仅作遮罩/淡出,非装饰
+                    )
+                Button("显示全部") { expanded = true }
+                    .buttonStyle(.omPlain)
+                    .font(OMFonts.caption)
+            }
+        } else {
+            details
+        }
+    }
+
+    /// 「详细」档内联预览的最大高度。
+    private static let previewHeight: CGFloat = 150
 
     // MARK: 行
 
@@ -295,10 +325,12 @@ struct ToolRowView: View {
         return false
     }
 
-    /// 默认展开策略:一律折叠(失败、Diff、运行中都不自动展开),由用户点击行自行展开;
-    /// 仅调试开关 `OMA_EXPAND_ALL` 可在脚本化截图时强制展开。
+    /// 默认展开策略:标准/精简档一律折叠(失败、Diff、运行中都不自动展开),由用户点击行自行展开;
+    /// 「详细」档下编辑/写入/命令默认展开为内联预览;调试开关 `OMA_EXPAND_ALL` 可在脚本化截图时强制展开。
     private func defaultExpanded(_ tool: ToolCall, _ p: ToolPresentation) -> Bool {
-        DebugFlags.expandAll
+        if DebugFlags.expandAll { return true }
+        // 「详细」档:编辑/写入/命令默认带内联预览;其余仍折叠
+        return density == .detailed && [.edit, .write, .terminal].contains(p.category)
     }
 
     static func statusText(_ status: ToolStatus) -> String {
@@ -326,6 +358,10 @@ struct ToolDetailsView: View {
     let tool: ToolCall
     let presentation: ToolPresentation
     @Environment(SessionModel.self) private var model
+    @AppStorage(ClientPrefs.Key.toolDensity) private var densityRaw = ToolDensity.standard.rawValue
+
+    /// 工具调用详细程度(子 Agent 内嵌分组沿用)。
+    private var density: ToolDensity { ToolDensity(rawValue: densityRaw) ?? .standard }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -352,7 +388,7 @@ struct ToolDetailsView: View {
             }
             if let child = entry.childStore, !child.entries.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
-                    ForEach(TimelineGrouping.group(child.entries)) { item in
+                    ForEach(TimelineGrouping.group(child.entries, density: density)) { item in
                         TimelineItemView(item: item)
                     }
                 }
@@ -685,7 +721,7 @@ struct ExploreGroupView: View {
         let isExpanded = expanded ?? DebugFlags.expandAll
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 7) {
-                Image.om("text.magnifyingglass", size: 11.5)
+                Image.om(group.style == .activity ? "layers" : "text.magnifyingglass", size: 11.5)
                     .frame(width: 16)
                     .foregroundStyle(OMColors.secondaryText)
                 Text(group.summary)

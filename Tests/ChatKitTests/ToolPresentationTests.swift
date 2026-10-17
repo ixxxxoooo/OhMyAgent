@@ -133,6 +133,40 @@ struct TimelineGroupingTests {
         #expect(single.allSatisfy { if case .entry = $0 { return true } else { return false } })
     }
 
+    @Test("精简档:连续的各类工具合并为活动摘要,子 Agent 与等待授权的工具保持独立")
+    func compactDensityGroupsAllTools() {
+        let s = TimelineStore()
+        s.apply(.toolCall(ToolCall(toolCallId: "e1", name: "Edit", kind: .edit, status: .completed, rawInput: ["file_path": .string("/a")])))
+        s.apply(.toolCall(ToolCall(toolCallId: "e2", name: "Edit", kind: .edit, status: .completed, rawInput: ["file_path": .string("/b")])))
+        s.apply(.toolCall(ToolCall(toolCallId: "x1", name: "Bash", kind: .execute, status: .completed, rawInput: ["command": .string("ls")])))
+        s.apply(.toolCall(ToolCall(toolCallId: "x2", name: "Bash", kind: .execute, status: .completed, rawInput: ["command": .string("pwd")])))
+        let standard = TimelineGrouping.group(s.entries)
+        #expect(standard.count == 4)
+        let compact = TimelineGrouping.group(s.entries, density: .compact)
+        #expect(compact.count == 1)
+        guard case .explore(let group) = compact[0] else { Issue.record("应为活动分组"); return }
+        #expect(group.style == .activity)
+        #expect(group.summary == "编辑了 2 个文件、运行了 2 条命令")
+
+        // 等待授权(pending)的工具打断合并,保持可见
+        let t = TimelineStore()
+        t.apply(.toolCall(ToolCall(toolCallId: "a", name: "Edit", kind: .edit, status: .completed)))
+        t.apply(.toolCall(ToolCall(toolCallId: "b", name: "Edit", kind: .edit, status: .pending)))
+        t.apply(.toolCall(ToolCall(toolCallId: "c", name: "Edit", kind: .edit, status: .completed)))
+        #expect(TimelineGrouping.group(t.entries, density: .compact).count == 3)
+    }
+
+    @Test("详细程度偏好:缺省与非法值回退标准,标题固定")
+    func densityPreference() {
+        let defaults = UserDefaults(suiteName: "oma.test.density.\(UUID().uuidString)") ?? .standard
+        #expect(ToolDensity.current(defaults) == .standard)
+        defaults.set("乱写", forKey: ToolDensity.preferenceKey)
+        #expect(ToolDensity.current(defaults) == .standard)
+        defaults.set("compact", forKey: ToolDensity.preferenceKey)
+        #expect(ToolDensity.current(defaults) == .compact)
+        #expect(ToolDensity.allCases.map(\.title) == ["精简", "标准", "详细"])
+    }
+
     @Test("分组运行态与失败态随工具状态变化")
     func runningState() {
         let s = TimelineStore()

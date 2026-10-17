@@ -107,6 +107,7 @@ struct CodeBlockView: View {
     let language: String?
     let code: String
     @State private var copied = false
+    @AppStorage(ClientPrefs.Key.chatCodeWrap) private var wrapLines = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -136,11 +137,21 @@ struct CodeBlockView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
             Divider()
-            ScrollView(.horizontal, showsIndicators: false) {
+            if wrapLines {
+                // 自动换行:代码块宽度固定为容器宽度,长行折行显示
                 Text(CodeHighlighter.attributed(code, fence: language))
                     .font(OMFonts.readingMono)
                     .padding(12)
-                    .fixedSize(horizontal: true, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    Text(CodeHighlighter.attributed(code, fence: language))
+                        .font(OMFonts.readingMono)
+                        .padding(12)
+                        .fixedSize(horizontal: true, vertical: true)
+                }
             }
         }
         .omSolidCard()

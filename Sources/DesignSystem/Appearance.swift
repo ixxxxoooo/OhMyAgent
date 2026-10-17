@@ -97,6 +97,8 @@ public final class AppearanceModel {
     public var alwaysOpaque: Bool { didSet { save("alwaysOpaque", alwaysOpaque); MaterialPolicy.shared.preference = alwaysOpaque ? .alwaysOpaque : .system } }
     /// 低电量模式自动回退不透明材质
     public var fallbackOnLowPower: Bool { didSet { save("fallbackOnLowPower", fallbackOnLowPower); MaterialPolicy.shared.fallbackOnLowPower = fallbackOnLowPower } }
+    /// Diff 使用主题配色(关闭后为固定红绿,与主题无关)
+    public var themedDiff: Bool { didSet { save("themedDiff", themedDiff); ThemeRuntime.themedDiff = themedDiff; themeChanged() } }
     /// 每次字号变化递增,用于让时间线整体刷新字体。
     public private(set) var fontRevision = 0
     /// 每次主题/强调色变化递增,用于让依赖令牌颜色的视图整体刷新。
@@ -138,6 +140,7 @@ public final class AppearanceModel {
         customAccentHex = string("accentHex") ?? "#D97757"
         accent2 = AccentChoice(rawValue: string("accent2") ?? "") ?? .system
         customAccent2Hex = string("accent2Hex") ?? "#5769F7"
+        themedDiff = bool("themedDiff", true)
         uiFontScale = double("uiFontScale", 1)
         timelineFontScale = double("timelineFontScale", 1)
         isCompact = bool("compact", false)
@@ -182,11 +185,12 @@ public final class AppearanceModel {
     public func reset() {
         theme = .system; themeID = ThemePackage.defaultID; accent = .system; accent2 = .system
         customAccentHex = "#D97757"; customAccent2Hex = "#5769F7"; uiFontScale = 1; timelineFontScale = 1
-        isCompact = false; reduceMotion = false; alwaysOpaque = false; fallbackOnLowPower = true
+        isCompact = false; themedDiff = true; reduceMotion = false; alwaysOpaque = false; fallbackOnLowPower = true
     }
 
     /// 应用全部设置(启动时调用)。
     public func applyAll() {
+        ThemeRuntime.themedDiff = themedDiff
         applyTheme()
         applyScale()
         MaterialPolicy.shared.preference = alwaysOpaque ? .alwaysOpaque : .system

@@ -126,10 +126,15 @@ struct AppearancePage: View {
     @AppStorage(ClientPrefs.Key.settingsWidthCustom) private var settingsWidthCustom = SettingsContentWidth.customDefault
     @AppStorage(ClientPrefs.Key.workingVerbStyle) private var verbStyle = WorkingVerbStyle.classic.rawValue
     @AppStorage(ClientPrefs.Key.scrollbarVisibility) private var scrollbar = ScrollbarVisibility.system.rawValue
+    @AppStorage(ClientPrefs.Key.toolDensity) private var toolDensityRaw = ToolDensity.standard.rawValue
+    @AppStorage(ClientPrefs.Key.chatCodeWrap) private var codeWrap = false
     @AppStorage(FontSmoothing.preferenceKey) private var fontSmoothing = FontSmoothing.system.rawValue
     @State private var smoothingAtLaunch = FontSmoothing.current().rawValue
     @Bindable private var workbench = AppEnvironment.shared.workbench
     @State private var themeFilter = ""
+
+    /// 当前工具调用详细程度。
+    private var density: ToolDensity { ToolDensity(rawValue: toolDensityRaw) ?? .standard }
 
     var body: some View {
         SettingsScroll {
@@ -211,7 +216,20 @@ struct AppearancePage: View {
                 AccentPreview().id(appearance.themeRevision)
                 Note("主强调色用于按钮与选中态;第二强调色用于链接与次要徽标。「跟随主题」使用所选主题的默认配色。").footnote()
             }
-            SettingsCard("聊天宽度") {
+            SettingsCard("Agent 会话") {
+                VStack(alignment: .leading, spacing: 8) {
+                    SettingsSliderRow(
+                        title: String(localized: "工具调用详细程度"),
+                        valueText: omLocalized(density.title),
+                        stops: ToolDensity.allCases.map { omLocalized($0.title) },
+                        index: Binding(
+                            get: { ToolDensity.allCases.firstIndex(of: density) ?? 1 },
+                            set: { toolDensityRaw = ToolDensity.allCases[min(max($0, 0), ToolDensity.allCases.count - 1)].rawValue }
+                        )
+                    )
+                    ToolDensityPreview(density: density)
+                }
+                Note("调整会话流里工具调用的信息量:精简把连续工具折成一行摘要,标准每个工具一行,详细在每行下方显示 Diff / 命令输出预览。").footnote()
                 SettingsSliderRow(
                     title: String(localized: "内容宽度"),
                     valueText: chatWidthSummary,
@@ -222,6 +240,8 @@ struct AppearancePage: View {
                     )
                 )
                 Note("控制会话时间线与输入框的最大宽度;窄屏或分屏时会自动收窄。").footnote()
+                SettingsToggleRow("代码块自动换行", detail: "会话里的代码块按容器宽度折行,不再横向滚动。", isOn: $codeWrap)
+                SettingsToggleRow("Diff 使用主题背景色", detail: "关闭后 Diff 的新增/删除行使用固定的红绿底色,与主题无关。", isOn: $appearance.themedDiff)
             }
             SettingsCard("设置页宽度") {
                 SettingsSliderRow(

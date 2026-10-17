@@ -664,6 +664,8 @@ public enum ThemeRuntime {
 
     /// 系统主题下当前是否深色(由 `AppearanceModel` 在外观变化时更新;供非主线程的令牌读取)。
     nonisolated(unsafe) public static var systemIsDark = false
+    /// Diff 是否使用主题配色(关闭后用与主题无关的固定红绿);由外观设置写入。
+    nonisolated(unsafe) public static var themedDiff = true
 
     /// 当前调色板(系统主题为 nil)。读取会登记 Observation 依赖。
     public static var palette: ThemePalette? {

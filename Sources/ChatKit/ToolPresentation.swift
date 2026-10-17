@@ -331,16 +331,20 @@ public final class TimelineItemsCache {
     private var owner: ObjectIdentifier?
     private var revision = -1
     private var count = -1
+    private var density: ToolDensity = .standard
     private var items: [TimelineItem] = []
 
     public init() {}
 
     /// 取分组结果。
-    /// - Parameter store: 时间线
+    /// - Parameters:
+    ///   - store: 时间线
+    ///   - density: 工具调用详细程度
     /// - Returns: 展示单元序列
-    public func items(for store: TimelineStore) -> [TimelineItem] {
-        if owner == ObjectIdentifier(store), store.revision == revision, store.entries.count == count { return items }
-        items = TimelineGrouping.group(store.entries)
+    public func items(for store: TimelineStore, density: ToolDensity = .standard) -> [TimelineItem] {
+        if owner == ObjectIdentifier(store), store.revision == revision, store.entries.count == count, self.density == density { return items }
+        items = TimelineGrouping.group(store.entries, density: density)
+        self.density = density
         owner = ObjectIdentifier(store)
         revision = store.revision
         count = store.entries.count
@@ -351,8 +355,22 @@ public final class TimelineItemsCache {
 /// 浏览步骤分组。
 @MainActor
 public struct ExploreGroup: Identifiable {
+    /// 分组风格:`explore` 只含浏览类步骤;`activity` 是精简档下合并的全部工具活动。
+    public enum Style: Sendable { case explore, activity }
+
     public let id: UUID
     public let entries: [TimelineEntry]
+    public let style: Style
+
+    /// - Parameters:
+    ///   - id: 分组 ID(取首个成员的 ID)
+    ///   - entries: 成员条目(含其间的思考)
+    ///   - style: 分组风格,默认浏览
+    public init(id: UUID, entries: [TimelineEntry], style: Style = .explore) {
+        self.id = id
+        self.entries = entries
+        self.style = style
+    }
 
     /// 工具条目数量。
     public var toolCount: Int { entries.filter { $0.kind == .tool }.count }
@@ -368,8 +386,42 @@ public struct ExploreGroup: Identifiable {
     /// 是否有失败步骤。
     public var hasFailure: Bool { entries.contains { $0.tool?.status == .failed } }
 
-    /// 摘要,如“已浏览 3 个文件、2 次搜索”。
+    /// 摘要:浏览风格如“已浏览 3 个文件、2 次搜索”;活动风格如“编辑了 2 个文件、运行了 2 条命令”。
     public var summary: String {
+        style == .activity ? activitySummary : exploreSummary
+    }
+
+    /// 活动摘要(精简档):按类别计数,顺序固定(编辑 → 新建 → 删除/移动 → 运行 → 读取 → 搜索 → 联网 → MCP)。
+    var activitySummary: String {
+        var edits = 0, writes = 0, removes = 0, runs = 0, reads = 0, searches = 0, fetches = 0, mcps = 0, others = 0
+        for entry in entries {
+            guard let tool = entry.tool else { continue }
+            switch ToolPresentation(tool: tool).category {
+            case .edit: edits += 1
+            case .write: writes += 1
+            case .delete, .move: removes += 1
+            case .terminal: runs += 1
+            case .read: reads += 1
+            case .search: searches += 1
+            case .fetch: fetches += 1
+            case .mcp: mcps += 1
+            default: others += 1
+            }
+        }
+        var parts: [String] = []
+        if edits > 0 { parts.append(isRunning ? String(localized: "编辑 \(edits) 个文件") : String(localized: "编辑了 \(edits) 个文件")) }
+        if writes > 0 { parts.append(isRunning ? String(localized: "新建 \(writes) 个文件") : String(localized: "新建了 \(writes) 个文件")) }
+        if removes > 0 { parts.append(isRunning ? String(localized: "删除/移动 \(removes) 个文件") : String(localized: "删除/移动了 \(removes) 个文件")) }
+        if runs > 0 { parts.append(isRunning ? String(localized: "运行 \(runs) 条命令") : String(localized: "运行了 \(runs) 条命令")) }
+        if reads > 0 { parts.append(isRunning ? String(localized: "读取 \(reads) 个文件") : String(localized: "读取了 \(reads) 个文件")) }
+        if searches > 0 { parts.append(isRunning ? String(localized: "搜索 \(searches) 次") : String(localized: "搜索了 \(searches) 次")) }
+        if fetches > 0 { parts.append(isRunning ? String(localized: "联网 \(fetches) 次") : String(localized: "联网了 \(fetches) 次")) }
+        if mcps > 0 { parts.append(isRunning ? String(localized: "调用 \(mcps) 个 MCP 工具") : String(localized: "调用了 \(mcps) 个 MCP 工具")) }
+        if others > 0 { parts.append(isRunning ? String(localized: "执行 \(others) 个其他工具") : String(localized: "执行了 \(others) 个其他工具")) }
+        return parts.joined(separator: String(localized: "、"))
+    }
+
+    var exploreSummary: String {
         var reads = 0, searches = 0, fetches = 0
         for entry in entries {
             guard let tool = entry.tool else { continue }
@@ -390,17 +442,25 @@ public struct ExploreGroup: Identifiable {
 
 /// 时间线分组器。
 public enum TimelineGrouping {
-    /// 把连续 ≥2 个“浏览”工具(及其间的思考)合并为一组,其余条目保持原样。
-    /// - Parameter entries: 时间线条目
+    /// 把连续 ≥2 个可合并的工具(及其间的思考)合并为一组,其余条目保持原样。
+    /// 标准/详细档只合并“浏览”类(读取/搜索/联网);精简档合并全部普通工具(子 Agent、计划与等待授权的工具除外)。
+    /// - Parameters:
+    ///   - entries: 时间线条目
+    ///   - density: 工具调用详细程度,默认标准
     /// - Returns: 展示单元序列
     @MainActor
-    public static func group(_ entries: [TimelineEntry]) -> [TimelineItem] {
+    public static func group(_ entries: [TimelineEntry], density: ToolDensity = .standard) -> [TimelineItem] {
         var items: [TimelineItem] = []
         var run: [TimelineEntry] = []
+        let style: ExploreGroup.Style = density == .compact ? .activity : .explore
 
         func isExploreTool(_ entry: TimelineEntry) -> Bool {
             guard entry.kind == .tool, let tool = entry.tool else { return false }
-            return ToolPresentation(tool: tool, hasChild: entry.childStore != nil).isExploration
+            let presentation = ToolPresentation(tool: tool, hasChild: entry.childStore != nil)
+            if density != .compact { return presentation.isExploration }
+            // 精简档:等待授权/子 Agent/计划/思考类工具保持独立可见
+            if tool.status == .pending || entry.childStore != nil { return false }
+            return ![.subagent, .plan, .think].contains(presentation.category)
         }
         /// 结束当前连续段:尾部的思考不并入分组。
         func flush() {
@@ -413,7 +473,7 @@ public enum TimelineGrouping {
                 items.append(.entry(members.removeFirst()))
             }
             if members.filter({ $0.kind == .tool }).count >= 2 {
-                items.append(.explore(ExploreGroup(id: members[0].id, entries: members)))
+                items.append(.explore(ExploreGroup(id: members[0].id, entries: members, style: style)))
             } else {
                 items.append(contentsOf: members.map(TimelineItem.entry))
             }

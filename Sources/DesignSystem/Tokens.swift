@@ -331,7 +331,8 @@ public enum OMDiffPalette {
 
     /// 正文区背景。
     public static func background(_ kind: Kind) -> Color {
-        if let palette = ThemeRuntime.palette {
+        // 先读取 palette 以建立主题变化的 Observation 依赖,再决定是否使用主题色
+        if let palette = ThemeRuntime.palette, ThemeRuntime.themedDiff {
             switch kind {
             case .added: return palette.diffAdded.color
             case .removed: return palette.diffRemoved.color
@@ -349,7 +350,7 @@ public enum OMDiffPalette {
 
     /// 行号槽背景(比正文深一档)。
     public static func gutter(_ kind: Kind) -> Color {
-        if let palette = ThemeRuntime.palette {
+        if let palette = ThemeRuntime.palette, ThemeRuntime.themedDiff {
             switch kind {
             case .added: return gutterMix(palette.diffAdded, toward: palette.success, dark: palette.isDark).color
             case .removed: return gutterMix(palette.diffRemoved, toward: palette.danger, dark: palette.isDark).color

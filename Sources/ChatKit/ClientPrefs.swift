@@ -62,6 +62,10 @@ public enum ClientPrefs {
         public static let workingVerbStyle = "appearance.workingVerbStyle"
         /// 滚动条显示方式(`ScrollbarVisibility`):system / autoHide / always
         public static let scrollbarVisibility = "appearance.scrollbarVisibility"
+        /// 工具调用详细程度(`ToolDensity`):compact / standard / detailed
+        public static let toolDensity = ToolDensity.preferenceKey
+        /// 聊天代码块自动换行(默认关闭,横向滚动)
+        public static let chatCodeWrap = "chat.codeWrap"
     }
 
     /// 托盘图标是否启用:菜单栏开关打开,或 Dock 图标被隐藏(此时必须有托盘才能打开窗口)。默认开启。
