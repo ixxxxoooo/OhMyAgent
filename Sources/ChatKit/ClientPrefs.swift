@@ -24,7 +24,18 @@ public enum ClientPrefs {
         public static let editorLSP = "editor.lsp"
         /// Agent 每次编辑文件后,自动在编辑器中打开并定位到首个改动行(默认关闭)
         public static let editorFollowAgent = "editor.followAgent"
+        /// Agent 终端输出字号(工具行里的命令输出)
         public static let terminalFontSize = "terminal.fontSize"
+        /// 交互终端:字体族、字号、光标形状/闪烁、回滚行数、Option 当 Meta、Shell 路径、登录 Shell、起始目录
+        public static let terminalShellFontFamily = "terminal.shell.fontFamily"
+        public static let terminalShellFontSize = "terminal.shell.fontSize"
+        public static let terminalCursorShape = "terminal.shell.cursorShape"
+        public static let terminalCursorBlink = "terminal.shell.cursorBlink"
+        public static let terminalScrollback = "terminal.shell.scrollback"
+        public static let terminalOptionAsMeta = "terminal.shell.optionAsMeta"
+        public static let terminalShellPath = "terminal.shell.path"
+        public static let terminalLoginShell = "terminal.shell.login"
+        public static let terminalStartDirectory = "terminal.shell.startDirectory"
         public static let terminalOutputKB = "terminal.outputLimitKB"
         public static let terminalInheritEnv = "terminal.inheritEnvironment"
         public static let budgetUSD = "usage.budgetUSD"

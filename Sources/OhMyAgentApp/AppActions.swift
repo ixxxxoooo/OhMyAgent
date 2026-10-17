@@ -189,7 +189,7 @@ final class AppActions {
     /// 在当前项目目录新建终端标签。
     func openTerminal() {
         let workbench = AppEnvironment.shared.workbench
-        let directory = workbench.selectedProjectID ?? NSHomeDirectory()
+        let directory = TerminalPrefs.load().startDirectoryPath(project: workbench.selectedProjectID)
         let id = UUID().uuidString
         TerminalStore.shared.register(id: id, directory: directory)
         let index = workbench.dock.allTabs.filter { if case .terminal = $0.kind { return true } else { return false } }.count + 1

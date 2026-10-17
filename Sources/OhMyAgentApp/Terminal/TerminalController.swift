@@ -30,6 +30,8 @@ final class TerminalController: Identifiable {
     @ObservationIgnored private let executable: String
     @ObservationIgnored private let arguments: [String]
     @ObservationIgnored private let extraEnvironment: [String: String]
+    /// 已应用到视图的偏好(用于热更新时判断是否有变化)
+    @ObservationIgnored private var appliedPrefs: TerminalPrefs
 
     /// - Parameters:
     ///   - id: 终端标识(对应标签的 `.terminal(id:)`)
@@ -37,27 +39,54 @@ final class TerminalController: Identifiable {
     ///   - executable: 可执行文件;默认读取 `$SHELL`,缺省 `/bin/zsh`
     ///   - arguments: 参数;默认 `-l`(登录 shell,加载用户的 profile)
     ///   - environment: 额外环境变量(测试用)
-    init(id: String, directory: String, executable: String? = nil, arguments: [String]? = nil, environment: [String: String] = [:]) {
+    ///   - prefs: 终端偏好(字体/光标/回滚/Shell);默认读取用户设置
+    init(id: String, directory: String, executable: String? = nil, arguments: [String]? = nil, environment: [String: String] = [:], prefs: TerminalPrefs = .load()) {
         self.id = id
         var isDir: ObjCBool = false
         let valid = FileManager.default.fileExists(atPath: directory, isDirectory: &isDir) && isDir.boolValue
         self.directory = valid ? directory : NSHomeDirectory()
-        let shell = executable ?? ProcessInfo.processInfo.environment["SHELL"].flatMap { $0.isEmpty ? nil : $0 } ?? "/bin/zsh"
-        self.executable = shell
-        self.arguments = arguments ?? ["-l"]
+        self.executable = executable ?? prefs.resolvedShell()
+        self.arguments = arguments ?? prefs.shellArguments
         self.extraEnvironment = environment
+        self.appliedPrefs = prefs
         let terminalView = TerminalView(frame: CGRect(x: 0, y: 0, width: 640, height: 360))
-        terminalView.font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
-        terminalView.optionAsMetaKey = true
         view = terminalView
         terminalView.terminalDelegate = self
+        // 回滚行数只能在创建时设定(视图尚为空,重置缓冲不丢内容)
+        terminalView.getTerminal().options.scrollback = prefs.scrollback
+        terminalView.getTerminal().resetToInitialState()
         TerminalOSC.install(on: terminalView)
+        applyPrefs(prefs, initial: true)
         applyTheme()
+        // 设置页修改偏好:字体/光标/Option 键热更新(Shell 与回滚仅对新终端生效)
+        NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.reloadPrefs() }
+        }
         // 主题切换/系统明暗变化:热更新终端配色(弱引用,控制器释放后回调为空操作)
         NotificationCenter.default.addObserver(forName: ThemeRuntime.didChange, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.applyTheme() }
         }
         start()
+    }
+
+    /// 读取最新偏好并在有变化时应用。
+    func reloadPrefs() {
+        let latest = TerminalPrefs.load()
+        guard latest != appliedPrefs else { return }
+        applyPrefs(latest, initial: false)
+    }
+
+    /// 把偏好应用到渲染视图(字体、光标样式、Option 键)。
+    /// - Parameters:
+    ///   - prefs: 偏好快照
+    ///   - initial: 是否创建时的首次应用(首次必定全量应用)
+    func applyPrefs(_ prefs: TerminalPrefs, initial: Bool) {
+        if initial || prefs.fontFamily != appliedPrefs.fontFamily || prefs.fontSize != appliedPrefs.fontSize { view.font = prefs.font }
+        if initial || prefs.cursorShape != appliedPrefs.cursorShape || prefs.cursorBlink != appliedPrefs.cursorBlink {
+            view.getTerminal().setCursorStyle(prefs.cursorStyle)
+        }
+        view.optionAsMetaKey = prefs.optionAsMeta
+        appliedPrefs = prefs
     }
 
     /// 把当前主题的终端配色(ANSI 16 色、前景、背景、光标、选区)应用到渲染视图。
