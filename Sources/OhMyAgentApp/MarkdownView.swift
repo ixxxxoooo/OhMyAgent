@@ -27,7 +27,7 @@ struct MarkdownView: View {
 }
 
 /// 把行内 Markdown 转为 AttributedString;失败时回退为纯文本。
-/// 行内代码仅保留系统标记(`inlinePresentationIntent`),底色与等宽字体由 `inlineMarkdownText` 套用。
+/// 行内代码仅保留系统标记(`inlinePresentationIntent`),圆角底与等宽字体由 `InlineMarkdownText` 绘制。
 /// - Parameter source: 原文
 func inlineMarkdown(_ source: String) -> AttributedString {
     let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
@@ -40,39 +40,70 @@ func inlineMarkdown(_ source: String) -> AttributedString {
     return result
 }
 
-/// 把行内 Markdown 构造成 `Text`:普通片段沿用系统渲染(链接、粗体、斜体),行内代码片段换成等宽字体 + 强调色 + 淡色底。
-/// 不使用自定义 `TextRenderer`:带自定义渲染器的文字在 SwiftUI 里无法被鼠标选中,而会话正文必须可选可复制。
-/// 左右内边距由文字两侧的细空格(U+2009)提供,底色为矩形(属性背景不支持圆角)。
+/// 行内代码标记:`InlineCodeTextRenderer` 据此在文字后面画圆角底。
+struct InlineCodeAttribute: TextAttribute {}
+
+/// 行内代码渲染器:在带 `InlineCodeAttribute` 的文字后画圆角底(圆角取 `OMRadius.tag`),其余文字原样绘制。
+/// 底色矩形 = 该段文字的排版框(含两侧内边距空格),不再额外上下外扩,使上下左右四边留白一致。
+struct InlineCodeTextRenderer: TextRenderer {
+    /// 底色
+    var fill: Color
+    /// 圆角
+    var radius: CGFloat
+
+    func draw(layout: Text.Layout, in context: inout GraphicsContext) {
+        for line in layout {
+            for run in line {
+                if run[InlineCodeAttribute.self] != nil {
+                    context.fill(Path(roundedRect: run.typographicBounds.rect, cornerRadius: radius, style: .continuous), with: .color(fill))
+                }
+                context.draw(run)
+            }
+        }
+    }
+}
+
+/// 行内代码两侧的内边距字符:四分之一个全角空格(U+2005,宽 0.25em),与排版框上下的留白视觉相当。
+private let inlineCodePadding = "\u{2005}"
+
+/// 把行内 Markdown 构造成 `Text`:普通片段沿用系统渲染(链接、粗体、斜体),行内代码片段换成等宽字体 + 强调色,并打上 `InlineCodeAttribute`。
 /// - Parameter source: 行内 Markdown 原文
 /// - Returns: 文本与是否含行内代码
 @MainActor
 func inlineMarkdownText(_ source: String) -> (text: Text, hasCode: Bool) {
     let attributed = inlineMarkdown(source)
-    var result = AttributedString()
+    var result: Text?
     var hasCode = false
     for run in attributed.runs {
+        let piece: Text
         if run.inlinePresentationIntent?.contains(.code) == true {
             hasCode = true
-            var piece = AttributedString("\u{2009}\(String(attributed[run.range].characters))\u{2009}")
-            piece.font = OMFonts.readingMono
-            piece.foregroundColor = OMColors.accentText
-            piece.backgroundColor = OMColors.accent.opacity(0.1)
-            result.append(piece)
+            let code = String(attributed[run.range].characters)
+            piece = Text(verbatim: "\(inlineCodePadding)\(code)\(inlineCodePadding)")
+                .font(OMFonts.readingMono)
+                .foregroundStyle(OMColors.accentText)
+                .customAttribute(InlineCodeAttribute())
         } else {
-            result.append(AttributedString(attributed[run.range]))
+            piece = Text(AttributedString(attributed[run.range]))
         }
+        result = result.map { Text("\($0)\(piece)") } ?? piece
     }
-    return (Text(result), hasCode)
+    return (result ?? Text(verbatim: ""), hasCode)
 }
 
-/// 行内 Markdown 文本:行内代码带淡色底与内边距;其余与 `Text(inlineMarkdown(…))` 一致。
+/// 行内 Markdown 文本:行内代码为圆角底并带内边距;其余与 `Text(inlineMarkdown(…))` 一致。
 struct InlineMarkdownText: View {
     let source: String
 
     init(_ source: String) { self.source = source }
 
     var body: some View {
-        inlineMarkdownText(source).text
+        let built = inlineMarkdownText(source)
+        if built.hasCode {
+            built.text.textRenderer(InlineCodeTextRenderer(fill: OMColors.accent.opacity(0.1), radius: OMRadius.tag))
+        } else {
+            built.text
+        }
     }
 }
 
