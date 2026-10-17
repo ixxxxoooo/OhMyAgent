@@ -41,7 +41,7 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
     /// 默认快捷键。
     var defaultBinding: ShortcutBinding {
         switch self {
-        case .newConversation: return ShortcutBinding(key: "n", modifiers: ["command", "shift"])
+        case .newConversation: return ShortcutBinding(key: "n", modifiers: ["command"])
         case .openWorkspace: return ShortcutBinding(key: "o", modifiers: ["command"])
         case .extensions: return ShortcutBinding(key: "e", modifiers: ["command", "shift"])
         case .send: return ShortcutBinding(key: "return", modifiers: ["command"])
