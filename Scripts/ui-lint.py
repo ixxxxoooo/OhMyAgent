@@ -35,6 +35,7 @@ RULES = [
     ("胶囊", re.compile(r"\bCapsule\(\)"), "标签/芯片/徽标用 OMPillShape;进度条、滚动条、滑块轨道等几何用途加 ui-lint:allow"),
     ("渐变", re.compile(r"\b(LinearGradient|RadialGradient|AngularGradient|EllipticalGradient)\("), "禁止渐变装饰(AGENTS.md 4.4);仅作遮罩/淡出时加 ui-lint:allow"),
     ("菜单", re.compile(r"\.contextMenu\s*[({]"), "右键菜单统一用 omContextMenu { OMMenuItem… }(自绘 Cursor 风格),禁止系统 .contextMenu"),
+    ("对话框", re.compile(r"\bNSAlert\s*\("), "弹窗统一用 OMDialog(自绘 Cursor 风格模态),禁止 NSAlert"),
     ("选择", re.compile(r"pickerStyle\(\s*\.(menu|inline|radioGroup|wheel)\s*\)"), "选择类控件用 OMPickList,档位用 OMStepSlider"),
 ]
 # 规则级文件豁免:(规则名, 文件名) → 原因。图标描边粗细、示意图几何、迷你预览不属于文字/控件规范

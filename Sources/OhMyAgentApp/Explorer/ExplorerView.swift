@@ -237,20 +237,20 @@ private enum ExplorerMenu {
 /// 资源管理器的文件操作(弹窗确认,后台执行)。
 @MainActor
 enum ExplorerActions {
-    /// 弹出单行文本输入框。
-    static func prompt(title: String, message: String = "", initial: String = "") -> String? {
-        let alert = NSAlert()
-        alert.messageText = title
-        alert.informativeText = message
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 280, height: 24))
-        field.stringValue = initial
-        alert.accessoryView = field
-        alert.addButton(withTitle: String(localized: "好"))
-        alert.addButton(withTitle: String(localized: "取消"))
-        alert.window.initialFirstResponder = field
-        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
-        let text = field.stringValue.trimmingCharacters(in: .whitespaces)
-        return text.isEmpty ? nil : text
+    /// 弹出单行文本输入框(自绘模态)。
+    /// - Parameters:
+    ///   - title: 标题
+    ///   - message: 说明
+    ///   - initial: 初始文本
+    ///   - validate: 校验(返回错误文案表示不合法)
+    /// - Returns: 去除首尾空白后的输入;取消或为空返回 nil
+    static func prompt(title: String, message: String = "", initial: String = "", validate: ((String) -> String?)? = nil) -> String? {
+        OMDialog.prompt(title: title, message: message, initial: initial, validate: validate)
+    }
+
+    /// 文件名校验错误文案(合法返回 nil)。
+    static func nameError(_ name: String) -> String? {
+        isValidName(name) ? nil : String(localized: "名称不能包含 / 或为 . 与 ..")
     }
 
     /// 校验名称:不能含路径分隔符或为 `.`/`..`。
@@ -259,7 +259,7 @@ enum ExplorerActions {
     }
 
     static func create(in directory: String, directory isDirectory: Bool, workbench: WorkbenchModel) {
-        guard let name = prompt(title: isDirectory ? String(localized: "新建文件夹") : String(localized: "新建文件")), isValidName(name) else { return }
+        guard let name = prompt(title: isDirectory ? String(localized: "新建文件夹") : String(localized: "新建文件"), validate: nameError), isValidName(name) else { return }
         let target = (directory as NSString).appendingPathComponent(name)
         Task {
             let error = await Task.detached { () -> String? in
@@ -280,7 +280,7 @@ enum ExplorerActions {
     }
 
     static func rename(_ entry: FileEntry, workbench: WorkbenchModel) {
-        guard let name = prompt(title: String(localized: "重命名"), initial: entry.name), isValidName(name), name != entry.name else { return }
+        guard let name = prompt(title: String(localized: "重命名"), initial: entry.name, validate: nameError), isValidName(name), name != entry.name else { return }
         let target = ((entry.path as NSString).deletingLastPathComponent as NSString).appendingPathComponent(name)
         let source = entry.path
         Task {
@@ -302,11 +302,7 @@ enum ExplorerActions {
     }
 
     static func trash(_ entry: FileEntry, workbench: WorkbenchModel) {
-        let alert = NSAlert()
-        alert.messageText = String(localized: "要把「\(entry.name)」移到废纸篓吗?")
-        alert.addButton(withTitle: String(localized: "移到废纸篓"))
-        alert.addButton(withTitle: String(localized: "取消"))
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        guard OMDialog.confirm(title: String(localized: "要把「\(entry.name)」移到废纸篓吗?"), confirmTitle: String(localized: "移到废纸篓"), destructive: true) else { return }
         let source = entry.path
         Task {
             let error = await Task.detached { () -> String? in
@@ -325,9 +321,6 @@ enum ExplorerActions {
     }
 
     private static func report(_ message: String) {
-        let alert = NSAlert()
-        alert.messageText = String(localized: "操作失败")
-        alert.informativeText = message
-        alert.runModal()
+        OMDialog.alert(title: String(localized: "操作失败"), message: message, isError: true)
     }
 }

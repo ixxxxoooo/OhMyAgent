@@ -90,20 +90,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         let dirty = FileDocumentStore.shared.dirtyDocuments
         guard !dirty.isEmpty else { return .terminateNow }
-        let alert = NSAlert()
-        alert.messageText = String(localized: "有 \(dirty.count) 个文件尚未保存")
-        alert.informativeText = dirty.prefix(5).map { ($0.path as NSString).lastPathComponent }.joined(separator: String(localized: "、"))
-        alert.addButton(withTitle: String(localized: "全部保存并退出"))
-        alert.addButton(withTitle: String(localized: "不保存直接退出"))
-        alert.addButton(withTitle: String(localized: "取消"))
-        switch alert.runModal() {
-        case .alertFirstButtonReturn:
+        let names = dirty.prefix(5).map { ($0.path as NSString).lastPathComponent }.joined(separator: String(localized: "、"))
+        let choice = OMDialog.show(title: String(localized: "有 \(dirty.count) 个文件尚未保存"), message: names, icon: "triangle-alert", buttons: [
+            .cancel(), .normal(String(localized: "不保存直接退出")), .primary(String(localized: "全部保存并退出")),
+        ]).index
+        switch choice {
+        case 2:
             Task {
                 let ok = await FileDocumentStore.shared.saveAll()
                 NSApp.reply(toApplicationShouldTerminate: ok)
             }
             return .terminateLater
-        case .alertSecondButtonReturn: return .terminateNow
+        case 1: return .terminateNow
         default: return .terminateCancel
         }
     }

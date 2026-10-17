@@ -49,25 +49,19 @@ final class UpdateModel {
         Task {
             for _ in 0..<150 where state == .checking { try? await Task.sleep(for: .milliseconds(200)) }
             guard case .result(let result) = state else { return }
-            let alert = NSAlert()
+            NSApp.activate()
             switch result {
             case .upToDate:
-                alert.messageText = String(localized: "已是最新版本")
-                alert.informativeText = "OhMyAgent \(currentVersion) (\(currentBuild))"
+                OMDialog.alert(title: String(localized: "已是最新版本"), message: "OhMyAgent \(currentVersion) (\(currentBuild))")
             case .available(let info):
-                alert.messageText = String(localized: "发现新版本 \(info.version)")
-                alert.informativeText = info.notes ?? ""
-                alert.addButton(withTitle: String(localized: "前往下载"))
-                alert.addButton(withTitle: String(localized: "稍后"))
+                let choice = OMDialog.show(title: String(localized: "发现新版本 \(info.version)"), message: info.notes ?? "",
+                                           buttons: [.cancel(String(localized: "稍后")), .primary(String(localized: "前往下载"))]).index
+                if choice == 1 { openDownload(info) }
             case .unsupportedSystem(let info):
-                alert.messageText = String(localized: "新版本 \(info.version) 需要 macOS \(info.minimumSystemVersion ?? "")")
+                OMDialog.alert(title: String(localized: "新版本 \(info.version) 需要 macOS \(info.minimumSystemVersion ?? "")"))
             case .failed(let message):
-                alert.messageText = String(localized: "检查更新失败")
-                alert.informativeText = message
-                alert.alertStyle = .warning
+                OMDialog.alert(title: String(localized: "检查更新失败"), message: message, isError: true)
             }
-            NSApp.activate()
-            if alert.runModal() == .alertFirstButtonReturn, case .available(let info) = result { openDownload(info) }
         }
     }
 

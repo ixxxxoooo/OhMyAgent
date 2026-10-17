@@ -123,18 +123,17 @@ final class AppActions {
             workbench.closeTab(id)
             return
         }
-        let alert = NSAlert()
-        alert.messageText = String(localized: "要保存对 \((path as NSString).lastPathComponent) 的修改吗?")
-        alert.informativeText = String(localized: "如果不保存,你的修改将会丢失。")
-        alert.addButton(withTitle: String(localized: "保存"))
-        alert.addButton(withTitle: String(localized: "不保存"))
-        alert.addButton(withTitle: String(localized: "取消"))
-        switch alert.runModal() {
-        case .alertFirstButtonReturn:
+        let choice = OMDialog.show(
+            title: String(localized: "要保存对 \((path as NSString).lastPathComponent) 的修改吗?"),
+            message: String(localized: "如果不保存,你的修改将会丢失。"),
+            buttons: [.cancel(), .destructive(String(localized: "不保存")), .primary(String(localized: "保存"))]
+        ).index
+        switch choice {
+        case 2:
             Task {
                 if await FileDocumentStore.shared.save(path) { FileDocumentStore.shared.discard(path); workbench.closeTab(id) }
             }
-        case .alertSecondButtonReturn:
+        case 1:
             FileDocumentStore.shared.discard(path)
             workbench.closeTab(id)
         default: break

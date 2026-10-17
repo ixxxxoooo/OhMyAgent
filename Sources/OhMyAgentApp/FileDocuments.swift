@@ -148,10 +148,7 @@ final class FileDocumentStore {
             return true
         case .failure(let error):
             Log.editor.error("文件保存失败", ["path": path, "error": error.localizedDescription])
-            let alert = NSAlert()
-            alert.messageText = String(localized: "无法保存文件")
-            alert.informativeText = error.localizedDescription
-            alert.runModal()
+            OMDialog.alert(title: String(localized: "无法保存文件"), message: error.localizedDescription, isError: true)
             return false
         }
     }
