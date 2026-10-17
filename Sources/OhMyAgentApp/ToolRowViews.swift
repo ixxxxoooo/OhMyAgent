@@ -196,17 +196,17 @@ struct ToolRowView: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(p.plainText),\(Self.statusText(tool.status))")
         .accessibilityAddTraits(canExpand || openablePath(tool, p) != nil ? .isButton : [])
-        .contextMenu {
+        .omContextMenu {
             if p.category == .subagent {
                 if entry.childStore != nil {
-                    Button("在标签中打开子 Agent 会话") {
+                    OMMenuItem("在标签中打开子 Agent 会话", icon: "external-link") {
                         let workbench = AppEnvironment.shared.workbench
                         if let project = workbench.projectID(of: model) {
                             workbench.openSubagent(project: project, toolCallID: tool.toolCallId, title: tool.title)
                         }
                     }
                 }
-                Button("查看子 Agent 定义…") { AppActions.shared.openSettings(page: .subagents) }
+                OMMenuItem("查看子 Agent 定义…", icon: "bot") { AppActions.shared.openSettings(page: .subagents) }
             }
         }
     }

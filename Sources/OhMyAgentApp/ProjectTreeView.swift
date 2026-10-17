@@ -459,33 +459,33 @@ private struct ProjectGroup: View {
         .accessibilityLabel(project.name)
         .accessibilityAddTraits(.isButton)
         .accessibilityAction(named: Text("新对话")) { workbench.newConversation(in: project.id) }
-        .contextMenu {
-            Button("新对话") { workbench.newConversation(in: project.id) }
-            Button("选中此项目") { workbench.select(project: project.id) }
-            Divider()
-            Button(project.pinned ? String(localized: "取消置顶") : String(localized: "置顶")) { workbench.togglePin(project.id) }
-            Button("重命名项目…") {
+        .omContextMenu {
+            OMMenuItem("新对话", icon: "message-square-plus") { workbench.newConversation(in: project.id) }
+            OMMenuItem("选中此项目", icon: "folder-open") { workbench.select(project: project.id) }
+            OMMenuDivider()
+            OMMenuItem(verbatim: project.pinned ? String(localized: "取消置顶") : String(localized: "置顶"), icon: "pin") { workbench.togglePin(project.id) }
+            OMMenuItem("重命名项目…", icon: "pencil") {
                 guard let name = ExplorerActions.prompt(title: String(localized: "重命名项目"), message: String(localized: "只修改侧栏里的显示名,不会改动磁盘上的目录名。"), initial: project.name) else { return }
                 workbench.renameProject(project.id, to: name)
             }
-            Button("在 Finder 中显示") { NSWorkspace.shared.activateFileViewerSelecting([project.url]) }
+            OMMenuItem("在 Finder 中显示", icon: "folder-search") { NSWorkspace.shared.activateFileViewerSelecting([project.url]) }
             let ides = IDELauncher.installed
             if !ides.isEmpty {
-                Menu("在 IDE 中打开") {
-                    ForEach(ides) { ide in
-                        Button { IDELauncher.open(project.url, with: ide) } label: { Text(verbatim: ide.name) }
+                OMMenuSubmenu("在 IDE 中打开", icon: "external-link") {
+                    for ide in ides {
+                        OMMenuItem(verbatim: ide.name) { IDELauncher.open(project.url, with: ide) }
                     }
                 }
             }
-            Button("拷贝路径") {
+            OMMenuItem("拷贝路径", icon: "copy") {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(project.id, forType: .string)
             }
-            Divider()
-            Button("全部标为已读") { AttentionCenter.shared.markAllRead(inWorkspace: project.id) }
-            Button("归档全部会话") { workbench.archiveAllSessions(in: project.id) }
-            Divider()
-            Button("移除项目", role: .destructive) { workbench.removeProject(project.id) }
+            OMMenuDivider()
+            OMMenuItem("全部标为已读", icon: "circle-check") { AttentionCenter.shared.markAllRead(inWorkspace: project.id) }
+            OMMenuItem("归档全部会话", icon: "archive") { workbench.archiveAllSessions(in: project.id) }
+            OMMenuDivider()
+            OMMenuItem("移除项目", icon: "trash", isDestructive: true) { workbench.removeProject(project.id) }
         }
     }
 }
@@ -578,7 +578,7 @@ private struct SessionLine: View {
         .onHover { hovering = $0 }
         .onTapGesture(perform: open)
         .help(mode == .pinned ? "\(projectName) · \(item.title)" : item.title)
-        .contextMenu { menu }
+        .omContextMenu { menu }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
     }
@@ -622,27 +622,29 @@ private struct SessionLine: View {
         .accessibilityLabel(label)
     }
 
-    @ViewBuilder
-    private var menu: some View {
-        Button("打开", action: open)
+    @OMMenuBuilder
+    private var menu: [MenuEntry] {
+        OMMenuItem("打开", icon: "external-link", action: open)
         if let id = item.sessionId {
-            Button(isPinned ? String(localized: "取消置顶") : String(localized: "置顶")) { workbench.toggleSessionPin(id, in: item.projectID) }
-            Button("重命名…") { rename(id) }
+            OMMenuItem(verbatim: isPinned ? String(localized: "取消置顶") : String(localized: "置顶"), icon: "pin") { workbench.toggleSessionPin(id, in: item.projectID) }
+            OMMenuItem("重命名…", icon: "pencil") { rename(id) }
             if isSelected, let model = workbench.sessions[item.projectID] {
-                Button("分支") { _ = workbench.forkConversation(from: model) }
+                OMMenuItem("分支", icon: "git-branch") { _ = workbench.forkConversation(from: model) }
             }
-            Menu("拷贝") {
-                Button("会话 ID") { copy(id) }
-                Button("标题") { copy(item.title) }
+            OMMenuSubmenu("拷贝", icon: "copy") {
+                OMMenuItem("会话 ID") { copy(id) }
+                OMMenuItem("标题") { copy(item.title) }
             }
-            Divider()
-            Button(isArchived ? String(localized: "取消归档") : String(localized: "归档")) { workbench.setSessionArchived(!isArchived, sessionId: id, in: item.projectID) }
+            OMMenuDivider()
+            OMMenuItem(verbatim: isArchived ? String(localized: "取消归档") : String(localized: "归档"), icon: isArchived ? "archive-restore" : "archive") {
+                workbench.setSessionArchived(!isArchived, sessionId: id, in: item.projectID)
+            }
             if !below.isEmpty {
-                Button("归档下方全部") { workbench.archiveSessions(below, in: item.projectID) }
+                OMMenuItem("归档下方全部", icon: "archive") { workbench.archiveSessions(below, in: item.projectID) }
             }
             if !item.isCurrent, let model = workbench.sessions[item.projectID], model.capabilities.canDelete {
-                Divider()
-                Button("删除", role: .destructive) {
+                OMMenuDivider()
+                OMMenuItem("删除", icon: "trash", isDestructive: true) {
                     model.deleteSession(SessionSummary(sessionId: id, cwd: item.projectID, title: item.title))
                 }
             }

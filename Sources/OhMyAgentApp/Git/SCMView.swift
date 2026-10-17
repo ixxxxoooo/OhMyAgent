@@ -502,15 +502,17 @@ private struct ChangeRow: View {
         .accessibilityAddTraits(.isButton)
         .accessibilityAction(named: Text("查看差异")) { openDiff() }
         .accessibilityAction(named: Text("在编辑器中打开")) { workbench.openFile(model.absolutePath(change.path), preview: false) }
-        .contextMenu {
-            Button("查看差异") { openDiff() }
-            Button("在编辑器中打开") { workbench.openFile(model.absolutePath(change.path), preview: false) }
+        .omContextMenu {
+            OMMenuItem("查看差异", icon: "file-diff") { openDiff() }
+            OMMenuItem("在编辑器中打开", icon: "file-text") { workbench.openFile(model.absolutePath(change.path), preview: false) }
             if !change.isUntracked {
-                Button("Git 历史") { workbench.openHistory(project: model.projectPath, path: model.absolutePath(change.path)) }
-                Button("Git Blame") { workbench.openBlame(model.absolutePath(change.path)) }
+                OMMenuDivider()
+                OMMenuItem("Git 历史", icon: "clock") { workbench.openHistory(project: model.projectPath, path: model.absolutePath(change.path)) }
+                OMMenuItem("Git Blame", icon: "git-fork") { workbench.openBlame(model.absolutePath(change.path)) }
             }
-            Button("在 Finder 中显示") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: model.absolutePath(change.path))]) }
-            Button("拷贝路径") {
+            OMMenuDivider()
+            OMMenuItem("在 Finder 中显示", icon: "folder-open") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: model.absolutePath(change.path))]) }
+            OMMenuItem("拷贝路径", icon: "copy") {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(change.path, forType: .string)
             }

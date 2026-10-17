@@ -92,12 +92,12 @@ struct GitGraphSection: View {
                                 .accessibilityElement(children: .combine)
                                 .accessibilityAddTraits(.isButton)
                                 .accessibilityHint(isOpen ? String(localized: "点按收起文件列表") : String(localized: "点按展开文件列表"))
-                                .contextMenu {
-                                    Button("拷贝提交哈希") {
+                                .omContextMenu {
+                                    OMMenuItem("拷贝提交哈希", icon: "copy") {
                                         NSPasteboard.general.clearContents()
                                         NSPasteboard.general.setString(row.commit.hash, forType: .string)
                                     }
-                                    Button("打开完整历史") { workbench.openHistory(project: model.projectPath) }
+                                    OMMenuItem("打开完整历史", icon: "git-commit-horizontal") { workbench.openHistory(project: model.projectPath) }
                                 }
                             if isOpen, let repo = model.repo {
                                 GraphCommitDetail(repo: repo, commit: row.commit, workbench: workbench)
@@ -188,9 +188,9 @@ private struct GraphCommitDetail: View {
         .onTapGesture { omWithAnimation { openFile = openFile == file.path ? nil : file.path } }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
-        .contextMenu {
-            Button("在编辑器中打开当前版本") { workbench.openFile(repo.root.path + "/" + file.path, preview: false) }
-            Button("文件历史") { workbench.openHistory(project: repo.root.path, path: repo.root.path + "/" + file.path) }
+        .omContextMenu {
+            OMMenuItem("在编辑器中打开当前版本", icon: "file-text") { workbench.openFile(repo.root.path + "/" + file.path, preview: false) }
+            OMMenuItem("文件历史", icon: "clock") { workbench.openHistory(project: repo.root.path, path: repo.root.path + "/" + file.path) }
         }
     }
 

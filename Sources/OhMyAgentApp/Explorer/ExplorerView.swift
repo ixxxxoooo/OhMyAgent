@@ -2,6 +2,7 @@
 // 资源管理器:按需展开的文件树;单击预览、双击固定;右键菜单支持新建/重命名/移到废纸篓等。
 
 import AppKit
+import ChatKit
 import DesignSystem
 import GitKit
 import IconKit
@@ -94,7 +95,7 @@ private struct FolderRow: View {
                 expanded.toggle()
             }
             .onDrag { NSItemProvider(object: URL(fileURLWithPath: entry.path) as NSURL) }
-            .contextMenu { ExplorerMenu(entry: entry, root: root, workbench: workbench) }
+            .omContextMenu { ExplorerMenu.entries(entry: entry, root: root, workbench: workbench) }
             if expanded {
                 DirectoryChildren(path: entry.path, depth: depth + 1, workbench: workbench, root: root)
             }
@@ -118,7 +119,7 @@ private struct FileRow: View {
         .simultaneousGesture(TapGesture(count: 2).onEnded { workbench.openFile(entry.path, preview: false) })
         // 拖到输入框 = 引用 @路径;拖到标签栏/内容区 = 打开
         .onDrag { NSItemProvider(object: URL(fileURLWithPath: entry.path) as NSURL) }
-        .contextMenu { ExplorerMenu(entry: entry, root: root, workbench: workbench) }
+        .omContextMenu { ExplorerMenu.entries(entry: entry, root: root, workbench: workbench) }
     }
 
     private var isActive: Bool {
@@ -202,36 +203,32 @@ private extension String {
     func trimmingSuffix(_ suffix: String) -> String { hasSuffix(suffix) ? String(dropLast(suffix.count)) : self }
 }
 
-private struct ExplorerMenu: View {
-    let entry: FileEntry
-    let root: String
-    let workbench: WorkbenchModel
-
-    var body: some View {
+private enum ExplorerMenu {
+    /// 资源管理器条目的右键菜单。
+    @OMMenuBuilder
+    static func entries(entry: FileEntry, root: String, workbench: WorkbenchModel) -> [MenuEntry] {
+        let parent = entry.isDirectory ? entry.path : (entry.path as NSString).deletingLastPathComponent
+        let relative = entry.path.hasPrefix(root + "/") ? String(entry.path.dropFirst(root.count + 1)) : entry.path
         if !entry.isDirectory {
-            Button("打开") { workbench.openFile(entry.path, preview: false) }
+            OMMenuItem("打开", icon: "file-text") { workbench.openFile(entry.path, preview: false) }
         }
-        Button("新建文件…") { ExplorerActions.create(in: entry.isDirectory ? entry.path : (entry.path as NSString).deletingLastPathComponent, directory: false, workbench: workbench) }
-        Button("新建文件夹…") { ExplorerActions.create(in: entry.isDirectory ? entry.path : (entry.path as NSString).deletingLastPathComponent, directory: true, workbench: workbench) }
-        Divider()
-        Button("重命名…") { ExplorerActions.rename(entry, workbench: workbench) }
-        Button("移到废纸篓") { ExplorerActions.trash(entry, workbench: workbench) }
-        Divider()
+        OMMenuItem("新建文件…", icon: "file-plus") { ExplorerActions.create(in: parent, directory: false, workbench: workbench) }
+        OMMenuItem("新建文件夹…", icon: "folder-plus") { ExplorerActions.create(in: parent, directory: true, workbench: workbench) }
+        OMMenuDivider()
+        OMMenuItem("重命名…", icon: "pencil") { ExplorerActions.rename(entry, workbench: workbench) }
+        OMMenuItem("移到废纸篓", icon: "trash", isDestructive: true) { ExplorerActions.trash(entry, workbench: workbench) }
+        OMMenuDivider()
         if !entry.isDirectory {
-            Button("Git 历史") { workbench.openHistory(project: root, path: entry.path) }
-            Button("Git Blame") { workbench.openBlame(entry.path) }
-            Divider()
+            OMMenuItem("Git 历史", icon: "clock") { workbench.openHistory(project: root, path: entry.path) }
+            OMMenuItem("Git Blame", icon: "git-fork") { workbench.openBlame(entry.path) }
+            OMMenuDivider()
         }
-        Button("在 Finder 中显示") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: entry.path)]) }
-        Button("拷贝路径") { copy(entry.path) }
-        Button("拷贝相对路径") { copy(relative) }
+        OMMenuItem("在 Finder 中显示", icon: "folder-open") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: entry.path)]) }
+        OMMenuItem("拷贝路径", icon: "copy") { copy(entry.path) }
+        OMMenuItem("拷贝相对路径", icon: "copy") { copy(relative) }
     }
 
-    private var relative: String {
-        entry.path.hasPrefix(root + "/") ? String(entry.path.dropFirst(root.count + 1)) : entry.path
-    }
-
-    private func copy(_ text: String) {
+    private static func copy(_ text: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
     }

@@ -192,8 +192,8 @@ private struct PropertyRow: View {
             } else {
                 Text(verbatim: property.key)
                     .onTapGesture(count: 2) { if !isReadOnly { renaming = true } }
-                    .contextMenu {
-                        if !isReadOnly { Button("重命名") { renaming = true } }
+                    .omContextMenu {
+                        if !isReadOnly { OMMenuItem("重命名", icon: "pencil") { renaming = true } }
                     }
             }
         }

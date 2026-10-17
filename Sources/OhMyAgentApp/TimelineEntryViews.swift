@@ -184,12 +184,12 @@ struct UserMessageView: View {
         .contentShape(RoundedRectangle(cornerRadius: OMRadius.modal, style: .continuous))
         .onHover { hovering = $0 }
         .onTapGesture(count: 2) { if !entry.isSteered { sticky?.beginEditing(entry, pinned: false) } }
-        .contextMenu {
-            Button("复制") {
+        .omContextMenu {
+            OMMenuItem("复制", icon: "copy") {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(entry.text, forType: .string)
             }
-            if !entry.isSteered { Button("编辑并重新发送…") { sticky?.beginEditing(entry, pinned: false) } }
+            if !entry.isSteered { OMMenuItem("编辑并重新发送…", icon: "pencil") { sticky?.beginEditing(entry, pinned: false) } }
         }
         // 被吸顶卡接管时隐藏原行(保留布局,位置继续上报)
         .opacity(sticky?.target?.stickyID == entry.id && !(sticky?.editing?.id == entry.id && sticky?.editorPinned != true) ? 0 : 1)

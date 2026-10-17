@@ -137,10 +137,11 @@ struct CustomThemeSection: View {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 170, maximum: 240), spacing: 8)], alignment: .leading, spacing: 8) {
                     ForEach(customs) { package in
                         ThemeCardPublic(package: package, selected: appearance.themeID == package.id) { appearance.themeID = package.id }
-                            .contextMenu {
-                                Button("编辑…") { edit(package) }
-                                Button("导出…") { export(package) }
-                                Button("删除", role: .destructive) { appearance.deleteCustomTheme(id: package.id) }
+                            .omContextMenu {
+                                OMMenuItem("编辑…", icon: "pencil") { edit(package) }
+                                OMMenuItem("导出…", icon: "download") { export(package) }
+                                OMMenuDivider()
+                                OMMenuItem("删除", icon: "trash", isDestructive: true) { appearance.deleteCustomTheme(id: package.id) }
                             }
                     }
                 }

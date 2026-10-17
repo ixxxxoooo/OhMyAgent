@@ -180,7 +180,7 @@ struct TabItemView: View {
         } preview: {
             TabDragPreview(title: workbench.displayTitle(tab), tab: tab)
         }
-        .contextMenu { menu }
+        .omContextMenu { menu }
         .help(helpText)
     }
 
@@ -235,12 +235,12 @@ struct TabItemView: View {
     }
 
     /// 终端/输出标签的「移到…」菜单:把它们从编辑区放回底部或左右侧栏(与标题条拖动等价)。
-    @ViewBuilder
-    private var panelMoveMenu: some View {
+    @OMMenuBuilder
+    private var panelMoveEntries: [MenuEntry] {
         if let item = panelItem {
-            Divider()
-            ForEach(item.allowedZones.filter { $0 != .editor }) { zone in
-                Button(Self.moveTitle(item: item, zone: zone)) { omWithAnimation { _ = workbench.place(item, in: zone) } }
+            OMMenuDivider()
+            for zone in item.allowedZones.filter({ $0 != .editor }) {
+                OMMenuItem(verbatim: Self.moveTitle(item: item, zone: zone), icon: zone == .left ? "panel-left" : (zone == .bottom ? "panel-bottom" : "panel-right")) { omWithAnimation { _ = workbench.place(item, in: zone) } }
             }
         }
     }
@@ -274,35 +274,31 @@ struct TabItemView: View {
         group.tabs.filter { !$0.isPinned && matching($0) }.map(\.id)
     }
 
-    @ViewBuilder
-    private var menu: some View {
-        Button("关闭") { AppActions.shared.requestCloseTab(tab.id) }
-        Button("关闭其它") { AppActions.shared.requestCloseTabs(closableIDs { $0.id != tab.id }) }
-            .disabled(closableIDs { $0.id != tab.id }.isEmpty)
-        Button("关闭右侧") { AppActions.shared.requestCloseTabs(closableIDs { rightIDs.contains($0.id) }) }
-            .disabled(closableIDs { rightIDs.contains($0.id) }.isEmpty)
-        Button("关闭全部") { AppActions.shared.requestCloseTabs(closableIDs { _ in true }) }
-            .disabled(closableIDs { _ in true }.isEmpty)
+    @OMMenuBuilder
+    private var menu: [MenuEntry] {
+        OMMenuItem("关闭", icon: "x") { AppActions.shared.requestCloseTab(tab.id) }
+        OMMenuItem("关闭其它", isEnabled: !closableIDs { $0.id != tab.id }.isEmpty) { AppActions.shared.requestCloseTabs(closableIDs { $0.id != tab.id }) }
+        OMMenuItem("关闭右侧", isEnabled: !closableIDs { rightIDs.contains($0.id) }.isEmpty) { AppActions.shared.requestCloseTabs(closableIDs { rightIDs.contains($0.id) }) }
+        OMMenuItem("关闭全部", isEnabled: !closableIDs { _ in true }.isEmpty) { AppActions.shared.requestCloseTabs(closableIDs { _ in true }) }
         if case .chat(let projectID, _) = tab.kind, let sessionId = workbench.session(forTab: tab)?.sessionId {
-            Divider()
-            Button("重命名标签…") {
+            OMMenuDivider()
+            OMMenuItem("重命名标签…", icon: "pencil") {
                 guard let name = ExplorerActions.prompt(title: String(localized: "重命名会话"), initial: workbench.displayTitle(tab)) else { return }
                 workbench.renameSession(sessionId, in: projectID, to: name)
             }
         }
-        Divider()
-        Button(tab.isPinned ? String(localized: "取消固定") : String(localized: "固定")) { workbench.dock.togglePinned(tab.id) }
-        Button("向右拆分") {
+        OMMenuDivider()
+        OMMenuItem(verbatim: tab.isPinned ? String(localized: "取消固定") : String(localized: "固定"), icon: "pin") { workbench.dock.togglePinned(tab.id) }
+        OMMenuItem("向右拆分", icon: "columns-2", isEnabled: group.tabs.count >= 2) {
             workbench.dock.drop(tab.id, onGroup: group.id, zone: .right)
             workbench.syncSelectionFromDock()
         }
-        .disabled(group.tabs.count < 2)
-        Button(workbench.dock.maximizedGroupID == group.id ? String(localized: "还原布局") : String(localized: "最大化此组")) { workbench.dock.toggleMaximize(group: group.id) }
-        panelMoveMenu
+        OMMenuItem(verbatim: workbench.dock.maximizedGroupID == group.id ? String(localized: "还原布局") : String(localized: "最大化此组"), icon: "maximize-2") { workbench.dock.toggleMaximize(group: group.id) }
+        panelMoveEntries
         if case .file(let path) = tab.kind {
-            Divider()
-            Button("在 Finder 中显示") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }
-            Button("拷贝路径") {
+            OMMenuDivider()
+            OMMenuItem("在 Finder 中显示", icon: "folder-open") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }
+            OMMenuItem("拷贝路径", icon: "copy") {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(path, forType: .string)
             }
