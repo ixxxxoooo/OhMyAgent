@@ -112,3 +112,26 @@ struct PaperThemeTests {
         }
     }
 }
+
+@MainActor
+@Suite("时间线行距")
+struct ReadingLineHeightTests {
+    @Test("正文与代码的行高 = 字号 × 1.5(以 TextKit 真实行高校准)")
+    func lineHeightIsOnePointFive() {
+        for size in [11.0, 12, 13, 14, 15, 17, 20] as [CGFloat] {
+            for mono in [false, true] {
+                let font = mono ? NSFont.monospacedSystemFont(ofSize: size, weight: .regular) : NSFont.systemFont(ofSize: size)
+                let natural = NSLayoutManager().defaultLineHeight(for: font)
+                let total = natural + OMFonts.lineSpacing(forSize: size, monospaced: mono)
+                #expect(abs(total - size * 1.5) <= 1.5, "size=\(size) mono=\(mono) total=\(total)")
+            }
+        }
+    }
+
+    @Test("行距随界面字号缩放且不为负")
+    func spacingScalesAndNonNegative() {
+        #expect(OMFonts.lineSpacing(forSize: 0) == 0)
+        #expect(OMFonts.lineSpacing(forSize: 26) > OMFonts.lineSpacing(forSize: 13))
+        #expect(OMFonts.readingLineSpacing >= 0 && OMFonts.readingMonoLineSpacing >= 0)
+    }
+}

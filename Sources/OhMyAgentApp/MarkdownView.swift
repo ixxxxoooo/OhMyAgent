@@ -45,6 +45,8 @@ struct MarkdownBlockView: View {
         case .heading(let level, let text):
             Text(inlineMarkdown(text))
                 .font(OMFonts.custom(headingSize(level), weight: .medium))
+                .lineSpacing(OMFonts.lineSpacing(forSize: headingSize(level)))
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, level <= 2 ? 6 : 2)
         case .paragraph(let text):
             Text(inlineMarkdown(text))
@@ -144,6 +146,7 @@ struct CodeBlockView: View {
                 // 自动换行:代码块宽度固定为容器宽度,长行折行显示
                 Text(CodeHighlighter.attributed(code, fence: language))
                     .font(OMFonts.readingMono)
+                    .lineSpacing(OMFonts.readingMonoLineSpacing)
                     .padding(12)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
@@ -152,6 +155,7 @@ struct CodeBlockView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     Text(CodeHighlighter.attributed(code, fence: language))
                         .font(OMFonts.readingMono)
+                        .lineSpacing(OMFonts.readingMonoLineSpacing)
                         .padding(12)
                         .fixedSize(horizontal: true, vertical: true)
                 }

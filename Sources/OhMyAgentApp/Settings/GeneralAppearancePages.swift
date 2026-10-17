@@ -268,7 +268,7 @@ struct AppearancePage: View {
                     stops: Self.fontStops(85...150),
                     index: fontIndex($appearance.timelineFontScale, lower: 85)
                 )
-                Text("预览:Claude 的回复会按这个大小显示。`let x = 1`").font(OMFonts.reading).padding(8)
+                Text("预览:Claude 的回复会按这个大小显示。`let x = 1`").font(OMFonts.reading).lineSpacing(OMFonts.readingLineSpacing).padding(8)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(OMColors.card, in: RoundedRectangle(cornerRadius: OMRadius.control))
             }

@@ -418,8 +418,54 @@ public enum OMFonts {
     public static var reading: Font { .system(size: 13 * OMScale.ui * OMScale.timeline) }
     /// 时间线代码
     public static var readingMono: Font { .system(size: 12 * OMScale.ui * OMScale.timeline, design: .monospaced) }
-    /// 时间线正文的行距(行高为字号的 1.5 倍):系统默认行高约 1.2 倍,`lineSpacing` 补足差值 0.3 倍。
-    public static var readingLineSpacing: CGFloat { 13 * OMScale.ui * OMScale.timeline * 0.3 }
+    /// 时间线行高与字号的比值(1.5 倍)。
+    public static let readingLineHeightRatio: CGFloat = 1.5
+
+    /// 把行高校准为 `size × 1.5` 所需的额外行距:用字体的真实自然行高(ascender + |descender| + leading,
+    /// 与 TextKit 默认行高一致)而不是假定的 1.2 倍,等宽字体同样适用。
+    /// - Parameters:
+    ///   - size: 实际字号(已含缩放)
+    ///   - monospaced: 是否等宽字体
+    ///   - weight: 字重(自然行高与字重基本无关,仅用于取同一字体)
+    /// - Returns: 传给 `lineSpacing` 的额外行距(≥ 0)
+    public static func lineSpacing(forSize size: CGFloat, monospaced: Bool = false) -> CGFloat {
+        guard size > 0 else { return 0 }
+        let key = LineHeightKey(size: size, monospaced: monospaced)
+        let natural = LineHeightCache.shared.naturalHeight(for: key)
+        return max(0, size * readingLineHeightRatio - natural)
+    }
+
+    /// 时间线正文的行距(行高为字号的 1.5 倍)。
+    public static var readingLineSpacing: CGFloat { lineSpacing(forSize: 13 * OMScale.ui * OMScale.timeline) }
+    /// 时间线代码的行距(行高同为字号的 1.5 倍)。
+    public static var readingMonoLineSpacing: CGFloat { lineSpacing(forSize: 12 * OMScale.ui * OMScale.timeline, monospaced: true) }
+    /// 任意字号(基准值,会乘界面与时间线缩放)的时间线行距,用于 Markdown 标题。
+    public static func readingLineSpacing(forBaseSize base: CGFloat) -> CGFloat {
+        lineSpacing(forSize: base * OMScale.ui * OMScale.timeline)
+    }
+}
+
+/// 行高缓存的键(字号 + 是否等宽)。
+private struct LineHeightKey: Hashable {
+    let size: CGFloat
+    let monospaced: Bool
+}
+
+/// 字体自然行高缓存:`NSLayoutManager` 的默认行高与 SwiftUI/TextKit 实际排版一致;结果按字号缓存,避免 body 里反复创建。
+private final class LineHeightCache: @unchecked Sendable {
+    static let shared = LineHeightCache()
+    private let lock = NSLock()
+    private var values: [LineHeightKey: CGFloat] = [:]
+
+    func naturalHeight(for key: LineHeightKey) -> CGFloat {
+        lock.lock()
+        defer { lock.unlock() }
+        if let cached = values[key] { return cached }
+        let font = key.monospaced ? NSFont.monospacedSystemFont(ofSize: key.size, weight: .regular) : NSFont.systemFont(ofSize: key.size)
+        let height = NSLayoutManager().defaultLineHeight(for: font)
+        values[key] = height
+        return height
+    }
 }
 
 /// 编辑性标题级别(页面级大标题备用令牌:字重 regular、系统字体、字号越大字距越紧;默认不被任何视图使用)。
