@@ -9,6 +9,8 @@ import SwiftUI
 struct SourceControlPage: View {
     @AppStorage(ClientPrefs.Key.scmCoAuthor) private var coAuthor = false
     @AppStorage(ClientPrefs.Key.scmAICommitMessage) private var aiMessage = true
+    @AppStorage(ClientPrefs.Key.worktreeMaxCount) private var worktreeMax = 25
+    @AppStorage(ClientPrefs.Key.worktreeCleanupHours) private var worktreeHours = 6
 
     var body: some View {
         SettingsScroll {
@@ -24,6 +26,11 @@ struct SourceControlPage: View {
                     isOn: $coAuthor
                 )
                 Note("署名只在通过 OhMyAgent 提交时追加,不会修改你的 git 配置;已包含同一署名时不会重复追加。").footnote()
+            }
+            SettingsCard("工作树") {
+                SettingsNumericField(title: "数量上限", value: $worktreeMax, format: IntegerFormatStyle<Int>(), unit: "个")
+                SettingsNumericField(title: "检查间隔", value: $worktreeHours, format: IntegerFormatStyle<Int>(), unit: "小时")
+                Note("`/worktree` 与「在工作树中运行」会在 ~/.ohmyagent/worktrees 下创建隔离检出。超过数量上限时,会询问是否清理最旧且没有未提交改动的工作树,不会静默删除。初始化脚本放在项目的 .oma/worktrees.json(也兼容 .cursor/worktrees.json),键 setup-worktree 为命令数组或脚本路径,运行时可用环境变量 ROOT_WORKTREE_PATH 取得主检出路径。").footnote()
             }
         }
     }

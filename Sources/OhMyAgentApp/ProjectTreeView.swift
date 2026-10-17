@@ -420,6 +420,11 @@ private struct ProjectGroup: View {
                 .font(OMFonts.small.weight(.medium))
                 .foregroundStyle(OMColors.secondaryText)
                 .lineLimit(1)
+            if let link = project.worktree {
+                Image.om("git-fork", size: 11).foregroundStyle(OMColors.accentText)
+                    .omTooltip(String(localized: "Git 工作树 · \(link.branch)"))
+                    .accessibilityLabel("Git 工作树 \(link.branch)")
+            }
             if project.pinned {
                 Image.om("pin.fill", size: 9).foregroundStyle(OMColors.tertiaryText)
             }

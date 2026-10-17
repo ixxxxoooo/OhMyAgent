@@ -65,7 +65,7 @@ public struct GitRepository: Sendable {
     // MARK: 内部执行
 
     @discardableResult
-    private func git(_ arguments: [String], input: Data? = nil, timeout: TimeInterval = 60, lockFree: Bool = true) async throws -> GitOutput {
+    func git(_ arguments: [String], input: Data? = nil, timeout: TimeInterval = 60, lockFree: Bool = true) async throws -> GitOutput {
         let output = try await GitProcess.run(arguments, in: root, input: input, timeout: timeout, lockFree: lockFree)
         guard output.status == 0 else {
             let message = output.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -81,7 +81,7 @@ public struct GitRepository: Sendable {
     }
 
     /// 校验分支/引用名:非空、不以 `-` 开头、不含空白与控制字符。
-    private func validateRef(_ name: String) throws {
+    func validateRef(_ name: String) throws {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty, trimmed == name, !name.hasPrefix("-"),
               !name.contains(where: { $0.isWhitespace || $0.isNewline || $0 == "~" || $0 == "^" || $0 == ":" || $0 == "?" || $0 == "*" || $0 == "[" || $0 == "\\" }),

@@ -49,7 +49,7 @@ let package = Package(
         // 聊天核心:时间线模型、事件合并、Markdown 解析、会话模型(不含视图)
         .target(name: "ChatKit", dependencies: ["ACPKit", "AgentHost", "CanvasKit", "DiffKit", "OMLog", "ProviderProxyKit"]),
         // 工作台:项目/会话树、布局、持久化(不含视图)
-        .target(name: "WorkbenchKit", dependencies: ["ACPKit", "AgentHost", "ChatKit", "OMLog"]),
+        .target(name: "WorkbenchKit", dependencies: ["ACPKit", "AgentHost", "ChatKit", "GitKit", "OMLog"]),
         // 应用本体
         .executableTarget(
             name: "OhMyAgentApp",

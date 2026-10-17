@@ -87,6 +87,9 @@ public enum ClientPrefs {
         public static let scmAICommitMessage = "scm.aiCommitMessage"
         /// 同时保留的语言服务器工作区上限(1–8,默认 4)
         public static let lspMaxWorkspaces = "codeIntel.maxLSPWorkspaces"
+        /// 工作树自动清理的检查间隔(小时,默认 6)与数量上限(默认 25)
+        public static let worktreeCleanupHours = "worktree.cleanupIntervalHours"
+        public static let worktreeMaxCount = "worktree.maxCount"
         /// 索引忽略 glob(多行文本)
         public static let indexIgnoreGlobs = IndexIgnore.preferenceKey
     }
@@ -139,6 +142,16 @@ public enum ClientPrefs {
         TerminalSandboxConfig(
             enabled: defaults.object(forKey: Key.terminalSandbox) as? Bool ?? false,
             network: TerminalSandboxConfig.Network(rawValue: defaults.string(forKey: Key.terminalSandboxNetwork) ?? "") ?? .local)
+    }
+
+    /// 工作树数量上限(1–200,默认 25)。
+    public static func worktreeMaxCount(_ defaults: UserDefaults = .standard) -> Int {
+        min(max(defaults.object(forKey: Key.worktreeMaxCount) as? Int ?? 25, 1), 200)
+    }
+
+    /// 工作树清理检查间隔(1–168 小时,默认 6)。
+    public static func worktreeCleanupHours(_ defaults: UserDefaults = .standard) -> Int {
+        min(max(defaults.object(forKey: Key.worktreeCleanupHours) as? Int ?? 6, 1), 168)
     }
 
     /// 终端不继承完整环境时保留的变量。

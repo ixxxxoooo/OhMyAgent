@@ -195,6 +195,29 @@ public final class WorkbenchModel {
         return id
     }
 
+    /// 把一个 Git 工作树登记为项目(带 `WorktreeLink`)并选中;侧栏会显示分支徽标。
+    /// - Parameters:
+    ///   - path: 工作树目录
+    ///   - link: 与原项目的关联
+    ///   - name: 显示名(通常为「原项目 · 任务名」)
+    /// - Returns: 项目 ID;目录不存在时为 nil
+    @discardableResult
+    public func openWorktreeProject(path: String, link: WorktreeLink, name: String, now: Date = Date()) -> String? {
+        guard let id = openProject(URL(fileURLWithPath: path), now: now),
+              let index = projects.firstIndex(where: { $0.id == id }) else { return nil }
+        projects[index].worktree = link
+        projects[index].name = name
+        scheduleSave()
+        return id
+    }
+
+    /// 工作树项目对应的原项目;不是工作树或原项目已移除时为 nil。
+    /// - Parameter id: 工作树项目 ID
+    public func worktreeOrigin(of id: String) -> ProjectEntry? {
+        guard let link = projects.first(where: { $0.id == id })?.worktree else { return nil }
+        return projects.first { $0.id == link.origin }
+    }
+
     /// 项目当前应显示的会话槽位:最近激活的;否则编辑区里已有的该项目会话标签;都没有时为 nil(主会话)。
     private func preferredSlot(for id: String) -> String? {
         if let slot = lastSlot[id], dock.tab(for: .chat(projectID: id, slot: slot)) != nil { return slot }

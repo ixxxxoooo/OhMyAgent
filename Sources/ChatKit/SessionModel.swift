@@ -316,6 +316,10 @@ public final class SessionModel {
     /// 需要在标签页中打开的画布(Agent 通过 Bridge 新建画布时设置,应用层消费后置空)
     public var canvasRequest: CanvasOpenRequest?
     /// 画布存储(默认在 Application Support;测试/演示可替换)
+    /// 就绪后要切换到的模型名(一次性;`/best-of-n` 使用)
+    @ObservationIgnored public var pendingModelName: String?
+    /// 「在工作树中运行」开关:开启后首条消息会先创建工作树(界面层处理)
+    public var runInWorktree = false
     @ObservationIgnored public var canvasStore = CanvasStore(directory: CanvasStore.defaultDirectory())
 
     private var supervisor: AgentSupervisor?
@@ -433,6 +437,7 @@ public final class SessionModel {
                     // 排队消息等会话回放完成后再发(openSession 末尾会 flush)
                     self.openSession(restoring, force: true)
                 } else {
+                    await self.applyPendingModel(client: client)
                     self.flushQueuedPrompt()
                 }
             } catch {
@@ -719,7 +724,7 @@ public final class SessionModel {
             } else {
                 send(LocalCommands.explorePrompt(question), bypassLocal: true)
             }
-        case .exportTranscript, .settings, .extensions, .mcpPanel, .history:
+        case .exportTranscript, .settings, .extensions, .mcpPanel, .history, .worktree, .applyWorktree, .deleteWorktree, .bestOfN:
             if let onLocalCommand {
                 onLocalCommand(command)
             } else {
@@ -782,6 +787,27 @@ public final class SessionModel {
         }
         // 切换成功后由 setConfigOption 在时间线插入「由 X 切换为 Y」分割线
         setConfigOption(option.id, value: match.value)
+    }
+
+    /// 就绪后、发出排队消息之前切到 `pendingModelName`(`/best-of-n` 为每个工作树会话指定不同模型);找不到时保持默认并提示。
+    /// - Parameter client: 已连接的客户端
+    private func applyPendingModel(client: ACPClient) async {
+        guard let name = pendingModelName, !name.isEmpty else { return }
+        pendingModelName = nil
+        guard let option = option(category: "model"), let sessionId else { return }
+        let needle = name.lowercased()
+        let match = option.options.first { $0.value.lowercased() == needle || $0.name.lowercased() == needle }
+            ?? option.options.first { $0.value.lowercased().contains(needle) || $0.name.lowercased().contains(needle) }
+        guard let match else {
+            timeline.appendNotice(String(localized: "没有名为「\(name)」的模型,使用默认模型。"), severity: "warning")
+            return
+        }
+        do {
+            let updated = try await client.setConfigOption(sessionId: sessionId, configId: option.id, value: .string(match.value))
+            if !updated.isEmpty { configOptions = updated }
+        } catch {
+            log.warning("切换待定模型失败", ["model": name, "error": error.localizedDescription])
+        }
     }
 
     /// `/model` 无参数时的模型列表。

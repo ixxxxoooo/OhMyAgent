@@ -29,7 +29,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .providers: return ["provider", "api", "密钥", "key", "openai", "anthropic"]
         case .agentExtensions: return ["acp", "registry", "codex", "gemini", "pi", "opencode", "注册表"]
         case .shortcuts: return ["快捷键", "shortcut", "keybinding"]
-        case .sourceControl: return ["git", "提交", "commit", "署名", "co-authored-by", "提交说明", "scm"]
+        case .sourceControl: return ["git", "提交", "commit", "署名", "co-authored-by", "提交说明", "scm", "工作树", "worktree"]
         case .codeIntelligence: return ["lsp", "语言服务器", "诊断", "补全", "忽略", "ignore", "glob", "索引", "language server"]
         default: return []
         }

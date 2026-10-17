@@ -30,6 +30,26 @@ struct WorkbenchTests {
         }
     }
 
+    @Test("工作树项目:带关联登记、可回溯原项目、旧状态文件无 worktree 字段也能解码")
+    func worktreeProject() throws {
+        let env = try makeEnvironment()
+        defer { try? FileManager.default.removeItem(at: env.root) }
+        let model = makeModel(env.store)
+        let origin = try #require(model.openProject(env.dirs[0]))
+        let link = WorktreeLink(origin: origin, branch: "oma/x", base: "abc123")
+        let id = try #require(model.openWorktreeProject(path: env.dirs[1].path, link: link, name: "alpha · x"))
+        #expect(model.projects.first { $0.id == id }?.worktree == link)
+        #expect(model.projects.first { $0.id == id }?.name == "alpha · x")
+        #expect(model.worktreeOrigin(of: id)?.id == origin)
+        #expect(model.worktreeOrigin(of: origin) == nil)
+        let entry = try #require(model.projects.first { $0.id == id })
+        let round = try JSONDecoder().decode(ProjectEntry.self, from: JSONEncoder().encode(entry))
+        #expect(round.worktree == link)
+        let old = #"{"id":"/tmp/p","name":"p","addedAt":0,"lastOpenedAt":0}"#
+        #expect(try JSONDecoder().decode(ProjectEntry.self, from: Data(old.utf8)).worktree == nil)
+        #expect(model.openWorktreeProject(path: env.root.appendingPathComponent("nope").path, link: link, name: "n") == nil)
+    }
+
     @Test("添加项目去重并选中,不存在的目录被拒绝")
     func addProjects() throws {
         let env = try makeEnvironment()

@@ -132,6 +132,22 @@ public struct CachedSession: Codable, Equatable, Sendable, Identifiable {
 }
 
 /// 项目条目(工作台左栏的一级节点)。
+/// 工作树项目与原项目的关联。
+public struct WorktreeLink: Codable, Equatable, Sendable {
+    /// 原项目(主检出)的项目 ID(目录路径)
+    public var origin: String
+    /// 工作树的分支
+    public var branch: String
+    /// 创建时主检出的提交(用于统计改动)
+    public var base: String
+
+    public init(origin: String, branch: String, base: String) {
+        self.origin = origin
+        self.branch = branch
+        self.base = base
+    }
+}
+
 public struct ProjectEntry: Codable, Equatable, Sendable, Identifiable {
     /// 标准化后的目录路径
     public var id: String
@@ -154,6 +170,8 @@ public struct ProjectEntry: Codable, Equatable, Sendable, Identifiable {
     public var icon: ProjectIcon?
     /// 工作区里额外的文件夹(绝对路径,不含主目录 `id`);Agent、搜索、文件树与 Git 面板会覆盖它们
     public var extraFolders: [String] = []
+    /// 非 nil 表示这是某个项目的 Git 工作树(隔离检出);侧栏显示分支徽标
+    public var worktree: WorktreeLink?
 
     public var url: URL { URL(fileURLWithPath: id) }
 
@@ -165,7 +183,7 @@ public struct ProjectEntry: Codable, Equatable, Sendable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, addedAt, lastOpenedAt, pinned, collapsed, sessions, pinnedSessions, archivedSessions, deletedSessions, isChatArea, icon, extraFolders
+        case id, name, addedAt, lastOpenedAt, pinned, collapsed, sessions, pinnedSessions, archivedSessions, deletedSessions, isChatArea, icon, extraFolders, worktree
     }
 
     /// 容错解码:新增字段缺失时使用默认值,旧版本状态文件可继续读取。
@@ -184,6 +202,7 @@ public struct ProjectEntry: Codable, Equatable, Sendable, Identifiable {
         isChatArea = try c.decodeIfPresent(Bool.self, forKey: .isChatArea) ?? false
         icon = try c.decodeIfPresent(ProjectIcon.self, forKey: .icon)
         extraFolders = try c.decodeIfPresent([String].self, forKey: .extraFolders) ?? []
+        worktree = try c.decodeIfPresent(WorktreeLink.self, forKey: .worktree)
     }
 }
 

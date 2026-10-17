@@ -23,6 +23,20 @@ struct ComposerView: View {
     @State private var lookup: Task<Void, Never>?
     @State private var dropTargeted = false
 
+    /// 发送草稿;开启「在工作树中运行」且是全新会话时,先建工作树再在其中发送。
+    private func submit(afterTurn: Bool = false) {
+        let text = model.draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        if model.runInWorktree, model.timeline.entries.isEmpty, !text.isEmpty, !text.hasPrefix("/") {
+            let images = model.attachments
+            model.draft = ""
+            model.attachments = []
+            model.runInWorktree = false
+            Task { await WorktreeActions.sendInWorktree(text, images: images, from: model) }
+            return
+        }
+        model.sendDraft(afterTurn: afterTurn)
+    }
+
     var body: some View {
         VStack(spacing: 6) {
             if !model.attachments.isEmpty {
@@ -39,13 +53,13 @@ struct ComposerView: View {
                 text: $model.draft,
                 height: $textHeight,
                 placeholder: placeholder,
-                onSubmit: { model.sendDraft() },
+                onSubmit: { submit() },
                 onEscape: { if model.isRunning { model.cancel() } },
                 controller: controller,
                 isCompletionActive: { completion != nil && !items.isEmpty },
                 onCompletionKey: handleCompletionKey,
                 onBacktab: { model.cycleMode() },
-                onSubmitAfterTurn: { model.sendDraft(afterTurn: true) },
+                onSubmitAfterTurn: { submit(afterTurn: true) },
                 onImages: { images in images.forEach { model.addAttachment($0) } },
                 // 不再在这里按能力拦截:不支持图片时由 addAttachment 给出提示,而不是悄悄吞掉粘贴/拖入
                 acceptsImages: { true },
@@ -220,11 +234,11 @@ struct ComposerView: View {
                         isRunning: model.isRunning,
                         hasContent: hasContent,
                         help: sendHelp,
-                        onSend: { model.sendDraft() }
+                        onSend: { submit() }
                     )
                     .keyboardShortcut(ShortcutStore.shared.shortcut(for: .send))
                 } else {
-                    Button { model.sendDraft() } label: {
+                    Button { submit() } label: {
                         Image.om(model.isRunning ? "corner-down-right" : "arrow.up", size: 12, weight: .bold).frame(width: 26, height: 26)
                     }
                     .buttonStyle(.glassProminent)
@@ -581,6 +595,7 @@ struct ComposerFooter: View {
                 BranchSwitcher(workspace: model.workspace, head: head, isBusy: model.isRunning) {
                     Task { await refresh() }
                 }
+                if canRunInWorktree { worktreeToggle }
             }
             Spacer()
             footerStatus
@@ -596,6 +611,31 @@ struct ComposerFooter: View {
         .onChange(of: model.isRunning) { _, running in
             if !running { Task { await refresh() } }
         }
+    }
+
+    /// 只有全新的、非工作树的单文件夹项目才能切到「在工作树中运行」。
+    private var canRunInWorktree: Bool {
+        guard model.timeline.entries.isEmpty, model.additionalDirectories.isEmpty else { return false }
+        return AppEnvironment.shared.workbench.projects.first { $0.id == model.workspace.path }?.worktree == nil
+    }
+
+    /// 「在工作树中运行」开关:开启后首条消息会先建隔离工作树,多个任务互不干扰。
+    private var worktreeToggle: some View {
+        Button { model.runInWorktree.toggle() } label: {
+            HStack(spacing: 4) {
+                Image.om("git-fork", size: 12)
+                Text("工作树")
+            }
+            .foregroundStyle(model.runInWorktree ? OMColors.accentText : OMColors.secondaryText)
+            .padding(.horizontal, 6)
+            .frame(height: 22)
+            .background(OMPillShape().fill(model.runInWorktree ? OMColors.selectedFill : .clear))
+            .contentShape(OMPillShape())
+        }
+        .buttonStyle(.plain)
+        .omTooltip(model.runInWorktree ? String(localized: "首条消息将在新的 Git 工作树里运行(点击关闭)") : String(localized: "在隔离的 Git 工作树里运行这个任务"))
+        .accessibilityLabel("在工作树中运行")
+        .accessibilityValue(model.runInWorktree ? String(localized: "已开启") : String(localized: "已关闭"))
     }
 
     /// 连接状态:仅在非正常态时提示(连接中/失败),正常时保持安静。

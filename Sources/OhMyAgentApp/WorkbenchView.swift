@@ -259,6 +259,13 @@ struct WorkbenchView: View {
         // 调试:OMA_OPEN_CANVAS=<画布 id> 直接打开画布标签
         if let canvasID = env["OMA_OPEN_CANVAS"], !canvasID.isEmpty { workbench.openCanvas(id: canvasID, title: String(localized: "画布")) }
         if let filter = env["OMA_OPEN_CUSTOMIZE"] { workbench.openCustomize(filter: filter) }
+        // 启动稍后按间隔检查一次工作树数量(超限时询问是否清理;演示模式不触发)
+        if env["OMA_DEMO"] == nil {
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(30))
+                WorktreeActions.periodicCleanup()
+            }
+        }
     }
 }
 

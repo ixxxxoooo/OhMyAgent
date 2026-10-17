@@ -33,6 +33,14 @@ public enum LocalCommand: Sendable, Equatable {
     case accountNotice
     /// 交给 Explore 子 Agent 做只读的代码库探索(`/explore <问题>`;问题为空时提示用法)
     case explore(String)
+    /// 在新的 Git 工作树里开始一个隔离任务(`/worktree [标题]`)
+    case worktree(String)
+    /// 把当前工作树的改动合并回原项目(`/apply-worktree`)
+    case applyWorktree
+    /// 删除当前工作树及其分支(`/delete-worktree`)
+    case deleteWorktree
+    /// 同一任务交给多个模型,各在独立工作树里并行完成(`/best-of-n 模型1,模型2 任务`)
+    case bestOfN(models: [String], task: String)
 }
 
 /// 命令目录条目(用于补全菜单与 `/help`)。
@@ -70,6 +78,10 @@ public enum LocalCommands {
         LocalCommandSpec(name: "export", summary: ChatL10n.t("把当前对话导出为 Markdown")),
         LocalCommandSpec(name: "doctor", summary: ChatL10n.t("打开诊断页检查安装与配置")),
         LocalCommandSpec(name: "explore", summary: ChatL10n.t("让 Explore 子 Agent 只读检索代码库"), hint: ChatL10n.t("要弄清的问题")),
+        LocalCommandSpec(name: "worktree", summary: ChatL10n.t("在新的 Git 工作树里开始隔离任务"), hint: ChatL10n.t("[标题]")),
+        LocalCommandSpec(name: "apply-worktree", summary: ChatL10n.t("把当前工作树的改动合并回原项目")),
+        LocalCommandSpec(name: "delete-worktree", summary: ChatL10n.t("删除当前工作树及其分支")),
+        LocalCommandSpec(name: "best-of-n", summary: ChatL10n.t("多个模型各在独立工作树里完成同一任务,并生成对比"), hint: ChatL10n.t("模型1,模型2 任务")),
         LocalCommandSpec(name: "usage", summary: ChatL10n.t("打开用量与花费统计")),
         LocalCommandSpec(name: "cost", summary: ChatL10n.t("打开用量与花费统计")),
     ]
@@ -82,6 +94,25 @@ public enum LocalCommands {
     public static func explorePrompt(_ question: String) -> String {
         "Use the Explore subagent (fast, read-only codebase search) to investigate the question below. Do not modify any files. "
             + "Prefer the `search_code` tool for broad searches. Report the key findings with file paths and line numbers.\n\nQuestion: \(question)"
+    }
+
+    /// `/best-of-n` 的参数最多并行的模型数。
+    public static let bestOfNLimit = 4
+
+    /// 解析 `/best-of-n` 参数:首个词是逗号分隔的模型名(去重,最多 `bestOfNLimit` 个),其余为任务。
+    /// - Parameter argument: 命令后的参数
+    /// - Returns: 模型与任务;模型不足 1 个或任务为空时为 nil
+    public static func parseBestOfN(_ argument: String) -> (models: [String], task: String)? {
+        let parts = argument.split(maxSplits: 1, whereSeparator: { $0.isWhitespace })
+        guard parts.count == 2 else { return nil }
+        var models: [String] = []
+        for raw in parts[0].split(separator: ",") {
+            let name = raw.trimmingCharacters(in: .whitespaces)
+            if !name.isEmpty, !models.contains(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) { models.append(name) }
+        }
+        let task = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !models.isEmpty, !task.isEmpty else { return nil }
+        return (Array(models.prefix(bestOfNLimit)), task)
     }
 
     /// 解析输入框文本;不是客户端命令(或带有应交给 Agent 的参数)时返回 nil。
@@ -116,6 +147,10 @@ public enum LocalCommands {
         case "export": return .exportTranscript
         case "login", "logout": return .accountNotice
         case "explore": return .explore(argument)
+        case "worktree": return .worktree(argument)
+        case "apply-worktree": return .applyWorktree
+        case "delete-worktree": return .deleteWorktree
+        case "best-of-n": return .bestOfN(models: parseBestOfN(argument)?.models ?? [], task: parseBestOfN(argument)?.task ?? "")
         default: return nil
         }
     }

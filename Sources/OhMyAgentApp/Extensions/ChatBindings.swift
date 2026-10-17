@@ -61,6 +61,8 @@ enum ChatBindings {
             showHistoryMenu(for: model)
         case .exportTranscript:
             exportTranscript(of: model)
+        case .worktree, .applyWorktree, .deleteWorktree, .bestOfN:
+            WorktreeActions.handle(command, in: model)
         default:
             break
         }
