@@ -180,22 +180,27 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         var shown = Set<String>()
         var count = 0
         for live in attention.sortedItems where count < 8 {
-            let entry = item(Self.sessionTitle(live.title, project: live.project)) {
+            let entry = item(Self.sessionTitle(live.title)) {
                 AppActions.shared.openSession(workspacePath: live.workspacePath, sessionId: live.sessionId, title: live.title, uid: live.id)
             }
             entry.toolTip = "\(live.title) — \(live.project)"
             entry.image = Self.dotImage(Self.dotColor(Self.indicator(of: live.state)))
+            if live.state == .unreadDone { Self.emphasize(entry) }
             menu.addItem(entry)
             if let sid = live.sessionId { shown.insert(sid) }
             count += 1
         }
+        let unreadIDs = RecentStore.unreadSessionIDs()
         for recent in RecentStore.sessions() where count < 8 && !shown.contains(recent.sessionId) {
             let project = (recent.workspacePath as NSString).lastPathComponent
-            let entry = item(Self.sessionTitle(recent.title, project: project)) {
+            let isUnread = unreadIDs.contains(recent.sessionId)
+            let entry = item(Self.sessionTitle(recent.title)) {
+                RecentStore.clearUnread(recent.sessionId)
                 AppActions.shared.openSession(workspacePath: recent.workspacePath, sessionId: recent.sessionId, title: recent.title)
             }
             entry.toolTip = "\(recent.title) — \(project)"
-            entry.image = Self.dotImage(nil)
+            entry.image = Self.dotImage(isUnread ? Self.dotColor(.unread) : nil)
+            if isUnread { Self.emphasize(entry) }
             menu.addItem(entry)
             count += 1
         }
@@ -208,7 +213,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.addItem(.separator())
         menu.addItem(item(String(localized: "设置…"), key: ",") { AppActions.shared.openSettings() })
         menu.addItem(item(String(localized: "检查更新…")) { UpdateModel.shared.checkInteractively() })
-        menu.addItem(item(String(localized: "重新启动 OhMyAgent"), key: "r") { AppActions.shared.relaunch() })
+        menu.addItem(item(String(localized: "重启"), key: "r") { AppActions.shared.relaunch() })
         menu.addItem(.separator())
         menu.addItem(item(String(localized: "退出 OhMyAgent"), key: "q") { NSApp.terminate(nil) })
         Log.perf.debug("托盘菜单构建", ["ms": "\(Int(started.duration(to: .now) / .milliseconds(1)))", "sessions": "\(count)"])
@@ -223,10 +228,15 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         }
     }
 
-    private static func sessionTitle(_ title: String, project: String) -> String {
-        let maxLen = 18
-        let clipped = title.count > maxLen ? String(title.prefix(maxLen)) + "…" : title
-        return "\(clipped) — \(project)"
+    /// 菜单里的会话标题:最多 12 个字符(项目名放进悬浮提示),让菜单保持窄。
+    private static func sessionTitle(_ title: String) -> String {
+        let maxLen = 12
+        return title.count > maxLen ? String(title.prefix(maxLen)) + "…" : title
+    }
+
+    /// 未读会话:标题加重到 medium(与前面的未读点一起提示)。
+    private static func emphasize(_ entry: NSMenuItem) {
+        entry.attributedTitle = NSAttributedString(string: entry.title, attributes: [.font: NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .medium)])
     }
 
     /// 菜单项前的状态点(无状态时为透明占位,保持对齐)。
@@ -234,7 +244,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let image = NSImage(size: NSSize(width: 10, height: 10), flipped: false) { rect in
             if let color {
                 color.setFill()
-                NSBezierPath(ovalIn: rect.insetBy(dx: 1, dy: 1)).fill()
+                NSBezierPath(ovalIn: rect.insetBy(dx: 0.5, dy: 0.5)).fill()
             }
             return true
         }

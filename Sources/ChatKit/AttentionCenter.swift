@@ -44,7 +44,7 @@ public struct AttentionItem: Sendable, Identifiable, Equatable {
 @MainActor
 @Observable
 public final class AttentionCenter {
-    public static let shared = AttentionCenter()
+    public static let shared = AttentionCenter(persistUnread: true)
 
     public private(set) var items: [String: AttentionItem] = [:]
     /// 当前被用户查看的会话(窗口为 key 且该会话可见)。
@@ -54,7 +54,11 @@ public final class AttentionCenter {
     /// 任意状态变化后回调(托盘刷新)。
     @ObservationIgnored public var onChange: (() -> Void)?
 
-    public init() {}
+    /// 是否把未读会话 ID 持久化到 `RecentStore`(托盘「最近会话」重启后仍能显示未读标识);测试默认关闭。
+    @ObservationIgnored private let persistUnread: Bool
+
+    /// - Parameter persistUnread: 是否持久化未读标记
+    public init(persistUnread: Bool = false) { self.persistUnread = persistUnread }
 
     /// 汇总指示:待处理 > 运行中 > 未读 > 无。
     public var indicator: TrayIndicator {
@@ -97,6 +101,10 @@ public final class AttentionCenter {
         if next == .idle, items[id] == nil { return }
         items[id] = item
         if next == .idle { items[id] = nil }
+        if persistUnread, let sid = sessionId {
+            // 仅在「被查看」时清除;后台会话空闲更新不能抹掉上次启动遗留的未读
+            if next == .unreadDone { RecentStore.markUnread(sid) } else if focusedID == id, next == .idle { RecentStore.clearUnread(sid) }
+        }
         if changed {
             Log.session.info("注意力状态变化", ["id": String(id.prefix(8)), "project": project, "from": "\(previous)", "to": "\(next)"])
             if next == .unreadDone { onFinished?(item) }
@@ -110,6 +118,7 @@ public final class AttentionCenter {
         guard var item = items[id], item.state == .unreadDone else { return }
         item.state = .idle
         items[id] = nil
+        if persistUnread, let sid = item.sessionId { RecentStore.clearUnread(sid) }
         Log.session.info("会话已读", ["id": String(id.prefix(8)), "project": item.project])
         onChange?()
     }
@@ -155,6 +164,7 @@ public struct RecentSession: Codable, Sendable, Equatable, Identifiable {
 public enum RecentStore {
     static let sessionsKey = "recent.sessions"
     static let projectsKey = "recent.projects"
+    static let unreadKey = "recent.unreadSessions"
 
     private static let suiteName = OSAllocatedUnfairLock<String?>(initialState: nil)
 
@@ -193,6 +203,32 @@ public enum RecentStore {
         let list = sessions(defaults)
         guard list.contains(where: { $0.sessionId == sessionId }) else { return }
         if let data = try? JSONEncoder().encode(list.filter { $0.sessionId != sessionId }) { defaults.set(data, forKey: sessionsKey) }
+    }
+
+    /// 读取未读完成的会话 ID 集合(跨启动保留)。
+    /// - Parameter defaults: 存储
+    public static func unreadSessionIDs(_ defaults: UserDefaults = RecentStore.defaults) -> Set<String> {
+        Set(defaults.stringArray(forKey: unreadKey) ?? [])
+    }
+
+    /// 标记某会话有未读完成结果(最多保留 50 个,超出时丢弃最早的)。
+    /// - Parameters:
+    ///   - sessionId: 协议会话 ID(空串忽略)
+    ///   - defaults: 存储
+    public static func markUnread(_ sessionId: String, _ defaults: UserDefaults = RecentStore.defaults) {
+        guard !sessionId.isEmpty else { return }
+        var list = (defaults.stringArray(forKey: unreadKey) ?? []).filter { $0 != sessionId }
+        list.append(sessionId)
+        defaults.set(Array(list.suffix(50)), forKey: unreadKey)
+    }
+
+    /// 清除某会话的未读标记。
+    /// - Parameters:
+    ///   - sessionId: 协议会话 ID
+    ///   - defaults: 存储
+    public static func clearUnread(_ sessionId: String, _ defaults: UserDefaults = RecentStore.defaults) {
+        guard let list = defaults.stringArray(forKey: unreadKey), list.contains(sessionId) else { return }
+        defaults.set(list.filter { $0 != sessionId }, forKey: unreadKey)
     }
 
     /// 清空最近会话。

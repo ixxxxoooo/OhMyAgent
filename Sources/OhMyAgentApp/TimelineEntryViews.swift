@@ -150,19 +150,23 @@ struct UserMessageView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .padding(.trailing, 18)
+        .padding(.trailing, 44)
         .omGlass(in: RoundedRectangle(cornerRadius: OMRadius.modal, style: .continuous))
         .overlay(alignment: .bottomTrailing) {
-            if !entry.isSteered {
-                Button { sticky?.beginEditing(entry, pinned: false) } label: {
-                    Image.om("square-pen", size: 12).foregroundStyle(OMColors.secondaryText).frame(width: 24, height: 24).contentShape(Rectangle())
+            // 悬停时右下角出现:复制图标 + 编辑图标(运行中引导的消息只有复制)
+            HStack(spacing: 0) {
+                OMCopyButton(help: String(localized: "复制消息"), size: 12) { entry.text }
+                if !entry.isSteered {
+                    Button { sticky?.beginEditing(entry, pinned: false) } label: {
+                        Image.om("square-pen", size: 12).foregroundStyle(OMColors.secondaryText).frame(width: 24, height: 24).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .omTooltip("放大编辑(双击)")
+                    .accessibilityLabel("放大编辑")
                 }
-                .buttonStyle(.plain)
-                .opacity(hovering ? 1 : 0)
-                .padding(8)
-                .omTooltip("放大编辑(双击)")
-                .accessibilityLabel("放大编辑")
             }
+            .opacity(hovering ? 1 : 0)
+            .padding(8)
         }
         .contentShape(RoundedRectangle(cornerRadius: OMRadius.modal, style: .continuous))
         .onHover { hovering = $0 }

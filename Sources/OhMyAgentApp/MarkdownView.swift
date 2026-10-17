@@ -27,6 +27,7 @@ struct MarkdownView: View {
 }
 
 /// 把行内 Markdown 转为 AttributedString;失败时回退为纯文本。
+/// 行内代码仅保留系统标记(`inlinePresentationIntent`),圆角底与等宽字体由 `InlineMarkdownText` 绘制。
 /// - Parameter source: 原文
 func inlineMarkdown(_ source: String) -> AttributedString {
     let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
@@ -36,13 +37,72 @@ func inlineMarkdown(_ source: String) -> AttributedString {
     for run in result.runs where run.link != nil {
         result[run.range].foregroundColor = linkColor
     }
-    // 行内代码:系统只打 `inlinePresentationIntent` 标记、SwiftUI 不会据此着色,这里显式用等宽字体 + 强调色 + 淡底
-    for run in result.runs where run.inlinePresentationIntent?.contains(.code) == true {
-        result[run.range].font = OMFonts.readingMono
-        result[run.range].foregroundColor = OMColors.accentText
-        result[run.range].backgroundColor = OMColors.subtleFill
-    }
     return result
+}
+
+/// 行内代码标记:`InlineCodeTextRenderer` 据此在文字后面画圆角底。
+struct InlineCodeAttribute: TextAttribute {}
+
+/// 行内代码渲染器:在带 `InlineCodeAttribute` 的文字后画圆角底(圆角取 `OMRadius.tag`),其余文字原样绘制。
+/// 左右内边距由文字两侧的细空格(U+2009)提供,所以换行时底色不会贴边。
+struct InlineCodeTextRenderer: TextRenderer {
+    /// 底色
+    var fill: Color
+    /// 圆角
+    var radius: CGFloat
+
+    func draw(layout: Text.Layout, in context: inout GraphicsContext) {
+        for line in layout {
+            for run in line {
+                if run[InlineCodeAttribute.self] != nil {
+                    let rect = run.typographicBounds.rect.insetBy(dx: 0, dy: -1)
+                    context.fill(Path(roundedRect: rect, cornerRadius: radius, style: .continuous), with: .color(fill))
+                }
+                context.draw(run)
+            }
+        }
+    }
+}
+
+/// 把行内 Markdown 构造成 `Text`:普通片段沿用系统渲染(链接、粗体、斜体),行内代码片段换成等宽字体 + 强调色,并打上 `InlineCodeAttribute`。
+/// - Parameter source: 行内 Markdown 原文
+/// - Returns: 文本与是否含行内代码
+@MainActor
+func inlineMarkdownText(_ source: String) -> (text: Text, hasCode: Bool) {
+    let attributed = inlineMarkdown(source)
+    var result: Text?
+    var hasCode = false
+    for run in attributed.runs {
+        let piece: Text
+        if run.inlinePresentationIntent?.contains(.code) == true {
+            hasCode = true
+            let code = String(attributed[run.range].characters)
+            piece = Text(verbatim: "\u{2009}\(code)\u{2009}")
+                .font(OMFonts.readingMono)
+                .foregroundStyle(OMColors.accentText)
+                .customAttribute(InlineCodeAttribute())
+        } else {
+            piece = Text(AttributedString(attributed[run.range]))
+        }
+        result = result.map { Text("\($0)\(piece)") } ?? piece
+    }
+    return (result ?? Text(verbatim: ""), hasCode)
+}
+
+/// 行内 Markdown 文本:行内代码为圆角底并带内边距;其余与 `Text(inlineMarkdown(…))` 一致。
+struct InlineMarkdownText: View {
+    let source: String
+
+    init(_ source: String) { self.source = source }
+
+    var body: some View {
+        let built = inlineMarkdownText(source)
+        if built.hasCode {
+            built.text.textRenderer(InlineCodeTextRenderer(fill: OMColors.accent.opacity(0.1), radius: OMRadius.tag))
+        } else {
+            built.text
+        }
+    }
 }
 
 /// 单个块的视图。
@@ -52,13 +112,13 @@ struct MarkdownBlockView: View, Equatable {
     var body: some View {
         switch block {
         case .heading(let level, let text):
-            Text(inlineMarkdown(text))
+            InlineMarkdownText(text)
                 .font(OMFonts.custom(headingSize(level), weight: .medium))
                 .lineSpacing(OMFonts.lineSpacing(forSize: headingSize(level)))
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, level <= 2 ? 6 : 2)
         case .paragraph(let text):
-            Text(inlineMarkdown(text))
+            InlineMarkdownText(text)
                 .font(OMFonts.reading)
                 .lineSpacing(OMFonts.readingLineSpacing)
                 .fixedSize(horizontal: false, vertical: true)
@@ -80,7 +140,7 @@ struct MarkdownBlockView: View, Equatable {
                         } else {
                             Text(item.marker).foregroundStyle(OMColors.secondaryText)
                         }
-                        Text(inlineMarkdown(item.text))
+                        InlineMarkdownText(item.text)
                             .lineSpacing(OMFonts.readingLineSpacing)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -91,7 +151,7 @@ struct MarkdownBlockView: View, Equatable {
         case .quote(let text):
             HStack(spacing: 10) {
                 RoundedRectangle(cornerRadius: 1.5).fill(OMColors.hairline).frame(width: 3) // ui-lint:allow 引用条细线圆角
-                Text(inlineMarkdown(text))
+                InlineMarkdownText(text)
                     .font(OMFonts.reading)
                     .lineSpacing(OMFonts.readingLineSpacing)
                     .foregroundStyle(OMColors.secondaryText)
@@ -183,14 +243,14 @@ struct TableBlockView: View {
         Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
             GridRow {
                 ForEach(Array(header.enumerated()), id: \.offset) { _, cell in
-                    Text(inlineMarkdown(cell)).font(OMFonts.small.weight(.medium))
+                    InlineMarkdownText(cell).font(OMFonts.small.weight(.medium))
                 }
             }
             Divider().gridCellUnsizedAxes(.horizontal)
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 GridRow {
                     ForEach(Array(row.enumerated()), id: \.offset) { _, cell in
-                        Text(inlineMarkdown(cell)).font(OMFonts.small)
+                        InlineMarkdownText(cell).font(OMFonts.small)
                     }
                 }
             }

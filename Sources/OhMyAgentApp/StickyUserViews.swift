@@ -176,20 +176,23 @@ struct StickyUserCard: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .padding(.trailing, 18)
+        .padding(.trailing, 44)
         .frame(maxWidth: .infinity, alignment: .leading)
         // 吸顶卡压在会话流之上,玻璃会透出后面滚动的正文:先垫一层不透明内容底色
         .background(OMColors.surface, in: RoundedRectangle(cornerRadius: OMRadius.modal, style: .continuous))
         .omGlass(in: RoundedRectangle(cornerRadius: OMRadius.modal, style: .continuous))
         .overlay(alignment: .bottomTrailing) {
-            Button { sticky?.beginEditing(entry, pinned: true) } label: {
-                Image.om("square-pen", size: 12).foregroundStyle(OMColors.secondaryText).frame(width: 24, height: 24).contentShape(Rectangle())
+            HStack(spacing: 0) {
+                OMCopyButton(help: String(localized: "复制消息"), size: 12) { entry.text }
+                Button { sticky?.beginEditing(entry, pinned: true) } label: {
+                    Image.om("square-pen", size: 12).foregroundStyle(OMColors.secondaryText).frame(width: 24, height: 24).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .omTooltip("放大编辑(双击)")
+                .accessibilityLabel("放大编辑")
             }
-            .buttonStyle(.plain)
             .opacity(hovering ? 1 : 0)
             .padding(8)
-            .omTooltip("放大编辑(双击)")
-            .accessibilityLabel("放大编辑")
         }
         .contentShape(RoundedRectangle(cornerRadius: OMRadius.modal, style: .continuous))
         .onHover { hovering = $0 }

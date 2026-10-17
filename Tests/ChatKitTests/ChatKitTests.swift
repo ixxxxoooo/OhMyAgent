@@ -352,6 +352,54 @@ struct M3ScenarioTests {
         model.shutdown()
     }
 
+    @Test("提问结果:回答后生成快照并挂到时间线;跳过只保留题目")
+    func elicitationOutcome() async throws {
+        let ws = try Self.tempWorkspace()
+        defer { try? FileManager.default.removeItem(at: ws) }
+        let model = try await Self.readyModel(workspace: ws)
+        model.send("#ask")
+        #expect(await SessionModelTests.wait { !model.pendingElicitations.isEmpty })
+        let prompt = try #require(model.pendingElicitations.first)
+        let questions = try #require(prompt.questions)
+        questions[0].choose("B")
+        questions[1].choose("文档")
+        questions[1].choose("测试")
+        prompt.accept()
+        let outcome = try #require(prompt.outcome)
+        #expect(outcome.state == .answered)
+        #expect(outcome.items.map(\.answers) == [["方案 B"], ["测试", "文档"]])
+        #expect(outcome.items[0].header == "方案")
+        model.dismiss(prompt)
+        let attached = model.timeline.entries.first { $0.elicitationOutcome != nil }
+        #expect(attached?.elicitationOutcome == outcome)
+        #expect(attached?.tool.map(ElicitationOutcome.isAskQuestion) == true)
+        #expect(await SessionModelTests.wait { !model.isRunning })
+        model.shutdown()
+    }
+
+    @Test("提问结果:从历史工具调用还原问答")
+    func replayedOutcome() {
+        let input: JSONValue = [
+            "questions": [
+                ["question": "你希望以什么形式呈现?", "header": "形式", "multiSelect": false,
+                 "options": [["label": "Mermaid 图", "description": "x"], ["label": "Markdown 大纲", "description": "y"]]],
+                ["question": "附加项?", "header": "附加", "multiSelect": true, "options": [["label": "测试"], ["label": "文档"]]],
+            ],
+        ]
+        let output: JSONValue = .string("User has answered your questions: \"你希望以什么形式呈现?\"=\"Markdown 大纲\", \"附加项?\"=\"测试, 文档\". You can now continue with the user's answers in mind.")
+        let tool = ToolCall(toolCallId: "t1", name: "AskUserQuestion", title: "Asking for your input", status: .completed, rawInput: input, rawOutput: output)
+        let outcome = ElicitationOutcome.replayed(from: tool)
+        #expect(outcome?.state == .answered)
+        #expect(outcome?.items.map(\.answers) == [["Markdown 大纲"], ["测试", "文档"]])
+        #expect(outcome?.items.first?.header == "形式")
+        // 没有结果文本且已完成 → 视为跳过;进行中 → 不还原
+        let skipped = ToolCall(toolCallId: "t2", name: "AskUserQuestion", status: .completed, rawInput: input)
+        #expect(ElicitationOutcome.replayed(from: skipped)?.state == .skipped)
+        let running = ToolCall(toolCallId: "t3", name: "AskUserQuestion", status: .inProgress, rawInput: input)
+        #expect(ElicitationOutcome.replayed(from: running) == nil)
+        #expect(!ElicitationOutcome.isAskQuestion(ToolCall(toolCallId: "t4", name: "Read")))
+    }
+
     @Test("声明 terminal 能力后命令输出进入终端会话")
     func terminal() async throws {
         let ws = try Self.tempWorkspace()
@@ -789,5 +837,20 @@ struct AttentionTests {
         #expect(RecentStore.projects(defaults) == ["/tmp", NSHomeDirectory()])
         RecentStore.recordProject("/不存在的目录", defaults)
         #expect(!RecentStore.projects(defaults).contains("/不存在的目录"))
+    }
+
+    @Test("未读会话标记可持久化、去重、清除,并限量 50 个")
+    func unreadSessionsPersist() {
+        let defaults = UserDefaults(suiteName: "oma-test-\(UUID().uuidString)")!
+        RecentStore.markUnread("a", defaults)
+        RecentStore.markUnread("b", defaults)
+        RecentStore.markUnread("a", defaults)
+        RecentStore.markUnread("", defaults)
+        #expect(RecentStore.unreadSessionIDs(defaults) == ["a", "b"])
+        RecentStore.clearUnread("a", defaults)
+        #expect(RecentStore.unreadSessionIDs(defaults) == ["b"])
+        for index in 0..<60 { RecentStore.markUnread("s\(index)", defaults) }
+        #expect(RecentStore.unreadSessionIDs(defaults).count == 50)
+        #expect(RecentStore.unreadSessionIDs(defaults).contains("s59"))
     }
 }

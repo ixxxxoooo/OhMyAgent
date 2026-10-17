@@ -2280,3 +2280,12 @@
 "%.0f ms · %lld 次 · P95 %.0f ms" = "%.0f ms · %lld calls · P95 %.0f ms";
 "资源采样写入 perf 日志(资源采样 / 容量快照 / 性能汇总)。查看汇总:Scripts/logs.sh report。" = "Resource samples are written to the perf log (resource sample / capacity snapshot / performance summary). View a report with Scripts/logs.sh report.";
 "## 性能画像" = "## Performance profile";
+"复制消息" = "Copy message";
+"重启" = "Restart";
+"向你提问" = "Ask you";
+"已回答 %lld 个问题" = "Answered %lld questions";
+"已跳过提问" = "Questions skipped";
+"提问已取消" = "Questions cancelled";
+"%lld 个问题" = "%lld questions";
+"未回答" = "Unanswered";
+"细滚动条(自绘)" = "Thin scrollbars (custom)";

@@ -81,7 +81,7 @@ struct CollapsibleOutput: View {
         }
     }
 
-    /// 限高滚动区域:内容矮于上限时贴合内容,高于上限时滚动;收起态底部渐隐提示还有更多。
+    /// 限高滚动区域:内容矮于上限时贴合内容,高于上限时滚动;收起态由底部「展开 · 共 N 行」条提示还有更多(不做淡出)。
     private func scrollingBody(_ text: String) -> some View {
         let limit = expanded ? Self.expandedHeight : Self.collapsedHeight
         return ScrollViewReader { proxy in
@@ -94,13 +94,6 @@ struct CollapsibleOutput: View {
             .scrollBounceBehavior(.basedOnSize)
             .onChange(of: raw) { if followTail { proxy.scrollTo("tail", anchor: .bottom) } }
             .onAppear { if followTail { proxy.scrollTo("tail", anchor: .bottom) } }
-        }
-        .overlay(alignment: .bottom) {
-            if !expanded, contentHeight > Self.collapsedHeight {
-                LinearGradient(colors: [.clear, OMColors.card.opacity(0.55)], startPoint: .top, endPoint: .bottom) // ui-lint:allow 仅作遮罩/淡出,非装饰
-                    .frame(height: 22)
-                    .allowsHitTesting(false)
-            }
         }
     }
 
