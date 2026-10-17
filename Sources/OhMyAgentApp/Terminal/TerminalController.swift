@@ -27,6 +27,8 @@ final class TerminalController: Identifiable {
     /// 当前持有渲染视图的宿主(见 `TerminalHostView.Coordinator`)
     @ObservationIgnored weak var hostToken: AnyObject?
     @ObservationIgnored private var process: LocalProcess?
+    /// 已登记到资源采样的 shell pid(退出时注销)。
+    @ObservationIgnored private var registeredPID: Int32?
     @ObservationIgnored private let executable: String
     @ObservationIgnored private let arguments: [String]
     @ObservationIgnored private let extraEnvironment: [String: String]
@@ -111,6 +113,10 @@ final class TerminalController: Identifiable {
         self.process = process
         process.startProcess(executable: executable, args: arguments, environment: Self.environment(extra: extraEnvironment, darkBackground: OMTerminalPalette.currentIsDark), execName: nil, currentDirectory: directory)
         isRunning = process.running
+        if isRunning {
+            registeredPID = process.shellPid
+            ProcessRegistry.shared.register(pid: process.shellPid, role: .terminal, label: (executable as NSString).lastPathComponent)
+        }
         Log.ui.info("终端已启动", ["id": id, "shell": (executable as NSString).lastPathComponent, "running": "\(isRunning)"])
     }
 
@@ -211,6 +217,8 @@ extension TerminalController: LocalProcessDelegate {
     nonisolated func processTerminated(_ source: LocalProcess, exitCode: Int32?) {
         MainActor.assumeIsolated {
             isRunning = false
+            if let pid = registeredPID { ProcessRegistry.shared.unregister(pid: pid) }
+            registeredPID = nil
             self.exitCode = exitCode.flatMap(Self.decodeWaitStatus)
             Log.ui.info("终端进程已退出", ["id": id, "code": self.exitCode.map { String($0) } ?? "signal"])
         }

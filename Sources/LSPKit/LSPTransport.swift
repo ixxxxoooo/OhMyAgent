@@ -63,6 +63,7 @@ public final class LSPStdioTransport: ACPTransport, @unchecked Sendable {
         }
         let name = (launch.executable as NSString).lastPathComponent
         process.terminationHandler = { [stdoutPipe, stderrPipe, decoder] proc in
+            ProcessRegistry.shared.unregister(pid: proc.processIdentifier)
             Log.lsp.info("语言服务器进程退出", ["server": name, "pid": "\(proc.processIdentifier)", "status": "\(proc.terminationStatus)"])
             stdoutPipe.fileHandleForReading.readabilityHandler = nil
             stderrPipe.fileHandleForReading.readabilityHandler = nil
@@ -76,6 +77,7 @@ public final class LSPStdioTransport: ACPTransport, @unchecked Sendable {
             Log.lsp.error("语言服务器启动失败", error: error, ["executable": launch.executable])
             throw error
         }
+        ProcessRegistry.shared.register(pid: process.processIdentifier, role: .lsp, label: name)
         Log.lsp.info("语言服务器已启动", ["server": name, "args": launch.arguments.joined(separator: " "), "cwd": launch.workingDirectory ?? "-", "pid": "\(process.processIdentifier)"])
         return stream
     }

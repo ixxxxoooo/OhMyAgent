@@ -50,6 +50,7 @@ final class ManagedTerminal: Sendable {
             self?.append(data)
         }
         process.terminationHandler = { [weak self] proc in
+            ProcessRegistry.shared.unregister(pid: proc.processIdentifier)
             // 读尽管道中剩余数据后再标记退出
             if let remaining = try? pipe.fileHandleForReading.readToEnd(), !remaining.isEmpty {
                 self?.append(remaining)
@@ -63,6 +64,7 @@ final class ManagedTerminal: Sendable {
             Log.terminal.error("终端命令启动失败", error: error, ["command": command, "cwd": cwd ?? "-"])
             throw error
         }
+        ProcessRegistry.shared.register(pid: process.processIdentifier, role: .terminal, label: (command as NSString).lastPathComponent)
         Log.terminal.info("终端命令已启动", ["id": id, "command": command, "args": args.joined(separator: " "), "cwd": cwd ?? "-", "pid": "\(process.processIdentifier)"])
     }
 

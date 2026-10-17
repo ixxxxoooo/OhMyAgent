@@ -104,6 +104,7 @@ public final class StdioTransport: ACPTransport, @unchecked Sendable {
         }
         let launchDescription = "\((launch.executable as NSString).lastPathComponent) \(launch.arguments.joined(separator: " "))"
         process.terminationHandler = { [stdoutPipe, stderrPipe, framer] proc in
+            ProcessRegistry.shared.unregister(pid: proc.processIdentifier)
             Log.agent.info("子进程退出", ["cmd": launchDescription, "pid": "\(proc.processIdentifier)", "status": "\(proc.terminationStatus)", "reason": proc.terminationReason == .exit ? "exit" : "signal"])
             // 读尽残余数据后再通知关闭,避免丢失最后几行
             stdoutPipe.fileHandleForReading.readabilityHandler = nil
@@ -119,6 +120,7 @@ public final class StdioTransport: ACPTransport, @unchecked Sendable {
             Log.agent.error("子进程启动失败", error: error, ["executable": launch.executable, "args": launch.arguments.joined(separator: " ")])
             throw error
         }
+        ProcessRegistry.shared.register(pid: process.processIdentifier, role: .agent, label: (launch.executable as NSString).lastPathComponent)
         Log.agent.info("子进程已启动", ["executable": launch.executable, "args": launch.arguments.joined(separator: " "), "cwd": launch.workingDirectory ?? "-", "pid": "\(process.processIdentifier)"])
         return stream
     }
