@@ -395,11 +395,11 @@ public enum OMFonts {
     public static var body: Font { .system(size: 13.5 * OMScale.ui) }
     public static var small: Font { .system(size: 11.5 * OMScale.ui) }
     public static var caption: Font { .system(size: 11 * OMScale.ui) }
-    public static var title: Font { .system(size: 15 * OMScale.ui, weight: .semibold) }
+    public static var title: Font { .system(size: 15 * OMScale.ui, weight: .medium) }
     public static var mono: Font { .system(size: 12.5 * OMScale.ui, design: .monospaced) }
     public static var monoSmall: Font { .system(size: 11.5 * OMScale.ui, design: .monospaced) }
-    /// 设置页分组标题(与 `title` 同族,略小,半粗)。
-    public static var sectionTitle: Font { .system(size: 13 * OMScale.ui, weight: .semibold) }
+    /// 设置页分组标题(与 `title` 同族,略小,中等字重;字重上限 medium,见 AGENTS.md 4.4)。
+    public static var sectionTitle: Font { .system(size: 13 * OMScale.ui, weight: .medium) }
     /// 受控的自定义字号(随界面字号缩放):仅用于令牌表覆盖不到的特例(Markdown 标题、徽标数字等)。
     /// - Parameters:
     ///   - size: 基准字号(未缩放)
@@ -412,4 +412,27 @@ public enum OMFonts {
     public static var reading: Font { .system(size: 13.5 * OMScale.ui * OMScale.timeline) }
     /// 时间线代码
     public static var readingMono: Font { .system(size: 12.5 * OMScale.ui * OMScale.timeline, design: .monospaced) }
+}
+
+/// 编辑性标题级别(纸感规范的「低语标题」:字重 regular、衬线、字号越大字距越紧)。
+public enum OMEditorialLevel: Sendable {
+    /// 22pt:空状态主标题、页面大标题
+    case small
+    /// 26pt:欢迎页等少数大标题
+    case medium
+
+    /// 基准字号。
+    var size: CGFloat { self == .small ? 22 : 26 }
+    /// 字距(pt):取自参考规范 -0.11px(22)与 -0.312px(26)。
+    var tracking: CGFloat { self == .small ? -0.11 : -0.312 }
+}
+
+public extension View {
+    /// 编辑性标题:系统衬线(New York)、regular 字重、按级别收紧字距,随「界面字号」缩放。
+    /// 仅用于空状态与页面级标题;界面标签、导航、按钮禁止使用衬线。
+    /// - Parameter level: 标题级别
+    func omEditorialHeading(_ level: OMEditorialLevel = .small) -> some View {
+        font(.system(size: level.size * OMScale.ui, weight: .regular, design: .serif))
+            .tracking(level.tracking)
+    }
 }

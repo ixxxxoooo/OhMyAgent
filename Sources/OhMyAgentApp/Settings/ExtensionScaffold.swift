@@ -152,7 +152,7 @@ struct ExtensionSectionLabel: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Text(verbatim: title).font(OMFonts.small.weight(.semibold)).foregroundStyle(OMColors.secondaryText)
+            Text(verbatim: title).font(OMFonts.small.weight(.medium)).foregroundStyle(OMColors.secondaryText)
             Text("\(count)").font(OMFonts.caption.monospacedDigit()).foregroundStyle(OMColors.tertiaryText)
         }
         .padding(.top, 6)

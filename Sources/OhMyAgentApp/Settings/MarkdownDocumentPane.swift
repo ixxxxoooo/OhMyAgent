@@ -93,7 +93,7 @@ struct FrontmatterPropertiesView: View {
         Button { omWithAnimation { collapsed.toggle() } } label: {
             HStack(spacing: 6) {
                 Image.om(collapsed ? "chevron-right" : "chevron-down", size: 11)
-                Text("属性").font(OMFonts.small.weight(.semibold))
+                Text("属性").font(OMFonts.small.weight(.medium))
                 if count > 0 { Text("\(count)").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText) }
                 Spacer()
             }

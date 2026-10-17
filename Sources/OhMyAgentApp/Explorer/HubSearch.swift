@@ -340,7 +340,7 @@ struct HubOverlay: View {
             ForEach(HubSegment.allCases) { item in
                 Button { hub.segment = item; focused = true } label: {
                     Text(item.title)
-                        .font(OMFonts.small.weight(hub.segment == item ? .semibold : .regular))
+                        .font(OMFonts.small.weight(hub.segment == item ? .medium : .regular))
                         .foregroundStyle(hub.segment == item ? OMColors.primaryText : OMColors.secondaryText)
                         .padding(.horizontal, 10)
                         .frame(height: 24)
@@ -506,7 +506,7 @@ private struct HubRow: View {
         for index in 0..<item.title.count {
             let next = text.index(afterCharacter: cursor)
             if item.positions.contains(index) {
-                text[cursor..<next].font = OMFonts.custom(13.5, weight: .bold)
+                text[cursor..<next].font = OMFonts.custom(13.5, weight: .bold) // ui-lint:allow 搜索命中高亮属于内容强调
                 text[cursor..<next].foregroundColor = OMColors.accent
             }
             cursor = next
@@ -592,7 +592,7 @@ private struct HubThemeRow: View {
         for index in 0..<item.title.count {
             let next = text.index(afterCharacter: cursor)
             if item.positions.contains(index) {
-                text[cursor..<next].font = OMFonts.custom(13.5, weight: .bold)
+                text[cursor..<next].font = OMFonts.custom(13.5, weight: .bold) // ui-lint:allow 搜索命中高亮属于内容强调
                 text[cursor..<next].foregroundColor = OMColors.accent
             }
             cursor = next

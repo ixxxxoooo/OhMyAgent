@@ -21,7 +21,7 @@ struct ChangesSummaryView: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 8) {
                     Text("\(count) \(count == 1 ? "File Changed" : "Files Changed")")
-                        .font(OMFonts.small.weight(.semibold))
+                        .font(OMFonts.small.weight(.medium))
                         .foregroundStyle(OMColors.primaryText)
                     Spacer()
                     Button {

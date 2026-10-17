@@ -232,7 +232,7 @@ private struct CommitDetailView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(commit.subject).font(OMFonts.small.weight(.semibold)).textSelection(.enabled)
+                Text(commit.subject).font(OMFonts.small.weight(.medium)).textSelection(.enabled)
                 HStack(spacing: 8) {
                     Text(commit.author)
                     Text(commit.date, format: .dateTime.year().month().day().hour().minute())
@@ -247,7 +247,7 @@ private struct CommitDetailView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(files) { file in
                         HStack(spacing: 6) {
-                            Text(file.staged?.badge ?? "").font(OMFonts.caption.weight(.semibold)).foregroundStyle(color(file.staged)).frame(width: 14)
+                            Text(file.staged?.badge ?? "").font(OMFonts.caption.weight(.medium)).foregroundStyle(color(file.staged)).frame(width: 14)
                             Text(file.path).font(OMFonts.small).lineLimit(1).truncationMode(.head)
                             Spacer()
                         }

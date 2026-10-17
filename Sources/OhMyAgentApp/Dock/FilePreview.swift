@@ -354,7 +354,7 @@ struct CSVTableView: View {
         HStack(alignment: .top, spacing: 0) {
             ForEach(Array(widths.enumerated()), id: \.offset) { column, width in
                 Text(row.indices.contains(column) ? row[column] : "")
-                    .font(header ? OMFonts.small.weight(.semibold) : OMFonts.small)
+                    .font(header ? OMFonts.small.weight(.medium) : OMFonts.small)
                     .lineLimit(3)
                     .padding(.horizontal, 8).padding(.vertical, 4)
                     .frame(width: width, alignment: .leading)

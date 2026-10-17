@@ -61,7 +61,7 @@ struct QuestionWizardCard: View {
                 Image.om("chevron-down", size: 11, weight: .bold)
                     .rotationEffect(.degrees(collapsed ? -90 : 0))
                 Image.om("message-circle-question-mark", size: 12)
-                Text("提问").font(OMFonts.small.weight(.semibold))
+                Text("提问").font(OMFonts.small.weight(.medium))
                 if questions.count > 1 {
                     Text("\(questions.count) 题").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
                 }
@@ -271,7 +271,7 @@ private struct QuestionBody: View {
 
     private func badge(_ index: Int, selected: Bool) -> some View {
         Text(letter(index))
-            .font(OMFonts.custom(10.5, weight: .semibold, design: .rounded))
+            .font(OMFonts.custom(10.5, weight: .medium, design: .rounded))
             .foregroundStyle(selected ? OMColors.onAction : OMColors.secondaryText)
             .frame(width: 18, height: 18)
             .background(selected ? OMColors.actionFill : OMColors.pressedFill, in: RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))

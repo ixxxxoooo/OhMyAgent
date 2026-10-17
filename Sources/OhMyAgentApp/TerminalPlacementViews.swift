@@ -118,7 +118,7 @@ struct TerminalSidePanel: View {
         VStack(spacing: 0) {
             HStack(spacing: 6) {
                 Image.om("square-terminal", size: 13)
-                Text("终端").font(OMFonts.small.weight(.semibold))
+                Text("终端").font(OMFonts.small.weight(.medium))
                 Spacer(minLength: 4)
                 Button { workbench.hideTerminal() } label: { Image.om("xmark") }
                     .buttonStyle(.omPlain)
@@ -149,7 +149,7 @@ struct OutputSidePanel: View {
         VStack(spacing: 0) {
             HStack(spacing: 6) {
                 Image.om("file-text", size: 13)
-                Text("输出").font(OMFonts.small.weight(.semibold))
+                Text("输出").font(OMFonts.small.weight(.medium))
                 Spacer(minLength: 4)
                 Button { workbench.hideOutput() } label: { Image.om("xmark") }
                     .buttonStyle(.omPlain)
@@ -184,7 +184,7 @@ struct TerminalDropOverlay: View {
                         RoundedRectangle(cornerRadius: OMRadius.control)
                             .fill(OMColors.selectedFill)
                             .overlay(RoundedRectangle(cornerRadius: OMRadius.control).strokeBorder(OMColors.accent.opacity(0.75), lineWidth: 2))
-                            .overlay { Text(drag.panel.title + " → " + Self.title(target)).font(OMFonts.body.weight(.semibold)).foregroundStyle(OMColors.accent) }
+                            .overlay { Text(drag.panel.title + " → " + Self.title(target)).font(OMFonts.body.weight(.medium)).foregroundStyle(OMColors.accent) }
                             .frame(width: max(0, rect.width - 8), height: max(0, rect.height - 8))
                             .position(x: rect.midX, y: rect.midY)
                     }

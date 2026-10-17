@@ -56,7 +56,7 @@ struct ContextUsagePanel: View {
 
     private var header: some View {
         HStack(spacing: 6) {
-            Text("上下文用量").font(OMFonts.small.weight(.semibold))
+            Text("上下文用量").font(OMFonts.small.weight(.medium))
             if model.isProbingContext { ProgressView().controlSize(.mini) }
             Spacer()
             Button(action: onClose) {
@@ -136,7 +136,7 @@ struct ContextUsageBody: View {
         let colored = usage.categories.enumerated().map { ContextPalette.Item(category: $1, color: ContextPalette.color(for: $1, index: $0)) }
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                Text("\(usage.percent)% 已满").font(OMFonts.small.weight(.semibold))
+                Text("\(usage.percent)% 已满").font(OMFonts.small.weight(.medium))
                 Spacer()
                 Text("~\(ContextUsage.formatTokens(usage.totalTokens)) / \(ContextUsage.formatTokens(usage.maxTokens)) Tokens")
                     .font(OMFonts.monoSmall).foregroundStyle(OMColors.secondaryText)

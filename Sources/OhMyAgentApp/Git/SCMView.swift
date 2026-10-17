@@ -87,7 +87,7 @@ private struct SCMContent: View {
         Button { branchShown.toggle() } label: {
             HStack(spacing: 4) {
                 Image.om("git-branch", size: 12)
-                Text(branchTitle).font(OMFonts.small.weight(.semibold)).lineLimit(1)
+                Text(branchTitle).font(OMFonts.small.weight(.medium)).lineLimit(1)
                 Image.om("chevron-down", size: 10).foregroundStyle(OMColors.tertiaryText)
             }
             .contentShape(Rectangle())
@@ -445,7 +445,7 @@ private struct SectionHeader<Actions: View>: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Text(title).font(OMFonts.caption.weight(.semibold)).foregroundStyle(tint)
+            Text(title).font(OMFonts.caption.weight(.medium)).foregroundStyle(tint)
             Text("\(count)").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
             Spacer()
             actions()
@@ -562,7 +562,7 @@ private struct ChangeRow: View {
 
     private var badge: some View {
         Text(section == .conflict ? "!" : (kind?.badge ?? ""))
-            .font(OMFonts.caption.weight(.semibold))
+            .font(OMFonts.caption.weight(.medium))
             .foregroundStyle(badgeColor)
             .frame(width: 14)
     }

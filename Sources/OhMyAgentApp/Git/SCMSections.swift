@@ -28,7 +28,7 @@ private struct CollapsibleHeader<Actions: View>: View {
                     Image.om("chevron-right", size: 10, weight: .bold)
                         .rotationEffect(.degrees(expanded ? 90 : 0))
                         .frame(width: 12)
-                    Text(title).font(OMFonts.caption.weight(.semibold))
+                    Text(title).font(OMFonts.caption.weight(.medium))
                     if let count { Text("\(count)").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText) }
                     Spacer(minLength: 0)
                 }
@@ -180,7 +180,7 @@ private struct GraphCommitDetail: View {
                 Text(dir).font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText).lineLimit(1).truncationMode(.head)
             }
             Spacer(minLength: 4)
-            Text(kind?.badge ?? "").font(OMFonts.caption.weight(.semibold)).foregroundStyle(color(kind))
+            Text(kind?.badge ?? "").font(OMFonts.caption.weight(.medium)).foregroundStyle(color(kind))
         }
         .padding(.horizontal, 12).padding(.vertical, 3)
         .background(openFile == file.path ? OMColors.selectedFill : .clear)

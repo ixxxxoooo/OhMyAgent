@@ -18,7 +18,7 @@ struct PermissionCard: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Image.om(prompt.isPlanApproval ? "list-todo" : ToolIcons.symbol(for: prompt.kind)).foregroundStyle(OMColors.warning)
-                Text(prompt.isPlanApproval ? String(localized: "计划待批准") : String(localized: "需要你的许可")).font(OMFonts.small.weight(.semibold))
+                Text(prompt.isPlanApproval ? String(localized: "计划待批准") : String(localized: "需要你的许可")).font(OMFonts.small.weight(.medium))
             }
             if !prompt.isPlanApproval {
                 Text(prompt.title)
@@ -124,7 +124,7 @@ struct GenericElicitationCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label("Agent 想向你确认", om: "questionmark.bubble")
-                .font(OMFonts.small.weight(.semibold))
+                .font(OMFonts.small.weight(.medium))
             if !prompt.message.isEmpty {
                 Text(prompt.message).font(OMFonts.body).textSelection(.enabled)
             }
@@ -167,7 +167,7 @@ struct ElicitFieldView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             if !field.title.isEmpty {
-                Text(field.title + (field.isRequired ? " *" : "")).font(OMFonts.small.weight(.semibold))
+                Text(field.title + (field.isRequired ? " *" : "")).font(OMFonts.small.weight(.medium))
             }
             if let detail = field.detail, !detail.isEmpty {
                 Text(detail).font(OMFonts.caption).foregroundStyle(OMColors.secondaryText)

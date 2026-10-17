@@ -34,7 +34,7 @@ enum DemoLaunch {
 struct DemoBadgeView: View {
     var body: some View {
         Text("演示")
-            .font(OMFonts.caption.weight(.semibold))
+            .font(OMFonts.caption.weight(.medium))
             .foregroundStyle(OMColors.warning)
             .padding(.horizontal, 8)
             .padding(.vertical, 2)

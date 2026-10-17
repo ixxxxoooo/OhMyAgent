@@ -146,7 +146,7 @@ struct SpreadsheetTabView: View {
                     ForEach(Array(workbook.sheets.enumerated()), id: \.offset) { index, ref in
                         Button { select(sheet: index) } label: {
                             Text(ref.name)
-                                .font(OMFonts.small.weight(index == sheetIndex ? .semibold : .regular))
+                                .font(OMFonts.small.weight(index == sheetIndex ? .medium : .regular))
                                 .lineLimit(1)
                                 .padding(.horizontal, 10).frame(height: 22)
                                 .background(index == sheetIndex ? OMColors.selectedFill : Color.clear, in: RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))
@@ -376,7 +376,7 @@ private struct ColumnFilterPanel: View {
     var body: some View {
         VStack(spacing: 0) {
             Text(verbatim: title)
-                .font(OMFonts.small.weight(.semibold)).lineLimit(1)
+                .font(OMFonts.small.weight(.medium)).lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 12).padding(.top, 10).padding(.bottom, 6)
             sortRow

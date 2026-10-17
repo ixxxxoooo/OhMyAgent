@@ -44,7 +44,7 @@ struct MarkdownBlockView: View {
         switch block {
         case .heading(let level, let text):
             Text(inlineMarkdown(text))
-                .font(OMFonts.custom(headingSize(level), weight: .semibold))
+                .font(OMFonts.custom(headingSize(level), weight: .medium))
                 .padding(.top, level <= 2 ? 6 : 2)
         case .paragraph(let text):
             Text(inlineMarkdown(text))
@@ -156,7 +156,7 @@ struct TableBlockView: View {
         Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
             GridRow {
                 ForEach(Array(header.enumerated()), id: \.offset) { _, cell in
-                    Text(inlineMarkdown(cell)).font(OMFonts.small.weight(.semibold))
+                    Text(inlineMarkdown(cell)).font(OMFonts.small.weight(.medium))
                 }
             }
             Divider().gridCellUnsizedAxes(.horizontal)

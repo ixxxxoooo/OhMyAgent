@@ -25,7 +25,7 @@ struct ExplorerView: View {
         if let project = workbench.selectedProject {
             VStack(spacing: 0) {
                 HStack(spacing: 8) {
-                    Text(project.name).font(OMFonts.small.weight(.semibold)).lineLimit(1)
+                    Text(project.name).font(OMFonts.small.weight(.medium)).lineLimit(1)
                     Spacer()
                     toolButton("file-plus", "新建文件") { ExplorerActions.create(in: project.id, directory: false, workbench: workbench) }
                     toolButton("folder-plus", "新建文件夹") { ExplorerActions.create(in: project.id, directory: true, workbench: workbench) }
@@ -154,7 +154,7 @@ private struct ExplorerRow: View {
                     if isDirectory {
                         Circle().fill(Self.tint(decoration)).frame(width: 6, height: 6).accessibilityHidden(true)
                     } else {
-                        Text(decoration.letter).font(OMFonts.caption.weight(.semibold)).foregroundStyle(Self.tint(decoration))
+                        Text(decoration.letter).font(OMFonts.caption.weight(.medium)).foregroundStyle(Self.tint(decoration))
                     }
                 }
             }

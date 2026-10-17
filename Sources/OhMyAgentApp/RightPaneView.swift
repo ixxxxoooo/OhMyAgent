@@ -50,7 +50,7 @@ struct RightPaneView: View {
             Spacer(minLength: 4)
             // 标题区同时是拖动手柄:按住拖到窗口左/右半边即可把工具栏换到那一侧
             Text(Self.title(workbench.layout.rightPane))
-                .font(OMFonts.small.weight(.semibold))
+                .font(OMFonts.small.weight(.medium))
                 .foregroundStyle(OMColors.secondaryText)
                 .lineLimit(1)
                 .frame(minWidth: 60, maxHeight: .infinity, alignment: .trailing)

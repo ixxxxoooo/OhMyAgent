@@ -98,7 +98,7 @@ struct MCPPanelView: View {
     private var header: some View {
         HStack(spacing: 8) {
             Image.om("plug", size: 13)
-            Text("MCP 服务器").font(OMFonts.body.weight(.semibold))
+            Text("MCP 服务器").font(OMFonts.body.weight(.medium))
             Spacer()
             if center.isBusy {
                 ProgressView().controlSize(.small)

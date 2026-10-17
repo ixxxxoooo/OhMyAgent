@@ -38,7 +38,7 @@ struct SearchPaneView: View {
     }
 
     private func toggle(_ label: String, _ binding: Binding<Bool>, help: LocalizedStringKey) -> some View {
-        Toggle(isOn: binding) { Text(label).font(OMFonts.custom(11, weight: .semibold, design: .monospaced)) }
+        Toggle(isOn: binding) { Text(label).font(OMFonts.custom(11, weight: .medium, design: .monospaced)) }
             .toggleStyle(.button)
             .controlSize(.small)
             .help(help)
@@ -112,7 +112,7 @@ struct SearchPaneView: View {
             HStack(spacing: 4) {
                 Image.om(collapsed.contains(file.path) ? "chevron-right" : "chevron-down", size: 10)
                 OMFileIcon(name: (file.path as NSString).lastPathComponent, size: 14)
-                Text((file.path as NSString).lastPathComponent).font(OMFonts.small.weight(.semibold))
+                Text((file.path as NSString).lastPathComponent).font(OMFonts.small.weight(.medium))
                 Text((file.path as NSString).deletingLastPathComponent).font(OMFonts.caption).foregroundStyle(OMColors.secondaryText).lineLimit(1).truncationMode(.head)
                 Spacer()
                 Text("\(file.hits.count)").font(OMFonts.caption).foregroundStyle(OMColors.secondaryText)
@@ -154,7 +154,7 @@ private struct HitRow: View {
         let range = NSRange(location: max(0, min(hit.previewColumn, ns.length)), length: max(0, min(hit.length, ns.length - max(0, min(hit.previewColumn, ns.length)))))
         if range.length > 0, let swiftRange = Range(range, in: hit.preview), let lower = AttributedString.Index(swiftRange.lowerBound, within: text), let upper = AttributedString.Index(swiftRange.upperBound, within: text) {
             text[lower..<upper].backgroundColor = OMColors.accent.opacity(0.3)
-            text[lower..<upper].font = OMFonts.readingMono.weight(.bold)
+            text[lower..<upper].font = OMFonts.readingMono.weight(.bold) // ui-lint:allow 搜索命中高亮属于内容强调
         }
         return text
     }

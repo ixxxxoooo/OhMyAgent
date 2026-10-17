@@ -365,7 +365,7 @@ struct SubagentTabView: View {
     private func header(tool: ToolCall, entry: TimelineEntry) -> some View {
         HStack(spacing: 8) {
             Image.om("bot", size: 14).foregroundStyle(OMColors.accent)
-            Text(tool.title).font(OMFonts.body.weight(.semibold)).lineLimit(1)
+            Text(tool.title).font(OMFonts.body.weight(.medium)).lineLimit(1)
             if tool.status.isTerminal {
                 OMTag(tool.status == .failed ? String(localized: "失败") : String(localized: "已完成"), tint: tool.status == .failed ? OMColors.danger : OMColors.success)
             } else {

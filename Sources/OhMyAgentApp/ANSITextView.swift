@@ -27,7 +27,7 @@ struct ANSITextView: View {
         var result = AttributedString()
         for span in ANSIParser.parse(raw, maxLines: maxLines) {
             var piece = AttributedString(span.text)
-            piece.font = OMFonts.custom(fontSize, weight: span.bold ? .semibold : .regular, design: .monospaced)
+            piece.font = OMFonts.custom(fontSize, weight: span.bold ? .semibold : .regular, design: .monospaced) // ui-lint:allow 终端 ANSI 加粗属于输出内容
             if let color = span.foreground { piece.foregroundColor = Self.color(color, dim: span.dim) }
             else if span.dim { piece.foregroundColor = OMColors.secondaryText }
             if span.underline { piece.underlineStyle = .single }

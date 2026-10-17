@@ -369,7 +369,7 @@ struct PlanView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Label("计划", om: "list.bullet.clipboard")
-                .font(OMFonts.small.weight(.semibold))
+                .font(OMFonts.small.weight(.medium))
                 .foregroundStyle(OMColors.secondaryText)
             ForEach(Array(entry.plan.enumerated()), id: \.offset) { _, item in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -452,7 +452,7 @@ struct PlanDocView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label("计划", om: "list.bullet.clipboard")
-                .font(OMFonts.small.weight(.semibold))
+                .font(OMFonts.small.weight(.medium))
                 .foregroundStyle(OMColors.secondaryText)
             MarkdownView(text: entry.text)
         }

@@ -34,7 +34,7 @@ struct BottomPanelView: View {
                 ForEach(panes, id: \.self) { pane in
                     Button(Self.title(pane)) { workbench.layout.bottomPane = pane }
                         .buttonStyle(.plain)
-                        .font(OMFonts.small.weight(currentPane == pane ? .semibold : .regular))
+                        .font(OMFonts.small.weight(currentPane == pane ? .medium : .regular))
                         .foregroundStyle(currentPane == pane ? OMColors.primaryText : OMColors.secondaryText)
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(currentPane == pane ? OMColors.selectedFill : .clear, in: OMPillShape())

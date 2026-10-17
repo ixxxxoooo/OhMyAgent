@@ -91,7 +91,7 @@ struct EmptyHint: View {
     var body: some View {
         VStack(spacing: 8) {
             Image.om(icon, size: 28).foregroundStyle(OMColors.tertiaryText)
-            Text(verbatim: omLocalized(title)).font(OMFonts.title)
+            Text(verbatim: omLocalized(title)).omEditorialHeading()
             if let message { Text(verbatim: omLocalized(message)).font(OMFonts.small).foregroundStyle(OMColors.secondaryText).multilineTextAlignment(.center) }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
