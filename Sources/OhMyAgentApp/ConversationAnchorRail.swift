@@ -53,6 +53,8 @@ struct ConversationAnchorRail: View {
 
     @State private var cache = AnchorCache()
     @State private var hovering = false
+    /// 用户刚点选的提问:视口贴底时(最后几条提问无法滚到顶部)据此高亮,滚离底部后失效
+    @State private var picked: UUID?
 
     /// 单根刻度占用的最小高度
     private static let minRow: CGFloat = 7
@@ -80,9 +82,14 @@ struct ConversationAnchorRail: View {
         }
     }
 
-    /// 当前所在提问:最靠上的可见条目之前(含)最近的一条;没有可见信息时取最后一条。
+    /// 当前所在提问:最靠上的可见条目之前(含)最近的一条;视口贴底时取点选项或最后一条;没有可见信息时取最后一条。
     private func currentAnchor(in anchors: [ConversationAnchor]) -> UUID? {
         guard let top = sticky.topIndex else { return anchors.last?.id }
+        if sticky.atBottom {
+            // 贴底:点选过且仍在可见区之后/内的取点选项,否则取最后一条
+            if let picked, let hit = anchors.first(where: { $0.id == picked }), hit.index >= top { return picked }
+            return anchors.last?.id
+        }
         return (anchors.last { $0.index <= top } ?? anchors.first)?.id
     }
 
@@ -95,7 +102,7 @@ struct ConversationAnchorRail: View {
         return VStack(spacing: 0) {
             ForEach(shown) { anchor in
                 let isCurrent = anchor.id == current
-                Button { onSelect(anchor.id) } label: {
+                Button { picked = anchor.id; onSelect(anchor.id) } label: {
                     RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous)
                         .fill(isCurrent ? OMColors.accent : OMColors.tertiaryText.opacity(hovering ? 0.8 : 0.5))
                         .frame(width: isCurrent ? 16 : 10, height: 2)
@@ -115,7 +122,7 @@ struct ConversationAnchorRail: View {
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(anchors) { anchor in
                         let isCurrent = anchor.id == current
-                        Button { onSelect(anchor.id) } label: {
+                        Button { picked = anchor.id; onSelect(anchor.id) } label: {
                             HStack(spacing: 8) {
                                 Text(verbatim: "\(anchor.number)")
                                     .font(OMFonts.caption)

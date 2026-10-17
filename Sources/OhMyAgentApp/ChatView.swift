@@ -146,6 +146,8 @@ struct ChatView: View {
             )
             // 仅在视口真正贴底、且不是内容增高造成时才恢复跟随;展开思考块等使内容变高后离底部仍有距离,不恢复,否则点击处会被拽走
             let distance = metrics.contentHeight - (metrics.offsetY + metrics.containerHeight)
+            let bottomNow = distance <= 4
+            if sticky.atBottom != bottomNow { sticky.atBottom = bottomNow }
             if follow.pinned, old.contentHeight == metrics.contentHeight, distance <= 4 { sticky.followSuspended = false }
         }
         .onScrollGeometryChange(for: TimelineEdgeFade.Edges.self) { geometry in

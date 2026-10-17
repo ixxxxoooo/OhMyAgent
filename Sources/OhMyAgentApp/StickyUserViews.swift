@@ -19,6 +19,8 @@ final class StickyUserState {
     private(set) var topIndex: Int?
     /// 各用户消息行在滚动视口中的顶边 Y
     private(set) var userMinY: [UUID: CGFloat] = [:]
+    /// 视口是否贴在时间线最底部(锚点导航据此高亮:最后几条提问滚不到顶部,只能看视口是否已到底)
+    var atBottom = false
     /// 吸顶卡(仅卡片本体)高度
     var cardHeight: CGFloat = 0
     /// 当前吸顶目标
