@@ -262,7 +262,7 @@ private struct SCMContent: View {
                         }
                         .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.omPrimary)
+                    .buttonStyle(.omPositive)
                     .controlSize(.small)
                     .disabled(!canCommit)
                     .keyboardShortcut(.return, modifiers: [.command])
@@ -286,8 +286,8 @@ private struct SCMContent: View {
                     .menuStyle(.borderlessButton)
                     .menuIndicator(.hidden)
                     .fixedSize()
-                    .background(canCommit ? OMColors.accent : OMColors.subtleFill)
-                    .foregroundStyle(canCommit ? OMColors.onAccent : OMColors.tertiaryText)
+                    .background(canCommit ? OMColors.actionPositive : OMColors.subtleFill)
+                    .foregroundStyle(canCommit ? OMColors.onPositive : OMColors.tertiaryText)
                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 }
             }

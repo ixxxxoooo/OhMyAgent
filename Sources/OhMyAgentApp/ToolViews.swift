@@ -36,8 +36,7 @@ struct PermissionCard: View {
             HStack(spacing: 8) {
                 ForEach(prompt.request.options) { option in
                     Button(option.name) { onChoose(option.optionId) }
-                        .buttonStyle(.omSecondary)
-                        .tint(option.kind == .allowOnce || option.kind == .allowAlways ? OMColors.accent : nil)
+                        .buttonStyle(buttonStyle(for: option))
                 }
             }
         }
@@ -46,6 +45,12 @@ struct PermissionCard: View {
         .omGlassCard()
         .accessibilityElement(children: .contain)
         .accessibilityLabel("权限请求:\(prompt.title)")
+    }
+
+    /// 选项按钮样式:单次允许是唯一的实心主操作(计划批准用暖色「继续」),其余为次按钮,避免叠加多个实心按钮。
+    private func buttonStyle(for option: PermissionOption) -> OMButtonStyle {
+        guard option.kind == .allowOnce else { return OMButtonStyle(.secondary) }
+        return OMButtonStyle(prompt.isPlanApproval ? .warm : .primary)
     }
 
     @ViewBuilder

@@ -108,9 +108,11 @@ public final class AppearanceModel {
     /// 视图刷新键:字号或主题任一变化都会改变。读取它的视图会被 Observation 追踪。
     public var renderKey: String { "\(fontRevision)-\(themeRevision)" }
 
-    /// 全局 tint(跟随生效的强调色)。读取 `themeRevision` 以建立 Observation 依赖。
+    /// 全局 tint(开关、焦点环等系统控件的着色):纸感主题为墨色(强调色只用于文字),其他主题跟随强调色。
+    /// 读取 `themeRevision` 以建立 Observation 依赖。
     public var tint: Color {
         _ = themeRevision
+        if ThemeRuntime.style.primaryButton == .ink { return OMColors.actionFill }
         return ThemeRuntime.accent?.color ?? Color.accentColor
     }
 

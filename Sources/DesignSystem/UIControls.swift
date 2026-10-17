@@ -7,20 +7,26 @@ import AppKit
 import IconKit
 import SwiftUI
 
-/// 统一按钮样式。四种风格 × 两种尺寸,颜色全部取自 `OMColors`,随主题变化。
+/// 统一按钮样式。七种风格 × 两种尺寸,颜色全部取自 `OMColors`,随主题变化。
+/// 纸感规范(AGENTS.md 4.4):主按钮墨色实底、次按钮 Linen 底(墨色 8%)、plain 幽灵悬停出现下划线;
+/// 同一组动作最多两种实心(主 + 次,或主 + 幽灵),不叠三个实心按钮。
 public struct OMButtonStyle: ButtonStyle {
     /// 风格。
     public enum Kind: Sendable {
-        /// 主操作:强调色实底
+        /// 主操作:纸感为墨色实底,其他主题为强调色实底
         case primary
-        /// 次操作:浅底 + 细描边
+        /// 次操作:浅底(纸感无描边,其他主题带细描边)
         case secondary
-        /// 无底文字按钮:仅悬停出现底色
+        /// 无底文字按钮:仅悬停出现底色(纸感:60% 文字,悬停下划线)
         case plain
         /// 破坏性操作:危险色文字 + 浅底
         case destructive
         /// 仅图标:方形,悬停出现底色
         case icon
+        /// 暖色动作(继续、执行计划):Amber 实底
+        case warm
+        /// 正向动作(提交、创建 PR):Forest 实底
+        case positive
     }
 
     /// 尺寸:紧凑 24pt、常规 28pt。
@@ -55,10 +61,14 @@ private struct OMButtonBody: View {
     @Environment(\.isEnabled) private var isEnabled
     @State private var hovering = false
 
+    /// 纸感(墨色按钮)风格。
+    private var inkStyle: Bool { ThemeRuntime.style.primaryButton == .ink }
+
     var body: some View {
         configuration.label
             .font(size == .compact ? OMFonts.small : OMFonts.body)
             .foregroundStyle(foreground)
+            .underline(kind == .plain && inkStyle && hovering && isEnabled)
             .padding(.horizontal, kind == .icon ? 0 : (size == .compact ? 9 : 12))
             .frame(minWidth: kind == .icon ? size.height : nil, minHeight: size.height)
             .frame(height: size.height)
@@ -67,32 +77,43 @@ private struct OMButtonBody: View {
             .contentShape(shape)
             .opacity(isEnabled ? (configuration.isPressed ? 0.75 : 1) : 0.45)
             .onHover { hovering = $0 }
+            .animation(OMMotion.standard, value: hovering)
     }
 
     private var shape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: size == .compact ? 6 : OMMetrics.controlRadius, style: .continuous)
+        RoundedRectangle(cornerRadius: size == .compact ? OMRadius.tag : OMRadius.control, style: .continuous)
     }
 
     private var foreground: Color {
         switch kind {
-        case .primary: return OMColors.onAccent
-        case .secondary, .plain, .icon: return OMColors.primaryText
+        case .primary: return OMColors.onAction
+        case .warm: return OMColors.onWarm
+        case .positive: return OMColors.onPositive
+        case .plain: return inkStyle && !(hovering && isEnabled) ? OMColors.primaryText.opacity(0.6) : OMColors.primaryText
+        case .secondary, .icon: return OMColors.primaryText
         case .destructive: return OMColors.danger
         }
     }
 
     private var background: Color {
+        let active = hovering && isEnabled
         switch kind {
-        case .primary: return hovering && isEnabled ? OMColors.accent.opacity(0.88) : OMColors.accent
-        case .secondary: return OMColors.primaryText.opacity(hovering && isEnabled ? 0.10 : 0.05)
-        case .destructive: return OMColors.danger.opacity(hovering && isEnabled ? 0.16 : 0.09)
-        case .plain, .icon: return OMColors.primaryText.opacity(hovering && isEnabled ? 0.08 : 0)
+        case .primary: return active ? OMColors.actionFill.opacity(0.88) : OMColors.actionFill
+        case .warm: return active ? OMColors.actionWarm.opacity(0.88) : OMColors.actionWarm
+        case .positive: return active ? OMColors.actionPositive.opacity(0.88) : OMColors.actionPositive
+        case .secondary:
+            // 纸感:Linen 底(墨色 8%),悬停加深;其他主题保持浅底
+            if inkStyle { return OMColors.primaryText.opacity(active ? 0.12 : 0.08) }
+            return OMColors.primaryText.opacity(active ? 0.10 : 0.05)
+        case .destructive: return OMColors.danger.opacity(active ? 0.16 : 0.09)
+        case .plain: return inkStyle ? .clear : OMColors.primaryText.opacity(active ? 0.08 : 0)
+        case .icon: return OMColors.primaryText.opacity(active ? 0.08 : 0)
         }
     }
 
     private var border: Color {
         switch kind {
-        case .secondary: return OMColors.hairline.opacity(0.7)
+        case .secondary: return inkStyle ? .clear : OMColors.hairline.opacity(0.7)
         default: return .clear
         }
     }
@@ -109,6 +130,10 @@ extension ButtonStyle where Self == OMButtonStyle {
     public static var omDestructive: OMButtonStyle { OMButtonStyle(.destructive) }
     /// 仅图标按钮。
     public static var omIcon: OMButtonStyle { OMButtonStyle(.icon) }
+    /// 暖色动作按钮(继续、执行计划),Amber 实底。
+    public static var omWarm: OMButtonStyle { OMButtonStyle(.warm) }
+    /// 正向动作按钮(提交、创建 PR),Forest 实底。
+    public static var omPositive: OMButtonStyle { OMButtonStyle(.positive) }
 }
 
 /// 复制按钮:仅图标(`copy`),复制成功后短暂变为 `check`。规范要求界面里的复制按钮一律用它。
@@ -178,12 +203,12 @@ public struct OMStepSlider: View {
                 let travel = max(proxy.size.width - thumb, 1)
                 ZStack(alignment: .leading) {
                     Capsule().fill(OMColors.pressedFill).frame(height: 4).padding(.horizontal, thumb / 2)
-                    Capsule().fill(OMColors.accent)
+                    Capsule().fill(OMColors.actionFill)
                         .frame(width: travel * fraction(current), height: 4)
                         .padding(.leading, thumb / 2)
                     ForEach(0..<stops.count, id: \.self) { tick in
                         Circle()
-                            .fill(tick <= current ? OMColors.onAccent.opacity(0.9) : OMColors.tertiaryText)
+                            .fill(tick <= current ? OMColors.onAction.opacity(0.9) : OMColors.tertiaryText)
                             .frame(width: 3, height: 3)
                             .offset(x: thumb / 2 + travel * fraction(tick) - 1.5)
                     }
