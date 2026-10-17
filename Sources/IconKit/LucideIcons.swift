@@ -1,9 +1,9 @@
 // @author ixxxxoooo
-// 由 Scripts/gen-icons.py 自动生成,请勿手改。来源:Lucide 1.57.0(ISC 许可,见 Resources/Licenses/Lucide-LICENSE.txt)。
+// 由 Scripts/gen-icons.py 自动生成,请勿手改。来源:Lucide 1.58.0(ISC 许可,见 Resources/Licenses/Lucide-LICENSE.txt)。
 // 每个图标是 24×24 视口内的若干 SVG path 数据(圆/矩形/折线等已在生成时转换为 path)。
 
 enum LucideData {
-    static let version = "1.57.0"
+    static let version = "1.58.0"
     static let icons: [String: [String]] = [
         "activity": ["M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"],
         "app-window": ["M4 4H20a2 2 0 0 1 2 2V18a2 2 0 0 1 -2 2H4a2 2 0 0 1 -2 -2V6a2 2 0 0 1 2 -2Z", "M10 4v4", "M2 8h20", "M6 4v4"],
@@ -170,6 +170,8 @@ enum LucideData {
         "text-align-start": ["M21 5H3", "M15 12H3", "M17 19H3"],
         "text-search": ["M21 5H3", "M10 12H3", "M10 19H3", "M14 15a3 3 0 1 0 6 0a3 3 0 1 0 -6 0Z", "m21 19-1.9-1.9"],
         "text-wrap": ["m16 16-3 3 3 3", "M3 12h14.5a1 1 0 0 1 0 7H13", "M3 19h6", "M3 5h18"],
+        "thumbs-down": ["M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z", "M17 14V2"],
+        "thumbs-up": ["M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z", "M7 10v12"],
         "timer": ["M10 2L14 2", "M12 14L15 11", "M4 14a8 8 0 1 0 16 0a8 8 0 1 0 -16 0Z"],
         "toggle-left": ["M6 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0Z", "M9 5H15a7 7 0 0 1 7 7V12a7 7 0 0 1 -7 7H9a7 7 0 0 1 -7 -7V12a7 7 0 0 1 7 -7Z"],
         "trash": ["M10 11v6", "M14 11v6", "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6", "M3 6h18", "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"],

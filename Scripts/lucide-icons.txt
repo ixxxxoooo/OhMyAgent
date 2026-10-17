@@ -112,6 +112,8 @@ square-pen
 square-terminal
 stethoscope
 terminal
+thumbs-down
+thumbs-up
 text-search
 trash
 triangle-alert

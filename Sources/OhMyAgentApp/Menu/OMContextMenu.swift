@@ -153,6 +153,8 @@ final class OMContextMenuCenter {
     private var anchors: [WeakAnchor] = []
     private var monitor: Any?
     private var panel: OMMenuPanel?
+    /// 上下文菜单当前是否正在展示
+    var isPresented: Bool { panel != nil }
     private weak var parent: NSWindow?
     private var resignObserver: NSObjectProtocol?
     private var keyMonitor: Any?

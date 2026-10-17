@@ -33,6 +33,8 @@ private final class PickerPanel: NSPanel {
 final class PickerPanelController {
     static let shared = PickerPanelController()
     private var panel: PickerPanel?
+    /// 选择浮层当前是否正在展示
+    var isPresented: Bool { panel != nil }
     private weak var parent: NSWindow?
     private var anchorScreenRect: NSRect = .zero
     private var onClose: (() -> Void)?

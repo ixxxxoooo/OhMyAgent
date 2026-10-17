@@ -220,6 +220,7 @@ struct UserMessageEditor: View {
     var body: some View {
         // 就地展开:占据原消息行的位置,随内容向下延展,会话流内容自然被推开
         card
+            .omDismissOnClickOutside(perform: onClose)
             .transition(.opacity.combined(with: .scale(scale: 0.985, anchor: .top)))
             .onExitCommand(perform: onClose)
             .onAppear { controller.focus() }
@@ -249,15 +250,25 @@ struct UserMessageEditor: View {
                     .font(OMFonts.small)
                     .foregroundStyle(OMColors.secondaryText)
                     .keyboardShortcut(.cancelAction)
-                Button(action: resend) {
-                    Image.om("arrow.up", size: 12, weight: .bold).frame(width: 26, height: 26)
+                if ThemeRuntime.style.primaryButton == .ink || !ThemeRuntime.style.allowsGlass {
+                    ComposerPaperSendButton(
+                        isRunning: false,
+                        hasContent: canResend,
+                        help: String(localized: "重新发送 (⌘Return)"),
+                        onSend: resend
+                    )
+                    .keyboardShortcut(.return, modifiers: .command)
+                } else {
+                    Button(action: resend) {
+                        Image.om("arrow.up", size: 12, weight: .bold).frame(width: 26, height: 26)
+                    }
+                    .buttonStyle(.glassProminent)
+                    .buttonBorderShape(.circle)
+                    .keyboardShortcut(.return, modifiers: .command)
+                    .disabled(!canResend)
+                    .help("重新发送 (⌘Return)")
+                    .accessibilityLabel("重新发送")
                 }
-                .buttonStyle(.glassProminent)
-                .buttonBorderShape(.circle)
-                .keyboardShortcut(.return, modifiers: .command)
-                .disabled(!canResend)
-                .help("重新发送 (⌘Return)")
-                .accessibilityLabel("重新发送")
             }
         }
         .padding(.horizontal, 14)
@@ -291,3 +302,98 @@ struct UserMessageEditor: View {
         }
     }
 }
+
+/// 记录宿主卡片 NSView 的容器。
+@MainActor
+final class OutsideClickAnchorBox {
+    weak var view: NSView?
+}
+
+/// 放置在卡片背后以获取卡片在窗口中的几何边界。
+struct OutsideClickAnchor: NSViewRepresentable {
+    let box: OutsideClickAnchorBox
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        box.view = view
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        box.view = nsView
+    }
+}
+
+/// 外部点击(空白处)取消编辑的协调器。
+@MainActor
+final class OutsideClickDismissCoordinator {
+    let box = OutsideClickAnchorBox()
+    private var monitor: Any?
+    var onDismiss: (() -> Void)?
+
+    /// 安装全局鼠标点击监听(仅在编辑展示期间生效)。
+    func install() {
+        guard monitor == nil else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            guard let self else { return event }
+            let consumed = MainActor.assumeIsolated { self.handle(event) }
+            return consumed ? nil : event
+        }
+    }
+
+    /// 移除鼠标监听。
+    func remove() {
+        if let monitor {
+            NSEvent.removeMonitor(monitor)
+            self.monitor = nil
+        }
+    }
+
+    /// 命中检测:点在卡片内部放行;点在卡片外部(空白处)则调用取消并消费事件。
+    func handle(_ event: NSEvent) -> Bool {
+        // 如果当前有全局选择浮层(如模型切换面板)或右键菜单展示,外部点击交由其自身处理
+        if PickerPanelController.shared.isPresented { return false }
+        if OMContextMenuCenter.shared.isPresented { return false }
+
+        guard let cardView = box.view, let cardWindow = cardView.window else { return false }
+        // 仅处理发生在当前窗口内的鼠标点击
+        guard event.window === cardWindow else { return false }
+
+        let locationInView = cardView.convert(event.locationInWindow, from: nil)
+        if cardView.bounds.contains(locationInView) {
+            // 点击在编辑卡片内部(输入框、按钮、附件等),放行事件
+            return false
+        }
+
+        // 点击在编辑窗口之外的空白处或其它区域,取消本次编辑
+        remove()
+        onDismiss?()
+        return true
+    }
+}
+
+/// 点击外部空白处取消编辑的 ViewModifier。
+struct OutsideClickDismissModifier: ViewModifier {
+    let onDismiss: () -> Void
+    @State private var coordinator = OutsideClickDismissCoordinator()
+
+    func body(content: Content) -> some View {
+        content
+            .background(OutsideClickAnchor(box: coordinator.box))
+            .onAppear {
+                coordinator.onDismiss = onDismiss
+                coordinator.install()
+            }
+            .onDisappear {
+                coordinator.remove()
+            }
+    }
+}
+
+extension View {
+    /// 当点击卡片外部(空白处)时自动取消。
+    func omDismissOnClickOutside(perform onDismiss: @escaping () -> Void) -> some View {
+        modifier(OutsideClickDismissModifier(onDismiss: onDismiss))
+    }
+}
+

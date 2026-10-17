@@ -106,12 +106,20 @@ enum HubSearchEngine {
             return items.isEmpty ? [] : [HubSection(id: segment.rawValue, title: segment.groupTitle, items: items)]
         }
         if trimmed.isEmpty {
-            // 「全部」且无查询:最近会话 + 项目,与 Cursor 的「最近」视图一致
+            // 「全部」且无查询:会话、项目、文件、操作、设置与主题全部展示代表项
             var result: [HubSection] = []
-            let recent = rank("", grouped[.sessions] ?? [], limit: 8)
+            let recent = rank("", grouped[.sessions] ?? [], limit: 6)
             if !recent.isEmpty { result.append(HubSection(id: "recent", title: String(localized: "最近会话"), items: recent)) }
-            let projects = rank("", grouped[.projects] ?? [], limit: 4)
+            let projects = rank("", grouped[.projects] ?? [], limit: 3)
             if !projects.isEmpty { result.append(HubSection(id: HubSegment.projects.rawValue, title: HubSegment.projects.title, items: projects)) }
+            let files = rank("", grouped[.files] ?? [], limit: 4)
+            if !files.isEmpty { result.append(HubSection(id: HubSegment.files.rawValue, title: HubSegment.files.title, items: files)) }
+            let actions = rank("", grouped[.actions] ?? [], limit: 4)
+            if !actions.isEmpty { result.append(HubSection(id: HubSegment.actions.rawValue, title: HubSegment.actions.title, items: actions)) }
+            let settings = rank("", grouped[.settings] ?? [], limit: 4)
+            if !settings.isEmpty { result.append(HubSection(id: HubSegment.settings.rawValue, title: HubSegment.settings.title, items: settings)) }
+            let themes = rank("", grouped[.themes] ?? [], limit: 4)
+            if !themes.isEmpty { result.append(HubSection(id: HubSegment.themes.rawValue, title: HubSegment.themes.title, items: themes)) }
             return result
         }
         return order.compactMap { kind in

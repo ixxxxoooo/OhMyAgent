@@ -42,14 +42,22 @@ struct OMGlassModifier<S: Shape>: ViewModifier {
     let interactive: Bool
     private let policy = MaterialPolicy.shared
 
+    private var useGlass: Bool { policy.useGlass && ThemeRuntime.style.allowsGlass }
+
     func body(content: Content) -> some View {
-        if policy.useGlass && ThemeRuntime.style.allowsGlass {
-            content.glassEffect(.regular.tint(tint).interactive(interactive), in: shape)
-        } else {
-            content
-                .background(OMColors.opaqueChrome, in: shape)
-                .overlay(shape.stroke(OMColors.hairline, lineWidth: 0.5))
-        }
+        content
+            .background {
+                if useGlass {
+                    shape.fill(.clear).glassEffect(.regular.tint(tint).interactive(interactive), in: shape)
+                } else {
+                    shape.fill(OMColors.opaqueChrome)
+                }
+            }
+            .overlay {
+                if !useGlass {
+                    shape.stroke(OMColors.hairline, lineWidth: 0.5)
+                }
+            }
     }
 }
 

@@ -18,16 +18,21 @@ struct HubSearchEngineTests {
             candidate("p1", .projects, "atlas-web"),
             candidate("f1", .files, "Router.swift", search: "Sources/Router.swift"),
             candidate("f2", .files, "Readme.md", search: "docs/Readme.md"),
-            candidate("a1", .actions, "新建终端标签"),
-            candidate("t1", .settings, "MCP", keywords: ["model context protocol", "服务器"]),
+            candidate("a1", .actions, "新建终端标签", keywords: ["操作", "命令"]),
+            candidate("t1", .settings, "MCP", keywords: ["model context protocol", "服务器", "设置"]),
+            candidate("th1", .themes, "Cursor 纸感", keywords: ["主题", "theme", "纸感", "浅色"]),
         ]
     }
 
-    @Test("全部分类无查询:只显示最近会话与项目")
+    @Test("全部分类无查询:展示各分类代表项")
     func emptyAll() {
         let sections = HubSearchEngine.sections(query: "", segment: .all, candidates: fixtures)
-        #expect(sections.map(\.id) == ["recent", "projects"])
+        #expect(sections.map(\.id) == ["recent", "projects", "files", "actions", "settings", "themes"])
         #expect(sections.first?.items.map(\.id) == ["s1", "s2"])
+        #expect(sections.first { $0.id == "files" }?.items.map(\.id) == ["f1", "f2"])
+        #expect(sections.first { $0.id == "actions" }?.items.map(\.id) == ["a1"])
+        #expect(sections.first { $0.id == "settings" }?.items.map(\.id) == ["t1"])
+        #expect(sections.first { $0.id == "themes" }?.items.map(\.id) == ["th1"])
     }
 
     @Test("单分类无查询:列出该分类全部候选")
@@ -76,5 +81,14 @@ struct HubSearchEngineTests {
         let sections = HubSearchEngine.sections(query: "dracula", segment: .all, candidates: fixtures + [theme])
         #expect(sections.map(\.id).contains("themes"))
         #expect(sections.first { $0.id == "themes" }?.items.first?.id == "t-dracula")
+    }
+
+    @Test("「全部」下可检索操作与设置")
+    func allActionAndSettingsSearch() {
+        let actionSections = HubSearchEngine.sections(query: "操作", segment: .all, candidates: fixtures)
+        #expect(actionSections.first { $0.id == "actions" }?.items.first?.id == "a1")
+
+        let settingSections = HubSearchEngine.sections(query: "设置", segment: .all, candidates: fixtures)
+        #expect(settingSections.first { $0.id == "settings" }?.items.first?.id == "t1")
     }
 }

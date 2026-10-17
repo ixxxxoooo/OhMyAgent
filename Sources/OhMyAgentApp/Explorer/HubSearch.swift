@@ -111,16 +111,22 @@ final class HubModel {
         updateLivePreview()
     }
 
+    /// 最近一次键盘移动时间戳,用于在键盘导航期间屏蔽由于重绘/滚动引起的误触 onHover
+    @ObservationIgnored private var lastKeyboardMoveTime: CFAbsoluteTime = 0
+
     /// 移动选中项(循环)。
     func move(_ step: Int) {
         let count = flatItems.count
         guard count > 0 else { return }
+        lastKeyboardMoveTime = CFAbsoluteTimeGetCurrent()
         selection = ((selection + step) % count + count) % count
         updateLivePreview()
     }
 
     /// 悬停选中某项并实时预览。
     func select(_ item: HubItem) {
+        // 键盘导航后 250ms 内忽略 hover 触发的选择,避免滚动或主题切换重绘时鼠标指针抢回选中项
+        guard CFAbsoluteTimeGetCurrent() - lastKeyboardMoveTime > 0.25 else { return }
         if let index = flatItems.firstIndex(of: item), index != selection {
             selection = index
             updateLivePreview()
@@ -183,28 +189,31 @@ enum HubCandidateBuilder {
             for cached in project.sessions where !project.archivedSessions.contains(cached.sessionId) && !EmptySessionRegistry.isHidden(cached.sessionId) {
                 let date = HubDates.parse(cached.updatedAt ?? cached.firstSeenAt)
                 let title = (cached.title?.isEmpty == false ? cached.title : nil) ?? String(localized: "新对话")
+                let keywords = ["会话", "对话", "session", "chat"]
                 sessions.append((date ?? .distantPast, HubCandidate(
                     id: "session:\(cached.sessionId)", segment: .sessions, title: title, subtitle: project.isChatArea ? String(localized: "会话区") : project.name,
-                    trailing: date.map(HubDates.relative), icon: .symbol("message-square"),
+                    trailing: date.map(HubDates.relative), icon: .symbol("message-square"), keywords: keywords,
                     action: .session(workspace: project.id, sessionId: cached.sessionId, title: cached.title))))
             }
         }
         result += sessions.sorted { $0.0 > $1.0 }.map(\.1)
         // 项目:最近打开优先
         for project in workbench.workspaceProjects.sorted(by: { $0.lastOpenedAt > $1.lastOpenedAt }) {
+            let keywords = ["项目", "project", "workspace", "工作区"]
             result.append(HubCandidate(
                 id: "project:\(project.id)", segment: .projects, title: project.name,
                 subtitle: (project.id as NSString).abbreviatingWithTildeInPath, trailing: nil,
-                icon: .file(name: project.name, isDirectory: true), action: .project(path: project.id)))
+                icon: .file(name: project.name, isDirectory: true), keywords: keywords, action: .project(path: project.id)))
         }
         // 文件:当前项目索引
         if let root = workbench.selectedProjectID, WorkspaceIndexModel.shared.root == root {
+            let fileKeywords = ["文件", "file"]
             for path in WorkspaceIndexModel.shared.files {
                 let name = (path as NSString).lastPathComponent
                 let dir = (path as NSString).deletingLastPathComponent
                 result.append(HubCandidate(
                     id: "file:\(path)", segment: .files, title: name, subtitle: dir.isEmpty ? nil : dir, trailing: nil,
-                    icon: .file(name: name, isDirectory: false), searchText: path, action: .file(root: root, relativePath: path)))
+                    icon: .file(name: name, isDirectory: false), searchText: path, keywords: fileKeywords, action: .file(root: root, relativePath: path)))
             }
             // 多文件夹工作区:附加文件夹的文件,副标题带上文件夹名
             for item in WorkspaceIndexModel.shared.extraFiles {
@@ -215,6 +224,7 @@ enum HubCandidateBuilder {
                     id: "file:\(item.root):\(item.path)", segment: .files, title: name,
                     subtitle: dir.isEmpty ? folder : folder + "/" + dir, trailing: nil,
                     icon: .file(name: name, isDirectory: false), searchText: folder + "/" + item.path,
+                    keywords: fileKeywords,
                     action: .file(root: item.root, relativePath: item.path)))
             }
         }
@@ -222,16 +232,18 @@ enum HubCandidateBuilder {
         var table: [String: PaletteCommand] = [:]
         for command in PaletteCommands.all(workbench: workbench) + DemoPaletteCommands.all(workbench: workbench) {
             table[command.id] = command
+            let keywords = ["操作", "命令", "action", "command", command.id]
             result.append(HubCandidate(
                 id: "action:\(command.id)", segment: .actions, title: command.title, subtitle: nil, trailing: command.shortcut,
-                icon: .symbol(command.icon), action: .command(id: command.id)))
+                icon: .symbol(command.icon), keywords: keywords, action: .command(id: command.id)))
         }
-        // 设置:全部设置页(含别名关键词)
+        // 设置:全部设置页(含别名关键词与全局设置词)
         for group in SettingsPage.groups {
             for page in group.pages {
+                let keywords = page.keywords + ["设置", "setting", "settings", "偏好设置", "preferences", group.title]
                 result.append(HubCandidate(
                     id: "settings:\(page.rawValue)", segment: .settings, title: page.title, subtitle: group.title, trailing: nil,
-                    icon: .symbol(page.icon), keywords: page.keywords, action: .settings(page: page.rawValue)))
+                    icon: .symbol(page.icon), keywords: keywords, action: .settings(page: page.rawValue)))
             }
         }
         // 主题:全部预置与自定义主题

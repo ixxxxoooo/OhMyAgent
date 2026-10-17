@@ -194,30 +194,104 @@ struct ComposerView: View {
         !model.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !model.attachments.isEmpty
     }
 
+    private var isPaperTheme: Bool {
+        ThemeRuntime.style.primaryButton == .ink || !ThemeRuntime.style.allowsGlass
+    }
+
     @ViewBuilder
     private var sendButton: some View {
         HStack(spacing: 6) {
             if model.isRunning {
-                Button { model.cancel() } label: {
-                    Image.om("stop.fill", size: 11, weight: .bold).frame(width: 26, height: 26)
+                if isPaperTheme {
+                    ComposerPaperStopButton { model.cancel() }
+                } else {
+                    Button { model.cancel() } label: {
+                        Image.om("stop.fill", size: 11, weight: .bold).frame(width: 26, height: 26)
+                    }
+                    .buttonStyle(.glass)
+                    .buttonBorderShape(.circle)
+                    .help("停止 (Esc)")
+                    .accessibilityLabel("停止生成")
                 }
-                .buttonStyle(.glass)
-                .buttonBorderShape(.circle)
-                .help("停止 (Esc)")
-                .accessibilityLabel("停止生成")
             }
             if !model.isRunning || hasContent {
-                Button { model.sendDraft() } label: {
-                    Image.om(model.isRunning ? "corner-down-right" : "arrow.up", size: 12, weight: .bold).frame(width: 26, height: 26)
+                if isPaperTheme {
+                    ComposerPaperSendButton(
+                        isRunning: model.isRunning,
+                        hasContent: hasContent,
+                        help: sendHelp,
+                        onSend: { model.sendDraft() }
+                    )
+                    .keyboardShortcut(ShortcutStore.shared.shortcut(for: .send))
+                } else {
+                    Button { model.sendDraft() } label: {
+                        Image.om(model.isRunning ? "corner-down-right" : "arrow.up", size: 12, weight: .bold).frame(width: 26, height: 26)
+                    }
+                    .buttonStyle(.glassProminent)
+                    .buttonBorderShape(.circle)
+                    .disabled(!hasContent)
+                    .keyboardShortcut(ShortcutStore.shared.shortcut(for: .send))
+                    .help(sendHelp)
+                    .accessibilityLabel(model.isRunning ? String(localized: "引导当前轮次") : String(localized: "发送"))
                 }
-                .buttonStyle(.glassProminent)
-                .buttonBorderShape(.circle)
-                .disabled(!hasContent)
-                .keyboardShortcut(ShortcutStore.shared.shortcut(for: .send))
-                .help(sendHelp)
-                .accessibilityLabel(model.isRunning ? String(localized: "引导当前轮次") : String(localized: "发送"))
             }
         }
+    }
+}
+
+/// 纸感风格的发送按钮:墨色实底(Ink)、纸白前景、发丝描边,与 Cursor 纸感规范完全契合。
+struct ComposerPaperSendButton: View {
+    let isRunning: Bool
+    let hasContent: Bool
+    let help: String
+    let onSend: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: onSend) {
+            Image.om(isRunning ? "corner-down-right" : "arrow.up", size: 12, weight: .bold)
+                .foregroundStyle(hasContent ? OMColors.onAction : OMColors.primaryText.opacity(0.35))
+                .frame(width: 26, height: 26)
+                .background(
+                    Circle()
+                        .fill(hasContent ? (hovering ? OMColors.actionFill.opacity(0.88) : OMColors.actionFill) : OMColors.primaryText.opacity(0.08))
+                )
+                .overlay(
+                    Circle()
+                        .strokeBorder(OMColors.hairline.opacity(hasContent ? 0.35 : 0.6), lineWidth: 0.5)
+                )
+        }
+        .buttonStyle(.plain)
+        .disabled(!hasContent)
+        .onHover { hovering = $0 }
+        .help(help)
+        .accessibilityLabel(isRunning ? String(localized: "引导当前轮次") : String(localized: "发送"))
+    }
+}
+
+/// 纸感风格的停止按钮:次要按钮质感,悬停加深。
+struct ComposerPaperStopButton: View {
+    let onCancel: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: onCancel) {
+            Image.om("stop.fill", size: 11, weight: .bold)
+                .foregroundStyle(OMColors.danger)
+                .frame(width: 26, height: 26)
+                .background(
+                    Circle()
+                        .fill(hovering ? OMColors.primaryText.opacity(0.12) : OMColors.primaryText.opacity(0.06))
+                )
+                .overlay(
+                    Circle()
+                        .strokeBorder(OMColors.hairline, lineWidth: 0.5)
+                )
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help("停止 (Esc)")
+        .accessibilityLabel("停止生成")
     }
 }
 
