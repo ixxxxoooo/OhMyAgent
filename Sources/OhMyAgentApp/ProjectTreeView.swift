@@ -674,65 +674,44 @@ private struct SessionLine: View {
     }
 }
 
-/// 行首状态点:运行中小转圈 / 等待处理橙点闪烁 / 未读完成绿点 / 常态灰点(历史会话与空闲)。
+/// 行首状态点:运行中实心点呼吸 / 等待处理空心环呼吸 / 未读完成静止小点 / 常态灰点(历史会话与空闲)。
+/// 颜色一律取主题强调色,呼吸动画遵循「减弱动态效果」。
 private struct SessionStatusDot: View {
     /// 当前会话的 uid(历史会话为 nil,只显示灰点)
     let uid: String?
     let isRunning: Bool
     private let center = AttentionCenter.shared
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let state = uid.flatMap { center.items[$0]?.state } ?? (isRunning ? .running : .idle)
         switch state {
         case .running:
-            ProgressView().controlSize(.mini).scaleEffect(0.7).frame(width: 10, height: 10).accessibilityLabel("运行中")
+            OMSessionDot(.running, size: 7).accessibilityLabel("运行中")
         case .needsInput:
-            dot(OMColors.statusWaiting, blink: true).accessibilityLabel("等待处理")
+            OMSessionDot(.waiting, size: 8).accessibilityLabel("等待处理")
         case .unreadDone:
-            dot(OMColors.statusUnread, blink: false).accessibilityLabel("已完成,未读")
+            OMSessionDot(.unread, size: 7).accessibilityLabel("已完成,未读")
         case .idle:
-            dot(OMColors.statusIdle, blink: false)
-        }
-    }
-
-    @ViewBuilder
-    private func dot(_ color: Color, blink: Bool) -> some View {
-        if blink && !reduceMotion {
-            Circle().fill(color).frame(width: 6, height: 6)
-                .phaseAnimator([1.0, 0.3]) { view, opacity in view.opacity(opacity) } animation: { _ in .easeInOut(duration: 0.7) }
-        } else {
-            Circle().fill(color).frame(width: 6, height: 6)
+            OMSessionDot(.idle, size: 6)
         }
     }
 }
 
-/// 会话状态点:运行中蓝点闪烁、待处理橙点闪烁、未读完成绿点常亮;已读/空闲不显示。
+/// 会话状态点(标签条用):运行中实心呼吸、待处理空心环呼吸、未读完成静止点;已读/空闲不显示。
 struct AttentionDot: View {
     let uid: String
     private let center = AttentionCenter.shared
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         switch center.items[uid]?.state ?? .idle {
         case .idle:
             EmptyView()
         case .unreadDone:
-            Circle().fill(OMColors.success).frame(width: 8, height: 8).accessibilityLabel("已完成,未读")
+            OMSessionDot(.unread, size: 8).accessibilityLabel("已完成,未读")
         case .running:
-            blinking(OMColors.statusRunning).accessibilityLabel("运行中")
+            OMSessionDot(.running, size: 8).accessibilityLabel("运行中")
         case .needsInput:
-            blinking(OMColors.statusWaiting).accessibilityLabel("等待处理")
-        }
-    }
-
-    @ViewBuilder
-    private func blinking(_ color: Color) -> some View {
-        if reduceMotion {
-            Circle().fill(color).frame(width: 8, height: 8)
-        } else {
-            Circle().fill(color).frame(width: 8, height: 8)
-                .phaseAnimator([1.0, 0.25]) { view, opacity in view.opacity(opacity) } animation: { _ in .easeInOut(duration: 0.6) }
+            OMSessionDot(.waiting, size: 8).accessibilityLabel("等待处理")
         }
     }
 }

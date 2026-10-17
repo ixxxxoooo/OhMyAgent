@@ -29,7 +29,7 @@ struct MCPSettingsPage: View {
                 // 原位替换:检测中图标换成转圈、文字换成「检测中…」,按钮宽度保持不变,页面不会被挤动
                 HStack(spacing: 6) {
                     if center.isCheckingMCP {
-                        ProgressView().controlSize(.small).scaleEffect(0.7).frame(width: 14, height: 14)
+                        OMSpinner(.small).scaleEffect(0.7).frame(width: 14, height: 14)
                         Text("检测中…")
                     } else {
                         Image.om("waveform.path.ecg", size: 14)
@@ -157,7 +157,7 @@ struct MCPSettingsPage: View {
     @ViewBuilder
     private func healthLabel(_ entry: MCPServerEntry) -> some View {
         if center.isCheckingMCP {
-            ProgressView().controlSize(.small).scaleEffect(0.7).frame(width: 14, height: 14)
+            OMSpinner(.small).scaleEffect(0.7).frame(width: 14, height: 14)
         } else if let health = center.mcpHealth[entry.config.name] {
             HStack(spacing: 5) {
                 healthDot(health)

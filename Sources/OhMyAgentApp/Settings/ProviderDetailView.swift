@@ -85,7 +85,7 @@ struct ProviderDetailView: View {
             Note("密钥保存在 ~/Library/Application Support/OhMyAgent/provider-keys.json(权限 0600),不写入日志与 ~/.claude。")
             HStack {
                 Button("测试连接") { Task { await test() } }.disabled(testing)
-                if testing { ProgressView().controlSize(.small) }
+                if testing { OMSpinner(.small) }
                 Spacer()
                 Button("去模型映射中使用…") { if save() { SettingsRouter.shared.go(.modelMapping) } }
                     .help("把这个提供商的模型映射到 Claude Code 的默认/Opus/Sonnet/Haiku 槽位")

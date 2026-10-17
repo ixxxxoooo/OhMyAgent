@@ -27,7 +27,7 @@ struct GitHistoryTabView: View {
     var body: some View {
         Group {
             if !loaded {
-                ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
+                OMSpinner(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let errorMessage {
                 OMEmptyState { Label("无法读取历史", om: "triangle-alert", size: 28) } description: { Text(errorMessage) }
             } else if repo == nil {

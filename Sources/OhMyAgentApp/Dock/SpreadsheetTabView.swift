@@ -43,7 +43,7 @@ struct SpreadsheetTabView: View {
         Group {
             switch phase {
             case .loading:
-                ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
+                OMSpinner(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
             case .failed(let message):
                 OMEmptyState {
                     Label("无法打开表格", om: "file-text", size: 28)

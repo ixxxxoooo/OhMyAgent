@@ -69,7 +69,7 @@ struct DiagnosticsPage: View {
             Section("claude doctor") {
                 HStack {
                     Button("运行检查") { Task { await runDoctor() } }.disabled(doctorRunning || !center.canRunCLI)
-                    if doctorRunning { ProgressView().controlSize(.small) }
+                    if doctorRunning { OMSpinner(.small) }
                 }
                 if let doctorOutput {
                     ScrollView { Text(doctorOutput).font(OMFonts.monoSmall).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }

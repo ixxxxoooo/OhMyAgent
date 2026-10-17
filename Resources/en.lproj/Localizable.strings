@@ -2197,3 +2197,4 @@
 "删除会话" = "Delete conversation";
 "「%@」正在运行,删除会立即中断它,且无法恢复。" = "“%@” is running. Deleting it stops it immediately and cannot be undone.";
 "「%@」将被永久删除,无法恢复。" = "“%@” will be permanently deleted. This cannot be undone.";
+"加载中" = "Loading";

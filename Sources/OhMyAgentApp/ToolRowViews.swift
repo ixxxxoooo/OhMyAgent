@@ -291,7 +291,7 @@ struct ToolRowView: View {
     private func statusView(_ status: ToolStatus) -> some View {
         switch status {
         case .pending: OMStatusDot(.idle)
-        case .inProgress: ProgressView().controlSize(.mini)
+        case .inProgress: OMSpinner(.mini)
         case .completed: Image.om("checkmark", size: 9, weight: .bold).foregroundStyle(OMColors.success.opacity(0.8))
         case .failed: Image.om("xmark", size: 9, weight: .bold).foregroundStyle(OMColors.danger)
         }
@@ -727,7 +727,7 @@ struct ExploreGroupView: View {
                 Text(group.summary)
                     .font(OMFonts.small)
                     .foregroundStyle(OMColors.secondaryText)
-                if group.isRunning { ProgressView().controlSize(.mini) }
+                if group.isRunning { OMSpinner(.mini) }
                 Spacer(minLength: 8)
                 Image.om("chevron.right", size: 9, weight: .bold)
                     .foregroundStyle(OMColors.tertiaryText)
@@ -778,7 +778,7 @@ struct TerminalOutputView: View {
                 ShellCommandText(command: session.command, lineLimit: 1)
                 Spacer()
                 if session.isRunning {
-                    ProgressView().controlSize(.mini)
+                    OMSpinner(.mini)
                     if let onInterrupt {
                         Button("停止", action: onInterrupt)
                             .buttonStyle(.omSecondary)

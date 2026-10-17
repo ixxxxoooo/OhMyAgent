@@ -57,7 +57,7 @@ struct ContextUsagePanel: View {
     private var header: some View {
         HStack(spacing: 6) {
             Text("上下文用量").font(OMFonts.small.weight(.medium))
-            if model.isProbingContext { ProgressView().controlSize(.mini) }
+            if model.isProbingContext { OMSpinner(.mini) }
             Spacer()
             Button(action: onClose) {
                 Image.om("x", size: 11).foregroundStyle(OMColors.secondaryText).frame(width: 20, height: 20).contentShape(Rectangle())

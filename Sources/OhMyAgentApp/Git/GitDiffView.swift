@@ -151,7 +151,7 @@ struct GitFileDiffView: View {
     private var content: some View {
         switch result {
         case .loading:
-            ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
+            OMSpinner(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
         case .notRepository:
             OMEmptyState {
                 Label("没有这个文件的改动记录", om: "file-diff", size: 28)

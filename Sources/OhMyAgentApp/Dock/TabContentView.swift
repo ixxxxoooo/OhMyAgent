@@ -54,7 +54,7 @@ private struct ChatPane: View {
                     .id(appearance.renderKey)
                     .environment(model)
             } else {
-                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                OMSpinner(.regular).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .task { workbench.ensureSession(project: projectID, slot: slot) }
@@ -134,7 +134,7 @@ struct FileTabView: View {
                 } else if let failure = doc.loadError {
                     Text(failure).foregroundStyle(OMColors.secondaryText).frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                    OMSpinner(.regular).frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
             .overlay {
@@ -481,7 +481,7 @@ struct LSPStatusBar: View {
             case .off:
                 EmptyView()
             case .starting:
-                ProgressView().controlSize(.mini)
+                OMSpinner(.mini)
                 Text("语言服务器启动中…").foregroundStyle(OMColors.secondaryText)
             case .ready(let name):
                 Image.om("circle-check", size: 12).foregroundStyle(OMColors.success)

@@ -51,13 +51,13 @@ struct AntigravityInstallSection: View {
             HStack(spacing: 8) {
                 switch progress {
                 case .downloading(let fraction):
-                    if let fraction { ProgressView(value: fraction).frame(maxWidth: 200) } else { ProgressView().controlSize(.small) }
+                    if let fraction { ProgressView(value: fraction).frame(maxWidth: 200) } else { OMSpinner(.small) }
                     Note("正在下载…")
                 case .extracting:
-                    ProgressView().controlSize(.small)
+                    OMSpinner(.small)
                     Note("正在解压…")
                 case .finalizing:
-                    ProgressView().controlSize(.small)
+                    OMSpinner(.small)
                     Note("正在完成安装…")
                 }
             }

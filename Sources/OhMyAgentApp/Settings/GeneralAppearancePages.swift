@@ -29,7 +29,7 @@ struct GeneralPage: View {
     private var updateStatus: some View {
         switch updates.state {
         case .idle: EmptyView()
-        case .checking: ProgressView().controlSize(.small)
+        case .checking: OMSpinner(.small)
         case .result(.upToDate): Text("已是最新版本").foregroundStyle(OMColors.secondaryText)
         case .result(.available(let info)):
             Button("下载 \(info.version)") { updates.openDownload(info) }

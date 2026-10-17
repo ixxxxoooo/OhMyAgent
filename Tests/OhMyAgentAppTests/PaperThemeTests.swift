@@ -58,8 +58,9 @@ struct PaperThemeTests {
             let warm = try #require(p.actionWarm), positive = try #require(p.actionPositive)
             #expect(p.readableForeground(on: warm).contrast(with: warm) >= 4.5, "\(id) 暖色按钮")
             #expect(p.readableForeground(on: positive).contrast(with: positive) >= 4.5, "\(id) 正向按钮")
-            // 主按钮:墨色实底 + 画布前景
-            #expect(p.foreground.contrast(with: p.surface) >= 7, "\(id) 主按钮")
+            // 主按钮:强调色实底(纸感取加深的 Ember 同色相)+ onAccent 前景
+            let fill = p.accentText ?? p.accent
+            #expect((p.onAccent ?? p.surface).contrast(with: fill) >= 4.5, "\(id) 主按钮 \((p.onAccent ?? p.surface).contrast(with: fill))")
         }
     }
 
@@ -77,14 +78,17 @@ struct PaperThemeTests {
         }
     }
 
-    @Test("纸感风格:关闭玻璃、4/8 圆角、墨色主按钮、中性选中")
+    @Test("纸感风格:关闭玻璃、4/8 圆角、主按钮与选中跟随强调色")
     func styleTokens() throws {
         let light = ThemePackage.find("paper-light")
         withRuntime(light) {
             #expect(ThemeRuntime.style.allowsGlass == false && ThemeRuntime.style.flatCards)
             #expect(OMRadius.tag == 4 && OMRadius.control == 4 && OMRadius.card == 4)
             #expect(OMRadius.floating == 8 && OMRadius.modal == 8)
-            #expect(ThemeRuntime.style.primaryButton == .ink && ThemeRuntime.style.selectionTint == .neutral)
+            #expect(ThemeRuntime.style.primaryButton == .accent && ThemeRuntime.style.selectionTint == .accent)
+            // 选中填充、主按钮填充、状态色都来自强调色
+            #expect(OMColors.statusActive == OMColors.accent && OMColors.statusRunning == OMColors.accent)
+            #expect(OMColors.statusWaiting == OMColors.accent && OMColors.statusUnread == OMColors.accent)
         }
     }
 

@@ -125,7 +125,7 @@ struct MermaidBlockView: View {
     private var content: some View {
         switch result {
         case .none:
-            ProgressView().controlSize(.small).frame(maxWidth: .infinity, minHeight: 80)
+            OMSpinner(.small).frame(maxWidth: .infinity, minHeight: 80)
         case .scene(let scene, _):
             if showSource { sourceView } else {
                 MermaidCanvas(scene: scene)
@@ -198,7 +198,7 @@ struct PreviewTabView: View {
             .padding(.horizontal, 12).padding(.vertical, 6)
             Divider()
             switch result {
-            case .none: ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .none: OMSpinner(.regular).frame(maxWidth: .infinity, maxHeight: .infinity)
             case .scene(let scene, _): sceneView(scene)
             case .failure(let error):
                 Text(error.description).foregroundStyle(OMColors.secondaryText).frame(maxWidth: .infinity, maxHeight: .infinity)

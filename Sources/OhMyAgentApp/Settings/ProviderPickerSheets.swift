@@ -54,7 +54,7 @@ struct ModelFetchSheet: View {
     @ViewBuilder
     private var content: some View {
         if loading {
-            HStack { Spacer(); ProgressView(); Spacer() }.frame(maxHeight: .infinity)
+            HStack { Spacer(); OMSpinner(.regular); Spacer() }.frame(maxHeight: .infinity)
         } else if let errorMessage {
             VStack(spacing: 8) {
                 Label(errorMessage, om: "xmark.octagon.fill").foregroundStyle(OMColors.danger).fixedSize(horizontal: false, vertical: true)

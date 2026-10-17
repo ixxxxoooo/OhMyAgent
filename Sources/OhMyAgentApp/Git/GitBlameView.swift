@@ -22,7 +22,7 @@ struct GitBlameTabView: View {
     var body: some View {
         switch phase {
         case .loading:
-            ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
+            OMSpinner(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
                 .task { await load() }
         case .notRepository:
             OMEmptyState { Label("不是 Git 仓库", om: "git-branch", size: 28) } description: { Text("文件不在 Git 仓库中,或尚未提交。") }

@@ -136,9 +136,12 @@ public enum OMColors {
     public static var accentText: Color { ThemeRuntime.palette?.accentText?.color ?? accent }
     /// 内联链接色:纸感为加深的 Ember(链接是 Ember 的本职),其他主题为第二强调色。
     public static var link: Color { ThemeRuntime.palette?.accentText?.color ?? accent2 }
-    /// 主按钮与控件「开」态的填充:纸感为墨色(强调色只用于文字),其他主题为强调色。
+    /// 主按钮与控件「开」态的填充:一律跟随主题强调色。
+    /// 纸感的 Ember 在小字号上对比度不足,主题提供加深版 `accentText` 时填充取加深版(同一色相);
+    /// 用户在外观里自选了强调色时直接用所选色。
     public static var actionFill: Color {
-        ThemeRuntime.style.primaryButton == .ink ? primaryText : accent
+        if ThemeRuntime.style.primaryButton == .ink { return primaryText }
+        return ThemeRuntime.accentOverride == nil ? accentText : accent
     }
     /// `actionFill` 之上的前景。
     public static var onAction: Color {
@@ -181,12 +184,14 @@ public enum OMColors {
 
     // MARK: 状态色(运行星芒、托盘闪烁点、会话状态点、项目状态标识共用)
 
+    /// 进行中:运行、加载、呼吸点、进度——统一取主题强调色。
+    public static var statusActive: Color { accent }
     /// 运行中。
-    public static var statusRunning: Color { accent }
-    /// 等待处理(权限/提问)。
-    public static var statusWaiting: Color { warning }
-    /// 已完成未读。
-    public static var statusUnread: Color { success }
+    public static var statusRunning: Color { statusActive }
+    /// 等待处理(权限/提问):与运行同色相,靠空心环形与节奏区分。
+    public static var statusWaiting: Color { accent }
+    /// 已完成未读:同色相的静止实心点。
+    public static var statusUnread: Color { accent }
     /// 空闲。
     public static var statusIdle: Color { tertiaryText }
 

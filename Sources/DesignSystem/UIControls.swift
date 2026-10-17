@@ -61,8 +61,8 @@ private struct OMButtonBody: View {
     @Environment(\.isEnabled) private var isEnabled
     @State private var hovering = false
 
-    /// 纸感(墨色按钮)风格。
-    private var inkStyle: Bool { ThemeRuntime.style.primaryButton == .ink }
+    /// 纸感的扁平按钮风格(次按钮无描边、文字按钮悬停加下划线);与主按钮填充色无关。
+    private var inkStyle: Bool { ThemeRuntime.style.flatCards }
 
     var body: some View {
         configuration.label

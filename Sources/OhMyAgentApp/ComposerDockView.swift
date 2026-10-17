@@ -284,7 +284,7 @@ private struct SubagentDockRow: View {
         if let tool = entry.tool {
             let presentation = ToolPresentation(tool: tool, hasChild: true)
             DockRowShell(title: presentation.subject, meta: meta(presentation), tap: { open(tool) }) {
-                ProgressView().controlSize(.mini).scaleEffect(0.8)
+                OMSpinner(.mini).scaleEffect(0.8)
             } actions: {
                 HStack(spacing: 4) {
                     Text("在新标签页打开").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)

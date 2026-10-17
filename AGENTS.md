@@ -102,7 +102,7 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 **浮层与卡片**:沿用 `omGlassCard`、`OMMetrics.cardRadius`/`controlRadius`;阴影、描边用令牌,不另起一套。
 
 ## 4.3 主题渗透规范(所有界面必须跟随主题)
-- **颜色只来自 `OMColors` / `ThemePalette`**:前景、次要/三级文字、分隔线、填充(`subtleFill/hoverFill/selectedFill/pressedFill`)、状态(`statusRunning/Waiting/Unread/Idle`)、遮罩(`scrim`)、阴影(`shadowInk`)、图表序列(`chart(_:)`)都有令牌;`Color.primary/.secondary/.black/.white`、`NSColor.label/.separatorColor` 等系统色一律禁止(`Scripts/ui-lint.py` 扫描 `Sources/OhMyAgentApp`、`EditorKit`、`MermaidKit` 等)。
+- **颜色只来自 `OMColors` / `ThemePalette`**:前景、次要/三级文字、分隔线、填充(`subtleFill/hoverFill/selectedFill/pressedFill`)、状态(`statusActive/Running/Waiting/Unread/Idle`)、遮罩(`scrim`)、阴影(`shadowInk`)、图表序列(`chart(_:)`)都有令牌;`Color.primary/.secondary/.black/.white`、`NSColor.label/.separatorColor` 等系统色一律禁止(`Scripts/ui-lint.py` 扫描 `Sources/OhMyAgentApp`、`EditorKit`、`MermaidKit` 等)。
 - **读取令牌即自动刷新**:`ThemeRuntime` 的读取走 `ThemeTracker.revision`(Observation),视图 `body` 里读 `OMColors.*` 即可随主题热更新,**不要**靠 `.id(...)` 强制重建;AppKit 桥接(终端、编辑器、托盘)监听 `ThemeRuntime.didChange` 重新应用。
 - **新增主题**须同时提供:`surface`、`sidebarBackground`、`accent/accent2`、语法色、Diff 色、状态色;可选 `style`(圆角/描边/阴影/玻璃/填充倍率)与 `ansi`(16 色,缺省由状态色推导)。`ThemeTokenTests` 守卫对比度与 ANSI 完整性。
 - **终端、编辑器、聊天代码块、Mermaid、Git 图谱、状态点**都从主题取色:终端 `OMTerminalPalette`,Mermaid 经 `ThemeBridges` 注册 `MermaidTheme`,代码高亮缓存键包含主题 id。
@@ -114,7 +114,7 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 - **字重**:文字字重上限 `medium`(`OMFonts.title/sectionTitle` 已为 medium);标题统一用 `OMFonts.title`;字体一律系统字体,禁止衬线(`omEditorialHeading` 仅作备用令牌,默认不使用)。内容强调(搜索命中、ANSI 加粗)可 `// ui-lint:allow 原因`。
 - **圆角**:只用 `OMRadius`(`tag/control/card/floating/modal`),禁止字面量 `cornerRadius: N`;标签/芯片/徽标用 `OMPillShape`,`Capsule()` 仅限轨道类几何。间距用 `OMSpacing`(4 的倍数),动效用 `OMMotion.standard`。
 - **阴影与玻璃**:阴影只用 `omCardShadow/omFloatingShadow/omFloatShadow` 三档;`ThemeStyle.allowsGlass == false` 的主题(纸感)一律不透明卡片 + 发丝线;禁止装饰性渐变与发光(渐变只作遮罩/淡出,需 `ui-lint:allow`)。
-- **颜色角色**:`accent`(Ember)只做文字/链接/强调,不做大面积填充,文字用 `accentText`;主按钮填充用 `actionFill`(纸感为 Ink);「继续/执行计划」用 `.omWarm`(Amber),「提交/完成」用 `.omPositive`(Forest);同组实心按钮至多两个;选中背景用 `selectedFill`(纸感为中性色)。禁止纯 `#FFFFFF`/`#000000`。
+- **颜色角色(强调色渗透)**:选中背景 `selectedFill`、主按钮填充 `actionFill`、全局 `.tint`、进度/加载(`OMSpinner`)、会话状态点(`OMSessionDot`,运行实心呼吸 / 等待空心环 / 未读静止点)、托盘状态点一律跟随主题强调色(`statusActive/statusRunning/statusWaiting/statusUnread`);小字号文字用 `accentText`(纸感为加深 Ember,保证对比度),主按钮在提供 `accentText` 的主题里用同色相加深版;「继续/执行计划」用 `.omWarm`(Amber),「提交/完成」用 `.omPositive`(Forest);同组实心按钮至多两个。禁止纯 `#FFFFFF`/`#000000`。系统 `ProgressView` 不跟随 tint,加载一律用 `OMSpinner`。
 - **守卫**:`Scripts/ui-lint.py` 的字重/圆角/胶囊/渐变规则与 `PaperThemeTests`(对比度、sidebar ≠ surface、旧主题默认值不变)已接入 CI。
 
 ## 5. 日志规范(P1 起强制)

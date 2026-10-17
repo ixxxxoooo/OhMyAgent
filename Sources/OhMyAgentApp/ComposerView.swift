@@ -628,7 +628,7 @@ private struct DelayedConnectingHint: View {
     var body: some View {
         HStack(spacing: 4) {
             if delayElapsed || model.connectNote != nil {
-                ProgressView().controlSize(.mini)
+                OMSpinner(.mini)
                 Text(model.connectNote == nil ? String(localized: "正在连接…") : String(localized: "正在安装适配器…"))
             }
         }

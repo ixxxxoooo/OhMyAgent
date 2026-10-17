@@ -101,7 +101,7 @@ struct MCPPanelView: View {
             Text("MCP 服务器").font(OMFonts.body.weight(.medium))
             Spacer()
             if center.isBusy {
-                ProgressView().controlSize(.small)
+                OMSpinner(.small)
             } else {
                 Button {
                     Task { await center.checkMCPHealth() }

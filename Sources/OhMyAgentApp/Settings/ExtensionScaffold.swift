@@ -130,7 +130,7 @@ struct ExtensionBanners: View {
 
     private func banner(icon: String?, text: String, tint: Color, showsProgress: Bool = false, dismiss: (() -> Void)? = nil) -> some View {
         HStack(alignment: .top, spacing: 8) {
-            if showsProgress { ProgressView().controlSize(.small) }
+            if showsProgress { OMSpinner(.small) }
             if let icon { Image.om(icon, size: 13).foregroundStyle(tint) }
             Text(verbatim: text).font(OMFonts.small).textSelection(.enabled).lineLimit(4)
             Spacer(minLength: 0)

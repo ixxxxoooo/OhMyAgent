@@ -379,7 +379,7 @@ extension ThemePackage {
         $0.outline = ThemeRGB(hex: 0xCDCDC9)
         $0.selection = ThemeRGB(hex: 0x8BC4F8)
         $0.secondaryTextColor = ThemeRGB(hex: 0x6B6A63); $0.tertiaryTextColor = ThemeRGB(hex: 0xA1A19F)
-        $0.style = ThemeStyle(strokeScale: 0.75, allowsGlass: false, radiusSet: .paper, primaryButton: .ink, selectionTint: .neutral, flatCards: true)
+        $0.style = ThemeStyle(strokeScale: 0.75, allowsGlass: false, radiusSet: .paper, primaryButton: .accent, selectionTint: .accent, flatCards: true)
     })
 
     /// 纸感暖墨(深色):以 Ink 为卡片色,暖色提亮满足对比度(由同一规则推导)。
@@ -394,7 +394,7 @@ extension ThemePackage {
         $0.onAccent = ThemeRGB(hex: 0x1B1A16)
         $0.outline = ThemeRGB(hex: 0x3F3E36)
         $0.selection = ThemeRGB(hex: 0x8BC4F8)
-        $0.style = ThemeStyle(strokeScale: 0.75, allowsGlass: false, radiusSet: .paper, primaryButton: .ink, selectionTint: .neutral, flatCards: true)
+        $0.style = ThemeStyle(strokeScale: 0.75, allowsGlass: false, radiusSet: .paper, primaryButton: .accent, selectionTint: .accent, flatCards: true)
     })
 
     // Cursor 系

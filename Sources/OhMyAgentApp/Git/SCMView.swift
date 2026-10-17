@@ -66,7 +66,7 @@ private struct SCMContent: View {
         VStack(spacing: 0) {
             switch model.phase {
             case .unknown:
-                ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
+                OMSpinner(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
             case .notRepository:
                 notRepository
             case .ready:
@@ -99,7 +99,7 @@ private struct SCMContent: View {
             branchMenu
             Spacer(minLength: 0)
             if let busy = model.busy {
-                ProgressView().controlSize(.mini)
+                OMSpinner(.mini)
                 Text(LocalizedStringKey(busy)).font(OMFonts.caption).foregroundStyle(OMColors.secondaryText)
             }
             syncButton(icon: "arrow-down", count: model.status.behind, help: "拉取") { Task { await model.pull() } }
@@ -266,7 +266,7 @@ private struct SCMContent: View {
                         Task { await model.generateCommitMessage(gateway: workbench.activeSession?.utilityGateway) }
                     } label: {
                         if model.isGeneratingCommitMessage {
-                            ProgressView()
+                            OMSpinner(.regular)
                                 .controlSize(.mini)
                                 .frame(width: 20, height: 20)
                         } else {
@@ -353,7 +353,7 @@ private struct SCMContent: View {
         return Button { Task { await model.sync() } } label: {
             HStack(spacing: 6) {
                 if model.busy != nil {
-                    ProgressView().controlSize(.mini)
+                    OMSpinner(.mini)
                 } else {
                     Image.om(published ? "refresh-cw" : "arrow-up", size: 12)
                 }

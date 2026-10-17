@@ -200,7 +200,7 @@ struct SnippetDiffView: View {
             if let diff {
                 DiffView(diff: diff)
             } else {
-                ProgressView().controlSize(.small)
+                OMSpinner(.small)
             }
         }
         .task(id: "\(path)#\(newText.count)#\(oldText?.count ?? -1)") {

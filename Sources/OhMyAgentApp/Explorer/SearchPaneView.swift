@@ -58,7 +58,7 @@ struct SearchPaneView: View {
                 resultList(output)
             }
         } else if model.isSearching {
-            ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
+            OMSpinner(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             placeholder("text-search", "在文件中搜索", "输入关键词,在当前项目的所有文本文件中查找。")
         }
@@ -98,7 +98,7 @@ struct SearchPaneView: View {
     private func summary(_ output: SearchOutput) -> some View {
         HStack(spacing: 6) {
             Text("\(output.totalHits) 个结果,\(output.files.count) 个文件\(output.truncated ? String(localized: "(已截断)") : "")")
-            if model.isSearching { ProgressView().controlSize(.mini) }
+            if model.isSearching { OMSpinner(.mini) }
             Spacer()
         }
         .font(OMFonts.caption).foregroundStyle(OMColors.secondaryText)

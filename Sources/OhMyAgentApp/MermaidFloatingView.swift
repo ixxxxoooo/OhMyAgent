@@ -235,7 +235,7 @@ private struct MermaidFloatingPanel: View {
     private var content: some View {
         switch result {
         case .none:
-            ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
+            OMSpinner(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
         case .scene(let scene, _):
             if showSource {
                 ScrollView([.horizontal, .vertical]) {

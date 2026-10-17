@@ -153,7 +153,7 @@ private struct GraphCommitDetail: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 5)
             if !loaded {
-                ProgressView().controlSize(.small).frame(maxWidth: .infinity).padding(6)
+                OMSpinner(.small).frame(maxWidth: .infinity).padding(6)
             } else if files.isEmpty {
                 Text("这个提交没有文件改动(例如空的合并提交)。").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
                     .padding(.horizontal, 12).padding(.vertical, 4)
@@ -203,7 +203,7 @@ private struct GraphCommitDetail: View {
         } else if binary {
             Text("二进制文件,不显示差异。").font(OMFonts.caption).foregroundStyle(OMColors.secondaryText).padding(.horizontal, 12).padding(.vertical, 4)
         } else {
-            ProgressView().controlSize(.small).frame(maxWidth: .infinity).padding(6)
+            OMSpinner(.small).frame(maxWidth: .infinity).padding(6)
         }
     }
 

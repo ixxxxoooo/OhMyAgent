@@ -14,7 +14,7 @@ struct StatusBanner: View {
         VStack(spacing: 0) {
             if let message = center.busyMessage {
                 HStack(spacing: 8) {
-                    ProgressView().controlSize(.small)
+                    OMSpinner(.small)
                     Text(message).font(OMFonts.small)
                     Spacer()
                 }

@@ -221,7 +221,7 @@ struct BinaryPreviewTab: View {
                         Text("文件已损坏或格式不受支持。")
                     }
                 } else {
-                    ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                    OMSpinner(.regular).frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
         }
