@@ -2263,3 +2263,4 @@
 "分叉失败:Agent 未能连接,已仅复制对话记录。" = "Fork failed: the agent couldn't connect; only the transcript was copied.";
 "(图片)" = "(Image)";
 "跳到第 %lld 条提问" = "Jump to prompt %lld";
+"… (已截断 %lld 个字符)" = "… (%lld characters truncated)";

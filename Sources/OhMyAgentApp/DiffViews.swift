@@ -21,7 +21,6 @@ struct DiffView: View {
     /// 额外的块级操作(显示在「撤销此块」之前)
     var extraActions: [DiffHunkAction] = []
     /// 单次最多渲染的行数,超出需手动展开
-    private let softLimit = 300
     @State private var showAll = false
 
     var body: some View {
@@ -31,7 +30,7 @@ struct DiffView: View {
                 HunkView(hunk: hunk, onRevert: onRevertHunk.map { callback in { callback(hunk.id) } },
                          extraActions: extraActions.map { action in (action.title, { action.perform(hunk.id) }) })
             }
-            if total > softLimit, !showAll {
+            if total > DiffSoftLimit.lines, !showAll {
                 Button("显示全部 \(total) 行") { showAll = true }
                     .buttonStyle(.link)
                     .font(OMFonts.small)
@@ -40,14 +39,7 @@ struct DiffView: View {
     }
 
     private func visibleHunks(total: Int) -> [DiffHunk] {
-        guard total > softLimit, !showAll else { return diff.hunks }
-        var budget = softLimit
-        var result: [DiffHunk] = []
-        for hunk in diff.hunks where budget > 0 {
-            result.append(hunk)
-            budget -= hunk.lines.count
-        }
-        return result
+        DiffSoftLimit.visible(diff.hunks, total: total, showAll: showAll)
     }
 }
 
@@ -80,7 +72,8 @@ struct HunkView: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             Divider()
-            VStack(alignment: .leading, spacing: 0) {
+            // 惰性:只建视口附近的行
+            LazyVStack(alignment: .leading, spacing: 0) {
                 let marks = InlineDiff.highlights(for: hunk.lines)
                 ForEach(Array(hunk.lines.enumerated()), id: \.offset) { index, line in
                     DiffLineRow(line: line, mark: marks[index])
@@ -127,7 +120,7 @@ struct DiffLineRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .fixedSize(horizontal: false, vertical: true)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(accessibilityKind) \(line.text)")
+        .accessibilityLabel("\(accessibilityKind) \(DiffSoftLimit.displayText(line.text))")
     }
 
     private var paletteKind: OMDiffPalette.Kind {
@@ -140,7 +133,7 @@ struct DiffLineRow: View {
 
     /// 正文:有行内区间时,变化部分使用更深的底色。
     private var content: AttributedString {
-        var text = AttributedString(line.text.isEmpty ? " " : line.text)
+        var text = AttributedString(line.text.isEmpty ? " " : DiffSoftLimit.displayText(line.text))
         guard let mark, line.kind != .context else { return text }
         let characters = text.characters
         guard mark.upperBound <= characters.count, mark.lowerBound < mark.upperBound else { return text }

@@ -10,7 +10,6 @@ struct SideBySideDiffView: View {
     let diff: FileDiff
     var onRevertHunk: ((Int) -> Void)?
     var extraActions: [DiffHunkAction] = []
-    private let softLimit = 300
     @State private var showAll = false
 
     var body: some View {
@@ -20,7 +19,7 @@ struct SideBySideDiffView: View {
                 SideBySideHunkView(hunk: hunk, onRevert: onRevertHunk.map { callback in { callback(hunk.id) } },
                                    extraActions: extraActions.map { action in (action.title, { action.perform(hunk.id) }) })
             }
-            if total > softLimit, !showAll {
+            if total > DiffSoftLimit.lines, !showAll {
                 Button("显示全部 \(total) 行") { showAll = true }
                     .buttonStyle(.link)
                     .font(OMFonts.small)
@@ -29,14 +28,7 @@ struct SideBySideDiffView: View {
     }
 
     private func visibleHunks(total: Int) -> [DiffHunk] {
-        guard total > softLimit, !showAll else { return diff.hunks }
-        var budget = softLimit
-        var result: [DiffHunk] = []
-        for hunk in diff.hunks where budget > 0 {
-            result.append(hunk)
-            budget -= hunk.lines.count
-        }
-        return result
+        DiffSoftLimit.visible(diff.hunks, total: total, showAll: showAll)
     }
 }
 
@@ -69,7 +61,8 @@ private struct SideBySideHunkView: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             Divider()
-            VStack(alignment: .leading, spacing: 0) {
+            // 惰性:只建视口附近的行,打开大差异时不必一次建出全部行
+            LazyVStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                     HStack(alignment: .top, spacing: 0) {
                         half(row.left, mark: row.leftIndex.flatMap { marks[$0] }, number: row.left?.oldNumber)
@@ -105,7 +98,7 @@ private struct SideBySideHunkView: View {
         .font(OMFonts.monoSmall)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(line.map { "\(kindLabel($0.kind)) \($0.text)" } ?? "")
+        .accessibilityLabel(line.map { "\(kindLabel($0.kind)) \(DiffSoftLimit.displayText($0.text))" } ?? "")
     }
 
     private func paletteKind(_ line: DiffLine?) -> OMDiffPalette.Kind {
@@ -119,7 +112,7 @@ private struct SideBySideHunkView: View {
 
     private func content(_ line: DiffLine?, mark: Range<Int>?) -> AttributedString {
         guard let line else { return AttributedString(" ") }
-        var text = AttributedString(line.text.isEmpty ? " " : line.text)
+        var text = AttributedString(line.text.isEmpty ? " " : DiffSoftLimit.displayText(line.text))
         guard let mark, line.kind != .context else { return text }
         let characters = text.characters
         guard mark.upperBound <= characters.count, mark.lowerBound < mark.upperBound else { return text }
