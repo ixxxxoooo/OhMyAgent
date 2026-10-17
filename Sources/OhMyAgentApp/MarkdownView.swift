@@ -43,8 +43,9 @@ func inlineMarkdown(_ source: String) -> AttributedString {
 /// 行内代码标记:`InlineCodeTextRenderer` 据此在文字后面画圆角底。
 struct InlineCodeAttribute: TextAttribute {}
 
-/// 行内代码渲染器:在带 `InlineCodeAttribute` 的文字后画圆角底(圆角取 `OMRadius.tag`),其余文字原样绘制。
-/// 底色矩形 = 该段文字的排版框(含两侧内边距空格),不再额外上下外扩,使上下左右四边留白一致。
+/// 行内代码渲染器:同一行里连续的、带 `InlineCodeAttribute` 的片段(含两侧内边距空格,系统会把它们拆成独立片段)
+/// 合并成一个矩形,只画一块圆角底(圆角取 `OMRadius.tag`);先画全部底色,再画文字。
+/// 底色矩形 = 合并后的排版框,不再额外上下外扩,使上下左右四边留白一致;跨行换行的代码每行各一块。
 struct InlineCodeTextRenderer: TextRenderer {
     /// 底色
     var fill: Color
@@ -53,13 +54,24 @@ struct InlineCodeTextRenderer: TextRenderer {
 
     func draw(layout: Text.Layout, in context: inout GraphicsContext) {
         for line in layout {
+            var group: CGRect?
             for run in line {
                 if run[InlineCodeAttribute.self] != nil {
-                    context.fill(Path(roundedRect: run.typographicBounds.rect, cornerRadius: radius, style: .continuous), with: .color(fill))
+                    let rect = run.typographicBounds.rect
+                    group = group.map { $0.union(rect) } ?? rect
+                } else if let finished = group {
+                    fillBackground(finished, in: &context)
+                    group = nil
                 }
-                context.draw(run)
             }
+            if let finished = group { fillBackground(finished, in: &context) }
+            for run in line { context.draw(run) }
         }
+    }
+
+    /// 画一块圆角底。
+    private func fillBackground(_ rect: CGRect, in context: inout GraphicsContext) {
+        context.fill(Path(roundedRect: rect, cornerRadius: radius, style: .continuous), with: .color(fill))
     }
 }
 
