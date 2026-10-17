@@ -40,7 +40,7 @@ struct DemoBadgeView: View {
             .padding(.vertical, 2)
             .background(OMColors.warning.opacity(0.15), in: OMPillShape())
             .overlay(OMPillShape().strokeBorder(OMColors.warning.opacity(0.4), lineWidth: 0.5))
-            .help("演示模式:数据来自沙盒,Agent 为脚本化演示 Agent,不会触碰真实项目与账号")
+            .omTooltip("演示模式:数据来自沙盒,Agent 为脚本化演示 Agent,不会触碰真实项目与账号")
             .accessibilityLabel("演示模式")
             .allowsHitTesting(true)
     }

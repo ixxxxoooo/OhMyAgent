@@ -104,7 +104,7 @@ struct ComposerDockView: View {
                         .buttonStyle(.plain)
                         .font(OMFonts.small)
                         .foregroundStyle(OMColors.secondaryText)
-                        .help("停止本轮(含所有子 Agent)")
+                        .omTooltip("停止本轮(含所有子 Agent)")
                 }
                 Button {
                     omWithAnimation(.snappy(duration: 0.18)) { model.dockHidden = true }
@@ -115,7 +115,7 @@ struct ComposerDockView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(OMColors.secondaryText)
-                .help("收起")
+                .omTooltip("收起")
                 .accessibilityLabel("收起任务面板")
             }
             .padding(.horizontal, 12)
@@ -223,7 +223,7 @@ private struct DockRowShell<Leading: View, Actions: View>: View {
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture { tap?() }
-        .help(title)
+        .omTooltip(title)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(title)
         .accessibilityAddTraits(tap == nil ? [] : .isButton)
@@ -244,7 +244,7 @@ private struct RowIconButton: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(OMColors.secondaryText)
-        .help(label)
+        .omTooltip(label)
         .accessibilityLabel(label)
     }
 }
@@ -264,7 +264,7 @@ private struct QueuedRow: View {
                     .font(OMFonts.small)
                     .foregroundStyle(OMColors.secondaryText)
                     .disabled(model.isRunning && !model.canSteer)
-                    .help(model.isRunning ? String(localized: "立即引导进当前轮次") : String(localized: "立即发送"))
+                    .omTooltip(model.isRunning ? String(localized: "立即引导进当前轮次") : String(localized: "立即发送"))
                     .padding(.trailing, 4)
                 RowIconButton(icon: "pencil", label: String(localized: "编辑")) { model.editFollowUp(item.id) }
                 RowIconButton(icon: "trash", label: String(localized: "移除")) { model.removeFollowUp(item.id) }

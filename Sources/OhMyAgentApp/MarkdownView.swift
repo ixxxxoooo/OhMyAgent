@@ -33,6 +33,12 @@ func inlineMarkdown(_ source: String) -> AttributedString {
     for run in result.runs where run.link != nil {
         result[run.range].foregroundColor = linkColor
     }
+    // 行内代码:系统只打 `inlinePresentationIntent` 标记、SwiftUI 不会据此着色,这里显式用等宽字体 + 强调色 + 淡底
+    for run in result.runs where run.inlinePresentationIntent?.contains(.code) == true {
+        result[run.range].font = OMFonts.readingMono
+        result[run.range].foregroundColor = OMColors.accentText
+        result[run.range].backgroundColor = OMColors.subtleFill
+    }
     return result
 }
 
@@ -136,7 +142,7 @@ struct CodeBlockView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(copied ? OMColors.success : OMColors.secondaryText)
-                .help(copied ? String(localized: "已复制") : String(localized: "复制代码"))
+                .omTooltip(copied ? String(localized: "已复制") : String(localized: "复制代码"))
                 .accessibilityLabel(copied ? String(localized: "已复制") : String(localized: "复制代码"))
             }
             .padding(.horizontal, 12)

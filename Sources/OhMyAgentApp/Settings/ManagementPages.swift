@@ -17,6 +17,8 @@ struct EditorPage: View {
     @AppStorage(ClientPrefs.Key.editorWrap) private var wrap = true
     @AppStorage(ClientPrefs.Key.editorLargeFileLines) private var largeFileLines = 20_000
     @AppStorage(ClientPrefs.Key.editorFollowAgent) private var followAgent = false
+    private let appearance = AppearanceModel.shared
+    @State private var schemePickerShown = false
 
     /// 下拉选项:系统等宽 + 本机已安装的预置字体;当前值若不在其中(自定义字体)也要列出,否则选择器显示为空。
     private var fontOptions: [(value: String, title: String)] {
@@ -31,6 +33,87 @@ struct EditorPage: View {
     /// 预览用字体(与编辑器同一套解析与回退)。
     private var previewFont: NSFont {
         EditorFontPrefs.font(family: fontFamily, size: EditorFontPrefs.clampedSize(fontSize))
+    }
+
+    /// 预览代码(覆盖关键字、字符串、注释、数字、类型、函数与属性)。
+    private static let previewSample = """
+    // Greets a person
+    struct Greeter {
+        let name: String
+        func greet(times: Int = 3) -> String {
+            let text = "Hello, \\(name)"
+            return String(repeating: text, count: times)
+        }
+    }
+    """
+
+    /// 当前主题是否深色(决定自定义写入浅色还是深色变体)。
+    private var isDarkTheme: Bool { ThemeRuntime.palette?.isDark ?? ThemeRuntime.systemIsDark }
+
+    /// 当前方案的显示名。
+    private var schemeName: String {
+        SyntaxScheme.find(appearance.syntaxSchemeID)?.name ?? String(localized: "跟随主题")
+    }
+
+    /// 方案下拉的条目。
+    private var schemeEntries: [PickEntry] {
+        [PickEntry(id: SyntaxScheme.followThemeID, title: String(localized: "跟随主题"), subtitle: String(localized: "使用当前界面主题自带的语法色"))]
+            + SyntaxScheme.all.map { PickEntry(id: $0.id, title: $0.name) }
+    }
+
+    /// 某个语法项的取色绑定:读取当前生效色,写入则记为当前明暗下的自定义。
+    private func colorBinding(_ token: SyntaxToken) -> Binding<Color> {
+        Binding(
+            get: { Color(nsColor: EditorTheme.syntaxColor(token)) },
+            set: { newValue in
+                guard let srgb = NSColor(newValue).usingColorSpace(.sRGB) else { return }
+                let hex = ThemeRGB(red: srgb.redComponent, green: srgb.greenComponent, blue: srgb.blueComponent).hexString
+                appearance.syntaxOverrides[SyntaxPrefs.overrideKey(token, dark: isDarkTheme)] = hex
+            }
+        )
+    }
+
+    /// 代码高亮配色卡片:方案选择 + 逐项自定义。
+    private var syntaxCard: some View {
+        SettingsCard("代码高亮") {
+            SettingsRow("配色方案", detail: "编辑器与聊天里的代码块使用同一套配色。默认跟随当前界面主题;也可以指定独立的方案,浅色/深色主题会自动取对应变体。") {
+                Button { schemePickerShown.toggle() } label: {
+                    HStack(spacing: 6) {
+                        Text(verbatim: schemeName)
+                        Image.om("chevron-down", size: 12)
+                    }
+                }
+                .buttonStyle(.omSecondary)
+                .omPicker(isPresented: $schemePickerShown, entries: schemeEntries, selectedID: appearance.syntaxSchemeID,
+                          placeholder: String(localized: "搜索配色"), placement: .below, width: 240, showsSearch: false) { entry in
+                    appearance.syntaxSchemeID = entry.id
+                }
+            }
+            ForEach(SyntaxToken.allCases) { token in
+                SettingsRow(token.title) {
+                    if appearance.syntaxOverrides[SyntaxPrefs.overrideKey(token, dark: isDarkTheme)] != nil {
+                        Button { appearance.syntaxOverrides[SyntaxPrefs.overrideKey(token, dark: isDarkTheme)] = nil } label: {
+                            Image.om("undo-2", size: 12)
+                        }
+                        .buttonStyle(.omIcon)
+                        .omTooltip(String(localized: "恢复为方案颜色"))
+                        .accessibilityLabel("恢复为方案颜色")
+                    }
+                    ColorPicker("", selection: colorBinding(token), supportsOpacity: false).labelsHidden()
+                }
+            }
+            SettingsRow("恢复默认", detail: "清除全部自定义颜色并回到「跟随主题」。") {
+                Button("恢复默认") {
+                    appearance.syntaxOverrides = [:]
+                    appearance.syntaxSchemeID = SyntaxScheme.followThemeID
+                }
+                .buttonStyle(.omSecondary)
+                .disabled(appearance.syntaxOverrides.isEmpty && appearance.syntaxSchemeID == SyntaxScheme.followThemeID)
+            }
+            Note(isDarkTheme
+                 ? String(localized: "自定义颜色分别记在浅色与深色两个变体里:当前是深色主题,改的是深色变体。")
+                 : String(localized: "自定义颜色分别记在浅色与深色两个变体里:当前是浅色主题,改的是浅色变体。")).footnote()
+        }
     }
 
     /// 提交自定义字体:空串恢复系统等宽,否则写入规整后的字体族名。
@@ -74,11 +157,18 @@ struct EditorPage: View {
                 SettingsToggleRow("跟随 Agent", detail: "Agent 每次修改文件都会在预览标签中打开该文件并跳到第一处改动(仅当前项目);本轮改动过的行会在行号栏用强调色标出。", isOn: $followAgent)
                 Note("在编辑器里选中代码,右键「在对话中引用选区」或按 ⌘⇧L,会把 @文件:行范围 加入当前项目的输入框。").footnote()
             }
+            syntaxCard
             SettingsCard("预览") {
-                Text(verbatim: "func greet(name: String) -> String {\n    return \"Hello, \\(name)\"\n}")
+                // 预览走与编辑器、聊天代码块相同的高亮与配色;读取 renderKey 让配色变化时立即刷新
+                let _ = appearance.renderKey
+                Text(CodeHighlighter.attributed(Self.previewSample, language: .swift))
                     .font(Font(previewFont))
+                    .foregroundStyle(Color(nsColor: EditorTheme.default.foreground))
                     .lineSpacing(EditorFontPrefs.lineSpacing(for: previewFont))
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(Color(nsColor: EditorTheme.default.background), in: RoundedRectangle(cornerRadius: OMRadius.card, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: OMRadius.card, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
             }
             Note("编辑器用于查看 Agent 改动的文件;保存时处理(去尾随空白等)将在编辑能力开放后提供。")
         }

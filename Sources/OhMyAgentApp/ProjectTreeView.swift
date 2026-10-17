@@ -33,11 +33,13 @@ extension WorkbenchModel {
     @MainActor
     func sidebarSessions(for project: ProjectEntry) -> [SidebarSession] {
         let model = sessions[project.id]
+        // 该项目下所有已打开的会话(含尚无内容的空白新对话):点了「新对话」就是真实存在的会话,不随选中项目变化而消失
+        let openModels = conversations.filter { $0.key.projectID == project.id }.map(\.value)
         let cache = Dictionary(project.sessions.map { ($0.sessionId, $0) }, uniquingKeysWith: { first, _ in first })
         let currentAgent = model?.descriptor.id
         let deleted = Set(project.deletedSessions)
         var rows: [(key: Date, row: SidebarSession)] = project.sessions.compactMap { item in
-            guard item.sessionId != model?.sessionId, !EmptySessionRegistry.isHidden(item.sessionId), !deleted.contains(item.sessionId) else { return nil }
+            guard !openModels.contains(where: { $0.sessionId == item.sessionId }), !EmptySessionRegistry.isHidden(item.sessionId), !deleted.contains(item.sessionId) else { return nil }
             let displayDate = Self.parseDate(item.updatedAt) ?? Self.parseDate(item.createdAt) ?? Self.parseDate(item.firstSeenAt)
             return (item.stableKey, SidebarSession(
                 projectID: project.id, sessionId: item.sessionId, uid: nil,
@@ -46,14 +48,13 @@ extension WorkbenchModel {
                 foreignAgentID: item.agentId.flatMap { $0 != currentAgent ? $0 : nil }
             ))
         }
-        if let model, !deleted.contains(model.sessionId ?? ""),
-           !model.isPristine || model.isRunning || selectedProjectID == project.id {
-            let cached = model.sessionId.flatMap { cache[$0] }
+        for open in openModels where !deleted.contains(open.sessionId ?? "") {
+            let cached = open.sessionId.flatMap { cache[$0] }
             let key = cached?.stableKey ?? .distantFuture
             rows.append((key, SidebarSession(
-                projectID: project.id, sessionId: model.sessionId, uid: model.uid,
-                title: model.sessionTitle ?? cached?.title ?? String(localized: "新对话"),
-                updatedAt: nil, isCurrent: true, isRunning: model.isRunning
+                projectID: project.id, sessionId: open.sessionId, uid: open.uid,
+                title: open.sessionTitle ?? cached?.title ?? String(localized: "新对话"),
+                updatedAt: nil, isCurrent: open === model, isRunning: open.isRunning
             )))
         }
         // 稳定排序:创建时间倒序(新对话 .distantFuture 排在最前);同键按原始相对顺序全序兜底
@@ -148,15 +149,12 @@ struct ProjectTreeView: View {
 
     // MARK: 顶部主操作
 
-    /// 主操作区:新对话、搜索(点击展开输入框)、自动化(打开自动化页)。
+    /// 主操作区:新对话、自动化(打开自动化页);搜索入口在标题栏的搜索图标与 ⌘K。
     private var navigation: some View {
         VStack(spacing: 2) {
             // 选中项目时在该项目下新对话;没有项目或停在会话区时开一个不绑定项目的通用对话
             NavRow(title: "新对话", icon: "square.and.pencil", shortcut: ShortcutStore.shared.binding(for: .newConversation).display) {
                 workbench.newConversationInContext()
-            }
-            NavRow(title: "搜索", icon: "magnifyingglass", shortcut: ShortcutStore.shared.binding(for: .hubSearch).display) {
-                HubModel.shared.present(.all, workbench: workbench)
             }
             NavRow(title: "自动化", icon: "workflow", shortcut: nil) { workbench.openAutomation() }
         }
@@ -177,7 +175,7 @@ struct ProjectTreeView: View {
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help("筛选")
+        .omTooltip("筛选")
         .accessibilityLabel("筛选")
     }
 
@@ -212,7 +210,7 @@ struct ProjectTreeView: View {
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help("添加项目…")
+        .omTooltip("添加项目…")
         .accessibilityLabel("添加项目…")
     }
 
@@ -228,7 +226,7 @@ struct ProjectTreeView: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(OMColors.secondaryText)
-            .help("设置 (⌘,)")
+            .omTooltip("设置 (⌘,)")
             .accessibilityLabel("设置")
             if DemoLaunch.isActive { DemoBadgeView() }
             Spacer()
@@ -276,7 +274,7 @@ private struct SectionIconButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(label)
+        .omTooltip(label)
         .accessibilityLabel(label)
     }
 }
@@ -427,7 +425,7 @@ private struct ProjectGroup: View {
             if project.isMultiRoot {
                 Text(verbatim: "+\(project.extraFolders.count)")
                     .font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
-                    .help("工作区另含 \(project.extraFolders.count) 个文件夹")
+                    .omTooltip(String(localized: "工作区另含 \(project.extraFolders.count) 个文件夹"))
                     .accessibilityLabel("工作区另含 \(project.extraFolders.count) 个文件夹")
             }
             Spacer(minLength: 4)
@@ -446,7 +444,7 @@ private struct ProjectGroup: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(OMColors.secondaryText)
                 .opacity(hovering ? 1 : 0)
-                .help("在 \(project.name) 下新对话")
+                .omTooltip(String(localized: "在 \(project.name) 下新对话"))
                 .accessibilityLabel("在 \(project.name) 下新对话")
             }
             .frame(width: 24)
@@ -458,7 +456,7 @@ private struct ProjectGroup: View {
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture { omWithAnimation(.snappy(duration: 0.18)) { workbench.toggleCollapsed(project.id) } }
-        .help((project.id as NSString).abbreviatingWithTildeInPath)
+        .omTooltip((project.id as NSString).abbreviatingWithTildeInPath)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(project.name)
         .accessibilityAddTraits(.isButton)
@@ -522,7 +520,7 @@ private struct SubagentRows: View {
                     .onTapGesture {
                         workbench.openSubagent(project: projectID, toolCallID: tool.toolCallId, title: tool.title)
                     }
-                    .help(tool.title)
+                    .omTooltip(tool.title)
                     .accessibilityElement(children: .combine)
                     .accessibilityAddTraits(.isButton)
                 }
@@ -581,7 +579,7 @@ private struct SessionLine: View {
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture(perform: open)
-        .help(mode == .pinned ? "\(projectName) · \(item.title)" : item.title)
+        .omTooltip(mode == .pinned ? "\(projectName) · \(item.title)" : item.title)
         .omContextMenu { menu }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
@@ -622,7 +620,7 @@ private struct SessionLine: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(OMColors.tertiaryText)
-        .help(label)
+        .omTooltip(label)
         .accessibilityLabel(label)
     }
 

@@ -2,6 +2,7 @@
 // 对话区:时间线(锚定底部、流式时自动跟随)+ 浮动输入区。
 
 import IconKit
+import OMLog
 import ChatKit
 import DesignSystem
 import SwiftUI
@@ -31,7 +32,8 @@ struct ChatView: View {
     private var contentMaxWidth: CGFloat { ChatWidth.resolve(raw: chatWidth, custom: chatWidthCustom) }
 
     /// 新会话(时间线为空):输入区居中显示,对齐 kuku/Cursor 的新对话首屏。
-    private var isEmptySession: Bool { model.timeline.entries.isEmpty }
+    /// 正在恢复/回放历史会话时不算:否则打开会话会先闪出居中的「新对话」输入框,内容到了再跳回底部。
+    private var isEmptySession: Bool { model.timeline.entries.isEmpty && !model.isReplaying }
 
     /// 输入区最大宽度:新会话再收窄一档(不超过「较窄」),会话开始后跟随聊天宽度设置。
     private var composerMaxWidth: CGFloat {
@@ -80,10 +82,17 @@ struct ChatView: View {
             }
             PlanDock(model: model)
             GoalChip(model: model)
-            if usageOpen {
-                ContextUsagePanel(model: model) { omWithAnimation { usageOpen = false } }
-                    .transition(.opacity.combined(with: .offset(y: 6)))
-            }
+            // 用量面板锚点:零高度,面板以底边对齐锚点向上悬浮在会话画布之上(原位置),不占布局、不挤会话
+            Color.clear.frame(height: 0)
+                .overlay(alignment: .bottom) {
+                    if usageOpen {
+                        ContextUsagePanel(model: model) { omWithAnimation { usageOpen = false } }
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(height: 0, alignment: .bottom)
+                            .transition(.opacity.combined(with: .offset(y: 6)))
+                    }
+                }
+                .zIndex(1)
             ComposerDockView(model: model, workbench: AppEnvironment.shared.workbench)
             if isEmptySession {
                 // 新会话才显示项目切换 chip,会话开始后隐藏;缩进对齐下方 Git 分支 chip(页脚内缩 12pt)
@@ -148,6 +157,18 @@ struct ChatView: View {
         }
         .onChange(of: model.timeline.revision) { autoFollow() }
         .overlay(alignment: .bottom) { jumpButton }
+        .overlay(alignment: .trailing) {
+            ConversationAnchorRail(model: model, sticky: sticky) { id in
+                // 跳转到某条提问:暂停贴底自动跟随,避免流式输出把视口拽回底部
+                sticky.followSuspended = true
+                omWithAnimation { position.scrollTo(id: id, anchor: .top) }
+            }
+        }
+        .onAppear {
+            // 时间线挂载耗时:到下一个主循环(首轮布局之后)为止
+            let span = Log.perf.span("时间线挂载", warnMs: 120, ["entries": "\(model.timeline.entries.count)"])
+            DispatchQueue.main.async { span.end() }
+        }
     }
 
     /// 内容变化后:贴底且用户没在滚动时才自动滚到底;否则只累计「新消息」。
@@ -203,7 +224,7 @@ struct JumpToLatestButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
-        .help("回到最新消息")
+        .omTooltip("回到最新消息")
     }
 }
 

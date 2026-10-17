@@ -39,7 +39,7 @@ struct BranchSwitcher: View {
         .buttonStyle(.plain)
         .disabled(isBusy)
         .onHover { hovering = $0 }
-        .help(isBusy ? LocalizedStringKey("Agent 运行中,暂不能切换分支") : LocalizedStringKey("切换分支"))
+        .omTooltip(isBusy ? String(localized: "Agent 运行中,暂不能切换分支") : String(localized: "切换分支"))
         .accessibilityLabel("切换分支")
         .accessibilityValue(head.displayName)
         .omCustomPicker(isPresented: $shown, width: 280) {

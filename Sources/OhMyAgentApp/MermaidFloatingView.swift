@@ -225,7 +225,7 @@ private struct MermaidFloatingPanel: View {
         .menuIndicator(.hidden)
         .foregroundStyle(OMColors.secondaryText)
         .fixedSize()
-        .help("下载")
+        .omTooltip("下载")
         .accessibilityLabel("下载")
     }
 
@@ -373,7 +373,7 @@ struct FloatingIconButton: View {
         .buttonStyle(.plain)
         .foregroundStyle(active ? OMColors.accent : OMColors.secondaryText)
         .onHover { hovering = $0 }
-        .help(help)
+        .omTooltip(help)
         .accessibilityLabel(Text(help))
     }
 }

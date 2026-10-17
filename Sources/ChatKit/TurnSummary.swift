@@ -35,7 +35,11 @@ public struct TurnSummary: Sendable, Equatable {
     /// 本轮助手输出的正文(Markdown 原文,多条消息以空行连接);结束行的复制按钮复制它,而不是这一行元数据。
     public var outputText: String
 
-    public init(model: String, durationSeconds: Double, usage: TurnUsage? = nil, brand: ModelBrandHint? = nil, outputText: String = "") {
+    /// 回合结束的时间(没有时不显示);对齐 Claude Code 的「Cooked for 22s · done 10:20 am」。
+    public var finishedAt: Date?
+
+    public init(model: String, durationSeconds: Double, usage: TurnUsage? = nil, brand: ModelBrandHint? = nil, outputText: String = "", finishedAt: Date? = nil) {
+        self.finishedAt = finishedAt
         self.outputText = outputText
         self.brand = brand
         self.model = model
@@ -67,6 +71,7 @@ public struct TurnSummary: Sendable, Equatable {
             result.append(String(localized: "输入 \(input.formatted()) · 输出 \(usage.outputTokens.formatted()) token"))
         }
         if let tps = tokensPerSecond { result.append(String(format: String(localized: "%.1f tps"), tps)) }
+        if let finishedAt { result.append(String(localized: "完成于 \(finishedAt.formatted(date: .omitted, time: .shortened))")) }
         return result
     }
 

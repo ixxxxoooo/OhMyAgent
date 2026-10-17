@@ -99,6 +99,10 @@ public final class AppearanceModel {
     public var fallbackOnLowPower: Bool { didSet { save("fallbackOnLowPower", fallbackOnLowPower); MaterialPolicy.shared.fallbackOnLowPower = fallbackOnLowPower } }
     /// Diff 使用主题配色(关闭后为固定红绿,与主题无关)
     public var themedDiff: Bool { didSet { save("themedDiff", themedDiff); ThemeRuntime.themedDiff = themedDiff; themeChanged() } }
+    /// 代码高亮配色方案 id(`SyntaxScheme.followThemeID` = 跟随主题)。
+    public var syntaxSchemeID: String { didSet { save("syntaxScheme", syntaxSchemeID); syntaxChanged() } }
+    /// 代码高亮单项自定义(键 `light.keyword` / `dark.keyword`,值 `#RRGGBB`)。
+    public var syntaxOverrides: [String: String] { didSet { save("syntaxOverrides", syntaxOverrides); syntaxChanged() } }
     /// 每次字号变化递增,用于让时间线整体刷新字体。
     public private(set) var fontRevision = 0
     /// 每次主题/强调色变化递增,用于让依赖令牌颜色的视图整体刷新。
@@ -141,6 +145,8 @@ public final class AppearanceModel {
         accent2 = AccentChoice(rawValue: string("accent2") ?? "") ?? .system
         customAccent2Hex = string("accent2Hex") ?? "#5769F7"
         themedDiff = bool("themedDiff", true)
+        syntaxSchemeID = string("syntaxScheme") ?? SyntaxScheme.followThemeID
+        syntaxOverrides = defaults.dictionary(forKey: Self.prefix + "syntaxOverrides") as? [String: String] ?? [:]
         uiFontScale = double("uiFontScale", 1)
         timelineFontScale = double("timelineFontScale", 1)
         isCompact = bool("compact", false)
@@ -186,10 +192,13 @@ public final class AppearanceModel {
         theme = .system; themeID = ThemePackage.defaultID; accent = .system; accent2 = .system
         customAccentHex = "#D97757"; customAccent2Hex = "#5769F7"; uiFontScale = 1; timelineFontScale = 1
         isCompact = false; themedDiff = true; reduceMotion = false; alwaysOpaque = false; fallbackOnLowPower = true
+        syntaxSchemeID = SyntaxScheme.followThemeID; syntaxOverrides = [:]
     }
 
     /// 应用全部设置(启动时调用)。
     public func applyAll() {
+        SyntaxPrefs.schemeID = syntaxSchemeID
+        SyntaxPrefs.overrides = syntaxOverrides
         ThemeRuntime.themedDiff = themedDiff
         applyTheme()
         applyScale()
@@ -247,6 +256,13 @@ public final class AppearanceModel {
         themeRevision += 1
         ThemeRuntime.bump()
         NotificationCenter.default.post(name: ThemeRuntime.didChange, object: nil)
+    }
+
+    /// 代码高亮偏好变化:同步运行时快照并通知编辑器/代码块重新取色。
+    private func syntaxChanged() {
+        SyntaxPrefs.schemeID = syntaxSchemeID
+        SyntaxPrefs.overrides = syntaxOverrides
+        themeChanged()
     }
 
     private func applyScale() {

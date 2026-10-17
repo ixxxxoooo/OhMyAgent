@@ -63,7 +63,7 @@ struct ContextUsagePanel: View {
                 Image.om("x", size: 11).foregroundStyle(OMColors.secondaryText).frame(width: 20, height: 20).contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help("关闭")
+            .omTooltip("关闭")
             .accessibilityLabel("关闭")
         }
     }
@@ -168,7 +168,7 @@ struct ContextUsageBody: View {
                 ForEach(items.filter { $0.category.kind != .free }) { item in
                     Rectangle().fill(item.color)
                         .frame(width: max(0, proxy.size.width * CGFloat(item.category.tokens) / CGFloat(window)))
-                        .help("\(item.category.name) · \(ContextUsage.formatTokens(item.category.tokens))")
+                        .omTooltip("\(item.category.name) · \(ContextUsage.formatTokens(item.category.tokens))")
                 }
                 Spacer(minLength: 0)
             }

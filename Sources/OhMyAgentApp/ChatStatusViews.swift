@@ -31,13 +31,13 @@ struct GoalChip: View {
                     Image.om("x", size: 11).foregroundStyle(OMColors.secondaryText)
                 }
                 .buttonStyle(.plain)
-                .help("清除目标")
+                .omTooltip("清除目标")
                 .accessibilityLabel("清除目标")
             }
             .padding(.horizontal, 12)
             .frame(height: 30)
             .omGlassCard(cornerRadius: OMRadius.floating)
-            .help(goal.objective)
+            .omTooltip(goal.objective)
         }
     }
 }

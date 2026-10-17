@@ -17,9 +17,23 @@ struct TabContentView: View {
     let tab: WorkbenchTab
 
     var body: some View {
+        content
+            // 标签内容区底色恒定取主题:差异/历史/改动等视图自身没有底色,否则会透出窗口底层的颜色(与主题不一致);文件标签由编辑器自己的主题底色负责
+            .background(backgroundColor)
+    }
+
+    private var backgroundColor: Color {
+        if case .file = tab.kind { return Color(nsColor: EditorTheme.default.background) }
+        return OMColors.surface
+    }
+
+    @ViewBuilder
+    private var content: some View {
         switch tab.kind {
         case .chat(let projectID, let slot): ChatPane(workbench: workbench, projectID: projectID, slot: slot)
-        case .file(let path): FileTabView(workbench: workbench, tab: tab, path: path)
+        case .file(let path):
+            // 预览标签会在同一标签里换文件:按路径重建,滚动位置/语言服务器/对比状态都从干净状态开始,不残留上一个文件的状态
+            FileTabView(workbench: workbench, tab: tab, path: path).id(path)
         case .diff(let path): DiffTabView(workbench: workbench, path: path)
         case .changes(let projectID): ChangesTabView(workbench: workbench, projectID: projectID)
         case .subagent(let projectID, let toolCallID): SubagentTabView(workbench: workbench, projectID: projectID, toolCallID: toolCallID)
@@ -46,6 +60,7 @@ private struct ChatPane: View {
     let projectID: String
     let slot: String?
     private let appearance = AppearanceModel.shared
+    @Environment(\.tabIsActive) private var isActive
 
     var body: some View {
         Group {
@@ -54,10 +69,18 @@ private struct ChatPane: View {
                     .id(appearance.renderKey)
                     .environment(model)
             } else {
-                OMSpinner(.regular).frame(maxWidth: .infinity, maxHeight: .infinity)
+                Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .task { workbench.ensureSession(project: projectID, slot: slot) }
+        .task(id: isActive) {
+            // 可见时每 2 秒看一眼会话记录:终端里的 claude 续写了同一个会话,应用里实时同步出来
+            guard isActive else { return }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(2))
+                await workbench.conversations[ConversationKey(projectID: projectID, slot: slot)]?.syncExternalTranscript()
+            }
+        }
     }
 }
 
@@ -134,9 +157,12 @@ struct FileTabView: View {
                 } else if let failure = doc.loadError {
                     Text(failure).foregroundStyle(OMColors.secondaryText).frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    OMSpinner(.regular).frame(maxWidth: .infinity, maxHeight: .infinity)
+                    // 读盘通常几十毫秒:延迟显示转圈,避免一闪而过
+                    DelayedSpinner().frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
+            // 编辑区底色恒定为编辑器主题色:新建编辑器的首帧、加载中、切换文件时都不会透出别的底色(白闪)
+            .background(Color(nsColor: EditorTheme.default.background))
             .overlay {
                 if comparing {
                     GitFileDiffView(workbench: workbench, path: path, embedded: true)
@@ -415,7 +441,7 @@ struct SubagentStatusFooter: View {
             }
             .accessibilityElement(children: .combine)
         }
-        .help("子 Agent 不能单独中断:在主会话点「停止」会停止本轮及其所有子 Agent")
+        .omTooltip("子 Agent 不能单独中断:在主会话点「停止」会停止本轮及其所有子 Agent")
     }
 
     /// 已结束:终态 + 统计 + 复制。
@@ -518,5 +544,20 @@ struct LSPStatusBar: View {
         .padding(.horizontal, 12).padding(.vertical, 4)
         .background(.bar)
         .overlay(alignment: .top) { Divider() }
+    }
+}
+
+
+/// 延迟出现的加载转圈(短暂加载不显示,避免闪一下)。
+struct DelayedSpinner: View {
+    @State private var visible = false
+
+    var body: some View {
+        OMSpinner(.regular)
+            .opacity(visible ? 1 : 0)
+            .task {
+                try? await Task.sleep(for: .milliseconds(250))
+                visible = true
+            }
     }
 }

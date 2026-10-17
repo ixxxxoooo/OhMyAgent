@@ -29,7 +29,7 @@ public struct OMIconButton: View {
         }
         .buttonStyle(.plain)
         .omGlass(in: Circle(), interactive: true)
-        .help(help)
+        .omTooltip(help)
         .accessibilityLabel(help)
     }
 }

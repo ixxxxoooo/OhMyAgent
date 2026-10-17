@@ -212,7 +212,7 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(OMColors.secondaryText)
-                .help("返回工作台 (Esc)")
+                .omTooltip("返回工作台 (Esc)")
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 14)

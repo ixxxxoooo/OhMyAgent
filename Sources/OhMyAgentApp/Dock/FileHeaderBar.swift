@@ -68,7 +68,7 @@ struct FileHeaderBar: View {
             }
         }
         .font(OMFonts.monoSmall)
-        .help(path)
+        .omTooltip(path)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(String(localized: "文件路径"))
         .accessibilityValue(FileBreadcrumb.relativePath(path, root: projectRoot))
@@ -110,7 +110,7 @@ private struct HeaderIconButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .help(help)
+        .omTooltip(help)
         .accessibilityLabel(help)
     }
 }

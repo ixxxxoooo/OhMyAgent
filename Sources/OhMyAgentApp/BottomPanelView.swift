@@ -42,7 +42,7 @@ struct BottomPanelView: View {
                 Spacer()
                 Button { workbench.layout.bottomVisible = false } label: { Image.om("xmark") }
                     .buttonStyle(.omPlain)
-                    .help("关闭面板 (\(ShortcutStore.shared.binding(for: .togglePanel).display))")
+                    .omTooltip(String(localized: "关闭面板 (\(ShortcutStore.shared.binding(for: .togglePanel).display))"))
                     .accessibilityLabel("关闭底部面板")
             }
             .padding(.horizontal, 10).padding(.vertical, 4)

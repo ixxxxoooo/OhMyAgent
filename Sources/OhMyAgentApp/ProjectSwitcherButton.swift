@@ -113,7 +113,7 @@ struct ProjectSwitcherButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .help(String(localized: "切换项目"))
+        .omTooltip(String(localized: "切换项目"))
         .accessibilityLabel(String(localized: "当前项目: \(currentTitle)"))
         .omCustomPicker(isPresented: $shown, placement: .below, width: 220) {
             ProjectPickerPopover(model: model, workbench: workbench, shown: $shown)

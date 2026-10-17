@@ -24,7 +24,7 @@ struct HooksSettingsPage: View {
             errorKey: "Hooks"
         ) {
             Button { center.reload() } label: { Image.om("arrow.clockwise") }
-                .help("重新读取配置")
+                .omTooltip("重新读取配置")
                 .accessibilityLabel("刷新")
             Button { editor = HookEditorTarget(entry: nil) } label: { Label("添加 Hook", om: "plus") }
                 .buttonStyle(.omPrimary)
@@ -66,12 +66,12 @@ struct HooksSettingsPage: View {
                 if editable {
                     HStack(spacing: 6) {
                         Button { editor = HookEditorTarget(entry: entry) } label: { Image.om("pencil", size: 13).frame(width: 24, height: 24).contentShape(Rectangle()) }
-                            .buttonStyle(.plain).foregroundStyle(OMColors.secondaryText).help("编辑").accessibilityLabel("编辑")
+                            .buttonStyle(.plain).foregroundStyle(OMColors.secondaryText).omTooltip("编辑").accessibilityLabel("编辑")
                         Button { pendingDelete = entry } label: { Image.om("trash", size: 13).frame(width: 24, height: 24).contentShape(Rectangle()) }
-                            .buttonStyle(.plain).foregroundStyle(OMColors.secondaryText).help("删除").accessibilityLabel("删除")
+                            .buttonStyle(.plain).foregroundStyle(OMColors.secondaryText).omTooltip("删除").accessibilityLabel("删除")
                     }
                 } else {
-                    Image.om("lock", size: 13).foregroundStyle(OMColors.tertiaryText).help("来自插件,只读")
+                    Image.om("lock", size: 13).foregroundStyle(OMColors.tertiaryText).omTooltip("来自插件,只读")
                 }
             }
         )

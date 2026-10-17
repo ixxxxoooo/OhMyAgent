@@ -5,6 +5,7 @@
 import ACPKit
 import DiffKit
 import Foundation
+import OMLog
 
 /// 工具调用的一行摘要。
 public struct ToolPresentation: Sendable, Equatable {
@@ -342,11 +343,13 @@ public final class TimelineItemsCache {
     ///   - density: 工具调用详细程度
     /// - Returns: 展示单元序列
     public func items(for store: TimelineStore, density: ToolDensity = .standard) -> [TimelineItem] {
-        if owner == ObjectIdentifier(store), store.revision == revision, store.entries.count == count, self.density == density { return items }
+        if owner == ObjectIdentifier(store), store.structureRevision == revision, store.entries.count == count, self.density == density { return items }
+        let span = Log.perf.span("时间线分组", warnMs: 8, quiet: true, ["entries": "\(store.entries.count)"])
         items = TimelineGrouping.group(store.entries, density: density)
+        span.end()
         self.density = density
         owner = ObjectIdentifier(store)
-        revision = store.revision
+        revision = store.structureRevision
         count = store.entries.count
         return items
     }
@@ -400,7 +403,13 @@ public struct ExploreGroup: Identifiable {
             case .edit: edits += 1
             case .write: writes += 1
             case .delete, .move: removes += 1
-            case .terminal: runs += 1
+            case .terminal:
+                // 与 Claude Code 一致:grep/rg/find 算「搜索」,cat/ls/head 算「读取」,其余才是「运行命令」
+                switch ShellIntent.classify(ToolPresentation(tool: tool).subject) {
+                case .search: searches += 1
+                case .read: reads += 1
+                case .run: runs += 1
+                }
             case .read: reads += 1
             case .search: searches += 1
             case .fetch: fetches += 1
@@ -472,7 +481,12 @@ public enum TimelineGrouping {
             while let first = members.first, first.kind == .thought {
                 items.append(.entry(members.removeFirst()))
             }
-            if members.filter({ $0.kind == .tool }).count >= 2 {
+            // 精简档对齐 Claude Code:单个命令/搜索/读取也折叠成「运行了 1 条命令」这样的摘要行(编辑、新建等仍单独展示)
+            let tools = members.filter { $0.kind == .tool }
+            let soloCollapses = density == .compact && tools.count == 1 && tools[0].tool.map {
+                [.terminal, .search, .read, .fetch].contains(ToolPresentation(tool: $0).category)
+            } == true
+            if tools.count >= 2 || soloCollapses {
                 items.append(.explore(ExploreGroup(id: members[0].id, entries: members, style: style)))
             } else {
                 items.append(contentsOf: members.map(TimelineItem.entry))
@@ -491,5 +505,39 @@ public enum TimelineGrouping {
         }
         flush()
         return items
+    }
+}
+
+
+/// Shell 命令的意图(用于精简档摘要:搜索 / 读取 / 其他命令)。
+enum ShellIntent: Sendable, Equatable {
+    case search, read, run
+
+    private static let searchTools: Set<String> = ["grep", "egrep", "fgrep", "rg", "ag", "ack", "find", "fd", "locate"]
+    private static let readTools: Set<String> = ["cat", "head", "tail", "ls", "less", "more", "wc", "stat", "file", "tree", "bat", "nl", "du", "pwd"]
+
+    /// 判断一条命令的意图:拆开 `&&`/`;`/`|` 后忽略 `cd`/环境变量赋值/`rtk` 前缀,
+    /// 所有有效片段都同属搜索(或读取)才归为搜索(或读取),否则是运行命令。
+    /// - Parameter command: 命令文本(取首行即可)
+    /// - Returns: 意图
+    static func classify(_ command: String) -> ShellIntent {
+        let segments = command
+            .replacingOccurrences(of: "&&", with: ";")
+            .replacingOccurrences(of: "||", with: ";")
+            .split(separator: ";")
+        var intents: [ShellIntent] = []
+        for segment in segments {
+            // 管道只看第一个命令(`grep x | head` 仍是搜索)
+            let head = segment.split(separator: "|", maxSplits: 1).first.map(String.init) ?? ""
+            var words = head.split(whereSeparator: \.isWhitespace).map(String.init)
+            while let first = words.first, first.contains("=") && !first.hasPrefix("-") || first == "rtk" || first == "command" { words.removeFirst() }
+            guard let tool = words.first.map({ ($0 as NSString).lastPathComponent }) else { continue }
+            if tool == "cd" || tool == "export" || tool == "set" { continue }
+            if searchTools.contains(tool) { intents.append(.search) }
+            else if readTools.contains(tool) { intents.append(.read) }
+            else { return .run }
+        }
+        guard let first = intents.first, intents.allSatisfy({ $0 == first }) else { return .run }
+        return first
     }
 }

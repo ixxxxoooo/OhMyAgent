@@ -154,7 +154,7 @@ private struct ProjectIconPickerCard: View {
                         }
                         .buttonStyle(.plain)
                         .background(selected ? OMColors.selectedFill : Color.clear, in: RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))
-                        .help(name)
+                        .omTooltip(name)
                         .accessibilityLabel(name)
                     }
                 }

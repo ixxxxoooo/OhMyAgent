@@ -23,8 +23,49 @@ public struct EditorTheme {
 
     /// 默认主题。
     public static var `default`: EditorTheme {
-        if let palette = ThemeRuntime.palette { return themed(palette) }
-        return systemDefault
+        var theme = ThemeRuntime.palette.map { themed($0) } ?? systemDefault
+        theme.applySyntaxPreferences(darkTheme: ThemeRuntime.palette?.isDark)
+        return theme
+    }
+
+    /// 叠加用户在设置里选的代码高亮方案与单项自定义(没有任何指定时保持主题自带的语法色)。
+    /// - Parameter darkTheme: 主题包自带明暗;系统主题为 nil,此时生成随外观切换的动态色
+    mutating func applySyntaxPreferences(darkTheme: Bool?) {
+        guard SyntaxPrefs.isActive else { return }
+        for token in SyntaxToken.allCases {
+            guard let kind = Self.kind(for: token) else { continue }
+            if let isDark = darkTheme {
+                if let rgb = SyntaxPrefs.color(token, dark: isDark) { colors[kind] = rgb.nsColor }
+            } else {
+                let base = colors[kind]
+                let light = SyntaxPrefs.color(token, dark: false), dark = SyntaxPrefs.color(token, dark: true)
+                guard light != nil || dark != nil else { continue }
+                colors[kind] = NSColor(name: nil) { appearance in
+                    let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                    return (isDark ? dark : light)?.nsColor ?? base ?? .textColor
+                }
+            }
+        }
+    }
+
+    /// 某个语法项当前生效的颜色(含方案与自定义),设置页的取色器与预览用。
+    /// - Parameter token: 语法项
+    /// - Returns: 颜色
+    public static func syntaxColor(_ token: SyntaxToken) -> NSColor {
+        let theme = EditorTheme.default
+        return kind(for: token).flatMap { theme.colors[$0] } ?? theme.foreground
+    }
+
+    private static func kind(for token: SyntaxToken) -> SyntaxKind? {
+        switch token {
+        case .keyword: return .keyword
+        case .string: return .string
+        case .comment: return .comment
+        case .number: return .number
+        case .type: return .type
+        case .function: return .function
+        case .property: return .property
+        }
     }
 
     /// 由主题包调色板生成的编辑器主题。

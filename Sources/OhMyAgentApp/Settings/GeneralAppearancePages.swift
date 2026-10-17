@@ -416,7 +416,7 @@ struct ThemeCardPublic: View {
         .buttonStyle(.plain)
         .accessibilityLabel(package.name)
         .accessibilityAddTraits(selected ? [.isSelected] : [])
-        .help("\(package.name) · \(ThemePersonality.tagline(for: package))")
+        .omTooltip("\(package.name) · \(ThemePersonality.tagline(for: package))")
     }
 }
 
@@ -454,13 +454,13 @@ private struct AccentPicker: View {
                         .frame(width: 16, height: 16)
                     }
                     .buttonStyle(.plain)
-                    .help(item.displayName)
+                    .omTooltip(item.displayName)
                     .accessibilityLabel(item.displayName)
                     .accessibilityAddTraits(choice == item ? [.isSelected] : [])
                 }
                 ColorPicker("自定义", selection: customColor, supportsOpacity: false)
                     .labelsHidden()
-                    .help("自定义颜色")
+                    .omTooltip("自定义颜色")
             }
         }
     }

@@ -19,6 +19,7 @@ TOKEN_FILES = {"Tokens.swift", "ThemePackage.swift", "Appearance.swift"}
 
 # (规则名, 正则, 提示)
 RULES = [
+    ("提示", re.compile(r"\.help\("), "悬浮提示统一用 .omTooltip(全应用唯一实现,跟随主题);禁止系统 .help"),
     ("字号", re.compile(r"\.font\(\s*\.system\(size"), "字号必须用 OMFonts 令牌(特例用 OMFonts.custom)"),
     ("颜色", re.compile(r"Color\.(red|green|orange|yellow|blue|white|gray)\b|foregroundStyle\(\.(red|green|orange|yellow|blue)\)"), "颜色必须用 OMColors 语义色(danger/success/warning/onAccent…)"),
     ("颜色", re.compile(r"Color\(\s*(red|white|\.sRGB)\b|Color\(hex"), "禁止写死 RGB,使用 OMColors"),

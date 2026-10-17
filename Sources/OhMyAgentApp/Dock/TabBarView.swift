@@ -95,7 +95,7 @@ struct TabBarView: View {
         }
         .buttonStyle(TabBarIconButtonStyle())
         .disabled(workbench.selectedProjectID == nil)
-        .help(String(localized: "新对话") + " (\(ShortcutStore.shared.binding(for: .newConversation).display))")
+        .omTooltip(String(localized: "新对话") + " (\(ShortcutStore.shared.binding(for: .newConversation).display))")
         .accessibilityLabel("新对话")
     }
 
@@ -108,7 +108,7 @@ struct TabBarView: View {
         }
         .buttonStyle(TabBarIconButtonStyle())
         .padding(.trailing, 4)
-        .help("全部标签")
+        .omTooltip("全部标签")
         .accessibilityLabel("全部标签")
         .omCustomPicker(isPresented: $showOverflow, placement: .below, width: 350) {
             TabOverflowList(workbench: workbench, group: group) { showOverflow = false }
@@ -181,7 +181,7 @@ struct TabItemView: View {
             TabDragPreview(title: workbench.displayTitle(tab), tab: tab)
         }
         .omContextMenu { menu }
-        .help(helpText)
+        .omTooltip(helpText)
     }
 
     /// 类型图标:文件用彩色文件类型图标,其余用 Lucide 图标。
@@ -206,12 +206,12 @@ struct TabItemView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(OMColors.secondaryText)
-                .help("取消固定")
+                .omTooltip("取消固定")
                 .accessibilityLabel("取消固定")
             } else {
                 if tab.isDirty && !hovering {
                     Circle().fill(OMColors.secondaryText).frame(width: 7, height: 7)
-                        .help("有未保存修改")
+                        .omTooltip("有未保存修改")
                 }
                 if hovering {
                     Button { AppActions.shared.requestCloseTab(tab.id) } label: {
@@ -219,7 +219,7 @@ struct TabItemView: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(OMColors.secondaryText)
-                    .help("关闭标签")
+                    .omTooltip("关闭标签")
                     .accessibilityLabel("关闭标签")
                 }
             }
@@ -421,7 +421,7 @@ private struct TabOverflowRow: View {
                             .padding(.horizontal, 4)
                             .background(OMColors.hoverFill, in: RoundedRectangle(cornerRadius: OMRadius.tag))
                     }
-                    if item.tab.isDirty { Circle().fill(OMColors.warning).frame(width: 6, height: 6).help("有未保存修改") }
+                    if item.tab.isDirty { Circle().fill(OMColors.warning).frame(width: 6, height: 6).omTooltip("有未保存修改") }
                     if case .chat = item.tab.kind, let uid = workbench.session(forTab: item.tab)?.uid {
                         AttentionDot(uid: uid)
                     }
@@ -439,7 +439,7 @@ private struct TabOverflowRow: View {
             .buttonStyle(.plain)
             .foregroundStyle(OMColors.secondaryText)
             .opacity(hovering ? 1 : 0)
-            .help("关闭标签")
+            .omTooltip("关闭标签")
             .accessibilityLabel("关闭标签")
         }
         .frame(maxWidth: .infinity, alignment: .leading)

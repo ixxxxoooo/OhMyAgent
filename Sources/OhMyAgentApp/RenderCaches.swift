@@ -5,6 +5,7 @@
 import ChatKit
 import DesignSystem
 import MermaidKit
+import OMLog
 import SwiftUI
 
 /// NSCache 需要引用类型作为值。
@@ -35,7 +36,9 @@ enum MarkdownCache {
             return hit.value
         }
         misses += 1
+        let span = Log.perf.span("Markdown 解析", warnMs: 8, quiet: true, ["chars": "\(text.utf8.count)"])
         let parsed = MarkdownParser.parse(text)
+        span.end()
         cache.setObject(Box(parsed), forKey: key, cost: text.utf8.count * 4)
         return parsed
     }

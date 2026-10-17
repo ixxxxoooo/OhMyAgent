@@ -52,7 +52,7 @@ private struct OverlayButton: View {
         .disabled(!enabled)
         .foregroundStyle(enabled ? OMColors.secondaryText : OMColors.tertiaryText.opacity(0.6))
         .onHover { hovering = $0 }
-        .help(label)
+        .omTooltip(label)
         .accessibilityLabel(label)
     }
 }

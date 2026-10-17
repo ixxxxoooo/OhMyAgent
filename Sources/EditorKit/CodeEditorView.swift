@@ -17,6 +17,8 @@ public final class CodeEditorView: NSView {
         let value = UserDefaults.standard.object(forKey: "editor.largeFileLines") as? Int ?? 20_000
         return min(max(value, 2_000), 200_000)
     }
+    /// 不超过该长度的文本在装载时同步完成行索引与着色(首帧即是最终样子,切换文件不闪);更大的走后台。
+    static let syncLoadLimit = 200_000
     /// 视口上下额外高亮的缓冲字符数。
     private static let highlightPadding = 12_000
 
@@ -36,6 +38,12 @@ public final class CodeEditorView: NSView {
     var generation = 0
     /// Markdown 渲染状态(见 `CodeEditorView+Markdown.swift`)
     var markdown = MarkdownRenderState()
+    /// 查找条状态与结果(见 `CodeEditorView+Find.swift`)
+    let findModel = EditorFindModel()
+    var findHost: NSView?
+    var findResults: [NSTextCheckingResult] = []
+    var findRegex: NSRegularExpression?
+    var findRefreshTask: Task<Void, Never>?
     /// Markdown 渲染模式:关闭 / 源码着色 / 就地渲染(仅 `.markdown` 语言有效)
     public var markdownMode: MarkdownEditorMode = .off {
         didSet { if oldValue != markdownMode { markdownModeDidChange() } }
@@ -92,6 +100,9 @@ public final class CodeEditorView: NSView {
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = true
         scrollView.autohidesScrollers = true
+        // 图层底色:视图刚创建、尚未布局/绘制的首帧也是编辑器底色,不会闪白
+        wantsLayer = true
+        layer?.backgroundColor = theme.background.cgColor
         scrollView.drawsBackground = true
         scrollView.backgroundColor = theme.background
         scrollView.borderType = .noBorder
@@ -101,13 +112,17 @@ public final class CodeEditorView: NSView {
         scrollView.contentView.postsBoundsChangedNotifications = true
 
         textView.delegate = self
-        textView.onFocusChange = { [weak self] focused in self?.markdownSelectionDidChange(focus: focused) }
+        textView.onFocusChange = { [weak self] focused in
+            if focused, let self { CodeEditorView.lastFocused = self }
+            self?.markdownSelectionDidChange(focus: focused)
+        }
         textView.isEditable = isEditable
         textView.isSelectable = true
         textView.isRichText = false
         textView.allowsUndo = isEditable
-        textView.usesFindBar = true
-        textView.isIncrementalSearchingEnabled = true
+        // 查找由自绘查找条接管(`CodeEditorView+Find.swift`),不用系统查找栏
+        textView.usesFindBar = false
+        textView.isIncrementalSearchingEnabled = false
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
@@ -160,6 +175,7 @@ public final class CodeEditorView: NSView {
     @objc private func themeDidChange() {
         CodeHighlighter.clearCache()
         apply(theme: .default)
+        findThemeDidChange()
     }
 
     deinit {
@@ -198,6 +214,15 @@ public final class CodeEditorView: NSView {
         let roughLarge = text.utf16.count / 40 > Self.largeFileLineThreshold
         applyLargeFileMode(roughLarge)
         textView.layoutManagerEnsureViewport()
+        // 小文件:行索引、词法着色同步完成,避免先显示一帧无色文本、行号错位再跳变(切换文件时的闪动)
+        if text.utf16.count <= Self.syncLoadLimit {
+            let index = LineIndex(text: text)
+            lineIndex = index
+            ruler.lineIndex = index
+            if !usesMarkdownStyling {
+                paintSyncHighlight(SimpleLexer.lex(text, language: language))
+            }
+        }
         lastLoadDuration = (ContinuousClock.now - begin).seconds
 
         let engine = self.engine
@@ -215,7 +240,29 @@ public final class CodeEditorView: NSView {
             }
         }
         markdown.layout = nil
-        scheduleMarkdownRender(delay: .zero)
+        if usesMarkdownStyling, text.utf16.count <= Self.syncLoadLimit / 2 {
+            markdown.task?.cancel()
+            applyMarkdown(MarkdownLiveRenderer.layout(for: text))
+        } else {
+            scheduleMarkdownRender(delay: .zero)
+        }
+        scheduleFindRefresh()
+    }
+
+    /// 把整篇文本的词法片段一次性写成前景色,并标记全文已高亮。
+    /// - Parameter spans: 词法扫描结果
+    private func paintSyncHighlight(_ spans: [SyntaxSpan]) {
+        guard let storage = textView.textStorage else { return }
+        let docRange = NSRange(location: 0, length: storage.length)
+        storage.beginEditing()
+        storage.addAttribute(.foregroundColor, value: theme.foreground, range: docRange)
+        for span in spans {
+            guard let color = theme.colors[span.kind] else { continue }
+            let range = NSIntersectionRange(NSRange(location: span.location, length: span.length), docRange)
+            if range.length > 0 { storage.addAttribute(.foregroundColor, value: color, range: range) }
+        }
+        storage.endEditing()
+        highlightedRange = docRange
     }
 
     /// 用户编辑后:同步更新行索引(小文件)、防抖重做词法并回调。
@@ -253,6 +300,7 @@ public final class CodeEditorView: NSView {
         scheduleMarkdownRender(delay: .milliseconds(60))
         onTextChange?(text)
         scheduleAutoCompletion()
+        scheduleFindRefresh()
     }
 
     /// 滚动到指定行并选中该行。
@@ -413,6 +461,7 @@ public final class CodeEditorView: NSView {
     /// - Parameter theme: 主题
     public func apply(theme: EditorTheme) {
         self.theme = theme
+        layer?.backgroundColor = theme.background.cgColor
         scrollView.backgroundColor = theme.background
         scrollView.contentView.backgroundColor = theme.background
         textView.backgroundColor = theme.background

@@ -88,7 +88,7 @@ struct ProviderDetailView: View {
                 if testing { OMSpinner(.small) }
                 Spacer()
                 Button("去模型映射中使用…") { if save() { SettingsRouter.shared.go(.modelMapping) } }
-                    .help("把这个提供商的模型映射到 Claude Code 的默认/Opus/Sonnet/Haiku 槽位")
+                    .omTooltip("把这个提供商的模型映射到 Claude Code 的默认/Opus/Sonnet/Haiku 槽位")
             }
             if let testResult { resultView(testResult) }
         }
@@ -135,13 +135,13 @@ struct ProviderDetailView: View {
                     .frame(width: 22, height: 22)
             }
             .buttonStyle(.plain)
-            .help(draft.model == item.id ? "当前默认模型" : "设为默认模型")
+            .omTooltip(draft.model == item.id ? "当前默认模型" : "设为默认模型")
             .accessibilityLabel(String(localized: "设为默认模型"))
             Button { removeModel(item.id) } label: {
                 Image.om("trash", size: 13).foregroundStyle(OMColors.tertiaryText).frame(width: 22, height: 22)
             }
             .buttonStyle(.plain)
-            .help("删除")
+            .omTooltip("删除")
             .accessibilityLabel(String(localized: "删除模型"))
         }
     }

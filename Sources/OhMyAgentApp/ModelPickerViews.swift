@@ -30,7 +30,7 @@ struct ModelCopyButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(copied ? String(localized: "已复制") : label)
+        .omTooltip(copied ? String(localized: "已复制") : label)
         .accessibilityLabel(copied ? String(localized: "已复制") : label)
     }
 }

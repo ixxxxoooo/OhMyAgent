@@ -54,7 +54,7 @@ struct AutomationPage: View {
                     Image.om("plus", size: 14)
                 }
                 .buttonStyle(.omIcon)
-                .help("新建自动化")
+                .omTooltip("新建自动化")
                 .accessibilityLabel("新建自动化")
                 .omPicker(isPresented: $showNewPicker, entries: newEntries, selectedID: nil, placement: .belowTrailing, width: 280, onSelect: { startNew(with: $0.id) })
             }
@@ -194,9 +194,9 @@ struct AutomationPage: View {
                             .buttonStyle(.omPrimary)
                     }
                     Button { draft = AutomationDraft(automation: automation) } label: { Image.om("pencil", size: 13) }
-                        .buttonStyle(.omIcon).help("编辑").accessibilityLabel("编辑")
+                        .buttonStyle(.omIcon).omTooltip("编辑").accessibilityLabel("编辑")
                     Button { confirmDelete = true } label: { Image.om("trash", size: 13) }
-                        .buttonStyle(.omIcon).help("删除").accessibilityLabel("删除")
+                        .buttonStyle(.omIcon).omTooltip("删除").accessibilityLabel("删除")
                 }
                 infoGrid(automation)
                 VStack(alignment: .leading, spacing: 6) {

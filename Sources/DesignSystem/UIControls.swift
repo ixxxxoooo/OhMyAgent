@@ -171,7 +171,7 @@ public struct OMCopyButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(copied ? String(localized: "已复制") : help)
+        .omTooltip(copied ? String(localized: "已复制") : help)
         .accessibilityLabel(help)
     }
 }
@@ -269,68 +269,3 @@ public struct OMStepSlider: View {
         }
     }
 }
-
-// MARK: - 主题悬浮提示
-
-/// 符合主题风格的悬浮气泡提示 (替代系统原生黄色提示框)
-public struct OMTooltipModifier: ViewModifier {
-    private let text: String
-    private let icon: String?
-    @State private var isHovered = false
-    @State private var hoverTask: Task<Void, Never>?
-
-    public init(text: String, icon: String? = nil) {
-        self.text = text
-        self.icon = icon
-    }
-
-    public func body(content: Content) -> some View {
-        content
-            .onHover { hovering in
-                hoverTask?.cancel()
-                if hovering {
-                    hoverTask = Task {
-                        try? await Task.sleep(for: .milliseconds(300))
-                        if !Task.isCancelled {
-                            withAnimation(.easeOut(duration: 0.15)) { isHovered = true }
-                        }
-                    }
-                } else {
-                    withAnimation(.easeIn(duration: 0.1)) { isHovered = false }
-                }
-            }
-            .overlay(alignment: .top) {
-                if isHovered && !text.isEmpty {
-                    HStack(spacing: 4) {
-                        if let icon {
-                            Image.om(icon, size: 10)
-                                .foregroundStyle(OMColors.secondaryText)
-                        }
-                        Text(text)
-                            .font(OMFonts.caption)
-                            .foregroundStyle(OMColors.primaryText)
-                            .lineLimit(1)
-                    }
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3.5)
-                    .background(OMColors.card, in: RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
-                    .shadow(color: .black.opacity(0.18), radius: 3, y: 1.5)
-                    .fixedSize()
-                    .offset(y: -26)
-                    .allowsHitTesting(false)
-                    .zIndex(999)
-                    .transition(.opacity)
-                }
-            }
-    }
-}
-
-extension View {
-    /// 附加符合主题风格的悬浮提示
-    public func omTooltip(_ text: String, icon: String? = nil) -> some View {
-        modifier(OMTooltipModifier(text: text, icon: icon))
-            .help(text)
-    }
-}
-

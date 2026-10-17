@@ -24,7 +24,7 @@ struct ShortcutsPage: View {
                             .buttonStyle(.omSecondary)
                             .font(OMFonts.mono)
                         Button { store.reset(action) } label: { Image.om("arrow.uturn.backward") }
-                            .buttonStyle(.omPlain).help("恢复默认 \(action.defaultBinding.display)").accessibilityLabel("恢复 \(action.title) 的默认快捷键")
+                            .buttonStyle(.omPlain).omTooltip(String(localized: "恢复默认 \(action.defaultBinding.display)")).accessibilityLabel("恢复 \(action.title) 的默认快捷键")
                             .disabled(store.binding(for: action) == action.defaultBinding)
                     }
                 }

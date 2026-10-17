@@ -41,7 +41,7 @@ struct SearchPaneView: View {
         Toggle(isOn: binding) { Text(label).font(OMFonts.custom(11, weight: .medium, design: .monospaced)) }
             .toggleStyle(.button)
             .controlSize(.small)
-            .help(help)
+            .omTooltip(help)
             .accessibilityLabel(Text(help))
     }
 

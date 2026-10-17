@@ -61,6 +61,7 @@ private struct SCMContent: View {
     let workbench: WorkbenchModel
     @Bindable var model: GitModel
     @State private var branchShown = false
+    @State private var commitMenuShown = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -181,7 +182,7 @@ private struct SCMContent: View {
         .buttonStyle(.plain)
         .foregroundStyle(count > 0 ? OMColors.accent : OMColors.secondaryText)
         .disabled(model.busy != nil)
-        .help(help)
+        .omTooltip(help)
         .accessibilityLabel(Text(help))
     }
 
@@ -299,33 +300,22 @@ private struct SCMContent: View {
                         }
                         .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.omPositive)
-                    .controlSize(.small)
+                    .buttonStyle(.omPrimary)
                     .disabled(!canCommit)
                     .keyboardShortcut(.return, modifiers: [.command])
 
-                    Menu {
-                        Button("Commit & Push") { requestCommit(push: true) }
-                        Button(model.amend ? "取消修补" : "修补上一条提交 (Amend)") {
-                            Task { await model.setAmend(!model.amend) }
-                        }
-                        Button("暂存全部并提交") {
-                            Task {
-                                await model.stageAll()
-                                await model.commit(push: false)
-                            }
-                        }
-                    } label: {
+                    // 下拉箭头与主按钮同高(24pt)、同主题主色;菜单走统一的 OMPickList
+                    Button { commitMenuShown.toggle() } label: {
                         Image.om("chevron-down", size: 10)
-                            .frame(width: 22, height: 24)
-                            .contentShape(Rectangle())
+                            .frame(width: 14, height: 24)
                     }
-                    .menuStyle(.borderlessButton)
-                    .menuIndicator(.hidden)
-                    .fixedSize()
-                    .background(canCommit ? OMColors.actionPositive : OMColors.subtleFill)
-                    .foregroundStyle(canCommit ? OMColors.onPositive : OMColors.tertiaryText)
-                    .clipShape(RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))
+                    .buttonStyle(.omPrimary)
+                    .disabled(!canCommit)
+                    .omTooltip("更多提交方式")
+                    .accessibilityLabel("更多提交方式")
+                    .omPicker(isPresented: $commitMenuShown, entries: commitMenuEntries, selectedID: nil, placement: .below, width: 220, showsSearch: false) { entry in
+                        runCommitMenu(entry.id)
+                    }
                 }
             }
             if model.amend, model.status.ahead == 0, model.status.upstream != nil {
@@ -336,6 +326,30 @@ private struct SCMContent: View {
             }
         }
         .padding(10)
+    }
+
+    /// 提交下拉菜单的条目。
+    private var commitMenuEntries: [PickEntry] {
+        [
+            PickEntry(id: "push", title: "Commit & Push", icon: "arrow-up"),
+            PickEntry(id: "amend", title: model.amend ? String(localized: "取消修补") : String(localized: "修补上一条提交 (Amend)"), icon: "pencil"),
+            PickEntry(id: "stageAll", title: String(localized: "暂存全部并提交"), icon: "check")
+        ]
+    }
+
+    /// 执行提交下拉菜单中的某一项。
+    /// - Parameter id: `commitMenuEntries` 的条目 ID
+    private func runCommitMenu(_ id: String) {
+        switch id {
+        case "push": requestCommit(push: true)
+        case "amend": Task { await model.setAmend(!model.amend) }
+        case "stageAll":
+            Task {
+                await model.stageAll()
+                await model.commit(push: false)
+            }
+        default: break
+        }
     }
 
     /// 没有可提交的内容、也不在修补提交时:有待同步的提交(或分支尚未发布)就进入「同步」模式。
@@ -370,7 +384,7 @@ private struct SCMContent: View {
         }
         .buttonStyle(.omPrimary)
         .disabled(model.busy != nil)
-        .help(published ? String(localized: "先拉取远端新提交,再推送本地提交") : String(localized: "把当前分支推送到远程并建立跟踪"))
+        .omTooltip(published ? String(localized: "先拉取远端新提交,再推送本地提交") : String(localized: "把当前分支推送到远程并建立跟踪"))
     }
 
     /// 提交:没有暂存内容时先确认「将提交全部改动」,避免静默 `git add -A`。
@@ -527,8 +541,9 @@ private struct ChangeRow: View {
         .contentShape(Rectangle())
         .background(hovering ? OMColors.hoverFill : .clear)
         .onHover { hovering = $0 }
-        .onTapGesture(count: 2) { workbench.openFile(model.absolutePath(change.path), preview: false) }
+        // 单击立即打开差异;双击用 simultaneousGesture 叠加,避免单击被迫等待双击判定(约 0.3~0.5s 延迟)
         .onTapGesture { openDiff() }
+        .simultaneousGesture(TapGesture(count: 2).onEnded { workbench.openFile(model.absolutePath(change.path), preview: false) })
         .accessibilityElement(children: .combine)
         .accessibilityLabel(name + (dir.isEmpty ? "" : "," + dir))
         .accessibilityAddTraits(.isButton)

@@ -120,7 +120,7 @@ private struct WorkspaceEditorCard: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(OMColors.secondaryText)
-                .help("从工作区移除")
+                .omTooltip("从工作区移除")
                 .accessibilityLabel("从工作区移除")
             }
         }

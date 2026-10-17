@@ -28,7 +28,7 @@ struct MCPPanelButton: View {
             .foregroundStyle(OMColors.secondaryText)
         }
         .buttonStyle(.plain)
-        .help("MCP 服务器")
+        .omTooltip("MCP 服务器")
         .accessibilityLabel("MCP 服务器")
         .popover(isPresented: $shown, arrowEdge: .top) {
             MCPPanelView(model: model, center: center, dismiss: { shown = false })
@@ -110,7 +110,7 @@ struct MCPPanelView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!center.canRunCLI)
-                .help("重新检测连接状态")
+                .omTooltip("重新检测连接状态")
                 .accessibilityLabel("重新检测连接状态")
             }
         }
@@ -161,7 +161,7 @@ struct MCPPanelView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(model.isRunning)
-                .help("在当前会话中重连")
+                .omTooltip("在当前会话中重连")
                 .accessibilityLabel("重连 \(name)")
             }
             Button {
@@ -173,7 +173,7 @@ struct MCPPanelView: View {
             }
             .buttonStyle(.plain)
             .disabled(model.isRunning)
-            .help(entry.isDisabled ? String(localized: "在当前会话中启用") : String(localized: "在当前会话中停用"))
+            .omTooltip(entry.isDisabled ? String(localized: "在当前会话中启用") : String(localized: "在当前会话中停用"))
             .accessibilityLabel(entry.isDisabled ? String(localized: "启用 \(name)") : String(localized: "停用 \(name)"))
         }
     }
@@ -187,7 +187,7 @@ struct MCPPanelView: View {
                 Label("会话内状态", om: "activity")
             }
             .disabled(model.isRunning)
-            .help("让 Agent 汇报本会话中各服务器的连接情况与工具数")
+            .omTooltip("让 Agent 汇报本会话中各服务器的连接情况与工具数")
             Spacer()
             Button {
                 dismiss()

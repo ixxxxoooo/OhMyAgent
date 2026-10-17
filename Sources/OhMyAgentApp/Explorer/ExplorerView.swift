@@ -52,7 +52,7 @@ struct ExplorerView: View {
 
     private func toolButton(_ icon: String, _ help: LocalizedStringKey, action: @escaping () -> Void) -> some View {
         Button(action: action) { Image.om(icon, size: 13) }
-            .buttonStyle(.plain).foregroundStyle(OMColors.secondaryText).help(help).accessibilityLabel(Text(help))
+            .buttonStyle(.plain).foregroundStyle(OMColors.secondaryText).omTooltip(help).accessibilityLabel(Text(help))
     }
 }
 

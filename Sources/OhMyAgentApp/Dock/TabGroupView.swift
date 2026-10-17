@@ -4,6 +4,7 @@
 import ChatKit
 import DesignSystem
 import IconKit
+import OMLog
 import SwiftUI
 import UniformTypeIdentifiers
 import WorkbenchKit
@@ -141,6 +142,9 @@ struct TabGroupView: View {
                 }
             }
             .onChange(of: group.activeID, initial: true) {
+                // 标签切换耗时:到下一个主循环(本轮布局/提交之后)为止
+                let span = Log.perf.span("标签切换", warnMs: 50, ["tab": group.active?.title ?? "-"])
+                DispatchQueue.main.async { span.end() }
                 keepAlive.activate(group.activeID, in: group.tabs)
             }
             .onChange(of: group.tabs.map(\.id)) {

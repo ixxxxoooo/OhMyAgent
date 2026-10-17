@@ -93,7 +93,7 @@ private struct TerminalDragHandle: ViewModifier {
                         }
                 )
         )
-        .help(panel.dragHelp)
+        .omTooltip(panel.dragHelp)
     }
 }
 
@@ -122,7 +122,7 @@ struct TerminalSidePanel: View {
                 Spacer(minLength: 4)
                 Button { workbench.hideTerminal() } label: { Image.om("xmark") }
                     .buttonStyle(.omPlain)
-                    .help("关闭终端 (\(ShortcutStore.shared.binding(for: .togglePanel).display))")
+                    .omTooltip(String(localized: "关闭终端 (\(ShortcutStore.shared.binding(for: .togglePanel).display))"))
                     .accessibilityLabel("关闭终端面板")
             }
             .foregroundStyle(OMColors.secondaryText)
@@ -153,7 +153,7 @@ struct OutputSidePanel: View {
                 Spacer(minLength: 4)
                 Button { workbench.hideOutput() } label: { Image.om("xmark") }
                     .buttonStyle(.omPlain)
-                    .help("关闭输出")
+                    .omTooltip("关闭输出")
                     .accessibilityLabel("关闭输出面板")
             }
             .foregroundStyle(OMColors.secondaryText)

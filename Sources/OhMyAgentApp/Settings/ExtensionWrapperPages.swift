@@ -16,7 +16,7 @@ struct PluginsSettingsPage: View {
             subtitle: String(localized: "安装、启停与更新 Claude Code 插件,插件可携带技能、子 Agent、Hooks 与 MCP 服务器。需要本机已安装 claude 命令。")
         ) {
             Button { center.reload() } label: { Image.om("arrow.clockwise") }
-                .help("重新读取配置")
+                .omTooltip("重新读取配置")
                 .accessibilityLabel("刷新")
         } content: {
             PluginsManagerView(center: center)
@@ -34,7 +34,7 @@ struct MemorySettingsPage: View {
             subtitle: String(localized: "管理 CLAUDE.md 与 rules 规则文件,决定 Claude 在用户、项目层面默认遵循的指令。")
         ) {
             Button { center.reload() } label: { Image.om("arrow.clockwise") }
-                .help("重新读取配置")
+                .omTooltip("重新读取配置")
                 .accessibilityLabel("刷新")
         } content: {
             MemoryManagerView(center: center)

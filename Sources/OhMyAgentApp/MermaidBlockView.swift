@@ -99,7 +99,7 @@ struct MermaidBlockView: View {
         Button(action: action) { Image.om(symbol, size: 13) }
             .buttonStyle(.plain)
             .foregroundStyle(OMColors.secondaryText)
-            .help(help)
+            .omTooltip(help)
             .accessibilityLabel(Text(help))
     }
 
@@ -117,7 +117,7 @@ struct MermaidBlockView: View {
         .menuIndicator(.hidden)
         .foregroundStyle(OMColors.secondaryText)
         .fixedSize()
-        .help("下载")
+        .omTooltip("下载")
         .accessibilityLabel("下载")
     }
 
@@ -135,7 +135,7 @@ struct MermaidBlockView: View {
                     .contentShape(Rectangle())
                     .onTapGesture { openFloating() }
                     .onHover { inside in if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() } }
-                    .help("点击放大查看")
+                    .omTooltip("点击放大查看")
                     .accessibilityAddTraits(.isButton)
                     .accessibilityLabel("Mermaid 图表,点击放大查看")
             }

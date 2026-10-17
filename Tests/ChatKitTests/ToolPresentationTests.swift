@@ -133,13 +133,39 @@ struct TimelineGroupingTests {
         #expect(single.allSatisfy { if case .entry = $0 { return true } else { return false } })
     }
 
+    @Test("精简档:单个命令也折叠成摘要行,单个编辑保持独立;标准档不折叠")
+    func compactCollapsesSingleCommand() {
+        let s = TimelineStore()
+        s.apply(.toolCall(ToolCall(toolCallId: "x1", name: "Bash", kind: .execute, status: .completed, rawInput: ["command": .string("python3 - <<'EOF'")])))
+        let compact = TimelineGrouping.group(s.entries, density: .compact)
+        guard compact.count == 1, case .explore(let group) = compact[0] else { Issue.record("单个命令应折叠为分组"); return }
+        #expect(group.summary == "运行了 1 条命令")
+        #expect(TimelineGrouping.group(s.entries).count == 1)
+        if case .explore = TimelineGrouping.group(s.entries)[0] { Issue.record("标准档不应折叠单个命令") }
+
+        let e = TimelineStore()
+        e.apply(.toolCall(ToolCall(toolCallId: "e1", name: "Edit", kind: .edit, status: .completed, rawInput: ["file_path": .string("/a")])))
+        if case .explore = TimelineGrouping.group(e.entries, density: .compact)[0] { Issue.record("单个编辑应保持独立") }
+    }
+
+    @Test("Shell 命令按意图归类:grep/find 算搜索,cat/ls 算读取,其余算运行命令")
+    func shellIntent() {
+        #expect(ShellIntent.classify("grep -rn foo Sources") == .search)
+        #expect(ShellIntent.classify("cd /x && rg foo | head -5") == .search)
+        #expect(ShellIntent.classify("rtk git status") == .run)
+        #expect(ShellIntent.classify("cat a.txt") == .read)
+        #expect(ShellIntent.classify("ls -la; grep x y") == .run)
+        #expect(ShellIntent.classify("FOO=1 /usr/bin/find . -name x") == .search)
+        #expect(ShellIntent.classify("swift build") == .run)
+    }
+
     @Test("精简档:连续的各类工具合并为活动摘要,子 Agent 与等待授权的工具保持独立")
     func compactDensityGroupsAllTools() {
         let s = TimelineStore()
         s.apply(.toolCall(ToolCall(toolCallId: "e1", name: "Edit", kind: .edit, status: .completed, rawInput: ["file_path": .string("/a")])))
         s.apply(.toolCall(ToolCall(toolCallId: "e2", name: "Edit", kind: .edit, status: .completed, rawInput: ["file_path": .string("/b")])))
-        s.apply(.toolCall(ToolCall(toolCallId: "x1", name: "Bash", kind: .execute, status: .completed, rawInput: ["command": .string("ls")])))
-        s.apply(.toolCall(ToolCall(toolCallId: "x2", name: "Bash", kind: .execute, status: .completed, rawInput: ["command": .string("pwd")])))
+        s.apply(.toolCall(ToolCall(toolCallId: "x1", name: "Bash", kind: .execute, status: .completed, rawInput: ["command": .string("make build")])))
+        s.apply(.toolCall(ToolCall(toolCallId: "x2", name: "Bash", kind: .execute, status: .completed, rawInput: ["command": .string("swift test")])))
         let standard = TimelineGrouping.group(s.entries)
         #expect(standard.count == 4)
         let compact = TimelineGrouping.group(s.entries, density: .compact)

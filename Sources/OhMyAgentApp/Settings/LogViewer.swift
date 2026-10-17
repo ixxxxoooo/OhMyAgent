@@ -76,7 +76,7 @@ struct LogViewerView: View {
                 TextField("搜索", text: $model.search).textFieldStyle(.roundedBorder)
                 Toggle("跟随", isOn: $model.follow).toggleStyle(.checkbox)
                 Button { model.copyFiltered() } label: { Image.om("copy", size: 13) }
-                    .help("复制当前筛选的日志")
+                    .omTooltip("复制当前筛选的日志")
                     .accessibilityLabel("复制日志")
             }
             .labelsHidden()

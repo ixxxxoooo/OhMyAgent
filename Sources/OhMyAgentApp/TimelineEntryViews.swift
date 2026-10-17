@@ -56,39 +56,14 @@ struct ModelSwitchDividerView: View {
     }
 }
 
-/// 回合结束语与操作栏 (对标 Cursor 图 6: 点赞、点踩、复制、Fork Chat、时间、模型信息)。
+/// 回合结束语与操作栏 (复制、Fork Chat、时间、模型信息)。
 struct TurnSummaryView: View {
     let entry: TimelineEntry
     @Environment(SessionModel.self) private var model
-    @State private var feedback: Int? = nil
 
     var body: some View {
         if let summary = entry.summary {
             HStack(spacing: 8) {
-                // 点赞按钮
-                Button {
-                    feedback = feedback == 1 ? nil : 1
-                } label: {
-                    Image.om("thumbs-up", size: 12)
-                        .foregroundStyle(feedback == 1 ? OMColors.accent : OMColors.tertiaryText)
-                        .frame(width: 22, height: 22)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .omTooltip(feedback == 1 ? "已赞" : "有帮助", icon: "thumbs-up")
-
-                // 点踩按钮
-                Button {
-                    feedback = feedback == -1 ? nil : -1
-                } label: {
-                    Image.om("thumbs-down", size: 12)
-                        .foregroundStyle(feedback == -1 ? OMColors.danger : OMColors.tertiaryText)
-                        .frame(width: 22, height: 22)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .omTooltip(feedback == -1 ? "已踩" : "需要改进", icon: "thumbs-down")
-
                 // 复制按钮
                 if !summary.outputText.isEmpty {
                     OMCopyButton(help: String(localized: "复制回复"), size: 12) { summary.outputText }
@@ -135,9 +110,18 @@ struct UserMessageView: View {
 
     var body: some View {
         if let sticky, let model = sticky.model, sticky.editing?.id == entry.id, !sticky.isEditorFloating(for: entry.id) {
-            // 就地编辑:原位置展开为输入卡片(从吸顶卡发起的编辑悬浮在顶部,见 StickyUserOverlay)
-            UserMessageEditor(model: model, entry: entry, maxWidth: .infinity) { sticky.finishEditing() }
-                .id(entry.id)
+            // 就地编辑:原卡片保留占位(透明),编辑器以顶边对齐浮在其上并向下展开,
+            // 不改变布局高度、不把下方内容挤下去;收起时在原位置收回(从吸顶卡发起的编辑悬浮在顶部,见 StickyUserOverlay)
+            messageCard
+                .opacity(0)
+                .overlay(alignment: .top) {
+                    UserMessageEditor(model: model, entry: entry, maxWidth: .infinity) { sticky.finishEditing() }
+                        .id(entry.id)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxHeight: 0, alignment: .top)
+                        .frame(maxWidth: .infinity, alignment: .top)
+                }
+                .zIndex(10)
         } else {
             messageCard
         }
@@ -176,7 +160,7 @@ struct UserMessageView: View {
                 .buttonStyle(.plain)
                 .opacity(hovering ? 1 : 0)
                 .padding(8)
-                .help("放大编辑(双击)")
+                .omTooltip("放大编辑(双击)")
                 .accessibilityLabel("放大编辑")
             }
         }
@@ -226,7 +210,7 @@ struct AttachmentThumbnail: View {
                 .contentShape(RoundedRectangle(cornerRadius: OMRadius.control))
             }
             .buttonStyle(.plain)
-            .help("点击查看原图")
+            .omTooltip("点击查看原图")
             .accessibilityLabel("图片 \(attachment.name)")
             .accessibilityHint("查看原图")
             if let onRemove, hovering {
@@ -245,7 +229,7 @@ struct AttachmentThumbnail: View {
                 }
                 .buttonStyle(.plain)
                 .padding(3)
-                .help("移除图片")
+                .omTooltip("移除图片")
                 .accessibilityLabel("移除图片")
                 .transition(.opacity)
             }

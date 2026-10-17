@@ -39,9 +39,9 @@ struct MCPSettingsPage: View {
                 .frame(minWidth: 84)
             }
                 .disabled(!center.canRunCLI || center.isBusy || center.isCheckingMCP)
-                .help("运行 claude mcp list 检测各服务器连接状态")
+                .omTooltip("运行 claude mcp list 检测各服务器连接状态")
             Button { center.reload() } label: { Image.om("arrow.clockwise") }
-                .help("重新读取配置")
+                .omTooltip("重新读取配置")
                 .accessibilityLabel("刷新")
             Menu {
                 Button("表单添加…") { editor = MCPEditorTarget(entry: nil) }
@@ -163,7 +163,7 @@ struct MCPSettingsPage: View {
                 healthDot(health)
                 Text(verbatim: healthText(health)).font(OMFonts.caption).foregroundStyle(OMColors.secondaryText)
             }
-            .help(health.detail)
+            .omTooltip(health.detail)
         }
     }
 

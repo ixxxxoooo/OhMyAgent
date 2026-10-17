@@ -72,7 +72,7 @@ struct GitGraphSection: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(OMColors.secondaryText)
-                .help("在标签页打开完整历史")
+                .omTooltip("在标签页打开完整历史")
                 .accessibilityLabel("打开完整提交历史")
             }
             if expanded {

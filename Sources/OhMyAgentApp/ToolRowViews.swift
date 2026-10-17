@@ -153,7 +153,7 @@ struct ToolRowView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(OMColors.secondaryText)
-                .help("打开文件")
+                .omTooltip("打开文件")
                 .accessibilityLabel("打开 \((path as NSString).lastPathComponent)")
             }
             if entry.childStore != nil, let tool = entry.tool {
@@ -168,7 +168,7 @@ struct ToolRowView: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(OMColors.secondaryText)
                 .opacity(hovering ? 1 : 0.55)
-                .help("在标签中打开子 Agent 会话")
+                .omTooltip("在标签中打开子 Agent 会话")
                 .accessibilityLabel("在标签中打开子 Agent 会话")
             }
             if let stats, stats.added + stats.removed > 0 {
@@ -253,7 +253,7 @@ struct ToolRowView: View {
                 }
             }
             .lineLimit(1)
-            .help(p.subject)
+            .omTooltip(p.subject)
         } else if p.category == .terminal {
             // 命令按 shell 语法高亮;只取第一行作摘要
             ShellCommandText(command: p.subject.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? p.subject, lineLimit: 1, failed: failed, selectable: false)
@@ -545,7 +545,7 @@ struct CommandBox: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(OMColors.secondaryText)
-                    .help(commandExpanded ? String(localized: "收起命令") : String(localized: "展开完整命令"))
+                    .omTooltip(commandExpanded ? String(localized: "收起命令") : String(localized: "展开完整命令"))
                     .accessibilityLabel(commandExpanded ? String(localized: "收起命令") : String(localized: "展开完整命令"))
                 }
                 CopyButton(text: copyText, copied: $copied)
@@ -579,7 +579,7 @@ struct CopyButton: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(OMColors.secondaryText)
-        .help(copied ? String(localized: "已复制") : String(localized: "复制"))
+        .omTooltip(copied ? String(localized: "已复制") : String(localized: "复制"))
         .accessibilityLabel(copied ? String(localized: "已复制") : String(localized: "复制"))
     }
 }
@@ -677,7 +677,7 @@ struct SearchHitRow: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .help(hit.path)
+        .omTooltip(hit.path)
         .accessibilityLabel("\(hit.path)\(hit.line.map { String(localized: " 第 \($0) 行") } ?? "")")
     }
 }

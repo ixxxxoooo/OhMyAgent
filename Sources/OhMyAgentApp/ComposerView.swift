@@ -210,7 +210,7 @@ struct ComposerView: View {
                     }
                     .buttonStyle(.glass)
                     .buttonBorderShape(.circle)
-                    .help("停止 (Esc)")
+                    .omTooltip("停止 (Esc)")
                     .accessibilityLabel("停止生成")
                 }
             }
@@ -231,7 +231,7 @@ struct ComposerView: View {
                     .buttonBorderShape(.circle)
                     .disabled(!hasContent)
                     .keyboardShortcut(ShortcutStore.shared.shortcut(for: .send))
-                    .help(sendHelp)
+                    .omTooltip(sendHelp)
                     .accessibilityLabel(model.isRunning ? String(localized: "引导当前轮次") : String(localized: "发送"))
                 }
             }
@@ -264,7 +264,7 @@ struct ComposerPaperSendButton: View {
         .buttonStyle(.plain)
         .disabled(!hasContent)
         .onHover { hovering = $0 }
-        .help(help)
+        .omTooltip(help)
         .accessibilityLabel(isRunning ? String(localized: "引导当前轮次") : String(localized: "发送"))
     }
 }
@@ -290,7 +290,7 @@ struct ComposerPaperStopButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .help("停止 (Esc)")
+        .omTooltip("停止 (Esc)")
         .accessibilityLabel("停止生成")
     }
 }
@@ -356,7 +356,7 @@ struct OptionMenu: View {
         .menuStyle(.button)
         .buttonStyle(.plain)
         .foregroundStyle(tint)
-        .help(option.name)
+        .omTooltip(option.name)
         .accessibilityLabel(option.name))
     }
 
@@ -384,7 +384,7 @@ struct OptionMenu: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(tint)
-        .help(option.name)
+        .omTooltip(option.name)
         .accessibilityLabel(option.name)
         .omPicker(isPresented: $pickerShown, items: pickerRows, selectedID: current, placeholder: String(localized: "搜索模型"), width: 300,
                   row: { ModelPickRowContent(row: $0) }, onSelect: { row in

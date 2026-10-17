@@ -167,7 +167,7 @@ private struct PropertyRow: View {
                     .foregroundStyle(OMColors.tertiaryText)
                     .frame(width: 18, height: 22)
                     .opacity(hovering ? 1 : 0)
-                    .help("删除属性")
+                    .omTooltip("删除属性")
                     .accessibilityLabel(String(localized: "删除属性"))
             }
         }

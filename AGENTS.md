@@ -40,7 +40,8 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 
 ## 3. 开发流程(必须遵守)
 1. 开发前先读「开发进度.md」,优先复用现有代码,避免重复造轮子。
-2. 改完代码 → `Scripts/ci.sh`(必须零警告、测试全绿)→ `Scripts/restart.sh` 重启应用验证改动真实生效。
+2. **每次修改代码后执行 `Scripts/restart.sh` 重启应用**,确认改动真实生效;**不必每次跑 `Scripts/ci.sh`**,仅当用户明确说「测试 / CI」或准备提交时才跑(必须零警告、测试全绿)。
+   - 提交前必须已通过 `Scripts/ci.sh`(零警告、测试全绿);未验证的改动不得提交。
 3. **每完成一个功能点就提交一次**:一次提交只包含一个功能或修复,不要把多个功能混在一起;
    提交信息使用**中文 Conventional Commits**(`feat: …`、`fix: …`、`refactor: …`、`test: …`、`docs: …`、`chore: …`)。
 4. **每次提交后立即 `git push`** 到远端 `origin/main`(`origin` = https://github.com/ixxxxoooo/OhMyAgent.git)。
@@ -99,6 +100,7 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 **右键菜单与对话框**:右键菜单只用 `omContextMenu { OMMenuItem… }`(`OhMyAgentApp/Menu/OMContextMenu.swift`),禁止 `.contextMenu`;模态对话框只用 `OMDialog.confirm/prompt/alert` 或 `OMModal.run`(`Dialog/OMDialog.swift`),禁止 `NSAlert`;`ui-lint.py` 的「菜单」「对话框」规则守卫。自动化验证这类自绘子窗口用键盘,不要依赖合成点击。
 
 **设置页**:分组标题 `sectionTitle`;行标题 `body`;说明 `Note`(`caption` + `secondaryText`);所有数字输入用 `SettingsNumericField`;右侧内容宽度由「外观 → 设置页宽度」统一控制;页面骨架用 `SettingsForm`/`ExtensionPage`,不要自己拼 `ScrollView`。
+**悬浮提示**:全应用只有一套 `omTooltip`(`DesignSystem/Tooltip.swift`,独立面板显示,不会被裁切/遮挡),禁止系统 `.help`(`ui-lint.py` 的「提示」规则守卫)。样式随主题:纸感(`allowsGlass == false`)= 不透明卡片 + 发丝线、无阴影;玻璃主题 = Liquid Glass + 系统阴影。其他公共浮层/组件同理,必须按「纸感 vs 玻璃」分别验证。
 **浮层与卡片**:沿用 `omGlassCard`、`OMMetrics.cardRadius`/`controlRadius`;阴影、描边用令牌,不另起一套。
 
 ## 4.3 主题渗透规范(所有界面必须跟随主题)
@@ -128,7 +130,7 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 - 演示模式:`OMA_DEMO=1`、`OMA_DEMO_ROOT`、`OMA_DEMO_RESET=1`、`OMA_DEMO_SCENARIO=<场景名>`、`OMA_THEME=<主题 id>`(仅演示模式,如 `paper-light`/`paper-dark`/`cursor-light`,用于主题对比截图);输入框 `/demo-<场景名>` 或命令面板「演示场景」运行场景;新增工具卡/条目类型必须补演示场景(覆盖守卫测试会失败提醒)。
 - 调试钩子:`OMA_DRAFT`、`OMA_OPEN_SETTINGS`、`OMA_SETTINGS_PAGE`、`OMA_AGENT=fake|direct`、`OMA_LSP_PROBE=行:列`、`OMA_AUTOALLOW`(自动批准权限)、`OMA_USAGE_PANEL`(展开上下文用量面板)、`OMA_BRANCH_MENU`(展开分支切换弹层)、`OMA_ATTACH_IMAGE=路径1:路径2`(给输入框添加图片附件)、`OMA_PERF_OUT`、`OMA_TOGGLE_LEFT=秒`(延迟切换左栏)、`OMA_TAB_OVERFLOW=1`(标签溢出时自动展开「全部标签」下拉)、`OMA_TERMINAL_PLACEMENT=bottom|right|left|editor`、`OMA_SIDEBAR_SIDE`/`OMA_TOOLS_SIDE=left|right`、`OMA_SHOW_TERMINAL=1`(面板摆放)、`OMA_HUB=all|sessions|projects|files|actions|settings`(打开中央搜索窗)、`OMA_HUB_QUERY`(预填搜索词)、`OMA_OPEN_ITEM=<名称片段>`(设置页的技能/子 Agent/记忆自动打开对应条目)、`OMA_OPEN_AUTOMATION=1`(打开自动化页;`Scripts/restart.sh` 不转发,需直接 `open -g -n … --env`)。
 - 截图用 `screencapture -x -o -l<windowId>`;禁止用 osascript 发送按键;验证后删除截图。
-- 每次改动后重启应用与适配器子进程,确认修改在运行时真实生效。
+- 每次改动后重启应用与适配器子进程,确认修改在运行时真实生效;CI 仅在用户要求或提交前运行。
 
 ## 7. 安全
 - 不读取 Keychain 中的 OAuth 令牌;官方 `claude` 使用自己的凭据。

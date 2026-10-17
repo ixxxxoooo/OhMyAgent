@@ -278,6 +278,12 @@ public final class SessionModel {
     public private(set) var capabilities = AgentCapabilities()
     /// 正在回放历史会话
     public private(set) var isReplaying = false
+    /// 会话记录文件(`~/.claude/projects/…/<id>.jsonl`)的已知修改时间:晚于它说明别的进程(如终端里的 claude)写了这个会话
+    var transcriptBaseline: Date?
+    /// `transcriptBaseline` 所属的会话 ID(会话切换后基线作废)
+    var transcriptBaselineSession: String?
+    /// 本应用上一轮结束的时间:结束后几秒内记录文件仍在落盘,这段时间的变化算自己写的
+    var lastTurnEndedAt: Date?
     /// 工作区文件索引(供 @ 补全)
     public let fileIndex = FileIndex()
     /// 最近的 stderr 行(诊断用,最多 200 行)
@@ -502,7 +508,9 @@ public final class SessionModel {
         let applier = Task { [weak self] in
             for await batch in coalescer.batches {
                 guard let self else { return }
+                let span = Log.perf.span("事件批处理", warnMs: 16, quiet: true, ["events": "\(batch.count)"])
                 self.handle(batch)
+                span.end()
             }
         }
         pumpTasks = [reader, applier]
@@ -1092,9 +1100,10 @@ public final class SessionModel {
             self.publishTurnChanges()
             // 回合正常结束:追加结束语(模型、耗时、token、tps);取消或失败不显示
             if error == nil, self.stallMessage == nil, let reason, reason != .cancelled {
-                self.timeline.appendTurnSummary(TurnSummary(model: summaryModel, durationSeconds: Double(turnMs) / 1000, usage: usage, brand: summaryBrand))
+                self.timeline.appendTurnSummary(TurnSummary(model: summaryModel, durationSeconds: Double(turnMs) / 1000, usage: usage, brand: summaryBrand, finishedAt: Date()))
             }
             self.isRunning = false
+            self.lastTurnEndedAt = Date()
             self.turnStartedAt = nil
             self.promptTask = nil
             if self.goal?.isActive == true { self.goal?.isActive = false }
@@ -1218,6 +1227,18 @@ public final class SessionModel {
         usage = nil
         sessionId = summary.sessionId
         isReplaying = true
+        // 会话记录(耗时/完成时间)与回放并行解析:回放一结束就能补上每回合的结束行,不用再等一轮磁盘解析
+        let transcriptTurns = startTranscriptParse()
+        timeline.beginReplay()
+        timeline.replayResolveModel = { [weak self] raw in self?.resolveReplayModel(raw) ?? (raw, nil) }
+        if let transcriptTurns {
+            // 记录解析完成后立刻交给时间线:此后每个回合一结束就即时补结束行
+            Task { [weak self] in
+                let turns = await transcriptTurns.value
+                self?.timeline.replayTurns = turns
+            }
+        }
+        let replaySpan = Log.perf.span("历史会话回放", warnMs: 800, ["target": String(summary.sessionId.prefix(8))])
         let cwd = workspace.path
         let canLoad = capabilities.loadSession
         let servers = mcpServers
@@ -1240,7 +1261,10 @@ public final class SessionModel {
             }
             await self?.settleEvents()
             self?.timeline.finishStreaming()
+            self?.timeline.endReplay()
+            await self?.attachReplayedSummaries(parsing: transcriptTurns)
             self?.isReplaying = false
+            replaySpan.end(["entries": "\(self?.timeline.entries.count ?? 0)"])
             self?.flushQueuedPrompt()
             // 回放后一条内容都没有:多半是 Agent 建会话时落盘、却从没发过消息的空会话。登记后从列表里隐藏
             if let self, self.timeline.entries.isEmpty, self.sessionId == summary.sessionId {
@@ -1261,7 +1285,20 @@ public final class SessionModel {
 
     /// 执行服务端分叉 (若后端支持)
     public func forkFrom(source: SessionModel) async {
-        guard let client, let srcSessionId = source.sessionId, source.capabilities.canFork else {
+        guard let srcSessionId = source.sessionId, source.capabilities.canFork else {
+            log.warning("源会话不支持分叉,保留本地克隆", ["canFork": "\(source.capabilities.canFork)", "hasSession": "\(source.sessionId != nil)"])
+            timeline.appendNotice(String(localized: "当前引擎不支持服务端分叉,已仅复制对话记录。"), severity: "warning")
+            return
+        }
+        // 新标签的会话刚创建,Agent 还在连接:等握手完成后再分叉(最多约 60 秒)
+        var waited = 0
+        while phase != .ready, !isFailed, waited < 600 {
+            try? await Task.sleep(for: .milliseconds(100))
+            waited += 1
+        }
+        guard phase == .ready, let client else {
+            log.warning("等待连接就绪失败,保留本地克隆")
+            timeline.appendNotice(String(localized: "分叉失败:Agent 未能连接,已仅复制对话记录。"), isError: true)
             return
         }
         let cwd = workspace.path
@@ -1269,12 +1306,15 @@ public final class SessionModel {
         let meta = effectiveMeta()
         do {
             let setup = try await client.forkSession(sessionId: srcSessionId, cwd: cwd, mcpServers: servers, additionalDirectories: additionalDirectories, meta: meta)
+            // 分叉出的会话带有原会话的内容,不属于「空会话」,必须显示在历史里
+            EmptySessionRegistry.unhide(setup.sessionId)
             self.sessionId = setup.sessionId
             self.timeline.appendNotice(ChatL10n.t("已分叉为新会话，后续操作不会影响原会话。"))
             if !setup.configOptions.isEmpty { self.configOptions = setup.configOptions }
             self.refreshHistory()
         } catch {
             self.log.warning("服务端分叉失败，保留本地克隆", ["error": "\(error)"])
+            self.timeline.appendNotice(String(localized: "分叉失败:\(error.localizedDescription)"), isError: true)
         }
     }
 
@@ -1870,3 +1910,67 @@ struct AuthenticationFailure: Error, LocalizedError {
         String(localized: "「\(agent)」登录失败:\(reason)。请先在终端里完成该 Agent 的登录(例如 Antigravity 运行 `agy`),再点击「重试」。")
     }
 }
+
+
+// MARK: - 外部写入同步(终端里的 claude 续写了同一个会话)
+
+extension SessionModel {
+    /// 会话记录文件路径(只认 Claude Code 的存放位置;其他引擎没有这个文件时返回 nil)。
+    var transcriptURL: URL? {
+        guard let sessionId, !sessionId.isEmpty else { return nil }
+        // Claude Code 的目录名:路径里所有非字母数字字符都换成 "-"
+        let slug = String(workspace.path.map { $0.isASCII && ($0.isLetter || $0.isNumber) ? $0 : "-" })
+        let path = NSHomeDirectory() + "/.claude/projects/\(slug)/\(sessionId).jsonl"
+        return FileManager.default.fileExists(atPath: path) ? URL(fileURLWithPath: path) : nil
+    }
+
+    /// 检查会话记录是否被别的进程改动;空闲时发现改动就重新载入,让终端里续写的内容实时出现在应用里。
+    /// 由界面每隔几秒调用一次(仅当前可见的会话标签)。运行中、回放中、刚结束的回合不处理,避免把自己的写入当成外部改动。
+    public func syncExternalTranscript() async {
+        guard phase == .ready, !isRunning, !isReplaying, let sessionId, let url = transcriptURL else { return }
+        let modified = await Task.detached(priority: .utility) {
+            (try? FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate]) as? Date
+        }.value
+        guard let modified, !isRunning, !isReplaying, self.sessionId == sessionId else { return }
+        // 本轮刚结束(记录文件还在落盘)或还没有基线:只更新基线
+        if transcriptBaseline == nil || transcriptBaselineSession != sessionId || Date().timeIntervalSince(lastTurnEndedAt ?? .distantPast) < 5 {
+            transcriptBaseline = modified
+            transcriptBaselineSession = sessionId
+            return
+        }
+        guard let baseline = transcriptBaseline, modified.timeIntervalSince(baseline) > 0.5 else { return }
+        // 文件还在被持续写入(终端里的 claude 正在输出):等它安静 1.5 秒再整体重载,避免每 2 秒重放一次造成闪烁
+        guard Date().timeIntervalSince(modified) > 1.5 else { return }
+        transcriptBaseline = modified
+        log.info("检测到会话被外部续写,重新载入", ["session": String(sessionId.prefix(8))])
+        openSession(SessionSummary(sessionId: sessionId, cwd: workspace.path, title: sessionTitle), force: true)
+    }
+}
+
+extension SessionModel {
+    /// 在后台开始解析会话记录(没有记录文件的引擎返回 nil)。
+    /// - Returns: 解析任务;回放结束后交给 `attachReplayedSummaries(parsing:)`
+    func startTranscriptParse() -> Task<[TranscriptTurn], Never>? {
+        guard let url = transcriptURL else { return nil }
+        return Task.detached(priority: .userInitiated) { TranscriptTurns.parse(url) }
+    }
+
+    /// 回放结束后从会话记录补出各回合的耗时与完成时间(没有记录文件的引擎直接跳过)。
+    /// - Parameter parsing: `startTranscriptParse()` 启动的解析任务
+    func attachReplayedSummaries(parsing: Task<[TranscriptTurn], Never>?) async {
+        guard let parsing else { return }
+        let turns = await parsing.value
+        timeline.attachReplayedSummaries(turns) { [weak self] raw in self?.resolveReplayModel(raw) ?? (raw, nil) }
+    }
+
+    /// 把记录里的模型 ID 换成展示名与厂商图标线索。
+    /// 经模型映射发出的回合,记录里写的是槽位别名(oma-main 等)或空:用当前映射的真实模型展示。
+    /// - Parameter raw: 记录里的模型 ID
+    func resolveReplayModel(_ raw: String) -> (name: String, brand: ModelBrandHint?) {
+        if raw.isEmpty || raw.hasPrefix("oma-"), let mapped = currentMappedModel {
+            return (mapped.displayName, ModelBrandHint(modelId: mapped.modelId, providerPreset: mapped.presetId, providerName: mapped.providerName))
+        }
+        return (raw, raw.isEmpty ? nil : ModelBrandHint(modelId: raw))
+    }
+}
+

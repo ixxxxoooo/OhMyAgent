@@ -148,13 +148,67 @@ public final class TimelineStore {
     public private(set) var entries: [TimelineEntry] = []
     /// 每次变更自增,视图据此决定是否滚动到底部。
     public private(set) var revision = 0
+    /// 结构变更计数:条目增删、工具/计划等会影响分组的更新才自增;纯文本分片追加不计入,
+    /// 流式输出时据此跳过对整条时间线的重新分组(大会话每个批次 O(n) 的开销)。
+    public private(set) var structureRevision = 0
 
     private var toolIndex: [String: TimelineEntry] = [:]
     private var planEntry: TimelineEntry?
     /// 工具调用状态变化回调(含子 Agent 内部的调用),用于记录检查点等。
     public var onToolChange: ((ToolCall) -> Void)?
 
+    // MARK: 回放时即时补结束行
+
+    /// 历史回放中:会话记录解析出的回合(就绪后,每个回合一结束就立刻插入结束行,不等回放全部结束)
+    public var replayTurns: [TranscriptTurn]?
+    /// 把记录里的模型 ID 换成展示名与厂商图标线索
+    public var replayResolveModel: (String) -> (name: String, brand: ModelBrandHint?) = { ($0, $0.isEmpty ? nil : ModelBrandHint(modelId: $0)) }
+    private var replayActive = false
+    private var replayPrompts = 0
+    private var replayTurnStart: Int?
+    private var replayEarly: [TimelineEntry] = []
+
     public init() {}
+
+    /// 开始回放:重置即时补结束行的状态。
+    public func beginReplay() {
+        replayActive = true
+        replayPrompts = 0
+        replayTurnStart = nil
+        replayEarly = []
+        replayTurns = nil
+    }
+
+    /// 结束回放:补上最后一个回合的结束行;回合数与记录对不上时撤回即时插入的结束行,交给「从末尾对齐」的补齐逻辑。
+    public func endReplay() {
+        guard replayActive else { return }
+        finishStreaming()
+        insertEarlySummary()
+        if let turns = replayTurns, turns.count != replayPrompts {
+            let early = Set(replayEarly.map(\.id))
+            entries.removeAll { early.contains($0.id) }
+            revision += 1
+            structureRevision += 1
+        }
+        replayActive = false
+        replayEarly = []
+        replayTurnStart = nil
+    }
+
+    /// 给刚结束的回合插入结束行(记录已就绪且回合序号对得上时)。
+    private func insertEarlySummary() {
+        guard replayActive, let start = replayTurnStart, let turns = replayTurns, replayPrompts - 1 < turns.count,
+              entries.count > start + 1, let last = entries.last, last.kind != .turnSummary else { return }
+        let turn = turns[replayPrompts - 1]
+        let texts = entries[(start + 1)...].filter { $0.kind == .assistant }.map(\.text).filter { !$0.isEmpty }
+        let resolved = replayResolveModel(turn.model)
+        let summary = TurnSummary(model: resolved.name, durationSeconds: turn.end.timeIntervalSince(turn.start), brand: resolved.brand,
+                                  outputText: texts.joined(separator: "\n\n"), finishedAt: turn.end)
+        let entry = TimelineEntry(kind: .turnSummary, text: summary.copyText)
+        entry.summary = summary
+        entries.append(entry)
+        replayEarly.append(entry)
+    }
 
     /// 按工具调用 ID 查找条目。
     /// - Parameter id: 工具调用 ID
@@ -166,6 +220,7 @@ public final class TimelineStore {
         toolIndex.removeAll()
         planEntry = nil
         revision += 1
+        structureRevision += 1
     }
 
     /// 用给定的条目列表重设时间线 (用于 Fork 会话)
@@ -177,6 +232,7 @@ public final class TimelineStore {
         }
         self.planEntry = entries.last { $0.kind == .plan }
         self.revision += 1
+        self.structureRevision += 1
     }
 
     /// 追加用户消息(本地发送)。
@@ -192,6 +248,7 @@ public final class TimelineStore {
         entry.isSteered = steered
         entries.append(entry)
         revision += 1
+        structureRevision += 1
     }
 
     /// 追加计划文档(计划模式批准后)。
@@ -200,6 +257,7 @@ public final class TimelineStore {
         finishStreaming()
         entries.append(TimelineEntry(kind: .planDoc, text: markdown))
         revision += 1
+        structureRevision += 1
     }
 
     /// 追加提示或错误。
@@ -216,6 +274,7 @@ public final class TimelineStore {
         entry.detail = detail
         entries.append(entry)
         revision += 1
+        structureRevision += 1
     }
 
     /// 追加模型切换分割线(时间线中显示「由 X 切换为 Y」)。
@@ -228,6 +287,7 @@ public final class TimelineStore {
         entry.detail = to
         entries.append(entry)
         revision += 1
+        structureRevision += 1
     }
 
     /// 结束当前流式条目(轮次结束或切换类型时调用)。
@@ -254,6 +314,7 @@ public final class TimelineStore {
     /// 应用一个会话更新;与时间线无关的更新会被忽略。
     /// - Parameter update: 协议更新
     public func apply(_ update: SessionUpdate) {
+        let countBefore = entries.count
         switch update {
         case .userMessageChunk(let messageId, let content):
             appendChunk(kind: .user, messageId: messageId, content: content)
@@ -327,6 +388,13 @@ public final class TimelineStore {
             return
         }
         revision += 1
+        switch update {
+        case .userMessageChunk, .agentMessageChunk, .agentThoughtChunk:
+            // 文本分片并入已有条目不改变分组结构
+            if entries.count != countBefore { structureRevision += 1 }
+        default:
+            structureRevision += 1
+        }
     }
 
     /// 在本存储及其全部子存储中按工具调用 ID 查找条目(支持多层子 Agent)。
@@ -386,6 +454,38 @@ public final class TimelineStore {
         entry.summary = summary
         entries.append(entry)
         revision += 1
+        structureRevision += 1
+    }
+
+    /// 给回放出来的历史回合补上结束行(耗时 + 完成时间)。回放不会产生结束行,这里按会话记录里的时间戳补齐。
+    /// 对齐方式:把时间线里的用户消息与记录里的提问从末尾往前一一对应(两边数量可能不同,取较少者)。
+    /// - Parameters:
+    ///   - turns: 记录解析出的回合
+    ///   - resolveModel: 把记录里的模型 ID 换成展示名与厂商图标线索(默认原样显示并按模型名匹配图标)
+    public func attachReplayedSummaries(
+        _ turns: [TranscriptTurn],
+        resolveModel: (String) -> (name: String, brand: ModelBrandHint?) = { ($0, $0.isEmpty ? nil : ModelBrandHint(modelId: $0)) }
+    ) {
+        let users = entries.indices.filter { entries[$0].kind == .user && !entries[$0].isSteered }
+        let count = min(users.count, turns.count)
+        guard count > 0 else { return }
+        var inserted = false
+        // 从后往前插入,前面的下标不受影响
+        for offset in stride(from: count - 1, through: 0, by: -1) {
+            let userPosition = users.count - count + offset
+            let turn = turns[turns.count - count + offset]
+            let end = userPosition + 1 < users.count ? users[userPosition + 1] : entries.count
+            guard end > users[userPosition] + 1, entries[end - 1].kind != .turnSummary else { continue }
+            let texts = entries[(users[userPosition] + 1)..<end].filter { $0.kind == .assistant }.map(\.text).filter { !$0.isEmpty }
+            let resolved = resolveModel(turn.model)
+            let summary = TurnSummary(model: resolved.name, durationSeconds: turn.end.timeIntervalSince(turn.start), brand: resolved.brand,
+                                      outputText: texts.joined(separator: "\n\n"), finishedAt: turn.end)
+            let entry = TimelineEntry(kind: .turnSummary, text: summary.copyText)
+            entry.summary = summary
+            entries.insert(entry, at: end)
+            inserted = true
+        }
+        if inserted { revision += 1; structureRevision += 1 }
     }
 
     /// 追加“本轮改动”汇总条目。
@@ -400,6 +500,7 @@ public final class TimelineStore {
         entry.changes = changes
         entries.append(entry)
         revision += 1
+        structureRevision += 1
     }
 
     /// 文本分片归并:同类、仍在流式、消息 ID 兼容时追加,否则新建条目。
@@ -419,6 +520,12 @@ public final class TimelineStore {
             return
         }
         finishStreaming()
+        if replayActive, kind == .user {
+            // 新回合开始:上一回合已结束,立刻补它的结束行
+            if replayPrompts > 0 { insertEarlySummary() }
+            replayPrompts += 1
+            replayTurnStart = entries.count
+        }
         let entry = TimelineEntry(kind: kind, text: text, isStreaming: true)
         entry.messageId = messageId
         entries.append(entry)

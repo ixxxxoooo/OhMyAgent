@@ -33,7 +33,7 @@ struct FileMentionChip: View {
         .contentShape(shape)
         .onHover { hovering = $0 }
         .onTapGesture(perform: openFile)
-        .help(mention.path)
+        .omTooltip(mention.path)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(String(localized: mention.isDirectory ? "文件夹" : "文件") + " " + mention.name)
     }
@@ -56,7 +56,7 @@ struct FileMentionChip: View {
         }
         .buttonStyle(.plain)
         .opacity(removeOnHover ? (hovering ? 1 : 0) : (hovering ? 1 : 0.45))
-        .help("移除引用")
+        .omTooltip("移除引用")
         .accessibilityLabel("移除引用")
     }
 

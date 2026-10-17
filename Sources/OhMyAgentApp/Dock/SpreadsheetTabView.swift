@@ -117,14 +117,14 @@ struct SpreadsheetTabView: View {
                     Label("清除筛选", om: "funnel-x", size: 12)
                 }
                 .buttonStyle(.omPlain)
-                .help("清除全部筛选与排序")
+                .omTooltip("清除全部筛选与排序")
             }
             if filterMode {
                 Button { filterState.firstRowIsHeader.toggle() } label: {
                     Label(filterState.firstRowIsHeader ? String(localized: "首行为表头") : String(localized: "首行为数据"), om: filterState.firstRowIsHeader ? "square-check" : "square", size: 12)
                 }
                 .buttonStyle(.omPlain)
-                .help("首行作为表头:始终显示在最前,不参与筛选与排序")
+                .omTooltip("首行作为表头:始终显示在最前,不参与筛选与排序")
             }
             Button {
                 filterMode.toggle()
@@ -133,7 +133,7 @@ struct SpreadsheetTabView: View {
                 Label("筛选", om: "funnel", size: 12)
             }
             .buttonStyle(filterMode ? .omSecondary : .omPlain)
-            .help(filterMode ? "关闭筛选(清除全部条件)" : "开启列筛选")
+            .omTooltip(filterMode ? "关闭筛选(清除全部条件)" : "开启列筛选")
             .accessibilityAddTraits(filterMode ? .isSelected : [])
         }
     }
@@ -321,7 +321,7 @@ private struct HeaderCell: View {
                     .buttonStyle(.plain)
                     .foregroundStyle(isFiltered || sortedHere != nil ? OMColors.accent : OMColors.tertiaryText)
                     .onHover { hovering = $0 }
-                    .help(isFiltered ? "已筛选:点击修改" : "筛选此列")
+                    .omTooltip(isFiltered ? "已筛选:点击修改" : "筛选此列")
                     .accessibilityLabel(String(localized: "筛选列 \(letters)"))
                     .omCustomPicker(isPresented: $open, placement: .below, width: 260) {
                         ColumnFilterPanel(sheet: sheet, column: column, filterState: $filterState) { open = false }

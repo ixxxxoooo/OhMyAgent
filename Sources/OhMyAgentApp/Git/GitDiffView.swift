@@ -95,13 +95,13 @@ struct GitFileDiffView: View {
             HStack(spacing: 2) {
                 Button { moveHunk(-1, count: diff.hunks.count) } label: { Image.om("chevron-up", size: 12).frame(width: 22, height: 20) }
                     .keyboardShortcut(Self.f5, modifiers: [.option, .shift])
-                    .help("上一处差异 (⇧⌥F5)")
+                    .omTooltip("上一处差异 (⇧⌥F5)")
                     .accessibilityLabel("上一处差异")
                 Text("\(min(currentHunk, diff.hunks.count - 1) + 1)/\(diff.hunks.count)")
                     .font(OMFonts.caption.monospacedDigit()).foregroundStyle(OMColors.secondaryText)
                 Button { moveHunk(1, count: diff.hunks.count) } label: { Image.om("chevron-down", size: 12).frame(width: 22, height: 20) }
                     .keyboardShortcut(Self.f5, modifiers: [.option])
-                    .help("下一处差异 (⌥F5)")
+                    .omTooltip("下一处差异 (⌥F5)")
                     .accessibilityLabel("下一处差异")
             }
             .buttonStyle(.plain)
@@ -189,16 +189,21 @@ struct GitFileDiffView: View {
         }
     }
 
+    /// 加载差异。仓库定位只做一次(轮询时复用);结果与当前展示相同时不重新赋值,避免每 2 秒重建整页差异视图。
     private func load() async {
-        guard let repo = await GitRepository.discover(from: path) else {
-            result = .notRepository
-            return
+        if repository == nil || relativePath == nil {
+            guard let repo = await GitRepository.discover(from: path) else {
+                result = .notRepository
+                return
+            }
+            guard let relative = repo.relativePath(of: path) else { result = .notRepository; return }
+            repository = repo
+            relativePath = relative
         }
-        guard let relative = repo.relativePath(of: path) else { result = .notRepository; return }
-        repository = repo
-        relativePath = relative
+        guard let repo = repository, let relative = relativePath else { return }
         do {
             if let diff = try await repo.fileDiff(path: relative, scope: scope) {
+                if case .diff(let shown) = result, shown.sameContent(as: diff) { return }
                 result = .diff(diff)
             } else {
                 result = .binary
@@ -206,5 +211,12 @@ struct GitFileDiffView: View {
         } catch {
             result = .failed((error as? LocalizedError)?.errorDescription ?? "\(error)")
         }
+    }
+}
+
+private extension FileDiff {
+    /// 两份差异的内容是否一致(新旧文本逐行相同)。
+    func sameContent(as other: FileDiff) -> Bool {
+        added == other.added && removed == other.removed && oldLines == other.oldLines && newLines == other.newLines
     }
 }

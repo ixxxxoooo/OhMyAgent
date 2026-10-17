@@ -104,7 +104,7 @@ struct CollapsibleUserText: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help(expanded ? String(localized: "收起长消息") : String(localized: "展开全部内容"))
+                .omTooltip(expanded ? String(localized: "收起长消息") : String(localized: "展开全部内容"))
                 .accessibilityLabel(expanded ? String(localized: "收起长消息") : String(localized: "展开全部内容"))
             }
         }

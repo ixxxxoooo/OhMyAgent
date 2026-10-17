@@ -34,7 +34,7 @@ struct SkillsSettingsPage: View {
                 : String(localized: "用 SKILL.md 与自定义命令扩展 Claude 的能力,保存在 ~/.claude/skills、commands 或项目的 .claude 目录。")
         ) {
             Button { center.reload() } label: { Image.om("arrow.clockwise") }
-                .help("重新读取")
+                .omTooltip("重新读取")
                 .accessibilityLabel("刷新")
             Button { showCreate = true } label: { Label(String(localized: "新建\(noun)"), om: "plus") }
                 .buttonStyle(.omPrimary)
@@ -122,7 +122,7 @@ struct SkillsSettingsPage: View {
                         } label: { Image.om("message-square-plus", size: 14).frame(width: 24, height: 24).contentShape(Rectangle()) }
                             .buttonStyle(.plain)
                             .foregroundStyle(OMColors.secondaryText)
-                            .help(item.kind == .agent ? String(localized: "回到对话并 @ 提及这个子 Agent") : String(localized: "回到对话并插入这个命令"))
+                            .omTooltip(item.kind == .agent ? String(localized: "回到对话并 @ 提及这个子 Agent") : String(localized: "回到对话并插入这个命令"))
                             .accessibilityLabel("在对话中使用")
                     }
                     Menu {
@@ -189,10 +189,10 @@ struct MarkdownItemEditor: View {
                     Button {
                         AppActions.shared.insertIntoComposer(item.kind == .agent ? "@agent-\(item.name) " : "/\(item.name) ")
                     } label: { Label("在对话中使用", om: "message-square-plus") }
-                        .help(item.kind == .agent ? String(localized: "回到对话并 @ 提及这个子 Agent") : String(localized: "回到对话并插入这个命令"))
+                        .omTooltip(item.kind == .agent ? String(localized: "回到对话并 @ 提及这个子 Agent") : String(localized: "回到对话并插入这个命令"))
                 }
                 Button { NSWorkspace.shared.activateFileViewerSelecting([item.fileURL]) } label: { Image.om("folder") }
-                    .help("在 Finder 中显示").accessibilityLabel("在 Finder 中显示")
+                    .omTooltip("在 Finder 中显示").accessibilityLabel("在 Finder 中显示")
                 if !item.source.isReadOnly {
                     Button("还原") { text = original }.disabled(!isDirty)
                     Button("保存", action: save).buttonStyle(.omPrimary).disabled(!isDirty).keyboardShortcut("s", modifiers: .command)

@@ -43,7 +43,7 @@ struct RightPaneView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(selected ? OMColors.accent : OMColors.secondaryText)
-                .help(pane == .git ? (gitBadge?.tooltip.map { Self.title(pane) + ":" + $0 } ?? Self.title(pane)) : Self.title(pane))
+                .omTooltip(pane == .git ? (gitBadge?.tooltip.map { Self.title(pane) + ":" + $0 } ?? Self.title(pane)) : Self.title(pane))
                 .accessibilityLabel(Self.title(pane))
                 .accessibilityAddTraits(selected ? .isSelected : [])
             }

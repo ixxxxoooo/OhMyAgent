@@ -49,7 +49,7 @@ struct TerminalPanelView: View {
             Button { AppActions.shared.newTerminal() } label: { Image.om("plus", size: 12) }
                 .buttonStyle(.omIcon)
                 .disabled(!state.canAdd)
-                .help(String(localized: "新建终端 (\(ShortcutStore.shared.binding(for: .newTerminal).display))"))
+                .omTooltip(String(localized: "新建终端 (\(ShortcutStore.shared.binding(for: .newTerminal).display))"))
                 .accessibilityLabel("新建终端")
                 .padding(.trailing, 6)
         }
@@ -97,7 +97,7 @@ private struct TerminalPanelTab: View {
             }
             .buttonStyle(.plain)
             .opacity(canClose && (hovering || isActive) ? 1 : 0)
-            .help("关闭终端")
+            .omTooltip("关闭终端")
             .accessibilityLabel("关闭终端")
         }
         .foregroundStyle(isActive ? OMColors.primaryText : OMColors.secondaryText)

@@ -35,7 +35,7 @@ struct AgentMenu: View {
         }
         .buttonStyle(.plain)
         .fixedSize()
-        .help("切换 Agent(会在当前项目开始新会话),当前:\(model.descriptor.name)")
+        .omTooltip(String(localized: "切换 Agent(会在当前项目开始新会话),当前:\(model.descriptor.name)"))
         .accessibilityLabel("切换 Agent")
         .onChange(of: shown) { _, isShown in
             // 打开引擎选择器时预热其余引擎:选中后几乎立即可用
@@ -120,7 +120,7 @@ struct UsageButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(fraction.map { String(localized: "上下文 \(Int(($0 * 100).rounded()))%") } ?? String(localized: "上下文用量"))
+        .omTooltip(fraction.map { String(localized: "上下文 \(Int(($0 * 100).rounded()))%") } ?? String(localized: "上下文用量"))
         .accessibilityLabel("上下文用量")
         .accessibilityValue(fraction.map { String(localized: "已使用 \(Int(($0 * 100).rounded()))%") } ?? String(localized: "暂无数据"))
         .accessibilityAddTraits(isOpen ? .isSelected : [])

@@ -173,7 +173,7 @@ struct StickyUserCard: View {
             .buttonStyle(.plain)
             .opacity(hovering ? 1 : 0)
             .padding(8)
-            .help("放大编辑(双击)")
+            .omTooltip("放大编辑(双击)")
             .accessibilityLabel("放大编辑")
         }
         .contentShape(RoundedRectangle(cornerRadius: OMRadius.modal, style: .continuous))
@@ -270,7 +270,7 @@ struct UserMessageEditor: View {
                     .buttonBorderShape(.circle)
                     .keyboardShortcut(.return, modifiers: .command)
                     .disabled(!canResend)
-                    .help("重新发送 (⌘Return)")
+                    .omTooltip("重新发送 (⌘Return)")
                     .accessibilityLabel("重新发送")
                 }
             }
@@ -296,7 +296,7 @@ struct UserMessageEditor: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help("切换模型")
+                .omTooltip("切换模型")
                 .accessibilityLabel("切换模型")
                 .omPicker(isPresented: $modelPickerShown, items: rows, selectedID: shown.id, placeholder: String(localized: "搜索模型"),
                           placement: .below, width: 300, row: { ModelPickRowContent(row: $0) }, onSelect: { row in

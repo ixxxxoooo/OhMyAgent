@@ -75,7 +75,7 @@ extension CodeEditorView {
     // MARK: 落属性
 
     /// 全量应用:先铺基础属性,再逐块着色。
-    private func applyMarkdown(_ layout: MarkdownLiveLayout) {
+    func applyMarkdown(_ layout: MarkdownLiveLayout) {
         guard let storage = textView.textStorage, storage.length == layout.length else { return }
         markdown.isApplying = true
         defer { markdown.isApplying = false }

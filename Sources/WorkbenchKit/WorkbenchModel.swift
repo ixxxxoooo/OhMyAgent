@@ -738,10 +738,10 @@ public final class WorkbenchModel {
             syncSelectionFromDock()
             return
         }
-        // 当前活动会话还是空白的就在它身上打开,否则新开一个标签;会话属于别的引擎时一律新开标签并用原引擎承载
-        var target = sessions[id]
-        let foreignAgent = owner.flatMap { $0 != target?.descriptor.id ? $0 : nil }
-        if target == nil || target?.isPristine != true || foreignAgent != nil {
+        // 总是新开标签打开历史会话:空白新对话也是真实会话,必须保留在侧栏里,不能被顶替;会话属于别的引擎时用原引擎承载
+        let foreignAgent = owner.flatMap { $0 != sessions[id]?.descriptor.id ? $0 : nil }
+        var target: SessionModel?
+        do {
             let slot = UUID().uuidString
             let tab = dock.open(.chat(projectID: id, slot: slot), title: title ?? project.name)
             dock.activate(tab)
@@ -749,8 +749,6 @@ public final class WorkbenchModel {
             // 新标签走「恢复模式」:连接后直接 session/load,不先建空会话,侧栏也不会闪出「新对话」
             let pending = SessionSummary(sessionId: sessionId, cwd: id, title: title ?? cachedTitle(ofSession: sessionId, in: id))
             target = ensureSession(project: id, slot: slot, agentID: foreignAgent, restore: pending)
-        } else {
-            syncSelectionFromDock()
         }
         guard let model = target else { return }
         // 恢复模式已接管:无需再走「等连接就绪后打开」

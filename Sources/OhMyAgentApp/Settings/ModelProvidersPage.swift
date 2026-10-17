@@ -89,7 +89,7 @@ struct ModelProvidersPage: View {
                 Label("导入", om: "import")
             }
             .buttonStyle(.omSecondary)
-            .help("读取本机 OpenCode 的配置,确认后导入提供商与密钥")
+            .omTooltip("读取本机 OpenCode 的配置,确认后导入提供商与密钥")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)

@@ -75,7 +75,7 @@ struct LayoutDragEditor: View {
         .background(OMColors.selectedFill, in: RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))
         .foregroundStyle(OMColors.accent)
         .draggable(item.payload)
-        .help(item.allowedZones.count == 2 ? String(localized: "拖到左栏或右栏") : String(localized: "拖到左栏、右栏、底部或编辑区"))
+        .omTooltip(item.allowedZones.count == 2 ? String(localized: "拖到左栏或右栏") : String(localized: "拖到左栏、右栏、底部或编辑区"))
         .accessibilityLabel(Self.title(item))
         .accessibilityHint(String(localized: "拖动到其它区域可更换位置"))
     }

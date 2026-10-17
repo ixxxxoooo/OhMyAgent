@@ -7,6 +7,7 @@ import ChatKit
 import DesignSystem
 import LSPKit
 import OMLog
+import EditorKit
 import SwiftUI
 import WorkbenchKit
 
@@ -160,6 +161,7 @@ struct OhMyAgentApp: App {
         // 字体平滑偏好(AppleFontSmoothing)须早于任何文本控件创建
         FontSmoothing.applyAtLaunch()
         Log.bootstrap(process: "app")
+        MainThreadHitchMonitor.shared.start()
         DemoLaunch.activateIfRequested()
         // Bundle ID 变更迁移:须早于外观、快捷键等偏好的首次读取(演示模式使用隔离沙盒,不迁移)
         if !DemoLaunch.isActive { LegacyDefaultsMigration.migrateIfNeeded() }
@@ -225,6 +227,15 @@ struct WorkbenchCommands: Commands {
             }
         }
         CommandGroup(after: .textEditing) {
+            Button("在编辑器中查找…") { CodeEditorView.showFindInActiveEditor() }
+                .keyboardShortcut("f", modifiers: .command)
+            Button("替换…") { CodeEditorView.showFindInActiveEditor(replace: true) }
+                .keyboardShortcut("f", modifiers: [.command, .option])
+            Button("查找下一个") { CodeEditorView.findInActiveEditor(forward: true) }
+                .keyboardShortcut("g", modifiers: .command)
+            Button("查找上一个") { CodeEditorView.findInActiveEditor(forward: false) }
+                .keyboardShortcut("g", modifiers: [.command, .shift])
+            Divider()
             Button("搜索…") { HubModel.shared.present(.all, workbench: workbench) }
                 .keyboardShortcut(shortcuts.shortcut(for: .hubSearch))
             Button("快速打开文件…") { PaletteModel.present(.files, workbench: workbench) }

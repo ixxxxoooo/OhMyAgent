@@ -26,7 +26,7 @@ let package = Package(
         // Diff 与检查点
         .target(name: "DiffKit"),
         // AppKit TextKit 2 编辑器
-        .target(name: "EditorKit", dependencies: ["DiffKit", "DesignSystem"]),
+        .target(name: "EditorKit", dependencies: ["DiffKit", "DesignSystem", "IconKit"]),
         // Lucide 原生图标:SVG path 解析 + 模板图像渲染
         .target(name: "IconKit", dependencies: ["OMLog"]),
         // Mermaid 原生渲染:解析 → 分层布局 → 绘制场景(纯 Swift,无 WebView)
@@ -73,6 +73,7 @@ let package = Package(
         .testTarget(name: "LSPKitTests", dependencies: ["LSPKit", "ACPKit"]),
         .testTarget(name: "SpreadsheetKitTests", dependencies: ["SpreadsheetKit"]),
         .testTarget(name: "AutomationKitTests", dependencies: ["AutomationKit"]),
+        .testTarget(name: "EditorKitTests", dependencies: ["EditorKit"]),
         .testTarget(name: "MermaidKitTests", dependencies: ["MermaidKit"]),
         .testTarget(name: "OhMyAgentAppTests", dependencies: ["OhMyAgentApp", "ChatKit", "ACPKit", "DesignSystem", "EditorKit", "LSPKit"]),
         .testTarget(name: "WorkbenchKitTests", dependencies: ["WorkbenchKit", "ChatKit", "ACPKit", "AgentHost", "FakeAgent"]),

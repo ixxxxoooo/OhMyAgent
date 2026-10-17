@@ -24,6 +24,8 @@ final class HubModel {
         didSet { if segment != oldValue { selection = 0; recompute() } }
     }
     var selection = 0
+    /// 每次打开搜索窗递增:视图据此把键盘焦点(重新)放进输入框,编辑器/终端占着焦点时也一样
+    private(set) var focusToken = 0
     private(set) var sections: [HubSection] = []
     @ObservationIgnored private weak var workbench: WorkbenchModel?
     @ObservationIgnored private var commands: [String: PaletteCommand] = [:]
@@ -51,6 +53,7 @@ final class HubModel {
         self.query = query
         self.initialThemeID = AppearanceModel.shared.themeID
         selection = 0
+        focusToken += 1
         isPresented = true
         keyMonitor.install { [weak self] command in self?.handle(command) ?? false }
         if WorkspaceIndexModel.shared.root != workbench.selectedProjectID || WorkspaceIndexModel.shared.files.isEmpty {
@@ -313,6 +316,13 @@ struct HubOverlay: View {
         .clipShape(RoundedRectangle(cornerRadius: OMRadius.modal, style: .continuous))
         .omFloatShadow(cornerRadius: OMRadius.modal)
         .onAppear { focused = true }
+        .task(id: hub.focusToken) {
+            // 先让当前持有焦点的编辑器/终端放手,再把焦点交给输入框;输入框出现晚一帧时补一次
+            NSApp.keyWindow?.makeFirstResponder(nil)
+            focused = true
+            try? await Task.sleep(for: .milliseconds(60))
+            focused = true
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("搜索")
     }

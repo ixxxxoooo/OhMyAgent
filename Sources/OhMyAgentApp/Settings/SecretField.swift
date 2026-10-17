@@ -42,7 +42,7 @@ struct SecretField: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(OMColors.secondaryText)
-        .help(label)
+        .omTooltip(label)
         .accessibilityLabel(label)
     }
 
