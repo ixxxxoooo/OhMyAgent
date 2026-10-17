@@ -72,7 +72,7 @@ private struct DirectoryChildren: View {
                 }
             }
         }
-        .task(id: "\(path)#\(model.revision)") {
+        .task(id: "\(path)#\(model.revision)#\(model.version(of: path))") {
             let target = path
             entries = await Task.detached(priority: .userInitiated) { WorkspaceFiles.list(directory: target) }.value
         }
