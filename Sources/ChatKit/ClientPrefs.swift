@@ -2,6 +2,7 @@
 // 客户端偏好(UserDefaults):仅属于 OhMyAgent 本身的设置。Claude Code 自身的设置写回 settings.json,不在此处。
 // 设置页用 @AppStorage 绑定同名键,业务代码用这里的静态访问器读取,因此修改立即生效。
 
+import AgentHost
 import Foundation
 
 /// 客户端偏好键与读取器。
@@ -38,6 +39,9 @@ public enum ClientPrefs {
         public static let terminalStartDirectory = "terminal.shell.startDirectory"
         public static let terminalOutputKB = "terminal.outputLimitKB"
         public static let terminalInheritEnv = "terminal.inheritEnvironment"
+        /// Agent 终端沙箱(默认关闭)与网络档位(off/local/all)
+        public static let terminalSandbox = "terminal.sandbox.enabled"
+        public static let terminalSandboxNetwork = "terminal.sandbox.network"
         public static let budgetUSD = "usage.budgetUSD"
         public static let redactLogs = "privacy.redactLogs"
         public static let pathNode = "advanced.path.node"
@@ -128,6 +132,13 @@ public enum ClientPrefs {
     /// 终端是否继承完整登录 shell 环境。
     public static func terminalInheritsEnvironment(_ defaults: UserDefaults = .standard) -> Bool {
         defaults.object(forKey: Key.terminalInheritEnv) as? Bool ?? true
+    }
+
+    /// Agent 终端沙箱配置(设置页「Agent 终端」)。
+    public static func terminalSandboxConfig(_ defaults: UserDefaults = .standard) -> TerminalSandboxConfig {
+        TerminalSandboxConfig(
+            enabled: defaults.object(forKey: Key.terminalSandbox) as? Bool ?? false,
+            network: TerminalSandboxConfig.Network(rawValue: defaults.string(forKey: Key.terminalSandboxNetwork) ?? "") ?? .local)
     }
 
     /// 终端不继承完整环境时保留的变量。

@@ -47,7 +47,7 @@ struct TurnSummaryTests {
         let summary = try #require(model.timeline.entries.last { $0.kind == .turnSummary }?.summary)
         #expect(summary.usage?.outputTokens == 360)
         #expect((summary.brand != nil) == !summary.model.isEmpty, "有模型名就带厂商图标线索")
-        #expect(model.timeline.entries.last?.kind == .turnSummary, "结束语是本轮最后一条")
+        #expect(await SessionModelTests.wait { model.timeline.entries.last?.kind == .turnSummary }, "结束语是本轮最后一条,实际尾部:\(model.timeline.entries.suffix(3).map { "\($0.kind)" })")
         model.shutdown()
     }
 

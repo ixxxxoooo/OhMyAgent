@@ -116,6 +116,7 @@ public struct ClaudeACPProvider: AgentProvider {
         // 使用用户已安装并已登录的 claude,凭据由官方进程自行管理
         env["CLAUDE_CODE_EXECUTABLE"] = claude
         for (key, value) in descriptor.env { env[key] = value }
+        env[AgentEnvironment.marker] = "1"
         return ProcessLaunch(executable: node, arguments: [adapter] + descriptor.args, environment: env, workingDirectory: cwd)
     }
 }
@@ -131,6 +132,7 @@ public struct GenericACPProvider: AgentProvider {
     public func makeLaunch(cwd: String, tools: LocatedTools) throws -> ProcessLaunch {
         var env = tools.environment
         for (key, value) in descriptor.env { env[key] = value }
+        env[AgentEnvironment.marker] = "1"
         // 一键安装的 Agent:可执行文件取自安装目录(升级后路径自动跟随)
         if let registryId = descriptor.registryId {
             guard let installed = AgentInstaller().installed(id: registryId) else { throw AgentLaunchError.notInstalled(descriptor.name) }

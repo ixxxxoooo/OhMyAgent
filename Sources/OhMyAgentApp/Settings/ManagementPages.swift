@@ -1,6 +1,7 @@
 // @author ixxxxoooo
 // 设置页:编辑器、终端。
 
+import AgentHost
 import AppKit
 import ChatKit
 import ClaudeConfigKit
@@ -186,6 +187,8 @@ struct TerminalPage: View {
     @AppStorage(ClientPrefs.Key.terminalOutputKB) private var outputKB = 1024
     @AppStorage(ClientPrefs.Key.terminalInheritEnv) private var inheritEnv = true
     @AppStorage(ClientPrefs.Key.featureTerminal) private var terminalCapability = false
+    @AppStorage(ClientPrefs.Key.terminalSandbox) private var sandboxEnabled = false
+    @AppStorage(ClientPrefs.Key.terminalSandboxNetwork) private var sandboxNetwork = TerminalSandboxConfig.Network.local.rawValue
     // 交互终端
     @AppStorage(ClientPrefs.Key.terminalShellFontFamily) private var fontFamily = EditorFontPrefs.systemMonospace
     @AppStorage(ClientPrefs.Key.terminalShellFontSize) private var fontSize = TerminalPrefs.defaultSize
@@ -229,6 +232,9 @@ struct TerminalPage: View {
             behaviorCard
             shellCard
             agentCard
+            sandboxCard
+            ToolApprovalCard(domain: .terminal)
+            TerminalPromptHintCard()
         }
     }
 
@@ -290,6 +296,29 @@ struct TerminalPage: View {
                     options: TerminalStartDirectory.allCases.map { ($0.rawValue, $0.title) },
                     selection: $startDirectory, accessibilityName: String(localized: "新终端起始目录"))
             }
+        }
+    }
+
+    /// Agent 终端沙箱:限制写权限(仅工作区与临时目录)与网络。
+    private var sandboxCard: some View {
+        SettingsCard("沙箱") {
+            SettingsToggleRow("在沙箱中运行 Agent 命令", detail: "用 macOS sandbox-exec 限制命令只能写入工作区与临时目录;被拦截时工具卡片提供「放行一次并重试」。仅对 Agent 终端生效(需开启上方「让 Agent 使用 OhMyAgent 的终端」)。可在工作区 .oma/sandbox.json 里调整 network 与 additionalWritablePaths。", isOn: $sandboxEnabled)
+            if sandboxEnabled {
+                SettingsRow("网络", detail: "完全禁止、仅本机回环或不限制。") {
+                    OMCompactSegmented(
+                        options: TerminalSandboxConfig.Network.allCases.map { ($0.rawValue, networkTitle($0)) },
+                        selection: $sandboxNetwork, accessibilityName: String(localized: "沙箱网络"))
+                }
+                if !TerminalSandbox.isAvailable { Note("未找到 /usr/bin/sandbox-exec,沙箱不会生效。") }
+            }
+        }
+    }
+
+    private func networkTitle(_ network: TerminalSandboxConfig.Network) -> String {
+        switch network {
+        case .off: String(localized: "禁止")
+        case .local: String(localized: "仅本机")
+        case .all: String(localized: "不限制")
         }
     }
 

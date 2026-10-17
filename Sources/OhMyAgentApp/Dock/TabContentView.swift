@@ -487,7 +487,7 @@ struct AgentTerminalTabView: View {
                 .padding(.horizontal, 16)
                 .frame(height: 34)
                 Divider()
-                TerminalOutputView(session: session, fillHeight: true) { model.interruptTerminal(terminalID) }
+                TerminalOutputView(session: session, fillHeight: true, onInterrupt: { model.interruptTerminal(terminalID) }, onRetryUnsandboxed: { model.retryWithoutSandbox() })
                     .padding(12)
             }
             .background(OMColors.surface)

@@ -180,7 +180,8 @@ struct SessionModelTests {
         model.send("你好")
         #expect(await Self.wait { !model.isRunning && model.timeline.entries.contains { $0.kind == .assistant } })
         #expect(model.timeline.entries.first?.kind == .user)
-        #expect(model.timeline.entries.allSatisfy { !$0.isStreaming })
+        // 负载高时回合收尾(flush → 让出 → finishTurn)可能晚于 isRunning 的观察点:等待而不是立即断言
+        #expect(await Self.wait { model.timeline.entries.allSatisfy { !$0.isStreaming } })
 
         model.send("请调用工具 tool")
         #expect(await Self.wait { !model.pendingPermissions.isEmpty })

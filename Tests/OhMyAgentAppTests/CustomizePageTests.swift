@@ -25,7 +25,7 @@ struct CustomizePageTests {
     }
 
     /// MCP 待批准/失败进入「需要处理」,停用的单独标记,其余视为已连接。
-    @Test("MCP 状态归并")
+    @Test("MCP 状态归并") @MainActor
     func mcpStatuses() {
         var snapshot = ConfigSnapshot()
         func entry(_ name: String, disabled: Bool = false, approval: Bool = false) -> MCPServerEntry {

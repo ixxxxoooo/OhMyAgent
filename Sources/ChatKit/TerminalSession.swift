@@ -19,6 +19,10 @@ public final class TerminalSession: Identifiable {
     public private(set) var exitCode: Int?
     public private(set) var signal: String?
     public private(set) var isRunning = true
+    /// 是否在沙箱内运行
+    public internal(set) var sandboxed = false
+    /// 沙箱运行且输出像被拦截(工具卡片据此显示「放行一次」)
+    public var sandboxBlocked: Bool { sandboxed && !isRunning && TerminalSandbox.looksBlocked(output: output, exitCode: exitCode) }
     private var pollTask: Task<Void, Never>?
 
     init(id: String, command: String) {

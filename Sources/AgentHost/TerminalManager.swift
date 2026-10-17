@@ -25,14 +25,23 @@ final class ManagedTerminal: Sendable {
     private let process: Process
     private let state = Mutex(State())
 
-    init(id: String, command: String, args: [String], environment: [String: String], cwd: String?, limit: Int) throws {
+    /// 是否在沙箱内运行
+    let sandboxed: Bool
+
+    init(id: String, command: String, args: [String], environment: [String: String], cwd: String?, limit: Int, sandboxProfile: String? = nil) throws {
         self.id = id
+        self.sandboxed = sandboxProfile != nil
         self.command = ([command] + args).joined(separator: " ")
         self.limit = max(1024, limit)
         let process = Process()
         // 通过 env 解析命令名,使 PATH 中的命令(如 npm、git)可直接使用
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = [command] + args
+        if let sandboxProfile {
+            process.executableURL = URL(fileURLWithPath: TerminalSandbox.executable)
+            process.arguments = ["-p", sandboxProfile, "/usr/bin/env", command] + args
+        } else {
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+            process.arguments = [command] + args
+        }
         process.environment = environment
         if let cwd, !cwd.isEmpty { process.currentDirectoryURL = URL(fileURLWithPath: cwd) }
         let pipe = Pipe()
@@ -98,7 +107,7 @@ final class ManagedTerminal: Sendable {
             if state.truncated {
                 while let first = data.first, first & 0xC0 == 0x80 { data.removeFirst() }
             }
-            return TerminalOutputSnapshot(output: String(decoding: data, as: UTF8.self), truncated: state.truncated,
+            return TerminalOutputSnapshot(output: TerminalOutputSanitizer.clean(String(decoding: data, as: UTF8.self)), truncated: state.truncated,
                                           exitCode: state.exitCode, signal: state.signal)
         }
     }
@@ -133,6 +142,8 @@ final class ManagedTerminal: Sendable {
 public struct TerminalCreated: Sendable {
     public var id: String
     public var command: String
+    /// 是否在沙箱内运行
+    public var sandboxed: Bool = false
 }
 
 /// 终端管理器。
@@ -141,14 +152,19 @@ public actor TerminalManager {
     private let environmentProvider: @Sendable () -> [String: String]
     private let workspace: String
     private let onCreated: (@Sendable (TerminalCreated) -> Void)?
+    private let sandboxProvider: (@Sendable () -> TerminalSandboxConfig)?
+    private var bypassSandboxOnce = false
 
     /// 创建管理器。
     /// - Parameters:
     ///   - workspace: 默认工作目录
     ///   - environment: 基础环境(登录 shell 环境)
+    ///   - sandbox: 沙箱配置读取器(nil 表示不支持沙箱);每次创建时读取,设置页修改立即生效
     ///   - onCreated: 新终端创建时的回调
     public init(workspace: String, environment: @escaping @Sendable () -> [String: String] = { ProcessInfo.processInfo.environment },
+                sandbox: (@Sendable () -> TerminalSandboxConfig)? = nil,
                 onCreated: (@Sendable (TerminalCreated) -> Void)? = nil) {
+        self.sandboxProvider = sandbox
         self.workspace = workspace
         self.environmentProvider = environment
         self.onCreated = onCreated
@@ -159,11 +175,25 @@ public actor TerminalManager {
         guard !command.isEmpty else { throw JSONRPCError(code: JSONRPCError.invalidParams, message: "command 不能为空") }
         var environment = environmentProvider()
         for (key, value) in env { environment[key] = value }
+        environment = AgentEnvironment.marked(environment)
         let id = "term-\(UUID().uuidString.prefix(8))"
+        let directory = cwd ?? workspace
+        var profile: String?
+        if let config = sandboxProvider?(), config.enabled, TerminalSandbox.isAvailable {
+            if bypassSandboxOnce {
+                bypassSandboxOnce = false
+                Log.terminal.info("沙箱已放行一次", ["id": id])
+            } else {
+                let resolved = TerminalSandbox.resolve(base: config, workspace: workspace)
+                var extra = resolved
+                if directory != workspace { extra.writablePaths.append(directory) }
+                profile = TerminalSandbox.profile(workspace: workspace, config: extra)
+            }
+        }
         let terminal = try ManagedTerminal(id: id, command: command, args: args, environment: environment,
-                                           cwd: cwd ?? workspace, limit: outputByteLimit ?? 1_048_576)
+                                           cwd: directory, limit: outputByteLimit ?? 1_048_576, sandboxProfile: profile)
         terminals[id] = terminal
-        onCreated?(TerminalCreated(id: id, command: terminal.command))
+        onCreated?(TerminalCreated(id: id, command: terminal.command, sandboxed: terminal.sandboxed))
         return id
     }
 
@@ -196,6 +226,12 @@ public actor TerminalManager {
         for terminal in terminals.values { terminal.kill() }
         terminals.removeAll()
     }
+
+    /// 下一条终端命令不使用沙箱(用户点「放行一次」)。
+    public func allowUnsandboxedOnce() { bypassSandboxOnce = true }
+
+    /// 终端是否在沙箱内运行。
+    public func isSandboxed(_ id: String) -> Bool { terminals[id]?.sandboxed ?? false }
 
     /// 非抛出的快照读取(UI 轮询用)。
     public func peek(_ id: String) -> TerminalOutputSnapshot? {

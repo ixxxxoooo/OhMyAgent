@@ -482,7 +482,7 @@ struct ToolDetailsView: View {
             SnippetDiffView(path: path, oldText: oldText, newText: newText, showHeader: false)
         case .terminal(let id):
             if let session = model.terminals[id] {
-                TerminalOutputView(session: session) { model.interruptTerminal(id) }
+                TerminalOutputView(session: session, onInterrupt: { model.interruptTerminal(id) }, onRetryUnsandboxed: { model.retryWithoutSandbox() })
             } else {
                 Label(String(localized: "终端 \(id)"), om: "terminal").font(OMFonts.monoSmall)
             }
@@ -789,6 +789,8 @@ struct TerminalOutputView: View {
     let session: TerminalSession
     var fillHeight = false
     var onInterrupt: (() -> Void)?
+    /// 沙箱拦截后「放行一次」
+    var onRetryUnsandboxed: (() -> Void)?
     @AppStorage(ClientPrefs.Key.terminalFontSize) private var outputFontSize = 12.0
     @State private var copied = false
 
@@ -798,6 +800,7 @@ struct TerminalOutputView: View {
                 Text("$").foregroundStyle(OMColors.tertiaryText)
                 ShellCommandText(command: session.command, lineLimit: 1)
                 Spacer()
+                if session.sandboxed { OMTag(String(localized: "沙箱"), tint: OMColors.secondaryText) }
                 if session.isRunning {
                     OMSpinner(.mini)
                     if let onInterrupt {
@@ -821,6 +824,12 @@ struct TerminalOutputView: View {
                 }
                 .frame(maxHeight: fillHeight ? .infinity : 240)
                 .onChange(of: session.output) { proxy.scrollTo("tail", anchor: .bottom) }
+            }
+            if session.sandboxBlocked, let onRetryUnsandboxed {
+                HStack(spacing: 8) {
+                    Text("命令可能被沙箱拦截(只允许写入工作区与临时目录)。").font(OMFonts.caption).foregroundStyle(OMColors.warning)
+                    Button("放行一次并重试", action: onRetryUnsandboxed).buttonStyle(.omSecondary)
+                }
             }
             if session.truncated {
                 Text("输出过长,仅显示末尾部分").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)

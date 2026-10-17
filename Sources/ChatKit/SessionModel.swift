@@ -385,7 +385,7 @@ public final class SessionModel {
             }
             self.log.info("工具链解析完成", ["node": tools.nodePath ?? "-", "nodeVersion": tools.nodeVersion ?? "-", "claude": tools.claudePath ?? "-", "adapter": tools.adapterEntry ?? "-"])
             let environment = ClientPrefs.filterTerminalEnvironment(tools.environment, inherit: ClientPrefs.terminalInheritsEnvironment())
-            let manager = TerminalManager(workspace: cwd, environment: { environment }, onCreated: { [weak self] created in
+            let manager = TerminalManager(workspace: cwd, environment: { environment }, sandbox: { ClientPrefs.terminalSandboxConfig() }, onCreated: { [weak self] created in
                 Task { @MainActor in self?.registerTerminal(created) }
             })
             self.terminalManager = manager
@@ -1589,6 +1589,13 @@ public final class SessionModel {
     private func awaitPermission(_ request: PermissionRequest) async -> PermissionOutcome {
         snapshotter.capture(ToolCall(json: request.toolCallRaw))
         let call = ToolCall(json: request.toolCallRaw)
+        // 审批策略:终端命令/浏览器访问按「每次询问 / 允许列表 / 自动运行」处理
+        if let target = ToolApprovalPolicy.subject(of: call),
+           ToolApprovalPolicy.load(target.domain).decide(subject: target.subject, domain: target.domain) == .allow,
+           let option = request.options.first(where: { $0.kind == .allowOnce }) ?? request.options.first(where: { $0.kind == .allowAlways }) {
+            log.info("审批策略自动放行", ["domain": target.domain.rawValue, "toolCallId": call.toolCallId])
+            return .selected(optionId: option.optionId)
+        }
         log.info("请求权限", ["tool": call.title, "kind": "\(call.kind)", "toolCallId": call.toolCallId, "options": request.options.map(\.optionId).joined(separator: ",")])
         return await withCheckedContinuation { continuation in
             let prompt = PermissionPrompt(request: request, continuation: continuation)
@@ -1653,8 +1660,19 @@ public final class SessionModel {
     private func registerTerminal(_ created: TerminalCreated) {
         guard let manager = terminalManager else { return }
         let session = TerminalSession(id: created.id, command: created.command)
+        session.sandboxed = created.sandboxed
         terminals[created.id] = session
         session.startPolling(manager: manager)
+    }
+
+    /// 沙箱拦截后「放行一次」:下一条终端命令不进沙箱,并请 Agent 重试刚才的命令。
+    public func retryWithoutSandbox() {
+        guard let manager = terminalManager else { return }
+        log.info("用户放行一次沙箱")
+        Task { [weak self] in
+            await manager.allowUnsandboxedOnce()
+            self?.send(String(localized: "刚才的命令被沙箱拦截了,已为你放行一次,请不带沙箱重试那条命令。"))
+        }
     }
 
     /// 中断正在运行的终端命令(工具卡片上的“停止”按钮)。
