@@ -147,7 +147,7 @@ struct AutomationPage: View {
     private var welcome: some View {
         VStack(spacing: 14) {
             Image.om("workflow", size: 30).foregroundStyle(OMColors.tertiaryText)
-            Text("让 Agent 按计划自己干活").omEditorialHeading()
+            Text("让 Agent 按计划自己干活").font(OMFonts.title)
             Text("定时在项目里发送提示词:每日摘要、依赖检查、待办扫描……运行结果与会话都会保留,随时可以接着聊。")
                 .font(OMFonts.small).foregroundStyle(OMColors.secondaryText).multilineTextAlignment(.center).frame(maxWidth: 360)
             VStack(spacing: 6) {

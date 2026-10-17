@@ -216,7 +216,7 @@ struct EmptyStateView: View {
         VStack(spacing: 10) {
             if isGeneralChat {
                 Text("今天想聊点什么?")
-                    .omEditorialHeading()
+                    .font(OMFonts.title)
                 Text("不需要打开项目,直接提问即可")
                     .font(OMFonts.small)
                     .foregroundStyle(OMColors.secondaryText)
@@ -229,7 +229,7 @@ struct EmptyStateView: View {
                 .padding(.top, 6)
             } else {
                 Text("有什么可以帮你?")
-                    .omEditorialHeading()
+                    .font(OMFonts.title)
                 Text(model.workspace.abbreviatingHome)
                     .font(OMFonts.small)
                     .foregroundStyle(OMColors.secondaryText)

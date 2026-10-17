@@ -414,7 +414,7 @@ public enum OMFonts {
     public static var readingMono: Font { .system(size: 12.5 * OMScale.ui * OMScale.timeline, design: .monospaced) }
 }
 
-/// 编辑性标题级别(纸感规范的「低语标题」:字重 regular、衬线、字号越大字距越紧)。
+/// 编辑性标题级别(页面级大标题备用令牌:字重 regular、系统字体、字号越大字距越紧;默认不被任何视图使用)。
 public enum OMEditorialLevel: Sendable {
     /// 22pt:空状态主标题、页面大标题
     case small
@@ -428,11 +428,11 @@ public enum OMEditorialLevel: Sendable {
 }
 
 public extension View {
-    /// 编辑性标题:系统衬线(New York)、regular 字重、按级别收紧字距,随「界面字号」缩放。
-    /// 仅用于空状态与页面级标题;界面标签、导航、按钮禁止使用衬线。
+    /// 编辑性标题:系统字体、regular 字重、按级别收紧字距,随「界面字号」缩放。
+    /// 字体一律系统字体,禁止衬线。
     /// - Parameter level: 标题级别
     func omEditorialHeading(_ level: OMEditorialLevel = .small) -> some View {
-        font(.system(size: level.size * OMScale.ui, weight: .regular, design: .serif))
+        font(.system(size: level.size * OMScale.ui, weight: .regular))
             .tracking(level.tracking)
     }
 }

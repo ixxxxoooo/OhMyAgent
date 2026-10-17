@@ -109,7 +109,7 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 
 ## 4.4 Cursor 纸感设计规范(默认主题「Cursor 纸感」,全文见 `.specstory/history/docs/20261017_UI设计规范_Cursor纸感.md`)
 - **结构规则对所有主题生效,取值由主题提供**:字重、按钮层级、圆角令牌、三档阴影、强调色角色统一;色板、圆角大小、是否玻璃由 `ThemeStyle`/`ThemePalette` 决定。
-- **字重**:文字字重上限 `medium`(`OMFonts.title/sectionTitle` 已为 medium);空状态/页面级大标题用 `omEditorialHeading(.small/.medium)`(系统衬线 regular,22/26pt,紧字距),导航/按钮/标签禁止衬线。内容强调(搜索命中、ANSI 加粗)可 `// ui-lint:allow 原因`。
+- **字重**:文字字重上限 `medium`(`OMFonts.title/sectionTitle` 已为 medium);标题统一用 `OMFonts.title`;字体一律系统字体,禁止衬线(`omEditorialHeading` 仅作备用令牌,默认不使用)。内容强调(搜索命中、ANSI 加粗)可 `// ui-lint:allow 原因`。
 - **圆角**:只用 `OMRadius`(`tag/control/card/floating/modal`),禁止字面量 `cornerRadius: N`;标签/芯片/徽标用 `OMPillShape`,`Capsule()` 仅限轨道类几何。间距用 `OMSpacing`(4 的倍数),动效用 `OMMotion.standard`。
 - **阴影与玻璃**:阴影只用 `omCardShadow/omFloatingShadow/omFloatShadow` 三档;`ThemeStyle.allowsGlass == false` 的主题(纸感)一律不透明卡片 + 发丝线;禁止装饰性渐变与发光(渐变只作遮罩/淡出,需 `ui-lint:allow`)。
 - **颜色角色**:`accent`(Ember)只做文字/链接/强调,不做大面积填充,文字用 `accentText`;主按钮填充用 `actionFill`(纸感为 Ink);「继续/执行计划」用 `.omWarm`(Amber),「提交/完成」用 `.omPositive`(Forest);同组实心按钮至多两个;选中背景用 `selectedFill`(纸感为中性色)。禁止纯 `#FFFFFF`/`#000000`。

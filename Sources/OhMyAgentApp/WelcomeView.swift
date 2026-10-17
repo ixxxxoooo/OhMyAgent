@@ -15,7 +15,7 @@ struct WelcomeView: View {
             Image.om("sparkles", size: 40, weight: .light)
                 .foregroundStyle(OMColors.accent)
             Text("打开一个项目开始")
-                .omEditorialHeading(.medium)
+                .font(OMFonts.title)
             Text("添加项目目录后,可以直接在该项目下向 Claude Code 提问;也可以不打开项目,直接开始一个通用会话。")
                 .font(OMFonts.small)
                 .foregroundStyle(OMColors.secondaryText)
