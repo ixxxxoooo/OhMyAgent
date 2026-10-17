@@ -24,26 +24,88 @@ public enum MarkdownBlock: Hashable, Sendable {
     case rule
 }
 
+/// 一次解析的结果与续解析所需的信息(流式输出时,下一批文本只需重解析最后一个块)。
+public struct MarkdownParseState: Sendable {
+    /// 被解析的完整文本。
+    public let text: String
+    /// 块序列。
+    public let blocks: [MarkdownBlock]
+    /// 每个块起始行在 `text` 中的 UTF-8 偏移(与 `blocks` 等长)。
+    let starts: [Int]
+}
+
 /// 块级解析入口。
 public enum MarkdownParser {
     /// 解析 Markdown 文本。
     /// - Parameter text: 原始文本
     /// - Returns: 块序列
     public static func parse(_ text: String) -> [MarkdownBlock] {
+        parseState(text).blocks
+    }
+
+    /// 解析并保留续解析信息。
+    /// - Parameter text: 原始文本
+    public static func parseState(_ text: String) -> MarkdownParseState {
+        let (blocks, starts) = parseCore(text)
+        return MarkdownParseState(text: text, blocks: blocks, starts: starts)
+    }
+
+    /// 流式续解析:新文本以上次文本为前缀时,只重解析上次的最后两个块及其之后的内容。
+    ///
+    /// 正确性依据:解析器自左向右,每个块的起始行处解析器状态是干净的(没有未结束的段落),
+    /// 因此从某个块的起始行重新解析,得到的结果与整段重解析的后缀完全一致。
+    /// 之所以要回退两个块而不是一个:最后一行还没写完时可能不被识别(如 `-` 还不是列表项),
+    /// 写完后(`- `)会被**前一个**块吸收(接续上一个列表、表格行等),所以前一个块也要重解析;
+    /// 再往前的块,其边界由已经完整的行决定,不会再变。
+    /// - Parameters:
+    ///   - text: 新的完整文本
+    ///   - previous: 上一次的解析结果;为 nil 或文本不是其扩展时退回整段解析
+    /// - Returns: 解析结果(与 `parseState(text)` 等价)
+    public static func parseState(_ text: String, continuing previous: MarkdownParseState?) -> MarkdownParseState {
+        guard let previous, !previous.starts.isEmpty, text.utf8.count >= previous.text.utf8.count,
+              text.utf8.starts(with: previous.text.utf8) else { return parseState(text) }
+        let keep = max(previous.blocks.count - 2, 0)
+        let cut = previous.starts[keep]
+        let cutIndex = text.utf8.index(text.utf8.startIndex, offsetBy: cut)
+        let (tailBlocks, tailStarts) = parseCore(String(text[cutIndex...]))
+        return MarkdownParseState(
+            text: text,
+            blocks: Array(previous.blocks.prefix(keep)) + tailBlocks,
+            starts: Array(previous.starts.prefix(keep)) + tailStarts.map { $0 + cut }
+        )
+    }
+
+    /// 整段解析:返回块序列与每个块起始行的 UTF-8 偏移。
+    private static func parseCore(_ text: String) -> (blocks: [MarkdownBlock], starts: [Int]) {
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        // 每行起点的 UTF-8 偏移(行内容 + 换行符)
+        var lineOffsets: [Int] = []
+        lineOffsets.reserveCapacity(lines.count)
+        var running = 0
+        for line in lines { lineOffsets.append(running); running += line.utf8.count + 1 }
         var blocks: [MarkdownBlock] = []
+        var starts: [Int] = []
         var index = 0
         var paragraph: [String] = []
+        var paragraphStart = 0
 
         func flushParagraph() {
             guard !paragraph.isEmpty else { return }
             blocks.append(.paragraph(paragraph.joined(separator: "\n")))
+            starts.append(lineOffsets[paragraphStart])
             paragraph.removeAll()
+        }
+
+        /// 追加一个起始于第 `line` 行的块。
+        func add(_ block: MarkdownBlock, at line: Int) {
+            blocks.append(block)
+            starts.append(lineOffsets[line])
         }
 
         while index < lines.count {
             let line = lines[index]
             let trimmed = line.trimmingCharacters(in: .whitespaces)
+            let blockStart = index
 
             // 代码围栏
             if let fence = fenceInfo(trimmed) {
@@ -61,7 +123,7 @@ public enum MarkdownParser {
                     body.append(current)
                     index += 1
                 }
-                blocks.append(.code(language: fence.language, code: body.joined(separator: "\n"), isClosed: closed))
+                add(.code(language: fence.language, code: body.joined(separator: "\n"), isClosed: closed), at: blockStart)
                 continue
             }
 
@@ -74,7 +136,7 @@ public enum MarkdownParser {
             // 标题
             if let heading = headingInfo(trimmed) {
                 flushParagraph()
-                blocks.append(.heading(level: heading.level, text: heading.text))
+                add(.heading(level: heading.level, text: heading.text), at: blockStart)
                 index += 1
                 continue
             }
@@ -82,7 +144,7 @@ public enum MarkdownParser {
             // 分隔线
             if isRule(trimmed) {
                 flushParagraph()
-                blocks.append(.rule)
+                add(.rule, at: blockStart)
                 index += 1
                 continue
             }
@@ -99,7 +161,7 @@ public enum MarkdownParser {
                     rows.append(splitRow(rowLine))
                     index += 1
                 }
-                blocks.append(.table(header: header, rows: rows))
+                add(.table(header: header, rows: rows), at: blockStart)
                 continue
             }
 
@@ -115,7 +177,7 @@ public enum MarkdownParser {
                     quoted.append(content)
                     index += 1
                 }
-                blocks.append(.quote(quoted.joined(separator: "\n")))
+                add(.quote(quoted.joined(separator: "\n")), at: blockStart)
                 continue
             }
 
@@ -137,15 +199,16 @@ public enum MarkdownParser {
                         break
                     }
                 }
-                blocks.append(.list(items))
+                add(.list(items), at: blockStart)
                 continue
             }
 
+            if paragraph.isEmpty { paragraphStart = index }
             paragraph.append(line)
             index += 1
         }
         flushParagraph()
-        return blocks
+        return (blocks, starts)
     }
 
     // MARK: - 辅助

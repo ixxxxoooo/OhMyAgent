@@ -58,6 +58,7 @@ enum PerfGauges {
         gauges.registerMain("cache.markdown.hits") { MarkdownCache.hits }
         gauges.registerMain("cache.markdown.misses") { MarkdownCache.misses }
         gauges.registerMain("cache.markdown.streamReparse") { MarkdownCache.streamingReparses }
+        gauges.registerMain("cache.markdown.incremental") { MarkdownCache.incrementalParses }
         gauges.registerMain("cache.attachmentImage.hits") { AttachmentImageCache.hits }
         gauges.registerMain("cache.attachmentImage.misses") { AttachmentImageCache.misses }
         gauges.registerMain("cache.mermaidPreview.sources") { MermaidPreviewStore.shared.sources.count }

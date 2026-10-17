@@ -11,12 +11,15 @@ import SwiftUI
 /// Markdown 视图。
 struct MarkdownView: View {
     let text: String
+    /// 文本是否仍在流式增长(影响解析缓存策略,见 `MarkdownCache.blocks`)
+    var streaming = false
 
     var body: some View {
-        let blocks = MarkdownCache.blocks(for: text)
+        let blocks = MarkdownCache.blocks(for: text, streaming: streaming)
         VStack(alignment: .leading, spacing: 10) {
             ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
-                MarkdownBlockView(block: block)
+                // equatable:流式追加时只有末尾的块变化,其余块跳过 body 重算(含行内 Markdown 解析与代码高亮)
+                MarkdownBlockView(block: block).equatable()
             }
         }
         .textSelection(.enabled)
@@ -43,7 +46,7 @@ func inlineMarkdown(_ source: String) -> AttributedString {
 }
 
 /// 单个块的视图。
-struct MarkdownBlockView: View {
+struct MarkdownBlockView: View, Equatable {
     let block: MarkdownBlock
 
     var body: some View {

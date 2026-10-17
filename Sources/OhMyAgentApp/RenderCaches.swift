@@ -26,26 +26,49 @@ enum MarkdownCache {
     /// 命中/未命中统计(测试与诊断用)
     private(set) static var hits = 0
     private(set) static var misses = 0
-    /// 「流式整段重解析」次数:未命中且新文本以上一次未命中的文本为前缀(典型是流式输出每批都重解析全文)。
+    /// 「流式整段重解析」次数:新文本是上一次未命中文本的扩展,却没能复用续解析状态而整段重解析
+    /// (增量解析生效后应接近 0;持续增长说明续解析被打断,如状态被挤出)。
     private(set) static var streamingReparses = 0
+    /// 增量解析次数(只重解析末尾两个块)。
+    private(set) static var incrementalParses = 0
     private static var lastMissText = ""
+    /// 最近的续解析状态(同时流式输出的消息不会超过几条,超出按先进先出淘汰)。
+    private static var states: [MarkdownParseState] = []
+    private static let maxStates = 6
 
     /// 取解析结果;未命中时解析并写入。
-    /// - Parameter text: Markdown 原文
-    static func blocks(for text: String) -> [MarkdownBlock] {
+    /// - Parameters:
+    ///   - text: Markdown 原文
+    ///   - streaming: 文本是否仍在流式增长。流式中间态不写入全文缓存(每一批文本都不同,写进去只会挤掉有用的条目),
+    ///     只更新续解析状态;流式结束后的最终文本再正常入缓存
+    static func blocks(for text: String, streaming: Bool = false) -> [MarkdownBlock] {
         let key = text as NSString
         if let hit = cache.object(forKey: key) {
             hits += 1
             return hit.value
         }
         misses += 1
-        if !lastMissText.isEmpty, text.count > lastMissText.count, text.hasPrefix(lastMissText) { streamingReparses += 1 }
-        lastMissText = text
-        let span = Log.perf.span("Markdown 解析", warnMs: 8, quiet: true, ["chars": "\(text.utf8.count)"])
-        let parsed = MarkdownParser.parse(text)
+        let span = Log.perf.span("Markdown 解析", warnMs: 8, quiet: true, ["chars": "\(text.utf8.count)", "streaming": "\(streaming)"])
+        let baseIndex = states.lastIndex { Self.extends(text, $0.text) }
+        let state = MarkdownParser.parseState(text, continuing: baseIndex.map { states[$0] })
         span.end()
-        cache.setObject(Box(parsed), forKey: key, cost: text.utf8.count * 4)
-        return parsed
+        if let baseIndex {
+            incrementalParses += 1
+            states[baseIndex] = state
+        } else {
+            if !lastMissText.isEmpty, text.utf8.count > lastMissText.utf8.count, text.hasPrefix(lastMissText) { streamingReparses += 1 }
+            states.append(state)
+            if states.count > maxStates { states.removeFirst(states.count - maxStates) }
+        }
+        lastMissText = text
+        if !streaming { cache.setObject(Box(state.blocks), forKey: key, cost: text.utf8.count * 4) }
+        return state.blocks
+    }
+
+    /// 廉价预判 `text` 是否可能是 `base` 的扩展:长度不小于且开头 64 字节一致(完整前缀校验在解析器里做)。
+    private static func extends(_ text: String, _ base: String) -> Bool {
+        let probe = min(64, base.utf8.count)
+        return text.utf8.count >= base.utf8.count && text.utf8.prefix(probe).elementsEqual(base.utf8.prefix(probe))
     }
 
     /// 清空(测试用)。
@@ -54,7 +77,9 @@ enum MarkdownCache {
         hits = 0
         misses = 0
         streamingReparses = 0
+        incrementalParses = 0
         lastMissText = ""
+        states.removeAll()
     }
 }
 

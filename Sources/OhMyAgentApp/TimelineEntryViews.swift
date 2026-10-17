@@ -315,7 +315,7 @@ struct AssistantMessageView: View {
     let entry: TimelineEntry
 
     var body: some View {
-        MarkdownView(text: entry.text)
+        MarkdownView(text: entry.text, streaming: entry.isStreaming)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 2)
     }
