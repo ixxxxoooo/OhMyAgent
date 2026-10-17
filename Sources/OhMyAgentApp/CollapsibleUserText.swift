@@ -68,6 +68,7 @@ struct CollapsibleUserText: View {
         Text(text)
             .font(OMFonts.reading)
             .lineSpacing(OMFonts.readingLineSpacing)
+            .textSelection(.enabled)
     }
 
     private var collapsible: some View {

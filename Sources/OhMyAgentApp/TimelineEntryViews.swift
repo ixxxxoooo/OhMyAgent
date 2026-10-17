@@ -102,7 +102,7 @@ struct TurnSummaryView: View {
 }
 
 /// 用户消息:与底部输入框、吸顶卡一致的 Liquid Glass 圆角卡片(可带图片缩略图;运行中引导的消息带「引导」标记)。
-/// 双击放大编辑(见 `UserMessageEditor`);为让双击生效,这里不启用文字选择,复制走右键菜单。
+/// 正文可用鼠标选中复制;放大编辑(见 `UserMessageEditor`)走悬停铅笔图标与右键菜单——不再占用双击,否则双击选词会误触发编辑。
 struct UserMessageView: View {
     let entry: TimelineEntry
     @Environment(\.stickyUser) private var sticky
@@ -161,7 +161,7 @@ struct UserMessageView: View {
                         Image.om("square-pen", size: 12).foregroundStyle(OMColors.secondaryText).frame(width: 24, height: 24).contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .omTooltip("放大编辑(双击)")
+                    .omTooltip("放大编辑")
                     .accessibilityLabel("放大编辑")
                 }
             }
@@ -170,7 +170,6 @@ struct UserMessageView: View {
         }
         .contentShape(RoundedRectangle(cornerRadius: OMRadius.modal, style: .continuous))
         .onHover { hovering = $0 }
-        .onTapGesture(count: 2) { if !entry.isSteered { sticky?.beginEditing(entry, pinned: false) } }
         .omContextMenu {
             OMMenuItem("复制", icon: "copy") {
                 NSPasteboard.general.clearContents()
@@ -184,7 +183,6 @@ struct UserMessageView: View {
         .onDisappear { sticky?.forget(entry.id) }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("你:\(entry.text)")
-        .accessibilityHint(entry.isSteered ? "" : String(localized: "双击放大编辑"))
     }
 }
 
