@@ -1144,7 +1144,14 @@ public final class SessionModel {
             guard let result = try? await client.listSessions(cwd: cwd) else { return }
             let overrides = ClientPrefs.sessionTitleOverrides()
             let generated = ClientPrefs.generatedSessionTitles()
-            let sorted = result.sessions.filter { !EmptySessionRegistry.isHidden($0.sessionId) }.sorted { ($0.updatedAt ?? "") > ($1.updatedAt ?? "") }.map { item -> SessionSummary in
+            let visible = result.sessions.filter { !EmptySessionRegistry.isHidden($0.sessionId) }
+            // 仅当两者都有明确且不等的更新时间时倒序排;若均无更新时间则尊重 Agent 原生返回的原始顺序
+            let sorted = visible.sorted { lhs, rhs in
+                if let lu = lhs.updatedAt, let ru = rhs.updatedAt, !lu.isEmpty, !ru.isEmpty, lu != ru {
+                    return lu > ru
+                }
+                return false
+            }.map { item -> SessionSummary in
                 var copy = item
                 if let title = overrides[item.sessionId] ?? generated[item.sessionId] { copy.title = title }
                 return copy

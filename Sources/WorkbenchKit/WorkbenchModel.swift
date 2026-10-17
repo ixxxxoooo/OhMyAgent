@@ -64,6 +64,7 @@ public final class WorkbenchModel {
         selectedProjectID = selected
         layout = state.layout
         dock = (state.dock ?? DockLayout()).restoredForLaunch(projectIDs: Set(alive.map(\.id)))
+        self.healSessionCreationDates()
         log.info("工作台状态已加载", ["projects": "\(alive.count)", "selected": selected ?? "-"])
     }
 
@@ -797,7 +798,7 @@ public final class WorkbenchModel {
         if model.phase == .ready { model.refreshHistory() }
     }
 
-    /// 缓存历史会话摘要(每个项目每个 Agent 最多 30 条);为每条会话保留/生成「首次出现时间」作为稳定排序键。
+    /// 缓存历史会话摘要(每个项目每个 Agent 最多 30 条);为每条会话保留真实创建时间作为恒定排序键。
     ///
     /// 会话按 Agent 分开保留:某个 Agent 的列表刷新只替换它自己的条目,**不会冲掉其他 Agent 的会话**
     /// (切换引擎后,原引擎的会话仍在侧栏,点击时会切回对应引擎打开)。
@@ -810,12 +811,23 @@ public final class WorkbenchModel {
         guard let index = projects.firstIndex(where: { $0.id == id }) else { return }
         let existing = projects[index].sessions
         let previous = Dictionary(existing.map { ($0.sessionId, $0) }, uniquingKeysWith: { first, _ in first })
-        let hadCache = !existing.isEmpty
-        let nowText = now.formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true))
-        let fresh = history.prefix(30).map { item -> CachedSession in
-            // 首次填充时冻结为更新时间;之后新出现的会话以出现时刻为准(排在最前)
-            let first = previous[item.sessionId]?.firstSeenAt ?? (hadCache ? nowText : item.updatedAt)
-            return CachedSession(sessionId: item.sessionId, title: item.title, updatedAt: item.updatedAt, firstSeenAt: first, agentId: agentID)
+        let fresh = history.prefix(30).enumerated().map { (offset, item) -> CachedSession in
+            let existingCreated = previous[item.sessionId]?.createdAt ?? previous[item.sessionId]?.firstSeenAt
+            let createdAt: String
+            if let existingCreated, !existingCreated.isEmpty {
+                createdAt = existingCreated
+            } else if let physical = SessionTimeResolver.resolvePhysicalCreationDate(sessionId: item.sessionId, projectPath: id, agentID: agentID) {
+                createdAt = physical.formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true))
+            } else if let updated = item.updatedAt, !updated.isEmpty {
+                createdAt = updated
+            } else {
+                let simulated = now.addingTimeInterval(-Double(offset) * 1.0)
+                createdAt = simulated.formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true))
+            }
+            return CachedSession(
+                sessionId: item.sessionId, title: item.title, updatedAt: item.updatedAt,
+                createdAt: createdAt, firstSeenAt: createdAt, agentId: agentID
+            )
         }
         // 其他 Agent 的条目原样保留(同一会话 ID 以新列表为准)
         let freshIDs = Set(fresh.map(\.sessionId))
@@ -842,11 +854,46 @@ public final class WorkbenchModel {
             var item = projects[index].sessions[at]
             if item.agentId == nil { item.agentId = agentID }
             if let title, !title.isEmpty { item.title = title }
+            if item.createdAt == nil { item.createdAt = item.firstSeenAt ?? nowText }
             projects[index].sessions[at] = item
         } else {
-            projects[index].sessions.append(CachedSession(sessionId: sessionId, title: title, updatedAt: nowText, firstSeenAt: nowText, agentId: agentID))
+            let physical = SessionTimeResolver.resolvePhysicalCreationDate(sessionId: sessionId, projectPath: id, agentID: agentID)
+            let createdText = physical?.formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true)) ?? nowText
+            projects[index].sessions.append(CachedSession(sessionId: sessionId, title: title, updatedAt: nowText, createdAt: createdText, firstSeenAt: createdText, agentId: agentID))
         }
         scheduleSave()
+    }
+
+    /// 自愈修复会话创建时间:对旧数据中缺失创建时间或因批量赋值共享相同时间戳的会话,从文件系统解析真实物理创建时间纠偏。
+    func healSessionCreationDates() {
+        var changed = false
+        for pIndex in projects.indices {
+            let proj = projects[pIndex]
+            var sessions = proj.sessions
+            var counts: [String: Int] = [:]
+            for s in sessions {
+                if let k = s.createdAt ?? s.firstSeenAt { counts[k, default: 0] += 1 }
+            }
+            for sIndex in sessions.indices {
+                var s = sessions[sIndex]
+                let currentKey = s.createdAt ?? s.firstSeenAt
+                let isDuplicated = currentKey.map { (counts[$0] ?? 0) > 1 } ?? true
+                let needsHeal = s.createdAt == nil || isDuplicated
+                if needsHeal, let physical = SessionTimeResolver.resolvePhysicalCreationDate(sessionId: s.sessionId, projectPath: proj.id, agentID: s.agentId) {
+                    let fixed = physical.formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true))
+                    if s.createdAt != fixed {
+                        s.createdAt = fixed
+                        s.firstSeenAt = fixed
+                        sessions[sIndex] = s
+                        changed = true
+                    }
+                }
+            }
+            if proj.sessions != sessions {
+                projects[pIndex].sessions = sessions
+            }
+        }
+        if changed { scheduleSave() }
     }
 
     /// 关闭所有会话(应用退出)。

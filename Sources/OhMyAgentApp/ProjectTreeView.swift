@@ -27,7 +27,7 @@ struct SidebarSession: Identifiable, Equatable {
 }
 
 extension WorkbenchModel {
-    /// 项目的全部会话行(对齐 kuku:按「首次出现时间」倒序,会话有新活动时顺序不跳动;
+    /// 项目的全部会话行(按「创建时间」倒序,会话有新活动时顺序不跳动;
     /// 尚未产生消息的新对话没有协议会话 ID,固定排在最前)。
     @MainActor
     func sidebarSessions(for project: ProjectEntry) -> [SidebarSession] {
@@ -37,17 +37,25 @@ extension WorkbenchModel {
         // 当前引擎的会话取实时列表;其他引擎的会话取缓存——切换引擎不会让原来的会话从侧栏消失
         let source: [CachedSession] = {
             guard let live = model?.history, !live.isEmpty else { return project.sessions }
-            let liveItems = live.map { CachedSession(sessionId: $0.sessionId, title: $0.title, updatedAt: $0.updatedAt, firstSeenAt: cache[$0.sessionId]?.firstSeenAt, agentId: currentAgent) }
+            let liveItems = live.map {
+                CachedSession(
+                    sessionId: $0.sessionId, title: $0.title, updatedAt: $0.updatedAt,
+                    createdAt: cache[$0.sessionId]?.createdAt,
+                    firstSeenAt: cache[$0.sessionId]?.firstSeenAt,
+                    agentId: currentAgent
+                )
+            }
             let liveIDs = Set(live.map(\.sessionId))
             let others = project.sessions.filter { !liveIDs.contains($0.sessionId) && $0.agentId != nil && $0.agentId != currentAgent }
             return liveItems + others
         }()
         var rows: [(key: Date, row: SidebarSession)] = source.compactMap { item in
             guard item.sessionId != model?.sessionId, !EmptySessionRegistry.isHidden(item.sessionId) else { return nil }
+            let displayDate = Self.parseDate(item.updatedAt) ?? Self.parseDate(item.createdAt) ?? Self.parseDate(item.firstSeenAt)
             return (item.stableKey, SidebarSession(
                 projectID: project.id, sessionId: item.sessionId, uid: nil,
                 title: item.title ?? String(localized: "未命名对话"),
-                updatedAt: Self.parseDate(item.updatedAt), isCurrent: false, isRunning: false,
+                updatedAt: displayDate, isCurrent: false, isRunning: false,
                 foreignAgentID: item.agentId.flatMap { $0 != currentAgent ? $0 : nil }
             ))
         }
@@ -59,10 +67,13 @@ extension WorkbenchModel {
                 updatedAt: nil, isCurrent: true, isRunning: model.isRunning
             )))
         }
-        // 稳定排序:键倒序,同键按会话 ID 兜底(全序)
-        return rows.sorted { lhs, rhs in
-            lhs.key != rhs.key ? lhs.key > rhs.key : (lhs.row.sessionId ?? "") < (rhs.row.sessionId ?? "")
-        }.map(\.row)
+        // 稳定排序:创建时间倒序(新对话 .distantFuture 排在最前);同键按原始相对顺序全序兜底
+        return rows.enumerated().sorted { lhs, rhs in
+            if lhs.element.key != rhs.element.key {
+                return lhs.element.key > rhs.element.key
+            }
+            return lhs.offset < rhs.offset
+        }.map(\.element.row)
     }
 }
 
