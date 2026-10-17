@@ -1,6 +1,6 @@
 // @author ixxxxoooo
-// 对话锚点:会话流右侧边缘的迷你导航条。每条用户提问对应一根短横线,当前所在提问高亮;
-// 鼠标移上去展开提问列表,点击跳转到对应提问(对标主流对话产品的「大纲/锚点」)。
+// 对话锚点:会话流左侧边缘的迷你导航条。每条用户提问对应一根短横线,当前所在提问高亮;
+// 鼠标移上去在右侧展开提问列表,点击跳转到对应提问(对标主流对话产品的「大纲/锚点」)。
 
 import ChatKit
 import DesignSystem
@@ -66,19 +66,19 @@ struct ConversationAnchorRail: View {
             let current = currentAnchor(in: anchors)
             GeometryReader { proxy in
                 HStack(spacing: 6) {
+                    ticks(anchors: anchors, current: current, available: proxy.size.height - 48)
                     if hovering {
                         listCard(anchors: anchors, current: current, maxHeight: proxy.size.height - 48)
                             .transition(.opacity)
                     }
-                    ticks(anchors: anchors, current: current, available: proxy.size.height - 48)
                 }
                 // 悬停区只包住刻度(与展开后的列表),不含周围空白:鼠标真正移到刻度上才唤醒
                 .onHover { hovering = $0 }
                 .animation(omShouldReduceMotion() ? nil : .easeOut(duration: 0.12), value: hovering)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                 .allowsHitTesting(true)
             }
-            .padding(.trailing, 6)
+            .padding(.leading, 6)
         }
     }
 
@@ -106,7 +106,7 @@ struct ConversationAnchorRail: View {
                     RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous)
                         .fill(isCurrent ? OMColors.accent : OMColors.tertiaryText.opacity(hovering ? 0.8 : 0.5))
                         .frame(width: isCurrent ? 16 : 10, height: 2)
-                        .frame(width: 20, height: row, alignment: .trailing)
+                        .frame(width: 20, height: row, alignment: .leading)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)

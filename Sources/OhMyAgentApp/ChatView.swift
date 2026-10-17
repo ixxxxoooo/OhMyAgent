@@ -163,7 +163,7 @@ struct ChatView: View {
         }
         .onChange(of: model.timeline.revision) { autoFollow() }
         .overlay(alignment: .bottom) { jumpButton }
-        .overlay(alignment: .trailing) {
+        .overlay(alignment: .leading) {
             ConversationAnchorRail(model: model, sticky: sticky) { id in
                 // 跳转到某条提问:暂停贴底自动跟随,避免流式输出把视口拽回底部
                 sticky.followSuspended = true
