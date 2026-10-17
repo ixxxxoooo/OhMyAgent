@@ -269,3 +269,25 @@ public struct OMStepSlider: View {
         }
     }
 }
+
+// MARK: - 输入框
+
+/// 统一单行输入框样式:卡片底 + 发丝线描边,圆角取 `OMRadius.control`,高度 28。
+/// 取代系统 `.roundedBorder`(后者不随主题、圆角与描边都是系统值)。字体由调用处用 `OMFonts` 令牌指定。
+public struct OMFieldStyle: TextFieldStyle {
+    public init() {}
+
+    public func _body(configuration: TextField<Self._Label>) -> some View {
+        configuration
+            .textFieldStyle(.plain)
+            .padding(.horizontal, OMSpacing.sm)
+            .frame(minHeight: 28)
+            .background(OMColors.card, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
+    }
+}
+
+extension TextFieldStyle where Self == OMFieldStyle {
+    /// 统一单行输入框样式。
+    public static var omField: OMFieldStyle { OMFieldStyle() }
+}

@@ -41,6 +41,7 @@ struct MCPSettingsPage: View {
                 .disabled(!center.canRunCLI || center.isBusy || center.isCheckingMCP)
                 .omTooltip("运行 claude mcp list 检测各服务器连接状态")
             Button { center.reload() } label: { Image.om("arrow.clockwise") }
+                .buttonStyle(.omIcon)
                 .omTooltip("重新读取配置")
                 .accessibilityLabel("刷新")
             Menu {
@@ -129,7 +130,6 @@ struct MCPSettingsPage: View {
             if entry.needsApproval {
                 Button("批准") { center.perform(String(localized: "已批准 \(entry.config.name)")) { try MCPStore(paths: center.paths).approveProjectServer(name: entry.config.name) } }
                     .buttonStyle(.omPrimary)
-                    .controlSize(.small)
             } else {
                 OMSwitch(String(localized: "启用 \(entry.config.name)"), isOn: Binding(
                     get: { !entry.isDisabled },
@@ -232,10 +232,9 @@ struct MCPSettingsPage: View {
                 if !config.headers.isEmpty { keyValue(String(localized: "请求头"), config.headers.keys.sorted().map { "\($0): \(mask(config.headers[$0] ?? "", key: $0))" }.joined(separator: "\n")) }
             }
             HStack(spacing: 8) {
-                Button("编辑…") { editor = MCPEditorTarget(entry: entry) }
-                Button("删除…", role: .destructive) { pendingDelete = entry }
+                Button("编辑…") { editor = MCPEditorTarget(entry: entry) }.buttonStyle(.omSecondary)
+                Button("删除…", role: .destructive) { pendingDelete = entry }.buttonStyle(.omDestructive)
             }
-            .controlSize(.small)
             .padding(.top, 2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -302,7 +301,7 @@ struct MCPEditorSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(target.entry == nil ? String(localized: "添加 MCP 服务器") : String(localized: "编辑 \(target.entry!.config.name)")).font(OMFonts.title)
-            FormRow(label: String(localized: "名称")) { TextField("例如 github", text: $name).textFieldStyle(.roundedBorder) }
+            FormRow(label: String(localized: "名称")) { TextField("例如 github", text: $name).textFieldStyle(.omField) }
             if target.entry == nil {
                 FormRow(label: String(localized: "作用域"), hint: String(localized: "用户:所有项目可用;本地:仅此工作区、不入版本库;项目:写入 .mcp.json 与团队共享")) {
                     Picker("", selection: $scope) { ForEach(ConfigScope.allCases) { Text($0.displayName).tag($0) } }
@@ -313,11 +312,11 @@ struct MCPEditorSheet: View {
                 Picker("", selection: $transport) { ForEach(MCPTransportKind.allCases) { Text($0.displayName).tag($0) } }.labelsHidden().fixedSize()
             }
             if transport == .stdio {
-                FormRow(label: String(localized: "命令")) { TextField("npx", text: $command).textFieldStyle(.roundedBorder).font(OMFonts.mono) }
+                FormRow(label: String(localized: "命令")) { TextField("npx", text: $command).textFieldStyle(.omField).font(OMFonts.mono) }
                 FormRow(label: String(localized: "参数"), hint: String(localized: "每行一个参数")) { editor($args) }
                 FormRow(label: String(localized: "环境变量"), hint: String(localized: "每行 KEY=VALUE,支持 ${VAR} 与 ${VAR:-默认值}")) { editor($env) }
             } else {
-                FormRow(label: "URL") { TextField("https://", text: $url).textFieldStyle(.roundedBorder).font(OMFonts.mono) }
+                FormRow(label: "URL") { TextField("https://", text: $url).textFieldStyle(.omField).font(OMFonts.mono) }
                 FormRow(label: String(localized: "请求头"), hint: String(localized: "每行 Key: Value")) { editor($headers) }
             }
             SheetFooter(problems: name.isEmpty && command.isEmpty && url.isEmpty ? [String(localized: "请填写名称与连接信息")] : MCPStore.validate(config),
@@ -367,7 +366,7 @@ struct MCPJSONSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("通过 JSON 添加").font(OMFonts.title)
-            FormRow(label: String(localized: "名称")) { TextField("服务器名称", text: $name).textFieldStyle(.roundedBorder) }
+            FormRow(label: String(localized: "名称")) { TextField("服务器名称", text: $name).textFieldStyle(.omField) }
             FormRow(label: String(localized: "作用域")) {
                 Picker("", selection: $scope) { ForEach(ConfigScope.allCases) { Text($0.displayName).tag($0) } }.pickerStyle(.segmented).labelsHidden()
             }

@@ -48,7 +48,7 @@ struct StatusBanner: View {
     }
 }
 
-/// 小徽标。
+/// 小徽标:统一转发到设计系统的 `OMTag`(同一套内边距与色调),保留旧的 `color:` 参数名。
 struct Tag: View {
     let text: String
     var color: Color = OMColors.secondaryText
@@ -58,13 +58,7 @@ struct Tag: View {
         self.color = color
     }
 
-    var body: some View {
-        Text(text)
-            .font(OMFonts.caption)
-            .foregroundStyle(color)
-            .padding(.horizontal, 6).padding(.vertical, 1)
-            .background(color.opacity(0.12), in: OMPillShape())
-    }
+    var body: some View { OMTag(text, tint: color) }
 }
 
 /// 列表 + 详情的左右分栏。

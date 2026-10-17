@@ -24,6 +24,7 @@ struct HooksSettingsPage: View {
             errorKey: "Hooks"
         ) {
             Button { center.reload() } label: { Image.om("arrow.clockwise") }
+                .buttonStyle(.omIcon)
                 .omTooltip("重新读取配置")
                 .accessibilityLabel("刷新")
             Button { editor = HookEditorTarget(entry: nil) } label: { Label("添加 Hook", om: "plus") }
@@ -115,7 +116,7 @@ struct HookEditorSheet: View {
             FormRow(label: String(localized: "事件")) {
                 Picker("", selection: $event) { ForEach(HooksStore.events, id: \.self) { Text($0).tag($0) } }.labelsHidden().fixedSize().disabled(target.entry != nil)
             }
-            FormRow(label: String(localized: "匹配器"), hint: String(localized: "工具名或正则,如 Bash、Edit|Write;留空表示全部")) { TextField("", text: $matcher).textFieldStyle(.roundedBorder).font(OMFonts.mono) }
+            FormRow(label: String(localized: "匹配器"), hint: String(localized: "工具名或正则,如 Bash、Edit|Write;留空表示全部")) { TextField("", text: $matcher).textFieldStyle(.omField).font(OMFonts.mono) }
             if target.entry == nil {
                 FormRow(label: String(localized: "写入位置")) {
                     Picker("", selection: $scope) { ForEach(ConfigScope.allCases) { Text($0.displayName).tag($0) } }.pickerStyle(.segmented).labelsHidden()
@@ -125,13 +126,13 @@ struct HookEditorSheet: View {
                 Picker("", selection: $type) { ForEach(HooksStore.handlerTypes, id: \.self) { Text($0).tag($0) } }.labelsHidden().fixedSize()
             }
             switch type {
-            case "command": FormRow(label: String(localized: "命令"), hint: String(localized: "通过 stdin 接收事件 JSON;退出码 2 表示阻止")) { TextField("", text: $command).textFieldStyle(.roundedBorder).font(OMFonts.mono) }
-            case "http": FormRow(label: "URL") { TextField("https://", text: $url).textFieldStyle(.roundedBorder).font(OMFonts.mono) }
+            case "command": FormRow(label: String(localized: "命令"), hint: String(localized: "通过 stdin 接收事件 JSON;退出码 2 表示阻止")) { TextField("", text: $command).textFieldStyle(.omField).font(OMFonts.mono) }
+            case "http": FormRow(label: "URL") { TextField("https://", text: $url).textFieldStyle(.omField).font(OMFonts.mono) }
             case "prompt", "agent":
                 FormRow(label: String(localized: "提示词")) { TextEditor(text: $prompt).font(OMFonts.mono).frame(height: 80).settingsEditorStyle() }
-            default: FormRow(label: String(localized: "命令")) { TextField("", text: $command).textFieldStyle(.roundedBorder).font(OMFonts.mono) }
+            default: FormRow(label: String(localized: "命令")) { TextField("", text: $command).textFieldStyle(.omField).font(OMFonts.mono) }
             }
-            FormRow(label: String(localized: "超时(秒)")) { TextField("默认", text: $timeout).textFieldStyle(.roundedBorder).frame(width: 90) }
+            FormRow(label: String(localized: "超时(秒)")) { TextField("默认", text: $timeout).textFieldStyle(.omField).frame(width: 90) }
             SheetFooter(problems: problems, confirmTitle: String(localized: "保存"), onCancel: onClose, onConfirm: save)
         }
         .padding(20)

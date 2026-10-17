@@ -34,6 +34,7 @@ struct SkillsSettingsPage: View {
                 : String(localized: "用 SKILL.md 与自定义命令扩展 Claude 的能力,保存在 ~/.claude/skills、commands 或项目的 .claude 目录。")
         ) {
             Button { center.reload() } label: { Image.om("arrow.clockwise") }
+                .buttonStyle(.omIcon)
                 .omTooltip("重新读取")
                 .accessibilityLabel("刷新")
             Button { showCreate = true } label: { Label(String(localized: "新建\(noun)"), om: "plus") }
@@ -189,14 +190,16 @@ struct MarkdownItemEditor: View {
                     Button {
                         AppActions.shared.insertIntoComposer(item.kind == .agent ? "@agent-\(item.name) " : "/\(item.name) ")
                     } label: { Label("在对话中使用", om: "message-square-plus") }
+                        .buttonStyle(.omSecondary)
                         .omTooltip(item.kind == .agent ? String(localized: "回到对话并 @ 提及这个子 Agent") : String(localized: "回到对话并插入这个命令"))
                 }
                 Button { NSWorkspace.shared.activateFileViewerSelecting([item.fileURL]) } label: { Image.om("folder") }
+                    .buttonStyle(.omIcon)
                     .omTooltip("在 Finder 中显示").accessibilityLabel("在 Finder 中显示")
                 if !item.source.isReadOnly {
-                    Button("还原") { text = original }.disabled(!isDirty)
+                    Button("还原") { text = original }.buttonStyle(.omSecondary).disabled(!isDirty)
                     Button("保存", action: save).buttonStyle(.omPrimary).disabled(!isDirty).keyboardShortcut("s", modifiers: .command)
-                    Button("删除", role: .destructive, action: onDelete)
+                    Button("删除", role: .destructive, action: onDelete).buttonStyle(.omDestructive)
                 }
             }
             Text(item.fileURL.abbreviatingHome).font(OMFonts.caption).foregroundStyle(OMColors.secondaryText).lineLimit(1).truncationMode(.middle)
@@ -261,8 +264,8 @@ struct SkillCreateSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("新建 Skill").font(OMFonts.title)
-            FormRow(label: String(localized: "名称"), hint: String(localized: "同时是斜杠命令名:/\(name.isEmpty ? "name" : name)")) { TextField("code-review", text: $name).textFieldStyle(.roundedBorder) }
-            FormRow(label: String(localized: "描述")) { TextField("它做什么、何时使用", text: $description).textFieldStyle(.roundedBorder) }
+            FormRow(label: String(localized: "名称"), hint: String(localized: "同时是斜杠命令名:/\(name.isEmpty ? "name" : name)")) { TextField("code-review", text: $name).textFieldStyle(.omField) }
+            FormRow(label: String(localized: "描述")) { TextField("它做什么、何时使用", text: $description).textFieldStyle(.omField) }
             FormRow(label: String(localized: "模板")) {
                 Picker("", selection: $template) { ForEach(SkillTemplate.allCases) { Text($0.displayName).tag($0) } }.pickerStyle(.segmented).labelsHidden()
             }
@@ -299,10 +302,10 @@ struct AgentCreateSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("新建子 Agent").font(OMFonts.title)
-            FormRow(label: String(localized: "名称")) { TextField("code-reviewer", text: $name).textFieldStyle(.roundedBorder) }
-            FormRow(label: String(localized: "描述")) { TextField("何时应该委派给它", text: $description).textFieldStyle(.roundedBorder) }
-            FormRow(label: String(localized: "工具"), hint: String(localized: "逗号分隔,留空表示继承全部工具")) { TextField("Read, Grep, Glob", text: $tools).textFieldStyle(.roundedBorder) }
-            FormRow(label: String(localized: "模型"), hint: String(localized: "可选:sonnet / opus / haiku / inherit")) { TextField("留空继承", text: $model).textFieldStyle(.roundedBorder) }
+            FormRow(label: String(localized: "名称")) { TextField("code-reviewer", text: $name).textFieldStyle(.omField) }
+            FormRow(label: String(localized: "描述")) { TextField("何时应该委派给它", text: $description).textFieldStyle(.omField) }
+            FormRow(label: String(localized: "工具"), hint: String(localized: "逗号分隔,留空表示继承全部工具")) { TextField("Read, Grep, Glob", text: $tools).textFieldStyle(.omField) }
+            FormRow(label: String(localized: "模型"), hint: String(localized: "可选:sonnet / opus / haiku / inherit")) { TextField("留空继承", text: $model).textFieldStyle(.omField) }
             FormRow(label: String(localized: "系统提示")) {
                 TextEditor(text: $prompt).font(OMFonts.mono).frame(height: 110).settingsEditorStyle()
             }

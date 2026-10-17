@@ -43,7 +43,8 @@ struct ExtensionHeader<Actions: View>: View {
                 Text(verbatim: subtitle).font(OMFonts.small).foregroundStyle(OMColors.secondaryText).lineLimit(2)
             }
             Spacer(minLength: 12)
-            HStack(spacing: 8) { actions }
+            // 页头操作区:未显式指定样式的按钮统一为次按钮(紧凑 24pt),不再露出系统默认按钮
+            HStack(spacing: 8) { actions }.buttonStyle(.omSecondary)
         }
     }
 }
@@ -148,12 +149,13 @@ struct ExtensionBanners: View {
 /// 卡片列表中的分组小标题(例如「用户」「工作区」)。
 struct ExtensionSectionLabel: View {
     let title: String
-    let count: Int
+    /// 条目数;nil 表示不显示计数
+    var count: Int?
 
     var body: some View {
         HStack(spacing: 6) {
             Text(verbatim: title).font(OMFonts.small.weight(.medium)).foregroundStyle(OMColors.secondaryText)
-            Text("\(count)").font(OMFonts.caption.monospacedDigit()).foregroundStyle(OMColors.tertiaryText)
+            if let count { Text("\(count)").font(OMFonts.caption.monospacedDigit()).foregroundStyle(OMColors.tertiaryText) }
         }
         .padding(.top, 6)
         .padding(.leading, 2)

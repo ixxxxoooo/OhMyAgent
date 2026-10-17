@@ -20,23 +20,17 @@ struct MemoryManagerView: View {
             VStack(spacing: 0) {
                 HStack {
                     Button { showCreateRule = true } label: { Label("新建规则", om: "plus") }
+                        .buttonStyle(.omSecondary)
                     Spacer()
                 }
-                .padding(10)
-                List(files, selection: $selectedID) { file in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(file.title).font(OMFonts.body).lineLimit(1)
-                        HStack(spacing: 4) {
-                            Tag(file.exists ? String(localized: "已存在") : String(localized: "未创建"), color: file.exists ? OMColors.success : OMColors.tertiaryText)
-                            if !file.isLoadedByDefault { Tag(String(localized: "Claude 默认不读取"), color: OMColors.warning) }
-                            ForEach(file.pathFilters.prefix(2), id: \.self) { Tag($0) }
-                        }
+                .padding(OMSpacing.md)
+                ScrollView {
+                    VStack(spacing: 2) {
+                        ForEach(files) { file in fileRow(file) }
                     }
-                    .tag(file.id)
-                    .accessibilityElement(children: .combine)
+                    .padding(.horizontal, OMSpacing.sm)
+                    .padding(.bottom, OMSpacing.sm)
                 }
-                .listStyle(.inset)
-                .scrollContentBackground(.hidden)
             }
         } detail: {
             if let file = selected {
@@ -51,6 +45,28 @@ struct MemoryManagerView: View {
             selectedID = files.first { $0.title.localizedCaseInsensitiveContains(key) }?.id
         }
         .sheet(isPresented: $showCreateRule) { RuleCreateSheet(center: center) { showCreateRule = false } }
+    }
+
+    /// 列表里的一行:标题 + 状态/路径过滤标签;选中态用主题 `selectedFill`,不用系统列表的选中色。
+    private func fileRow(_ file: MemoryFile) -> some View {
+        let isSelected = file.id == selectedID
+        return Button { selectedID = file.id } label: {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(file.title).font(OMFonts.body).lineLimit(1)
+                OMFlowLayout(spacing: 4) {
+                    Tag(file.exists ? String(localized: "已存在") : String(localized: "未创建"), color: file.exists ? OMColors.success : OMColors.tertiaryText)
+                    if !file.isLoadedByDefault { Tag(String(localized: "Claude 默认不读取"), color: OMColors.warning) }
+                    ForEach(file.pathFilters.prefix(2), id: \.self) { Tag($0) }
+                }
+            }
+            .padding(.horizontal, OMSpacing.sm)
+            .padding(.vertical, OMSpacing.sm)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(isSelected ? OMColors.selectedFill : Color.clear, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
@@ -70,9 +86,9 @@ struct MemoryEditor: View {
                 Text(file.title).font(OMFonts.title).lineLimit(1)
                 Spacer()
                 if file.kind == .userRule || file.kind == .projectRule {
-                    Button("删除", role: .destructive) { confirmDelete = true }
+                    Button("删除", role: .destructive) { confirmDelete = true }.buttonStyle(.omDestructive)
                 }
-                Button("还原") { text = original }.disabled(!isDirty)
+                Button("还原") { text = original }.buttonStyle(.omSecondary).disabled(!isDirty)
                 Button(file.exists ? String(localized: "保存") : String(localized: "创建并保存"), action: save).buttonStyle(.omPrimary)
                     .disabled(!isDirty && file.exists).keyboardShortcut("s", modifiers: .command)
             }
@@ -109,8 +125,8 @@ struct RuleCreateSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("新建规则").font(OMFonts.title)
-            FormRow(label: String(localized: "文件名")) { TextField("swift-style", text: $name).textFieldStyle(.roundedBorder) }
-            FormRow(label: String(localized: "适用路径"), hint: String(localized: "可选,逗号分隔 glob,如 **/*.swift;留空表示始终加载")) { TextField("", text: $paths).textFieldStyle(.roundedBorder).font(OMFonts.mono) }
+            FormRow(label: String(localized: "文件名")) { TextField("swift-style", text: $name).textFieldStyle(.omField) }
+            FormRow(label: String(localized: "适用路径"), hint: String(localized: "可选,逗号分隔 glob,如 **/*.swift;留空表示始终加载")) { TextField("", text: $paths).textFieldStyle(.omField).font(OMFonts.mono) }
             FormRow(label: String(localized: "位置")) {
                 Picker("", selection: $scope) { Text("用户").tag(ConfigScope.user); Text("项目").tag(ConfigScope.project) }.pickerStyle(.segmented).labelsHidden()
             }

@@ -2430,3 +2430,8 @@
 "正在优化提示词,点击取消" = "Optimizing the prompt. Click to cancel";
 "撤销优化,还原原文" = "Undo optimization and restore the original";
 "优化提示词" = "Optimize prompt";
+"安装作用域" = "Install scope";
+"已安装" = "Installed";
+"还没有安装插件" = "No plugins installed yet";
+"在上方输入 plugin@marketplace 安装,或先添加一个插件市场。" = "Enter plugin@marketplace above to install, or add a plugin marketplace first.";
+"插件市场" = "Plugin marketplaces";

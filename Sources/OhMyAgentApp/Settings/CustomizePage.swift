@@ -79,14 +79,23 @@ struct CustomizePage: View {
     @Bindable var workbench: WorkbenchModel
     @State private var center = ConfigCenter(paths: ClaudePaths(workspace: SettingsContext.workspace))
     @State private var query = ""
+    @AppStorage(ClientPrefs.Key.settingsWidth) private var widthRaw = SettingsContentWidth.standard.rawValue
+    @AppStorage(ClientPrefs.Key.settingsWidthCustom) private var widthCustom = SettingsContentWidth.customDefault
 
     private var filter: CustomizeFilter { CustomizeFilter.resolve(workbench.customizeFilter) }
+
+    /// 与设置页共用的内容最大宽度(外观 → 设置页宽度):顶栏与各分类内容都按它限宽居中,左右边缘对齐。
+    private var contentWidth: CGFloat { SettingsContentWidth.resolve(raw: widthRaw, custom: widthCustom) }
 
     var body: some View {
         VStack(spacing: 0) {
             topBar
+                .frame(maxWidth: contentWidth)
+                .frame(maxWidth: .infinity)
             Divider().opacity(0.5)
             content
+                .frame(maxWidth: contentWidth)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(OMColors.surface)
@@ -121,8 +130,6 @@ struct CustomizePage: View {
         .padding(.horizontal, 28)
         .padding(.top, 18)
         .padding(.bottom, 12)
-        .frame(maxWidth: 760)
-        .frame(maxWidth: .infinity)
     }
 
     private func chip(_ item: CustomizeFilter) -> some View {
@@ -179,8 +186,6 @@ struct CustomizePage: View {
         }
         .padding(.horizontal, 28)
         .padding(.top, 12)
-        .frame(maxWidth: 760, alignment: .leading)
-        .frame(maxWidth: .infinity)
     }
 
     /// 「全部」视图:需要处理 + 已连接,两组卡片列表。
@@ -207,8 +212,7 @@ struct CustomizePage: View {
             }
             .padding(.horizontal, 28)
             .padding(.vertical, 16)
-            .frame(maxWidth: 760, alignment: .leading)
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollContentBackground(.hidden)
     }
