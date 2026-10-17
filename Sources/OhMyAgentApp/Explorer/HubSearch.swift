@@ -206,6 +206,17 @@ enum HubCandidateBuilder {
                     id: "file:\(path)", segment: .files, title: name, subtitle: dir.isEmpty ? nil : dir, trailing: nil,
                     icon: .file(name: name, isDirectory: false), searchText: path, action: .file(root: root, relativePath: path)))
             }
+            // 多文件夹工作区:附加文件夹的文件,副标题带上文件夹名
+            for item in WorkspaceIndexModel.shared.extraFiles {
+                let name = (item.path as NSString).lastPathComponent
+                let folder = (item.root as NSString).lastPathComponent
+                let dir = (item.path as NSString).deletingLastPathComponent
+                result.append(HubCandidate(
+                    id: "file:\(item.root):\(item.path)", segment: .files, title: name,
+                    subtitle: dir.isEmpty ? folder : folder + "/" + dir, trailing: nil,
+                    icon: .file(name: name, isDirectory: false), searchText: folder + "/" + item.path,
+                    action: .file(root: item.root, relativePath: item.path)))
+            }
         }
         // 操作:命令面板里的全部命令
         var table: [String: PaletteCommand] = [:]
@@ -284,7 +295,7 @@ struct HubOverlay: View {
                     .padding(.top, 84)
             }
             .transition(.opacity)
-            .onChange(of: WorkspaceIndexModel.shared.files.count) { hub.rebuildCandidates() }
+            .onChange(of: WorkspaceIndexModel.shared.files.count + WorkspaceIndexModel.shared.extraFiles.count) { hub.rebuildCandidates() }
             .onChange(of: workbench.projects) { hub.rebuildCandidates() }
         }
     }

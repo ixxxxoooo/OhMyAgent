@@ -326,6 +326,7 @@ public actor FileIndex {
     private var paths: [String] = []
     private var directories: [String] = []
     private var root: URL?
+    private var extraRoots: [URL] = []
     private var building: Task<Void, Never>?
 
     /// 默认忽略的目录名。
@@ -337,15 +338,25 @@ public actor FileIndex {
 
     public init() {}
 
-    /// 为工作区建立索引(幂等;根目录变化时重建)。
-    /// - Parameter root: 工作区目录
-    public func prepare(root: URL) {
-        if self.root == root, building != nil { return }
+    /// 为工作区建立索引(幂等;根目录或附加文件夹变化时重建)。
+    /// 附加文件夹(多文件夹工作区)里的文件与文件夹以绝对路径收录,主目录的仍为相对路径。
+    /// - Parameters:
+    ///   - root: 工作区主目录
+    ///   - extraRoots: 附加文件夹
+    public func prepare(root: URL, extraRoots: [URL] = []) {
+        if self.root == root, self.extraRoots == extraRoots, building != nil { return }
         self.root = root
+        self.extraRoots = extraRoots
         paths = []
         directories = []
         building = Task.detached(priority: .utility) { [weak self] in
-            let found = Self.enumerateAll(root: root)
+            var found = Self.enumerateAll(root: root)
+            for extra in extraRoots {
+                let prefix = extra.standardizedFileURL.path + "/"
+                let more = Self.enumerateAll(root: extra)
+                found.files += more.files.map { prefix + $0 }
+                found.directories += more.directories.map { prefix + $0 }
+            }
             await self?.finish(found.files, directories: found.directories, for: root)
         }
     }
@@ -354,7 +365,7 @@ public actor FileIndex {
     public func invalidate() {
         building?.cancel()
         building = nil
-        if let root { prepare(root: root) }
+        if let root { prepare(root: root, extraRoots: extraRoots) }
     }
 
     private func finish(_ found: [String], directories dirs: [String], for root: URL) {

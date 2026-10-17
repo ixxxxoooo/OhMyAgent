@@ -86,7 +86,7 @@ struct SearchPaneView: View {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(output.files) { file in
                         fileHeader(file)
-                        if !collapsed.contains(file.path) {
+                        if !collapsed.contains(file.id) {
                             ForEach(file.hits) { hit in HitRow(hit: hit, workbench: workbench) }
                         }
                     }
@@ -107,12 +107,15 @@ struct SearchPaneView: View {
 
     private func fileHeader(_ file: SearchFileResult) -> some View {
         Button {
-            if collapsed.contains(file.path) { collapsed.remove(file.path) } else { collapsed.insert(file.path) }
+            if collapsed.contains(file.id) { collapsed.remove(file.id) } else { collapsed.insert(file.id) }
         } label: {
             HStack(spacing: 4) {
-                Image.om(collapsed.contains(file.path) ? "chevron-right" : "chevron-down", size: 10)
+                Image.om(collapsed.contains(file.id) ? "chevron-right" : "chevron-down", size: 10)
                 OMFileIcon(name: (file.path as NSString).lastPathComponent, size: 14)
                 Text((file.path as NSString).lastPathComponent).font(OMFonts.small.weight(.medium))
+                if let root = file.root, root != workbench.selectedProjectID {
+                    Text(verbatim: (root as NSString).lastPathComponent).font(OMFonts.caption).foregroundStyle(OMColors.accentText)
+                }
                 Text((file.path as NSString).deletingLastPathComponent).font(OMFonts.caption).foregroundStyle(OMColors.secondaryText).lineLimit(1).truncationMode(.head)
                 Spacer()
                 Text("\(file.hits.count)").font(OMFonts.caption).foregroundStyle(OMColors.secondaryText)
@@ -131,7 +134,7 @@ private struct HitRow: View {
 
     var body: some View {
         Button {
-            guard let root = workbench.selectedProjectID else { return }
+            guard let root = hit.root ?? workbench.selectedProjectID else { return }
             workbench.openFile((root as NSString).appendingPathComponent(hit.path), line: hit.line, preview: true)
         } label: {
             HStack(alignment: .firstTextBaseline, spacing: 6) {

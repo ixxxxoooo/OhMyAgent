@@ -6,30 +6,47 @@ import Observation
 import OMLog
 import WorkbenchKit
 
+/// 附加文件夹里的一个文件(多文件夹工作区)。
+struct ExtraIndexedFile: Hashable, Sendable {
+    /// 所属附加文件夹(绝对路径)
+    let root: String
+    /// 相对该文件夹的路径
+    let path: String
+}
+
 /// 工作区文件索引缓存(按项目根目录),供快速打开与搜索复用。
+/// 多文件夹工作区:主目录的文件放在 `files`(相对主目录),附加文件夹的文件放在 `extraFiles`。
 @MainActor
 @Observable
 final class WorkspaceIndexModel {
     static let shared = WorkspaceIndexModel()
     private(set) var files: [String] = []
+    private(set) var extraFiles: [ExtraIndexedFile] = []
     private(set) var root: String?
     private(set) var isLoading = false
+    /// 查询某项目的附加文件夹(由应用层接到工作台模型);默认没有。
+    @ObservationIgnored var extraRootsProvider: @MainActor (String) -> [String] = { _ in [] }
     @ObservationIgnored private var task: Task<Void, Never>?
 
-    /// 刷新索引(后台线程扫描)。
+    /// 刷新索引(后台线程扫描主目录与全部附加文件夹)。
     /// - Parameter root: 项目根目录;nil 清空
     func refresh(root newRoot: String?) {
         task?.cancel()
         root = newRoot
-        guard let newRoot else { files = []; return }
+        guard let newRoot else { files = []; extraFiles = []; return }
+        let extras = extraRootsProvider(newRoot)
         isLoading = true
         task = Task { [weak self] in
             let started = ContinuousClock.now
-            let list = await Task.detached(priority: .userInitiated) { WorkspaceFiles.index(root: newRoot) }.value
+            let (list, extraList) = await Task.detached(priority: .userInitiated) {
+                (WorkspaceFiles.index(root: newRoot),
+                 extras.flatMap { folder in WorkspaceFiles.index(root: folder).map { ExtraIndexedFile(root: folder, path: $0) } })
+            }.value
             guard !Task.isCancelled, let self, self.root == newRoot else { return }
             self.files = list
+            self.extraFiles = extraList
             self.isLoading = false
-            Log.editor.info("文件索引完成", ["root": newRoot, "files": "\(list.count)", "ms": "\(Int((ContinuousClock.now - started).seconds * 1000))"])
+            Log.editor.info("文件索引完成", ["root": newRoot, "files": "\(list.count)", "extraRoots": "\(extras.count)", "extraFiles": "\(extraList.count)", "ms": "\(Int((ContinuousClock.now - started).seconds * 1000))"])
         }
     }
 }
@@ -87,8 +104,13 @@ final class SearchModel {
             try? await Task.sleep(for: .milliseconds(250))
             guard !Task.isCancelled else { return }
             let started = ContinuousClock.now
-            let files = index.root == root && !index.files.isEmpty ? index.files : nil
-            let result = await WorkspaceSearch.search(root: root, options: options, files: files)
+            let indexed = index.root == root && !index.files.isEmpty
+            var targets: [(root: String, files: [String]?)] = [(root, indexed ? index.files : nil)]
+            for folder in index.extraRootsProvider(root) {
+                let list = index.root == root ? index.extraFiles.filter { $0.root == folder }.map(\.path) : []
+                targets.append((folder, list.isEmpty ? nil : list))
+            }
+            let result = await WorkspaceSearch.searchRoots(targets, options: options)
             guard !Task.isCancelled, let self else { return }
             self.output = result
             self.isSearching = false
@@ -102,37 +124,43 @@ final class SearchModel {
 @MainActor
 final class WorkspaceWatchCenter {
     static let shared = WorkspaceWatchCenter()
-    private var watcher: WorkspaceWatcher?
+    private var watchers: [WorkspaceWatcher] = []
     private var indexTask: Task<Void, Never>?
     private(set) var root: String?
+    private(set) var extraRoots: [String] = []
 
-    /// 切换监听的项目(nil 停止监听);同一根目录重复调用无副作用。
-    /// - Parameter newRoot: 项目根目录
-    func watch(root newRoot: String?) {
-        guard newRoot != root else { return }
-        watcher?.stop()
-        watcher = nil
+    /// 切换监听的项目(nil 停止监听);主目录与附加文件夹都没变化时无副作用。
+    /// - Parameters:
+    ///   - newRoot: 项目根目录
+    ///   - extras: 多文件夹工作区的附加文件夹
+    func watch(root newRoot: String?, extras: [String] = []) {
+        guard newRoot != root || extras != extraRoots else { return }
+        watchers.forEach { $0.stop() }
+        watchers = []
         indexTask?.cancel()
         root = newRoot
+        extraRoots = newRoot == nil ? [] : extras
         guard let newRoot else { return }
-        let watcher = WorkspaceWatcher(root: newRoot) { batch in
-            Task { @MainActor in WorkspaceWatchCenter.shared.apply(batch, root: newRoot) }
+        for folder in [newRoot] + extraRoots {
+            let watcher = WorkspaceWatcher(root: folder) { batch in
+                Task { @MainActor in WorkspaceWatchCenter.shared.apply(batch, root: folder) }
+            }
+            watcher.start()
+            watchers.append(watcher)
         }
-        watcher.start()
-        self.watcher = watcher
-        Log.editor.info("开始监听工作区文件变化", ["root": newRoot])
+        Log.editor.info("开始监听工作区文件变化", ["root": newRoot, "extraRoots": "\(extraRoots.count)"])
     }
 
     /// 应用一批变化:刷新受影响目录;文件集合变化时节流重建索引(快速打开/搜索用)。
     private func apply(_ batch: WorkspaceChangeBatch, root watched: String) {
-        guard watched == root else { return }
+        guard watched == root || extraRoots.contains(watched), let primary = root else { return }
         if batch.needsFullRefresh {
             ExplorerModel.shared.bump()
         } else {
             ExplorerModel.shared.markDirty(batch.directories)
         }
         Log.editor.debug("工作区文件变化", ["dirs": "\(batch.directories.count)", "full": "\(batch.needsFullRefresh)"])
-        scheduleIndexRefresh(root: watched)
+        scheduleIndexRefresh(root: primary)
     }
 
     /// 节流重建文件索引:1.5 秒内的多次变化合并为一次。

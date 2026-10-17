@@ -426,7 +426,7 @@ public final class SessionModel {
     private func newSessionAuthenticating(client: ACPClient, methods: [AuthMethod], servers: [MCPServerConfig]) async throws -> SessionSetup {
         let cwd = workspace.path
         do {
-            let setup = try await client.newSession(cwd: cwd, mcpServers: servers, meta: effectiveMeta())
+            let setup = try await client.newSession(cwd: cwd, mcpServers: servers, additionalDirectories: additionalDirectories, meta: effectiveMeta())
             EmptySessionRegistry.hide(setup.sessionId)
             return setup
         } catch let error as JSONRPCError where error.isAuthRequired {
@@ -439,7 +439,7 @@ public final class SessionModel {
                 log.error("认证失败", error: error, ["agent": descriptor.id, "method": method.id])
                 throw AuthenticationFailure(agent: descriptor.name, reason: error.localizedDescription)
             }
-            let setup = try await client.newSession(cwd: cwd, mcpServers: servers, meta: effectiveMeta())
+            let setup = try await client.newSession(cwd: cwd, mcpServers: servers, additionalDirectories: additionalDirectories, meta: effectiveMeta())
             EmptySessionRegistry.hide(setup.sessionId)
             return setup
         }
@@ -812,13 +812,24 @@ public final class SessionModel {
     private func effectiveMeta() -> JSONValue? {
         guard activeDescriptor.kind == .claudeACP else { return providerMeta }
         var options = SessionOptions(defaults: .standard)
-        if let extra = extraSystemPrompt, !extra.isEmpty {
-            options.appendPrompt = [options.appendPrompt.trimmingCharacters(in: .whitespacesAndNewlines), extra].filter { !$0.isEmpty }.joined(separator: "\n\n")
+        let extras = [extraSystemPrompt, additionalDirectoriesNote].compactMap { $0 }.filter { !$0.isEmpty }
+        if !extras.isEmpty {
+            options.appendPrompt = ([options.appendPrompt.trimmingCharacters(in: .whitespacesAndNewlines)] + extras).filter { !$0.isEmpty }.joined(separator: "\n\n")
         }
         return options.merged(into: providerMeta ?? defaultGatewayMeta)
     }
     /// 额外追加到系统提示末尾的文本(会话区用它约束为纯文字问答);须在连接前设置。
     public var extraSystemPrompt: String?
+    /// 多文件夹工作区里除主目录(`workspace`)之外的附加文件夹(绝对路径);须在连接前设置,
+    /// 对已建立的 ACP 会话不生效(协议不支持运行中变更)。
+    public var additionalDirectories: [String] = []
+    /// 引擎不支持 `additionalDirectories` 能力时的兜底:把附加文件夹写进系统提示,让 Agent 知道它们的存在。
+    /// - Returns: 无附加文件夹或引擎原生支持时为 nil
+    public var additionalDirectoriesNote: String? {
+        guard !additionalDirectories.isEmpty, !capabilities.additionalDirectories else { return nil }
+        let list = additionalDirectories.map { "- \($0)" }.joined(separator: "\n")
+        return String(localized: "本工作区除当前目录外还包含以下文件夹,需要时可以用绝对路径读取、搜索与修改其中的文件:") + "\n" + list
+    }
     /// 未启用提供商、但 ~/.claude 配置了第三方网关时,仅含「关闭服务端 auto 分类器探测」开关的 `_meta`
     @ObservationIgnored private var defaultGatewayMeta: JSONValue?
     /// 本机网关地址(发送前探测用)
@@ -1109,9 +1120,10 @@ public final class SessionModel {
         Task { await checkpoints.reset() }
         let servers = mcpServers
         let meta = effectiveMeta()
+        let dirs = additionalDirectories
         Task { [weak self] in
             do {
-                let setup = try await client.newSession(cwd: cwd, mcpServers: servers, meta: meta)
+                let setup = try await client.newSession(cwd: cwd, mcpServers: servers, additionalDirectories: dirs, meta: meta)
                 EmptySessionRegistry.hide(setup.sessionId)
                 self?.sessionId = setup.sessionId
                 self?.configOptions = setup.configOptions
@@ -1168,11 +1180,12 @@ public final class SessionModel {
         let canLoad = capabilities.loadSession
         let servers = mcpServers
         let meta = effectiveMeta()
+        let dirs = additionalDirectories
         Task { [weak self] in
             do {
                 let setup = canLoad
-                    ? try await client.loadSession(sessionId: summary.sessionId, cwd: cwd, mcpServers: servers, meta: meta)
-                    : try await client.resumeSession(sessionId: summary.sessionId, cwd: cwd, mcpServers: servers, meta: meta)
+                    ? try await client.loadSession(sessionId: summary.sessionId, cwd: cwd, mcpServers: servers, additionalDirectories: dirs, meta: meta)
+                    : try await client.resumeSession(sessionId: summary.sessionId, cwd: cwd, mcpServers: servers, additionalDirectories: dirs, meta: meta)
                 self?.configOptions = setup.configOptions.isEmpty ? (self?.configOptions ?? []) : setup.configOptions
             } catch {
                 if let rpc = error as? JSONRPCError, rpc.code == -32002 {
@@ -1212,7 +1225,7 @@ public final class SessionModel {
         let servers = mcpServers
         let meta = effectiveMeta()
         do {
-            let setup = try await client.forkSession(sessionId: srcSessionId, cwd: cwd, mcpServers: servers, meta: meta)
+            let setup = try await client.forkSession(sessionId: srcSessionId, cwd: cwd, mcpServers: servers, additionalDirectories: additionalDirectories, meta: meta)
             self.sessionId = setup.sessionId
             self.timeline.appendNotice(ChatL10n.t("已分叉为新会话，后续操作不会影响原会话。"))
             if !setup.configOptions.isEmpty { self.configOptions = setup.configOptions }
@@ -1228,9 +1241,10 @@ public final class SessionModel {
         let cwd = workspace.path
         let servers = mcpServers
         let meta = effectiveMeta()
+        let dirs = additionalDirectories
         Task { [weak self] in
             do {
-                let setup = try await client.forkSession(sessionId: sessionId, cwd: cwd, mcpServers: servers, meta: meta)
+                let setup = try await client.forkSession(sessionId: sessionId, cwd: cwd, mcpServers: servers, additionalDirectories: dirs, meta: meta)
                 // 分叉出的会话带有原会话的内容,不属于「空会话」,必须显示在历史里
                 EmptySessionRegistry.unhide(setup.sessionId)
                 self?.sessionId = setup.sessionId
@@ -1269,7 +1283,7 @@ public final class SessionModel {
         case .slash:
             return CompletionEngine.slashItems(query: context.query, agentCommands: availableCommands, entries: slashCatalog?() ?? [])
         case .mention:
-            await fileIndex.prepare(root: workspace)
+            await fileIndex.prepare(root: workspace, extraRoots: additionalDirectories.map { URL(fileURLWithPath: $0) })
             await fileIndex.waitUntilReady()
             let paths = await fileIndex.search(context.query, limit: 24)
             let dirs = await fileIndex.searchDirectories(context.query, limit: 8)
@@ -1389,7 +1403,7 @@ public final class SessionModel {
             let target = self.mappedModels[.main].map { "\($0.providerName) · \($0.displayName)" } ?? ChatL10n.t("系统默认")
             do {
                 if hadConversation, canResume {
-                    let setup = try await client.resumeSession(sessionId: sessionId, cwd: cwd, mcpServers: servers, meta: meta)
+                    let setup = try await client.resumeSession(sessionId: sessionId, cwd: cwd, mcpServers: servers, additionalDirectories: additionalDirectories, meta: meta)
                     if !setup.configOptions.isEmpty { self.configOptions = setup.configOptions }
                     self.timeline.appendNotice(String(localized: "模型映射已更新为 \(target),对话上下文已保留。"))
                 } else {
@@ -1412,7 +1426,7 @@ public final class SessionModel {
 
     /// 用给定 `_meta` 新建会话并替换当前会话 ID。
     private func startFreshSession(client: ACPClient, cwd: String, servers: [MCPServerConfig], meta: JSONValue?) async throws {
-        let setup = try await client.newSession(cwd: cwd, mcpServers: servers, meta: meta)
+        let setup = try await client.newSession(cwd: cwd, mcpServers: servers, additionalDirectories: additionalDirectories, meta: meta)
         EmptySessionRegistry.hide(setup.sessionId)
         sessionId = setup.sessionId
         configOptions = setup.configOptions

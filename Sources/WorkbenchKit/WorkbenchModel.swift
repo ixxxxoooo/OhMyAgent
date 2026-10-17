@@ -214,7 +214,8 @@ public final class WorkbenchModel {
         guard let index = projects.firstIndex(where: { $0.id == id }) else { return }
         let removed = projects.remove(at: index)
         warmPool.discard(workspace: removed.url.path)
-        dock.closeTabs { Self.belongs($0.kind, toProject: id) }
+        let folders = [id] + removed.extraFolders
+        dock.closeTabs { tab in folders.contains { Self.belongs(tab.kind, toProject: $0) } }
         for key in conversations.keys where key.projectID == id {
             conversations[key]?.shutdown()
             conversations[key] = nil
@@ -559,6 +560,57 @@ public final class WorkbenchModel {
         ProjectIconFiles.importImage(from: url, into: projectIconDirectory)
     }
 
+    // MARK: 多文件夹工作区
+
+    /// 工作区的全部根目录(主目录在前);项目不存在时为空。
+    public func allRoots(of id: String) -> [String] {
+        projects.first(where: { $0.id == id })?.allRoots ?? []
+    }
+
+    /// 给工作区添加一个附加文件夹。已打开的会话需重新建立才会让 Agent 获得新目录的访问范围。
+    /// - Parameters:
+    ///   - path: 文件夹路径
+    ///   - id: 项目 ID
+    /// - Returns: 成功返回规范化路径;失败给出原因
+    @discardableResult
+    public func addFolder(_ path: String, to id: String, requireExists: Bool = true) -> Result<String, WorkspaceFolderError> {
+        guard let index = projects.firstIndex(where: { $0.id == id }) else { return .failure(.notDirectory) }
+        let result = WorkspaceFolders.validate(path, primary: id, existing: projects[index].extraFolders, requireExists: requireExists)
+        if case .success(let normalized) = result {
+            projects[index].extraFolders.append(normalized)
+            workspaceFoldersChanged(project: id)
+            log.info("工作区添加文件夹", ["project": id, "folder": normalized])
+        }
+        return result
+    }
+
+    /// 从工作区移除一个附加文件夹(只改工作区配置,不动磁盘)。
+    /// - Parameters:
+    ///   - path: 文件夹路径
+    ///   - id: 项目 ID
+    public func removeFolder(_ path: String, from id: String) {
+        guard let index = projects.firstIndex(where: { $0.id == id }), projects[index].extraFolders.contains(path) else { return }
+        projects[index].extraFolders.removeAll { $0 == path }
+        workspaceFoldersChanged(project: id)
+        log.info("工作区移除文件夹", ["project": id, "folder": path])
+    }
+
+    /// 附加文件夹变化后:刷新会话参数、丢弃不含新目录的待命会话、保存。
+    private func workspaceFoldersChanged(project id: String) {
+        let extras = projects.first(where: { $0.id == id })?.extraFolders ?? []
+        for (key, model) in conversations where key.projectID == id { model.additionalDirectories = extras }
+        warmPool.discard(workspace: id)
+        scheduleSave()
+    }
+
+    /// 领取预热会话;带附加文件夹的工作区不使用预热会话(预热时无法得知附加目录)。
+    /// - Parameters:
+    ///   - agentID: 引擎 ID
+    ///   - project: 项目
+    public func takeWarmSession(agentID: String, project: ProjectEntry) -> SessionModel? {
+        project.isMultiRoot ? nil : warmPool.take(agentID: agentID, workspace: project.url)
+    }
+
     // MARK: 设置整页
 
     /// 进入设置整页。
@@ -692,8 +744,9 @@ public final class WorkbenchModel {
         let key = ConversationKey(projectID: id, slot: slot)
         if let existing = conversations[key] { return existing }
         guard let project = projects.first(where: { $0.id == id }) else { return nil }
-        let model = agentID.flatMap { warmPool.take(agentID: $0, workspace: project.url) ?? makeAgentSession?(project.url, $0) } ?? makeSession(project.url)
+        let model = agentID.flatMap { takeWarmSession(agentID: $0, project: project) ?? makeAgentSession?(project.url, $0) } ?? makeSession(project.url)
         if project.isChatArea { model.extraSystemPrompt = Self.chatAreaPrompt }
+        model.additionalDirectories = project.extraFolders
         wire(model, project: id)
         conversations[key] = model
         if autoConnect { model.connect() }
@@ -735,6 +788,7 @@ public final class WorkbenchModel {
             rememberSession(sessionId, title: old.sessionTitle, agentID: old.descriptor.id, for: id)
         }
         conversations[key]?.shutdown()
+        if let project = projects.first(where: { $0.id == id }) { model.additionalDirectories = project.extraFolders }
         wire(model, project: id)
         conversations[key] = model
         lastSlot[id] = .some(slot)

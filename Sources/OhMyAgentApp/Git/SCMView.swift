@@ -12,13 +12,45 @@ import WorkbenchKit
 /// 右栏「Git」页:分支/同步、提交框、本轮 Agent 改动、更改分组、提交图谱。
 struct SCMView: View {
     let workbench: WorkbenchModel
+    /// 多文件夹工作区里当前查看的仓库根目录(nil 为主目录)
+    @State private var chosenRoot: String?
+    @State private var rootPickerShown = false
 
     var body: some View {
         if let project = workbench.selectedProject {
-            SCMContent(workbench: workbench, model: GitStore.shared.model(for: project.id))
-                .id(project.id)
+            let roots = project.allRoots
+            let active = chosenRoot.flatMap { roots.contains($0) ? $0 : nil } ?? project.id
+            VStack(spacing: 0) {
+                if project.isMultiRoot {
+                    rootBar(roots: roots, active: active)
+                    Divider()
+                }
+                SCMContent(workbench: workbench, model: GitStore.shared.model(for: active))
+                    .id(active)
+            }
         } else {
             OMEmptyState { Label("没有项目", om: "folder", size: 28) } description: { Text("添加一个项目后,这里会显示它的 Git 状态。") }
+        }
+    }
+
+    /// 多文件夹工作区:切换当前查看的仓库。
+    private func rootBar(roots: [String], active: String) -> some View {
+        Button { rootPickerShown.toggle() } label: {
+            HStack(spacing: 6) {
+                Image.om("folder", size: 12)
+                Text(verbatim: (active as NSString).lastPathComponent).font(OMFonts.small.weight(.medium)).lineLimit(1)
+                Image.om("chevron-down", size: 10).foregroundStyle(OMColors.tertiaryText)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 12).frame(height: 28)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("切换仓库")
+        .omPicker(isPresented: $rootPickerShown,
+                  entries: roots.map { PickEntry(id: $0, title: ($0 as NSString).lastPathComponent, subtitle: ($0 as NSString).abbreviatingWithTildeInPath, icon: "folder") },
+                  selectedID: active, placeholder: String(localized: "搜索文件夹"), placement: .below, width: 280, showsSearch: roots.count > 6) { entry in
+            chosenRoot = entry.id
         }
     }
 }

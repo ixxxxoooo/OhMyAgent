@@ -14,10 +14,9 @@ struct ExplorerView: View {
     let workbench: WorkbenchModel
     private let model = ExplorerModel.shared
 
-    /// 当前项目的 Git 装饰(随状态轮询更新;非仓库时为空)
-    private var decorations: GitDecorationIndex {
-        guard let project = workbench.selectedProject else { return GitDecorationIndex() }
-        let git = GitStore.shared.model(for: project.id)
+    /// 某根目录的 Git 装饰(随状态轮询更新;非仓库时为空)
+    fileprivate static func decorations(forRoot root: String) -> GitDecorationIndex {
+        let git = GitStore.shared.model(for: root)
         guard git.phase == .ready, !git.status.isClean else { return GitDecorationIndex() }
         return GitDecorationIndex(status: git.status, base: git.absolutePath("").trimmingSuffix("/"))
     }
@@ -39,7 +38,11 @@ struct ExplorerView: View {
                         DirectoryChildren(path: project.id, depth: 0, workbench: workbench, root: project.id)
                     }
                     .padding(.vertical, 4)
-                    .environment(\.gitDecorations, decorations)
+                    .environment(\.gitDecorations, Self.decorations(forRoot: project.id))
+                    // 多文件夹工作区:附加文件夹各自成一棵树
+                    ForEach(project.extraFolders, id: \.self) { folder in
+                        ExtraRootSection(folder: folder, project: project.id, workbench: workbench)
+                    }
                 }
             }
         } else {
@@ -50,6 +53,34 @@ struct ExplorerView: View {
     private func toolButton(_ icon: String, _ help: LocalizedStringKey, action: @escaping () -> Void) -> some View {
         Button(action: action) { Image.om(icon, size: 13) }
             .buttonStyle(.plain).foregroundStyle(OMColors.secondaryText).help(help).accessibilityLabel(Text(help))
+    }
+}
+
+/// 多文件夹工作区里的一个附加文件夹:可折叠的根节点 + 它自己的文件树与 Git 装饰。
+private struct ExtraRootSection: View {
+    let folder: String
+    let project: String
+    let workbench: WorkbenchModel
+    @State private var expanded = true
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ExplorerRow(depth: 0, name: (folder as NSString).lastPathComponent, isDirectory: true, expanded: expanded,
+                        chevron: expanded ? "chevron-down" : "chevron-right", isActive: false, decoration: nil) {
+                expanded.toggle()
+            }
+            .omContextMenu {
+                OMMenuItem("在 Finder 中显示", icon: "folder-search") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: folder)]) }
+                OMMenuItem("从工作区移除", icon: "x", isDestructive: true) {
+                    workbench.removeFolder(folder, from: project)
+                    WorkspaceIndexModel.shared.refresh(root: project)
+                }
+            }
+            if expanded {
+                DirectoryChildren(path: folder, depth: 1, workbench: workbench, root: folder)
+                    .environment(\.gitDecorations, ExplorerView.decorations(forRoot: folder))
+            }
+        }
     }
 }
 

@@ -47,7 +47,8 @@ struct WorkbenchView: View {
             // 终端标签被关闭 → 结束其 shell 进程
             TerminalStore.shared.prune(keeping: Set(ids))
         }
-        .onChange(of: workbench.selectedProject?.id, initial: true) { _, id in WorkspaceWatchCenter.shared.watch(root: id) }
+        .onChange(of: workbench.selectedProject?.id, initial: true) { _, id in WorkspaceWatchCenter.shared.watch(root: id, extras: workbench.selectedProject?.extraFolders ?? []) }
+        .onChange(of: workbench.selectedProject?.extraFolders ?? []) { _, extras in WorkspaceWatchCenter.shared.watch(root: workbench.selectedProject?.id, extras: extras) }
         .onChange(of: workbench.activeSession?.uid) { _, _ in updateFocus() }
         .onChange(of: workbench.activeSession?.phase) { _, _ in consumeSessionRequest() }
         .onChange(of: actions.sessionRequest) { _, _ in consumeSessionRequest() }

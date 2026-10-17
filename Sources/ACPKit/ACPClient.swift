@@ -347,8 +347,8 @@ public actor ACPClient {
     }
 
     /// 分叉会话。
-    public func forkSession(sessionId: String, cwd: String, mcpServers: [MCPServerConfig] = [], meta: JSONValue? = nil) async throws -> SessionSetup {
-        var params = sessionParams(cwd: cwd, mcpServers: mcpServers, additionalDirectories: [], meta: meta)
+    public func forkSession(sessionId: String, cwd: String, mcpServers: [MCPServerConfig] = [], additionalDirectories: [String] = [], meta: JSONValue? = nil) async throws -> SessionSetup {
+        var params = sessionParams(cwd: cwd, mcpServers: mcpServers, additionalDirectories: additionalDirectories, meta: meta)
         params["sessionId"] = .string(sessionId)
         let result = try await connection.request("session/fork", params: .object(params))
         return parseSetup(result)

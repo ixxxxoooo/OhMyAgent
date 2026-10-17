@@ -58,7 +58,8 @@ struct AgentMenu: View {
         guard let id = workbench.selectedProjectID, let current = workbench.activeSession, descriptor.id != current.descriptor.id else { return }
         Log.session.info("切换 Agent", ["project": id, "from": current.descriptor.id, "to": descriptor.id])
         // 优先认领预热好的待命会话,没有再现场创建
-        let next = workbench.warmPool.take(agentID: descriptor.id, workspace: current.workspace)
+        let project = workbench.projects.first(where: { $0.id == id })
+        let next = project.flatMap { workbench.takeWarmSession(agentID: descriptor.id, project: $0) }
             ?? AppEnvironment.makeSession(workspace: current.workspace, descriptor: descriptor)
         workbench.replaceSession(for: id, with: next)
     }

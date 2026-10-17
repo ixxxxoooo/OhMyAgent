@@ -150,7 +150,7 @@ public struct SearchOptions: Equatable, Sendable {
 
 /// 一处命中。
 public struct SearchHit: Identifiable, Hashable, Sendable {
-    public var id: String { "\(path):\(line):\(column)" }
+    public var id: String { "\(root ?? ""):\(path):\(line):\(column)" }
     public let path: String
     /// 行号(1 起)
     public let line: Int
@@ -161,13 +161,17 @@ public struct SearchHit: Identifiable, Hashable, Sendable {
     public let preview: String
     /// 预览中命中的起点(UTF-16)
     public let previewColumn: Int
+    /// 命中所在的工作区文件夹(多文件夹搜索时标注;单根搜索为 nil)
+    public var root: String?
 }
 
 /// 一个文件的命中集合。
 public struct SearchFileResult: Identifiable, Hashable, Sendable {
-    public var id: String { path }
+    public var id: String { "\(root ?? ""):\(path)" }
     public let path: String
     public let hits: [SearchHit]
+    /// 所在的工作区文件夹(多文件夹搜索时标注;单根搜索为 nil)
+    public var root: String?
 }
 
 /// 搜索输出。
@@ -236,6 +240,34 @@ public enum WorkspaceSearch {
             limited.append(SearchFileResult(path: file.path, hits: hits))
         }
         return SearchOutput(files: limited, totalHits: total, truncated: results.reduce(0) { $0 + $1.hits.count } > total || total >= maxHits, error: nil)
+    }
+
+    /// 在多个工作区文件夹里搜索并合并结果(主目录在前);命中带 `root` 标注。
+    /// - Parameters:
+    ///   - roots: 文件夹及其已有的相对路径索引(索引为空则现场建立)
+    ///   - options: 搜索选项
+    /// - Returns: 合并后的输出;任一文件夹正则非法即返回该错误
+    public static func searchRoots(_ roots: [(root: String, files: [String]?)], options: SearchOptions) async -> SearchOutput {
+        var merged: [SearchFileResult] = []
+        var total = 0
+        var truncated = false
+        for item in roots {
+            if Task.isCancelled { break }
+            let output = await search(root: item.root, options: options, files: item.files)
+            if output.error != nil { return output }
+            for file in output.files {
+                guard total < maxHits else { truncated = true; break }
+                let hits = Array(file.hits.prefix(maxHits - total)).map { hit -> SearchHit in
+                    var tagged = hit
+                    tagged.root = item.root
+                    return tagged
+                }
+                total += hits.count
+                merged.append(SearchFileResult(path: file.path, hits: hits, root: item.root))
+            }
+            if output.truncated { truncated = true }
+        }
+        return SearchOutput(files: merged, totalHits: total, truncated: truncated, error: nil)
     }
 
     /// 搜索单个文件;二进制与超大文件返回 nil。

@@ -24,6 +24,9 @@ final class AppEnvironment {
             return AppEnvironment.makeSession(workspace: url, descriptor: descriptor)
         }
         workbench.warmPool.factory = { url, descriptor in AppEnvironment.makeSession(workspace: url, descriptor: descriptor) }
+        // 多文件夹工作区:文件索引覆盖附加文件夹
+        let wb = workbench
+        WorkspaceIndexModel.shared.extraRootsProvider = { id in wb.projects.first(where: { $0.id == id })?.extraFolders ?? [] }
         // 切换项目后,为新项目重新安排预热
         workbench.onProjectSelected = { [weak self] _ in self?.scheduleEngineWarmup(delay: .seconds(2)) }
     }

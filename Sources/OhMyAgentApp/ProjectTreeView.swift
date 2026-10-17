@@ -424,6 +424,12 @@ private struct ProjectGroup: View {
             if project.pinned {
                 Image.om("pin.fill", size: 9).foregroundStyle(OMColors.tertiaryText)
             }
+            if project.isMultiRoot {
+                Text(verbatim: "+\(project.extraFolders.count)")
+                    .font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
+                    .help("工作区另含 \(project.extraFolders.count) 个文件夹")
+                    .accessibilityLabel("工作区另含 \(project.extraFolders.count) 个文件夹")
+            }
             Spacer(minLength: 4)
             // 固定 24pt 保留区:会话数 ⇄ 悬停「+」,互换不位移
             ZStack(alignment: .trailing) {
@@ -467,6 +473,7 @@ private struct ProjectGroup: View {
                 guard let name = ExplorerActions.prompt(title: String(localized: "重命名项目"), message: String(localized: "只修改侧栏里的显示名,不会改动磁盘上的目录名。"), initial: project.name) else { return }
                 workbench.renameProject(project.id, to: name)
             }
+            OMMenuItem("编辑工作区…", icon: "folder-plus") { WorkspaceEditor.present(project: project, workbench: workbench) }
             OMMenuItem("在 Finder 中显示", icon: "folder-search") { NSWorkspace.shared.activateFileViewerSelecting([project.url]) }
             let ides = IDELauncher.installed
             if !ides.isEmpty {
