@@ -41,51 +41,51 @@ struct EditorPage: View {
     }
 
     var body: some View {
-        SettingsForm {
-            Section("文件查看器") {
-                Picker("代码字体", selection: Binding(
-                    get: { EditorFontPrefs.normalizedFamily(fontFamily) },
-                    set: { fontFamily = $0; customFamily = $0 == EditorFontPrefs.systemMonospace ? "" : $0 }
-                )) {
-                    ForEach(fontOptions, id: \.value) { option in
-                        Text(option.title).tag(option.value)
+        SettingsScroll {
+            SettingsCard("文件查看器") {
+                SettingsRow("代码字体", detail: "下拉里只列出本机已安装的预置字体;字体未安装时自动回退到系统等宽。") {
+                    Picker("", selection: Binding(
+                        get: { EditorFontPrefs.normalizedFamily(fontFamily) },
+                        set: { fontFamily = $0; customFamily = $0 == EditorFontPrefs.systemMonospace ? "" : $0 }
+                    )) {
+                        ForEach(fontOptions, id: \.value) { option in
+                            Text(option.title).tag(option.value)
+                        }
                     }
+                    .labelsHidden()
+                    .fixedSize()
                 }
-                LabeledContent {
+                SettingsRow("自定义字体", detail: "手动填写任意已安装的字体族名,回车生效,留空恢复系统等宽。") {
                     TextField("", text: $customFamily, prompt: Text(verbatim: EditorFontPrefs.systemMonospace))
                         .frame(width: 220)
                         .multilineTextAlignment(.trailing)
                         .onSubmit(commitCustomFamily)
-                } label: {
-                    Text("自定义字体")
                 }
-                Note("下拉里只列出本机已安装的预置字体;也可以手动填写任意已安装的字体族名,回车生效,留空恢复系统等宽。字体未安装时自动回退到系统等宽。")
-                LabeledContent("字号 \(Int(EditorFontPrefs.clampedSize(fontSize))) pt") {
+                SettingsRow(String(localized: "字号 \(Int(EditorFontPrefs.clampedSize(fontSize))) pt")) {
                     Slider(value: $fontSize, in: EditorFontPrefs.sizeRange, step: 1).frame(width: 220)
                 }
-                Toggle("自动换行", isOn: $wrap)
-                SettingsNumericField(title: "大文件模式起点", value: $largeFileLines, format: IntegerFormatStyle<Int>(), unit: "行")
-                Note("超过该行数的文件会强制换行并关闭复杂高亮以保持流畅(范围 2,000–200,000)。新打开的文件立即生效。")
+                SettingsToggleRow("自动换行", isOn: $wrap)
+                SettingsRow("大文件模式起点", detail: "超过该行数的文件会强制换行并关闭复杂高亮以保持流畅(范围 2,000–200,000);新打开的文件立即生效。") {
+                    TextField("", value: $largeFileLines, format: IntegerFormatStyle<Int>())
+                        .multilineTextAlignment(.trailing).frame(width: 90).accessibilityLabel("大文件模式起点")
+                    Text("行").font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
+                }
             }
-            Section("Agent 联动") {
-                Toggle("跟随 Agent:编辑文件时自动打开并定位到改动处", isOn: $followAgent)
-                Note("开启后,Agent 每次修改文件都会在预览标签中打开该文件并跳到第一处改动(仅当前项目)。本轮改动过的行会在行号栏用强调色标出,文件被你编辑后标记消失。在编辑器里选中代码,右键「在对话中引用选区」或按 ⌘⇧L,会把 @文件:行范围 加入当前项目的输入框。")
+            SettingsCard("Agent 联动") {
+                SettingsToggleRow("跟随 Agent", detail: "Agent 每次修改文件都会在预览标签中打开该文件并跳到第一处改动(仅当前项目);本轮改动过的行会在行号栏用强调色标出。", isOn: $followAgent)
+                Note("在编辑器里选中代码,右键「在对话中引用选区」或按 ⌘⇧L,会把 @文件:行范围 加入当前项目的输入框。").footnote()
             }
-            Section("语言服务器(LSP)") {
-                Toggle("启用诊断、悬停提示、跳转定义与补全", isOn: $lspEnabled)
-                Note("Swift 使用 Xcode 自带的 sourcekit-lsp;TypeScript/JavaScript 需要 typescript-language-server,Python 需要 pyright(npm i -g typescript-language-server typescript pyright)。悬停停留查看类型,⌘ 点击或 F12 跳转定义,⌃Space 补全,输入 . 自动补全。")
+            SettingsCard("语言服务器(LSP)") {
+                SettingsToggleRow("启用诊断、悬停提示、跳转定义与补全", isOn: $lspEnabled)
+                Note("Swift 使用 Xcode 自带的 sourcekit-lsp;TypeScript/JavaScript 需要 typescript-language-server,Python 需要 pyright(npm i -g typescript-language-server typescript pyright)。悬停停留查看类型,⌘ 点击或 F12 跳转定义,⌃Space 补全,输入 . 自动补全。").footnote()
             }
-            Section("预览") {
+            SettingsCard("预览") {
                 Text(verbatim: "func greet(name: String) -> String {\n    return \"Hello, \\(name)\"\n}")
                     .font(Font(previewFont))
                     .lineSpacing(EditorFontPrefs.lineSpacing(for: previewFont))
-                    .padding(8).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(OMColors.surface, in: RoundedRectangle(cornerRadius: OMRadius.control))
-                    .overlay(RoundedRectangle(cornerRadius: OMRadius.control).strokeBorder(OMColors.hairline))
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Section {
-                Note("编辑器用于查看 Agent 改动的文件;保存时处理(去尾随空白等)将在编辑能力开放后提供。")
-            }
+            Note("编辑器用于查看 Agent 改动的文件;保存时处理(去尾随空白等)将在编辑能力开放后提供。")
         }
         .onAppear {
             let current = EditorFontPrefs.normalizedFamily(fontFamily)
@@ -102,17 +102,18 @@ struct TerminalPage: View {
     @AppStorage(ClientPrefs.Key.featureTerminal) private var terminalCapability = false
 
     var body: some View {
-        SettingsForm {
-            Section("Agent 终端") {
-                Toggle("让 Agent 使用 OhMyAgent 的终端(声明 terminal 能力)", isOn: $terminalCapability)
-                Note("开启后 Claude 的命令会在客户端终端里运行并实时显示输出;对已打开的窗口在重新连接后生效。关闭时由 claude 自己执行命令。")
-                LabeledContent("输出字号 \(String(format: "%.1f", fontSize)) pt") {
+        SettingsScroll {
+            SettingsCard("Agent 终端") {
+                SettingsToggleRow("让 Agent 使用 OhMyAgent 的终端", detail: "声明 terminal 能力:开启后 Claude 的命令会在客户端终端里运行并实时显示输出;对已打开的窗口在重新连接后生效。关闭时由 claude 自己执行命令。", isOn: $terminalCapability)
+                SettingsRow(String(localized: "输出字号 \(String(format: "%.1f", fontSize)) pt")) {
                     Slider(value: $fontSize, in: 9...20, step: 0.5).frame(width: 220)
                 }
-                SettingsNumericField(title: "输出缓冲上限", value: $outputKB, format: IntegerFormatStyle<Int>(), unit: "KB")
-                Note("超出上限时丢弃最早的输出(在字符边界截断)。范围 64–16,384 KB。")
-                Toggle("继承完整的登录 Shell 环境变量", isOn: $inheritEnv)
-                Note("关闭后只保留 PATH、HOME、USER、SHELL、LANG、TERM 等基础变量,可避免把令牌等敏感变量暴露给命令。")
+                SettingsRow("输出缓冲上限", detail: "超出上限时丢弃最早的输出(在字符边界截断)。范围 64–16,384 KB。") {
+                    TextField("", value: $outputKB, format: IntegerFormatStyle<Int>())
+                        .multilineTextAlignment(.trailing).frame(width: 90).accessibilityLabel("输出缓冲上限")
+                    Text("KB").font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
+                }
+                SettingsToggleRow("继承完整的登录 Shell 环境变量", detail: "关闭后只保留 PATH、HOME、USER、SHELL、LANG、TERM 等基础变量,可避免把令牌等敏感变量暴露给命令。", isOn: $inheritEnv)
             }
         }
     }

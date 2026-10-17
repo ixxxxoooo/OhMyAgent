@@ -132,8 +132,9 @@ struct AppearancePage: View {
     @State private var themeFilter = ""
 
     var body: some View {
-        SettingsForm {
-            Section("主题") {
+        SettingsScroll {
+            SettingsCard("主题") {
+              VStack(alignment: .leading, spacing: 12) {
                 // 当前主题的迷你工作台预览(侧栏、对话、代码块、输入框、终端)
                 ThemeMiniWorkbench(package: appearance.themePackage)
                     .frame(height: 170)
@@ -194,21 +195,23 @@ struct AppearancePage: View {
                         }
                     }
                 }
-                Picker("模式", selection: $appearance.theme) { ForEach(AppTheme.allCases) { Text($0.displayName).tag($0) } }
-                    .pickerStyle(.segmented)
-                    .disabled(appearance.themePackage.tone != .system)
-                Note("「模式」只在主题为「跟随系统」时可选;其余主题自带明暗。")
+              }
+                SettingsRow("模式", detail: "只在主题为「跟随系统」时可选;其余主题自带明暗。") {
+                    Picker("", selection: $appearance.theme) { ForEach(AppTheme.allCases) { Text($0.displayName).tag($0) } }
+                        .pickerStyle(.segmented).labelsHidden().fixedSize()
+                        .disabled(appearance.themePackage.tone != .system)
+                }
             }
             if themeFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 CustomThemeSection()
             }
-            Section("强调色") {
+            SettingsCard("强调色") {
                 AccentPicker(title: "主强调色", choice: $appearance.accent, hex: $appearance.customAccentHex)
                 AccentPicker(title: "第二强调色", choice: $appearance.accent2, hex: $appearance.customAccent2Hex)
                 AccentPreview().id(appearance.themeRevision)
-                Note("主强调色用于按钮与选中态;第二强调色用于链接与次要徽标。「跟随主题」使用所选主题的默认配色。")
+                Note("主强调色用于按钮与选中态;第二强调色用于链接与次要徽标。「跟随主题」使用所选主题的默认配色。").footnote()
             }
-            Section("聊天宽度") {
+            SettingsCard("聊天宽度") {
                 SettingsSliderRow(
                     title: String(localized: "内容宽度"),
                     valueText: chatWidthSummary,
@@ -218,9 +221,9 @@ struct AppearancePage: View {
                         set: { chatWidth = ChatWidth.presets[min(max($0, 0), ChatWidth.presets.count - 1)].rawValue }
                     )
                 )
-                Note("控制会话时间线与输入框的最大宽度;窄屏或分屏时会自动收窄。")
+                Note("控制会话时间线与输入框的最大宽度;窄屏或分屏时会自动收窄。").footnote()
             }
-            Section("设置页宽度") {
+            SettingsCard("设置页宽度") {
                 SettingsSliderRow(
                     title: String(localized: "内容宽度"),
                     valueText: settingsWidthSummary,
@@ -230,9 +233,9 @@ struct AppearancePage: View {
                         set: { settingsWidth = SettingsContentWidth.presets[min(max($0, 0), SettingsContentWidth.presets.count - 1)].rawValue }
                     )
                 )
-                Note("统一控制所有设置页右侧内容的最大宽度;窗口较窄时自动收窄。")
+                Note("统一控制所有设置页右侧内容的最大宽度;窗口较窄时自动收窄。").footnote()
             }
-            Section("字号") {
+            SettingsCard("字号") {
                 SettingsSliderRow(
                     title: String(localized: "界面字号"),
                     valueText: "\(Int((appearance.uiFontScale * 100).rounded()))%",
@@ -249,9 +252,12 @@ struct AppearancePage: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(OMColors.card, in: RoundedRectangle(cornerRadius: OMRadius.control))
             }
-            Section("字体平滑") {
-                Picker("字体平滑", selection: $fontSmoothing) {
-                    ForEach(FontSmoothing.allCases) { Text(LocalizedStringKey($0.title)).tag($0.rawValue) }
+            SettingsCard("字体平滑") {
+                SettingsRow("字体平滑") {
+                    Picker("", selection: $fontSmoothing) {
+                        ForEach(FontSmoothing.allCases) { Text(LocalizedStringKey($0.title)).tag($0.rawValue) }
+                    }
+                    .labelsHidden().fixedSize()
                 }
                 if fontSmoothing != smoothingAtLaunch {
                     HStack {
@@ -260,30 +266,32 @@ struct AppearancePage: View {
                         Button("立即重启") { AppActions.shared.relaunch() }.buttonStyle(.omSecondary)
                     }
                 }
-                Note("控制文字笔画粗细(对应 macOS 的 AppleFontSmoothing,只影响本应用):「关闭」最细,「强」最粗;「跟随系统」沿用系统设置。")
+                Note("控制文字笔画粗细(对应 macOS 的 AppleFontSmoothing,只影响本应用):「关闭」最细,「强」最粗;「跟随系统」沿用系统设置。").footnote()
             }
-            Section("等待动画(Spinner Verbs)") {
+            SettingsCard("等待动画(Spinner Verbs)") {
                 ForEach(WorkingVerbStyle.allCases) { style in
                     VerbStyleRow(style: style, selected: WorkingVerbStyle.resolve(verbStyle) == style) { verbStyle = style.rawValue }
                 }
-                Note("运行中会话流末尾的「✻ 思考中…」会按所选风格显示动词与动画字符;颜色跟随主题强调色。")
+                Note("运行中会话流末尾的「✻ 思考中…」会按所选风格显示动词与动画字符;颜色跟随主题强调色。").footnote()
             }
-            Section("滚动条") {
-                Picker("显示方式", selection: $scrollbar) {
-                    ForEach(ScrollbarVisibility.allCases) { Text(LocalizedStringKey($0.title)).tag($0.rawValue) }
+            SettingsCard("滚动条") {
+                SettingsRow("显示方式") {
+                    Picker("", selection: $scrollbar) {
+                        ForEach(ScrollbarVisibility.allCases) { Text(LocalizedStringKey($0.title)).tag($0.rawValue) }
+                    }
+                    .pickerStyle(.segmented).labelsHidden().fixedSize()
                 }
-                .pickerStyle(.segmented)
-                Note("「跟随系统」沿用 macOS「显示滚动条」设置;「自动隐藏」仅在滚动时出现;「始终显示」常驻。")
+                Note("「跟随系统」沿用 macOS「显示滚动条」设置;「自动隐藏」仅在滚动时出现;「始终显示」常驻。").footnote()
             }
-            Section("材质与动效") {
-                Toggle("始终使用不透明材质", isOn: $appearance.alwaysOpaque)
-                Toggle("低电量模式自动改用不透明材质", isOn: $appearance.fallbackOnLowPower)
-                Toggle("减弱动效", isOn: $appearance.reduceMotion)
-                Toggle("紧凑密度", isOn: $appearance.isCompact)
-                Note("系统「减少透明度」「减少动态效果」始终优先。代码、Diff、编辑器等阅读区域恒为纯色,不受影响。")
+            SettingsCard("材质与动效") {
+                SettingsToggleRow("始终使用不透明材质", isOn: $appearance.alwaysOpaque)
+                SettingsToggleRow("低电量模式自动改用不透明材质", isOn: $appearance.fallbackOnLowPower)
+                SettingsToggleRow("减弱动效", isOn: $appearance.reduceMotion)
+                SettingsToggleRow("紧凑密度", isOn: $appearance.isCompact)
+                Note("系统「减少透明度」「减少动态效果」始终优先。代码、Diff、编辑器等阅读区域恒为纯色,不受影响。").footnote()
             }
             layoutSection
-            Section {
+            SettingsCard {
                 Button("恢复默认主题") { appearance.reset(); chatWidth = ChatWidth.standard.rawValue; chatWidthCustom = ChatWidth.customDefault }
             }
         }
@@ -321,9 +329,9 @@ extension AppearancePage {
     /// 布局:迷你工作台示意图,拖动面板卡片到左栏/右栏/底部/编辑区(也可直接拖动面板标题条换位置)。
     @ViewBuilder
     fileprivate var layoutSection: some View {
-        Section("布局") {
+        SettingsCard("布局") {
             LayoutDragEditor(workbench: workbench)
-            Note("把「项目栏 / 文件 / Git / 终端 / 输出」的卡片拖到想要的位置;终端和输出的标题条也可以直接拖到窗口的左侧、右侧、底部或中间。换位置不会中断终端里正在运行的进程。")
+            Note("把「项目栏 / 文件 / Git / 终端 / 输出」的卡片拖到想要的位置;终端和输出的标题条也可以直接拖到窗口的左侧、右侧、底部或中间。换位置不会中断终端里正在运行的进程。").footnote()
             Button("恢复默认布局") { workbench.resetLayout() }
         }
     }
