@@ -507,6 +507,7 @@ public final class SessionModel {
         // 主 actor:按批应用
         let applier = Task { [weak self] in
             for await batch in coalescer.batches {
+                EventCoalescer.backlog.consumed(batch.count)
                 guard let self else { return }
                 let span = Log.perf.span("事件批处理", warnMs: 16, quiet: true, ["events": "\(batch.count)"])
                 self.handle(batch)

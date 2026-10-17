@@ -74,6 +74,9 @@ final class AppEnvironment {
     /// 工作台为空且存在旧版「最近工作区」偏好时迁移该目录(主目录除外)。
     func bootstrap() {
         let env = ProcessInfo.processInfo.environment
+        // 性能观测:注册容量指标,并启动资源采样(采样前先在主线程刷新指标)
+        PerfGauges.register(workbench: workbench)
+        ResourceSampler.shared.start(intervalSeconds: ResourceSampler.configuredInterval()) { await PerfGauges.refresh() }
         if let list = env["OMA_OPEN_PROJECTS"], !list.isEmpty {
             for path in list.split(separator: ":") { workbench.openProject(URL(fileURLWithPath: String(path))) }
         } else if DemoLaunch.isActive {

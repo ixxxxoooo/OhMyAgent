@@ -237,3 +237,45 @@ struct RegistryTests {
         #expect(gauges.snapshot() == ["a": 42])
     }
 }
+
+@Suite("积压计数与主线程指标")
+struct BacklogTests {
+    @Test("积压深度与峰值")
+    func backlog() {
+        let backlog = StreamBacklog(name: "t.backlog", registry: nil)
+        backlog.produced(5)
+        backlog.consumed(2)
+        #expect(backlog.depth == 3)
+        backlog.produced(10)
+        #expect(backlog.peak == 13)
+        backlog.consumed(100)  // 多消费不出现负数
+        #expect(backlog.depth == 0)
+        #expect(backlog.peak == 13)
+    }
+
+    @Test("积压计数自动注册为深度与峰值两个指标")
+    func registered() {
+        let gauges = GaugeRegistry()
+        let backlog = StreamBacklog(name: "t.reg", registry: gauges)
+        backlog.produced(4)
+        backlog.consumed(1)
+        #expect(gauges.snapshot() == ["t.reg.depth": 3, "t.reg.peak": 4])
+    }
+
+    @Test("主 actor 指标只在 refreshMain 后可见,注销后消失")
+    @MainActor
+    func mainGauges() {
+        let gauges = GaugeRegistry()
+        var value = 7
+        gauges.registerMain("m") { value }
+        #expect(gauges.snapshot().isEmpty)
+        gauges.refreshMain()
+        #expect(gauges.snapshot() == ["m": 7])
+        value = 9
+        #expect(gauges.snapshot() == ["m": 7])  // 未刷新仍是旧值
+        gauges.refreshMain()
+        #expect(gauges.snapshot() == ["m": 9])
+        gauges.unregister("m")
+        #expect(gauges.snapshot().isEmpty)
+    }
+}

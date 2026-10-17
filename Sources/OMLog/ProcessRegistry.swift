@@ -59,6 +59,9 @@ public final class GaugeRegistry: @unchecked Sendable {
     public static let shared = GaugeRegistry()
 
     private let readers = Mutex<[String: @Sendable () -> Int]>([:])
+    /// 主 actor 指标的读取闭包与最近一次刷新的缓存值。
+    private let mainReaders = Mutex<[String: @MainActor @Sendable () -> Int]>([:])
+    private let mainCache = Mutex<[String: Int]>([:])
 
     public init() {}
 
@@ -70,15 +73,75 @@ public final class GaugeRegistry: @unchecked Sendable {
         readers.withLock { $0[name] = read }
     }
 
+    /// 注册一个必须在主 actor 读取的指标(如读取 `@Observable` 模型)。
+    /// 采样线程不会直接调用它,而是由采样前的 `refreshMain()` 在主线程求值并缓存。
+    /// - Parameters:
+    ///   - name: 指标名
+    ///   - read: 在主 actor 上读取当前值的闭包
+    public func registerMain(_ name: String, _ read: @escaping @MainActor @Sendable () -> Int) {
+        mainReaders.withLock { $0[name] = read }
+    }
+
     /// 注销一个指标。
     /// - Parameter name: 指标名
     public func unregister(_ name: String) {
         readers.withLock { _ = $0.removeValue(forKey: name) }
+        mainReaders.withLock { _ = $0.removeValue(forKey: name) }
+        mainCache.withLock { _ = $0.removeValue(forKey: name) }
     }
 
-    /// 读取全部指标的当前值(闭包在锁外执行,避免读取闭包反向注册造成死锁)。
+    /// 在主 actor 上求值全部主 actor 指标并更新缓存(采样前调用)。
+    @MainActor
+    public func refreshMain() {
+        let copy = mainReaders.withLock { $0 }
+        guard !copy.isEmpty else { return }
+        let values = copy.mapValues { $0() }
+        mainCache.withLock { $0 = values }
+    }
+
+    /// 读取全部指标的当前值(闭包在锁外执行,避免读取闭包反向注册造成死锁);
+    /// 主 actor 指标取最近一次 `refreshMain()` 的缓存。
     public func snapshot() -> [String: Int] {
         let copy = readers.withLock { $0 }
-        return copy.mapValues { $0() }
+        var result = copy.mapValues { $0() }
+        for (name, value) in mainCache.withLock({ $0 }) { result[name] = value }
+        return result
     }
+}
+
+/// 无界 AsyncStream 的积压计数器:生产端 `produced()`、消费端 `consumed()`,
+/// 积压深度 = 已生产 − 已消费。深度持续增长说明消费者跟不上,是内存增长的前兆。
+public final class StreamBacklog: Sendable {
+    private struct State { var produced = 0; var consumed = 0; var peak = 0 }
+    private let state = Mutex(State())
+    /// 指标名前缀,如 `backlog.acpLines`。
+    public let name: String
+
+    /// 创建计数器。
+    /// - Parameters:
+    ///   - name: 指标名前缀
+    ///   - registry: 注册到的指标表(缺省为全局;传 nil 不注册,便于测试)
+    public init(name: String, registry: GaugeRegistry? = .shared) {
+        self.name = name
+        registry?.register("\(name).depth") { [weak self] in self?.depth ?? 0 }
+        registry?.register("\(name).peak") { [weak self] in self?.peak ?? 0 }
+    }
+
+    /// 生产了 `count` 个元素。
+    public func produced(_ count: Int = 1) {
+        state.withLock { state in
+            state.produced += count
+            state.peak = max(state.peak, state.produced - state.consumed)
+        }
+    }
+
+    /// 消费了 `count` 个元素。
+    public func consumed(_ count: Int = 1) {
+        state.withLock { $0.consumed += count }
+    }
+
+    /// 当前积压深度。
+    public var depth: Int { state.withLock { max($0.produced - $0.consumed, 0) } }
+    /// 历史最大积压深度。
+    public var peak: Int { state.withLock { $0.peak } }
 }

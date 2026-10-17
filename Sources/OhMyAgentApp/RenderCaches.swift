@@ -26,6 +26,9 @@ enum MarkdownCache {
     /// 命中/未命中统计(测试与诊断用)
     private(set) static var hits = 0
     private(set) static var misses = 0
+    /// 「流式整段重解析」次数:未命中且新文本以上一次未命中的文本为前缀(典型是流式输出每批都重解析全文)。
+    private(set) static var streamingReparses = 0
+    private static var lastMissText = ""
 
     /// 取解析结果;未命中时解析并写入。
     /// - Parameter text: Markdown 原文
@@ -36,6 +39,8 @@ enum MarkdownCache {
             return hit.value
         }
         misses += 1
+        if !lastMissText.isEmpty, text.count > lastMissText.count, text.hasPrefix(lastMissText) { streamingReparses += 1 }
+        lastMissText = text
         let span = Log.perf.span("Markdown 解析", warnMs: 8, quiet: true, ["chars": "\(text.utf8.count)"])
         let parsed = MarkdownParser.parse(text)
         span.end()
@@ -48,6 +53,8 @@ enum MarkdownCache {
         cache.removeAllObjects()
         hits = 0
         misses = 0
+        streamingReparses = 0
+        lastMissText = ""
     }
 }
 

@@ -5,6 +5,7 @@
 import AppKit
 import DesignSystem
 import Foundation
+import Synchronization
 import SwiftUI
 
 /// 代码高亮器。
@@ -17,6 +18,11 @@ public enum CodeHighlighter {
         let value: AttributedString
         init(_ value: AttributedString) { self.value = value }
     }
+
+    private static let counters = Mutex((hits: 0, misses: 0))
+
+    /// 缓存命中/未命中累计(诊断用)。
+    public static var cacheStats: (hits: Int, misses: Int) { counters.withLock { $0 } }
 
     private static let cache: NSCache<NSString, Box> = {
         let cache = NSCache<NSString, Box>()
@@ -35,7 +41,11 @@ public enum CodeHighlighter {
         // 缓存键含主题 id 与明暗:切换主题后同一段代码立即以新配色重新生成
         _ = ThemeRuntime.palette
         let key = "\(ThemeRuntime.package.id)#\(ThemeRuntime.systemIsDark)#\(SyntaxPrefs.cacheKey)#\(language.rawValue)#\(code.hashValue)#\(code.utf16.count)" as NSString
-        if let hit = cache.object(forKey: key) { return hit.value }
+        if let hit = cache.object(forKey: key) {
+            counters.withLock { $0.hits += 1 }
+            return hit.value
+        }
+        counters.withLock { $0.misses += 1 }
         let result = build(code, language: language)
         cache.setObject(Box(result), forKey: key, cost: code.utf16.count * 4)
         return result

@@ -4,10 +4,13 @@
 
 import ACPKit
 import Foundation
+import OMLog
 import Synchronization
 
 /// 事件合并器。
 public final class EventCoalescer: Sendable {
+    /// 事件积压(生产:`push`;消费:`SessionModel` 的批处理循环)。所有会话共用,反映整体是否来得及应用。
+    public static let backlog = StreamBacklog(name: "backlog.events")
     private struct State {
         var buffer: [ClientEvent] = []
         var scheduled = false
@@ -31,6 +34,7 @@ public final class EventCoalescer: Sendable {
     /// 推入一个事件;可在任意线程调用。
     /// - Parameter event: 事件
     public func push(_ event: ClientEvent) {
+        Self.backlog.produced()
         let needsSchedule = state.withLock { state -> Bool in
             state.buffer.append(event)
             if state.scheduled { return false }

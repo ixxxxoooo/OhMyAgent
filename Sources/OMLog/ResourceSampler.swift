@@ -125,12 +125,15 @@ public final class ResourceSampler: @unchecked Sendable {
     }
 
     /// 启动(或以新间隔重启)周期采样,立即采一次作为基线。
-    /// - Parameter intervalSeconds: 间隔秒数;不大于 0 等价于停止
-    public func start(intervalSeconds: Int) {
+    /// - Parameters:
+    ///   - intervalSeconds: 间隔秒数;不大于 0 等价于停止
+    ///   - beforeSample: 每次采样前执行(用于在主 actor 刷新主线程指标)
+    public func start(intervalSeconds: Int, beforeSample: (@Sendable () async -> Void)? = nil) {
         stop()
         guard intervalSeconds > 0 else { return }
         let task = Task.detached(priority: .utility) { [self] in
             while !Task.isCancelled {
+                await beforeSample?()
                 _ = sample()
                 try? await Task.sleep(for: .seconds(intervalSeconds))
             }

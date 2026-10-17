@@ -66,6 +66,7 @@ public actor ACPConnection {
         readTask = Task { [weak self] in
             for await event in events {
                 guard let self else { return }
+                if case .line = event { StdioTransport.backlog.consumed() }
                 await self.handle(event)
             }
         }

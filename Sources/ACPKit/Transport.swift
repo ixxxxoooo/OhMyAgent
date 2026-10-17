@@ -52,6 +52,8 @@ final class FramerBox: Sendable {
 
 /// 基于子进程标准输入输出的传输,换行分隔 JSON。
 public final class StdioTransport: ACPTransport, @unchecked Sendable {
+    /// 子进程输出行的积压(生产:读管道回调;消费:`ACPConnection` 的读循环)。
+    public static let backlog = StreamBacklog(name: "backlog.acpLines")
     private let launch: ProcessLaunch
     private let process = Process()
     private let stdinPipe = Pipe()
@@ -90,6 +92,7 @@ public final class StdioTransport: ACPTransport, @unchecked Sendable {
                 return
             }
             let lines = framer.push(data)
+            StdioTransport.backlog.produced(lines.count)
             for line in lines { continuation.yield(.line(line)) }
         }
         stderrPipe.fileHandleForReading.readabilityHandler = { handle in
