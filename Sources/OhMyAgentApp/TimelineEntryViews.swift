@@ -160,9 +160,7 @@ struct UserMessageView: View {
                 }
             }
             if !entry.text.isEmpty {
-                Text(entry.text)
-                    .font(OMFonts.reading)
-                    .lineSpacing(OMFonts.readingLineSpacing)
+                CollapsibleUserText(text: entry.text)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
