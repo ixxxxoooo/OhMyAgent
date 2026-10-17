@@ -13,7 +13,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
     case general, appearance, shortcuts
     case agent, providers, modelMapping, prompts, network, permissions, trust, agentExtensions
     case mcp, skills, subagents, hooks, plugins, memory
-    case editor, terminal
+    case editor, terminal, sourceControl, codeIntelligence
     case usage, privacy, advanced, diagnostics
     var id: String { rawValue }
 
@@ -29,6 +29,8 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .providers: return ["provider", "api", "密钥", "key", "openai", "anthropic"]
         case .agentExtensions: return ["acp", "registry", "codex", "gemini", "pi", "opencode", "注册表"]
         case .shortcuts: return ["快捷键", "shortcut", "keybinding"]
+        case .sourceControl: return ["git", "提交", "commit", "署名", "co-authored-by", "提交说明", "scm"]
+        case .codeIntelligence: return ["lsp", "语言服务器", "诊断", "补全", "忽略", "ignore", "glob", "索引", "language server"]
         default: return []
         }
     }
@@ -45,7 +47,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         (String(localized: "客户端"), [.general, .appearance, .shortcuts]),
         ("Agent", [.agent, .providers, .modelMapping, .prompts, .network, .permissions, .trust, .agentExtensions]),
         (String(localized: "扩展"), [.mcp, .skills, .subagents, .hooks, .plugins, .memory]),
-        (String(localized: "工作台"), [.editor, .terminal]),
+        (String(localized: "工作台"), [.editor, .terminal, .sourceControl, .codeIntelligence]),
         (String(localized: "其他"), [.usage, .privacy, .advanced, .diagnostics]),
     ]
 
@@ -70,6 +72,8 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .memory: return String(localized: "记忆与指令")
         case .editor: return String(localized: "编辑器")
         case .terminal: return String(localized: "终端")
+        case .sourceControl: return String(localized: "源代码管理")
+        case .codeIntelligence: return String(localized: "代码智能")
         case .usage: return String(localized: "用量与成本")
         case .privacy: return String(localized: "隐私与遥测")
         case .advanced: return String(localized: "高级")
@@ -98,6 +102,8 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .memory: return "brain"
         case .editor: return "chevron.left.forwardslash.chevron.right"
         case .terminal: return "terminal"
+        case .sourceControl: return "git-branch"
+        case .codeIntelligence: return "braces"
         case .usage: return "chart.bar"
         case .privacy: return "hand.raised"
         case .advanced: return "wrench.and.screwdriver"
@@ -270,6 +276,8 @@ struct SettingsView: View {
         case .memory: MemorySettingsPage(center: center)
         case .editor: EditorPage()
         case .terminal: TerminalPage()
+        case .sourceControl: SourceControlPage()
+        case .codeIntelligence: CodeIntelligencePage()
         case .shortcuts: ShortcutsPage()
         case .usage: UsagePage(paths: model.paths)
         case .agentExtensions: AgentExtensionsPage()

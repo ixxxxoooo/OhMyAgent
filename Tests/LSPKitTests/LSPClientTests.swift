@@ -255,6 +255,22 @@ struct LSPManagerTests {
         await manager.shutdownAll()
     }
 
+    @Test("超过工作区上限时回收最久未用且空闲的服务器,有打开文档的保留")
+    func evictsOverLimit() async throws {
+        let probe = FactoryProbe()
+        let manager = manager(probe)
+        await manager.setMaxClients(2)
+        guard case .ready(let a) = await manager.open(path: "/tmp/pa/a.swift", projectRoot: "/tmp/pa", text: "a") else { Issue.record("A 应打开"); return }
+        await manager.close(a)
+        guard case .ready(let b) = await manager.open(path: "/tmp/pb/b.swift", projectRoot: "/tmp/pb", text: "b") else { Issue.record("B 应打开"); return }
+        // B 保持打开;打开 C 时只能回收空闲的 A
+        guard case .ready(let c) = await manager.open(path: "/tmp/pc/c.swift", projectRoot: "/tmp/pc", text: "c") else { Issue.record("C 应打开"); return }
+        #expect(await manager.runningCount == 2)
+        #expect(await b.client.state == .ready)
+        #expect(await c.client.state == .ready)
+        await manager.shutdownAll()
+    }
+
     @Test("并发打开只启动一次服务器")
     func concurrentOpenStartsOnce() async throws {
         let probe = FactoryProbe()

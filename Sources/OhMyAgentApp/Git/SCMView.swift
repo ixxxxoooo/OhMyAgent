@@ -2,6 +2,7 @@
 // 源代码管理面板:分支、同步、提交框、冲突/已暂存/更改/未跟踪分组;点击文件打开 Diff 标签。
 
 import AppKit
+import ChatKit
 import DesignSystem
 import GitKit
 import IconKit
@@ -23,6 +24,8 @@ struct SCMView: View {
 }
 
 private struct SCMContent: View {
+    /// 是否显示「AI 生成提交说明」按钮(设置 → 源代码管理)
+    @AppStorage(ClientPrefs.Key.scmAICommitMessage) private var aiCommitMessage = true
     let workbench: WorkbenchModel
     @Bindable var model: GitModel
     @State private var branchShown = false
@@ -226,22 +229,24 @@ private struct SCMContent: View {
                         if canCommit { requestCommit(push: false) }
                     }
 
-                Button {
-                    Task { await model.generateCommitMessage(gateway: workbench.activeSession?.utilityGateway) }
-                } label: {
-                    if model.isGeneratingCommitMessage {
-                        ProgressView()
-                            .controlSize(.mini)
-                            .frame(width: 20, height: 20)
-                    } else {
-                        Image.om("sparkles", size: 13)
-                            .foregroundStyle(OMColors.accent)
-                            .frame(width: 20, height: 20)
+                if aiCommitMessage {
+                    Button {
+                        Task { await model.generateCommitMessage(gateway: workbench.activeSession?.utilityGateway) }
+                    } label: {
+                        if model.isGeneratingCommitMessage {
+                            ProgressView()
+                                .controlSize(.mini)
+                                .frame(width: 20, height: 20)
+                        } else {
+                            Image.om("sparkles", size: 13)
+                                .foregroundStyle(OMColors.accent)
+                                .frame(width: 20, height: 20)
+                        }
                     }
+                    .buttonStyle(.plain)
+                    .disabled(model.isGeneratingCommitMessage || (model.status.changes.isEmpty && model.status.untrackedChanges.isEmpty))
+                    .omTooltip("根据改动与最近提交风格生成提交说明", icon: "sparkles")
                 }
-                .buttonStyle(.plain)
-                .disabled(model.isGeneratingCommitMessage || (model.status.changes.isEmpty && model.status.untrackedChanges.isEmpty))
-                .omTooltip("根据改动与最近提交风格生成提交说明", icon: "sparkles")
             }
             .padding(8)
             .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))

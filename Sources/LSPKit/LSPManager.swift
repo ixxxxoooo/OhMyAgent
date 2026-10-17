@@ -40,6 +40,9 @@ public actor LSPManager {
     private var pendingStarts: [String: Task<Result<LSPClient, any Error>, Never>] = [:]
     private var failedUntil: [String: Date] = [:]
     private var idleTasks: [String: Task<Void, Never>] = [:]
+    /// 同时保留的服务器上限(0 表示不限制);超出时回收最久未用且无打开文档的服务器
+    private var maxClients = 0
+    private var lastUsed: [String: Date] = [:]
 
     /// - Parameters:
     ///   - factory: 传输工厂,默认按 `LSPServerLocator` 启动真实子进程
@@ -59,6 +62,13 @@ public actor LSPManager {
     public static let defaultFactory: TransportFactory = { kind, projectRoot, workspaceRoot in
         guard let launch = LSPServerLocator.locate(kind, projectRoot: projectRoot, workspaceRoot: workspaceRoot) else { return nil }
         return LSPStdioTransport(launch: launch)
+    }
+
+    /// 设置同时保留的服务器上限并立即生效。
+    /// - Parameter limit: 1 以上为上限;0 或负数表示不限制
+    public func setMaxClients(_ limit: Int) async {
+        maxClients = max(limit, 0)
+        await evictIfNeeded(keeping: nil)
     }
 
     /// 打开文档:必要时启动服务器,并发送 didOpen。
@@ -85,6 +95,8 @@ public actor LSPManager {
             failedUntil[key] = Date().addingTimeInterval(failureBackoff)
             return .failed(kind: kind, message: error.localizedDescription)
         }
+        lastUsed[key] = Date()
+        await evictIfNeeded(keeping: key)
         let uri = LSPURI.make(path: path)
         await client.didOpen(uri: uri, languageID: languageID, text: text)
         return .ready(LSPDocumentHandle(client: client, kind: kind, key: key, path: path, uri: uri, languageID: languageID))
@@ -153,6 +165,23 @@ public actor LSPManager {
     /// 服务器自行退出后清理登记,下次打开文档会重新启动。
     private func forget(key: String, client: LSPClient) {
         if clients[key] === client { clients[key] = nil }
+    }
+
+    /// 超出上限时回收最久未用且没有打开文档的服务器(`keeping` 与有打开文档的不回收)。
+    private func evictIfNeeded(keeping: String?) async {
+        guard maxClients > 0 else { return }
+        while clients.count > maxClients {
+            var candidates: [(key: String, used: Date)] = []
+            for (key, client) in clients where key != keeping {
+                if await client.openDocumentCount == 0 { candidates.append((key, lastUsed[key] ?? .distantPast)) }
+            }
+            guard let victim = candidates.min(by: { $0.used < $1.used }), let client = clients[victim.key] else { return }
+            clients[victim.key] = nil
+            idleTasks[victim.key]?.cancel()
+            idleTasks[victim.key] = nil
+            Log.lsp.info("语言服务器超出上限被回收", ["key": victim.key, "max": String(maxClients)])
+            await client.shutdown()
+        }
     }
 
     private func recycleIfIdle(key: String) async {

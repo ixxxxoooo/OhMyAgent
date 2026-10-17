@@ -131,7 +131,7 @@ final class GitModel {
     /// 提交。没有暂存内容时先暂存全部(与 VS Code 的智能提交一致)。
     /// - Parameter push: 提交后是否继续推送
     func commit(push: Bool = false) async {
-        let message = commitMessage
+        let message = CommitTrailer.apply(to: commitMessage, enabled: UserDefaults.standard.bool(forKey: ClientPrefs.Key.scmCoAuthor))
         let amending = amend
         // amend 时允许暂存区为空(只改提交说明);否则没有暂存内容就先暂存全部
         let needsStageAll = status.stagedChanges.isEmpty && !amending

@@ -16,7 +16,6 @@ struct EditorPage: View {
     @State private var customFamily = ""
     @AppStorage(ClientPrefs.Key.editorWrap) private var wrap = true
     @AppStorage(ClientPrefs.Key.editorLargeFileLines) private var largeFileLines = 20_000
-    @AppStorage(ClientPrefs.Key.editorLSP) private var lspEnabled = true
     @AppStorage(ClientPrefs.Key.editorFollowAgent) private var followAgent = false
 
     /// 下拉选项:系统等宽 + 本机已安装的预置字体;当前值若不在其中(自定义字体)也要列出,否则选择器显示为空。
@@ -74,10 +73,6 @@ struct EditorPage: View {
             SettingsCard("Agent 联动") {
                 SettingsToggleRow("跟随 Agent", detail: "Agent 每次修改文件都会在预览标签中打开该文件并跳到第一处改动(仅当前项目);本轮改动过的行会在行号栏用强调色标出。", isOn: $followAgent)
                 Note("在编辑器里选中代码,右键「在对话中引用选区」或按 ⌘⇧L,会把 @文件:行范围 加入当前项目的输入框。").footnote()
-            }
-            SettingsCard("语言服务器(LSP)") {
-                SettingsToggleRow("启用诊断、悬停提示、跳转定义与补全", isOn: $lspEnabled)
-                Note("Swift 使用 Xcode 自带的 sourcekit-lsp;TypeScript/JavaScript 需要 typescript-language-server,Python 需要 pyright(npm i -g typescript-language-server typescript pyright)。悬停停留查看类型,⌘ 点击或 F12 跳转定义,⌃Space 补全,输入 . 自动补全。").footnote()
             }
             SettingsCard("预览") {
                 Text(verbatim: "func greet(name: String) -> String {\n    return \"Hello, \\(name)\"\n}")

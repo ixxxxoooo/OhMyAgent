@@ -1,6 +1,7 @@
 // @author ixxxxoooo
 // 工作区文件能力(无视图):目录列举、文件索引、模糊匹配(快速打开)、全局文本搜索。
 
+import ChatKit
 import Foundation
 
 /// 资源管理器中的一个条目。
@@ -47,8 +48,9 @@ public enum WorkspaceFiles {
     /// - Parameters:
     ///   - root: 工作区根目录
     ///   - limit: 最多返回的文件数
+    ///   - ignore: 用户自定义忽略规则(默认读取设置)
     /// - Returns: 相对路径数组(已排序)
-    public static func index(root: String, limit: Int = 100_000) -> [String] {
+    public static func index(root: String, limit: Int = 100_000, ignore: IndexIgnore = .current()) -> [String] {
         guard !root.isEmpty, let enumerator = FileManager.default.enumerator(atPath: root) else { return [] }
         var result: [String] = []
         // 使用路径式枚举器直接得到相对路径,避免 /private 等符号链接前缀差异
@@ -57,10 +59,11 @@ public enum WorkspaceFiles {
             let name = (rel as NSString).lastPathComponent
             let type = enumerator.fileAttributes?[.type] as? FileAttributeType
             if type == .typeDirectory || type == .typeSymbolicLink {
-                if type == .typeSymbolicLink || WorkspaceIgnore.skippedDirectories.contains(name) { enumerator.skipDescendants() }
+                if type == .typeSymbolicLink || WorkspaceIgnore.skippedDirectories.contains(name)
+                    || ignore.ignores(relativePath: rel, isDirectory: true) { enumerator.skipDescendants() }
                 continue
             }
-            guard type == .typeRegular, name != ".DS_Store" else { continue }
+            guard type == .typeRegular, name != ".DS_Store", !ignore.ignores(relativePath: rel, isDirectory: false) else { continue }
             result.append(rel)
             if result.count >= limit { break }
         }

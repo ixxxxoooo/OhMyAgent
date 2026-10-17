@@ -420,6 +420,7 @@ public actor FileIndex {
         var files: [String] = []
         var dirs: [String] = []
         let rootPath = root.standardizedFileURL.path
+        let userIgnore = IndexIgnore.current()
         for case let url as URL in enumerator {
             if Task.isCancelled { break }
             let name = url.lastPathComponent
@@ -427,7 +428,7 @@ public actor FileIndex {
             let full = url.standardizedFileURL.path
             let relative = full.hasPrefix(rootPath + "/") ? String(full.dropFirst(rootPath.count + 1)) : nil
             if values?.isDirectory == true {
-                if ignoredDirectories.contains(name) {
+                if ignoredDirectories.contains(name) || (relative.map { userIgnore.ignores(relativePath: $0, isDirectory: true) } ?? false) {
                     enumerator.skipDescendants()
                 } else if let relative, dirs.count < maxFiles / 4 {
                     dirs.append(relative)
@@ -435,7 +436,7 @@ public actor FileIndex {
                 continue
             }
             guard values?.isRegularFile == true else { continue }
-            if let relative { files.append(relative) }
+            if let relative, !userIgnore.ignores(relativePath: relative, isDirectory: false) { files.append(relative) }
             if files.count >= maxFiles { break }
         }
         return (files, dirs)

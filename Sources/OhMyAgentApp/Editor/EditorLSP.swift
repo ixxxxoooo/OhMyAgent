@@ -1,6 +1,7 @@
 // @author ixxxxoooo
 // 文件标签与语言服务器的桥接:位置换算、诊断转换、文档同步(防抖)、hover/定义/补全。
 
+import ChatKit
 import EditorKit
 import Foundation
 import LSPKit
@@ -100,6 +101,8 @@ final class EditorLSPController {
         currentText = text
         syncedText = text
         status = .starting
+        let stored = UserDefaults.standard.integer(forKey: ClientPrefs.Key.lspMaxWorkspaces)
+        await manager.setMaxClients(stored == 0 ? 4 : stored)
         let result = await manager.open(path: path, projectRoot: projectRoot, text: text)
         if closing {
             // 等待期间视图已消失:若已打开则立刻关闭

@@ -66,6 +66,14 @@ public enum ClientPrefs {
         public static let toolDensity = ToolDensity.preferenceKey
         /// 聊天代码块自动换行(默认关闭,横向滚动)
         public static let chatCodeWrap = "chat.codeWrap"
+        /// 提交时附带 `Co-authored-by: OhMyAgent` 署名(默认关闭)
+        public static let scmCoAuthor = "scm.coAuthor"
+        /// 源代码管理面板显示「AI 生成提交说明」按钮(默认开启)
+        public static let scmAICommitMessage = "scm.aiCommitMessage"
+        /// 同时保留的语言服务器工作区上限(1–8,默认 4)
+        public static let lspMaxWorkspaces = "codeIntel.maxLSPWorkspaces"
+        /// 索引忽略 glob(多行文本)
+        public static let indexIgnoreGlobs = IndexIgnore.preferenceKey
     }
 
     /// 托盘图标是否启用:菜单栏开关打开,或 Dock 图标被隐藏(此时必须有托盘才能打开窗口)。默认开启。
