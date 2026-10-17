@@ -138,13 +138,15 @@ struct ChatView: View {
         .onScrollPhaseChange { _, phase in scrollPhase = phase }
         .onScrollGeometryChange(for: ScrollMetrics.self) { geometry in
             ScrollMetrics(offsetY: geometry.contentOffset.y, contentHeight: geometry.contentSize.height, containerHeight: geometry.containerSize.height)
-        } action: { _, metrics in
+        } action: { old, metrics in
             // 内容增高(工具详情异步展开)不会放手;用户主动向上滚(或在滚动中离开底部)才放手
             follow.geometryChanged(
                 offsetY: metrics.offsetY, contentHeight: metrics.contentHeight, containerHeight: metrics.containerHeight,
                 userScrolling: scrollPhase != .idle, entryCount: model.timeline.entries.count
             )
-            if follow.pinned { sticky.followSuspended = false }
+            // 仅在视口真正贴底、且不是内容增高造成时才恢复跟随;展开思考块等使内容变高后离底部仍有距离,不恢复,否则点击处会被拽走
+            let distance = metrics.contentHeight - (metrics.offsetY + metrics.containerHeight)
+            if follow.pinned, old.contentHeight == metrics.contentHeight, distance <= 4 { sticky.followSuspended = false }
         }
         .onScrollGeometryChange(for: TimelineEdgeFade.Edges.self) { geometry in
             TimelineEdgeFade.Edges(
