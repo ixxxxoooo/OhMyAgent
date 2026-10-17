@@ -81,4 +81,57 @@ struct SessionOrderTests {
         #expect(secondCached.title == "新标题")
         model.shutdownAll()
     }
+
+    @Test("点击历史会话:新标签走恢复模式,从点击起就以该会话 ID 标识,不先建空会话")
+    func openHistoryUsesRestoreMode() throws {
+        let (model, id, root) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        // 当前会话有内容(草稿非空)→ 必须新开标签承载历史会话
+        model.sessions[id]?.draft = "写到一半"
+        let before = model.conversations.count
+        model.openHistory(project: id, sessionId: "hist-1", title: "旧会话")
+        #expect(model.conversations.count == before + 1)
+        let opened = try #require(model.sessions[id])
+        #expect(opened.sessionId == "hist-1")
+        #expect(opened.sessionTitle == "旧会话")
+        #expect(opened.isReplaying)
+        model.shutdownAll()
+    }
+
+    @Test("重启恢复:有内容的会话标签在原标签里恢复同一个会话")
+    func chatSlotsRestoredAfterRelaunch() throws {
+        let (model, id, root) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        model.sessions[id]?.draft = "占位"
+        model.openHistory(project: id, sessionId: "hist-2", title: "恢复我")
+        model.saveNow()
+        model.shutdownAll()
+
+        let store = WorkbenchStore(fileURL: root.appendingPathComponent("state/workbench.json"))
+        let reopened = WorkbenchModel(store: store, autoConnect: false) { url in
+            let session = SessionModel(workspace: url)
+            session.attention = AttentionCenter()
+            return session
+        }
+        reopened.select(project: id)
+        let restored = try #require(reopened.sessions[id])
+        #expect(restored.sessionId == "hist-2")
+        reopened.shutdownAll()
+    }
+
+    @Test("删除会话:清缓存/置顶/归档并写墓碑,列表刷新后不会回来")
+    func forgetSessionKeepsTombstone() throws {
+        let (model, id, root) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let items = [SessionSummary(sessionId: "d1", cwd: id, title: "要删的", updatedAt: nil), SessionSummary(sessionId: "d2", cwd: id, title: "保留", updatedAt: nil)]
+        model.cacheHistory(items, agentID: "claude-code", for: id)
+        model.toggleSessionPin("d1", in: id)
+        #expect(model.forgetSession("d1", in: id))
+        let entry = try #require(model.projects.first)
+        #expect(!entry.sessions.contains { $0.sessionId == "d1" })
+        #expect(!entry.pinnedSessions.contains("d1"))
+        model.cacheHistory(items, agentID: "claude-code", for: id)
+        #expect(model.projects[0].sessions.map(\.sessionId) == ["d2"])
+        model.shutdownAll()
+    }
 }

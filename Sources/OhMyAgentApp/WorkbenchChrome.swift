@@ -50,13 +50,20 @@ struct AgentMenu: View {
         }
     }
 
-    /// 当前项目内切换 Agent:结束旧会话进程,用新描述符开始新会话。
+    /// 当前项目内切换 Agent。
+    /// - 当前会话还是空白:原位替换成新引擎的空白会话(列表不变)。
+    /// - 当前会话已有内容:保持它原样不动,在新标签里用新引擎开始新对话——
+    ///   切换引擎不会让任何已有会话发生变化或消失。
     /// - Parameter descriptor: 目标 Agent
     @MainActor
     static func switchAgent(to descriptor: AgentDescriptor) {
         let workbench = AppEnvironment.shared.workbench
         guard let id = workbench.selectedProjectID, let current = workbench.activeSession, descriptor.id != current.descriptor.id else { return }
-        Log.session.info("切换 Agent", ["project": id, "from": current.descriptor.id, "to": descriptor.id])
+        Log.session.info("切换 Agent", ["project": id, "from": current.descriptor.id, "to": descriptor.id, "pristine": current.isPristine ? "yes" : "no"])
+        guard current.isPristine else {
+            workbench.newConversation(in: id, agentID: descriptor.id)
+            return
+        }
         // 优先认领预热好的待命会话,没有再现场创建
         let project = workbench.projects.first(where: { $0.id == id })
         let next = project.flatMap { workbench.takeWarmSession(agentID: descriptor.id, project: $0) }

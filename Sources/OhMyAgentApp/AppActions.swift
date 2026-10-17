@@ -66,6 +66,46 @@ final class AppActions {
         showMainWindow()
     }
 
+    /// 删除会话:确认 → 客户端移除(缓存/置顶/归档/标签 + 墓碑)→ 引擎支持时同步删除其历史。
+    /// 引擎侧用**会话所属引擎**的连接删除;没有对应连接时只做本地移除(墓碑保证它不再回到侧栏)。
+    /// - Parameters:
+    ///   - projectID: 项目 ID
+    ///   - sessionId: 协议会话 ID
+    ///   - title: 标题(确认框展示)
+    ///   - agentID: 会话所属引擎(nil 取缓存登记的归属)
+    func deleteSession(projectID: String, sessionId: String, title: String, agentID: String?) {
+        let workbench = AppEnvironment.shared.workbench
+        let models = workbench.conversations.filter { $0.key.projectID == projectID }.map(\.value)
+        let running = models.contains { $0.sessionId == sessionId && $0.isRunning }
+        let message = running
+            ? String(localized: "「\(title)」正在运行,删除会立即中断它,且无法恢复。")
+            : String(localized: "「\(title)」将被永久删除,无法恢复。")
+        guard OMDialog.confirm(title: String(localized: "删除会话"), message: message, confirmTitle: String(localized: "删除"), destructive: true) else { return }
+        let owner = agentID ?? workbench.cachedAgentID(ofSession: sessionId, in: projectID)
+        func matches(_ model: SessionModel) -> Bool { model.phase == .ready && (owner == nil || model.descriptor.id == owner) }
+        let bystander = models.first { $0.sessionId != sessionId && matches($0) }
+        let displaying = models.first { $0.sessionId == sessionId && matches($0) }
+        RecentStore.removeSession(sessionId)
+        if let bystander {
+            workbench.forgetSession(sessionId, in: projectID)
+            Task { _ = await bystander.deleteOnEngine(sessionId) }
+        } else if let displaying {
+            // 只有正显示它的连接能删:先让引擎删(最多等 3 秒),再关闭标签
+            Task {
+                await withTaskGroup(of: Void.self) { group in
+                    group.addTask { _ = await displaying.deleteOnEngine(sessionId) }
+                    group.addTask { try? await Task.sleep(for: .seconds(3)) }
+                    await group.next()
+                    group.cancelAll()
+                }
+                workbench.forgetSession(sessionId, in: projectID)
+            }
+        } else {
+            workbench.forgetSession(sessionId, in: projectID)
+            Log.session.info("删除会话:无对应引擎连接,仅本地移除", ["project": projectID, "owner": owner ?? "-"])
+        }
+    }
+
     /// 回到对话并把文本追加到当前会话的输入框(设置页里的「在对话中使用」)。
     /// - Parameter text: 要插入的文本(如 `/review ` 或 `@agent-explorer `)
     func insertIntoComposer(_ text: String) {

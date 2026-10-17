@@ -183,6 +183,16 @@ public enum RecentStore {
         if let data = try? JSONEncoder().encode(Array(list.prefix(20))) { defaults.set(data, forKey: sessionsKey) }
     }
 
+    /// 从最近会话里移除某个会话(用户删除会话后调用)。
+    /// - Parameters:
+    ///   - sessionId: 协议会话 ID
+    ///   - defaults: 存储
+    public static func removeSession(_ sessionId: String, _ defaults: UserDefaults = RecentStore.defaults) {
+        let list = sessions(defaults)
+        guard list.contains(where: { $0.sessionId == sessionId }) else { return }
+        if let data = try? JSONEncoder().encode(list.filter { $0.sessionId != sessionId }) { defaults.set(data, forKey: sessionsKey) }
+    }
+
     /// 清空最近会话。
     public static func clearSessions(_ defaults: UserDefaults = RecentStore.defaults) { defaults.removeObject(forKey: sessionsKey) }
 

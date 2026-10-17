@@ -22,35 +22,22 @@ struct SidebarSession: Identifiable, Equatable {
     let updatedAt: Date?
     let isCurrent: Bool
     let isRunning: Bool
-    /// 会话所属 Agent;只在属于「别的引擎」时才有值(用来显示引擎徽标、点击时切回原引擎打开)
+    /// 会话所属 Agent;只在属于「别的引擎」时才有值(点击时据此切回原引擎打开;界面不显示引擎名)
     var foreignAgentID: String?
 }
 
 extension WorkbenchModel {
-    /// 项目的全部会话行(按「创建时间」倒序,会话有新活动时顺序不跳动;
-    /// 尚未产生消息的新对话没有协议会话 ID,固定排在最前)。
+    /// 项目的全部会话行:**只读持久化缓存**(`ProjectEntry.sessions`),按「创建时间」倒序,
+    /// 与当前引擎、连接状态、引擎历史刷新都无关——切换引擎、点击会话、会话有新活动时顺序都不跳动。
+    /// 当前会话若是尚未产生内容的空白对话,只在该项目被选中时显示为顶部的「新对话」。
     @MainActor
     func sidebarSessions(for project: ProjectEntry) -> [SidebarSession] {
         let model = sessions[project.id]
         let cache = Dictionary(project.sessions.map { ($0.sessionId, $0) }, uniquingKeysWith: { first, _ in first })
         let currentAgent = model?.descriptor.id
-        // 当前引擎的会话取实时列表;其他引擎的会话取缓存——切换引擎不会让原来的会话从侧栏消失
-        let source: [CachedSession] = {
-            guard let live = model?.history, !live.isEmpty else { return project.sessions }
-            let liveItems = live.map {
-                CachedSession(
-                    sessionId: $0.sessionId, title: $0.title, updatedAt: $0.updatedAt,
-                    createdAt: cache[$0.sessionId]?.createdAt,
-                    firstSeenAt: cache[$0.sessionId]?.firstSeenAt,
-                    agentId: currentAgent
-                )
-            }
-            let liveIDs = Set(live.map(\.sessionId))
-            let others = project.sessions.filter { !liveIDs.contains($0.sessionId) && $0.agentId != nil && $0.agentId != currentAgent }
-            return liveItems + others
-        }()
-        var rows: [(key: Date, row: SidebarSession)] = source.compactMap { item in
-            guard item.sessionId != model?.sessionId, !EmptySessionRegistry.isHidden(item.sessionId) else { return nil }
+        let deleted = Set(project.deletedSessions)
+        var rows: [(key: Date, row: SidebarSession)] = project.sessions.compactMap { item in
+            guard item.sessionId != model?.sessionId, !EmptySessionRegistry.isHidden(item.sessionId), !deleted.contains(item.sessionId) else { return nil }
             let displayDate = Self.parseDate(item.updatedAt) ?? Self.parseDate(item.createdAt) ?? Self.parseDate(item.firstSeenAt)
             return (item.stableKey, SidebarSession(
                 projectID: project.id, sessionId: item.sessionId, uid: nil,
@@ -59,11 +46,13 @@ extension WorkbenchModel {
                 foreignAgentID: item.agentId.flatMap { $0 != currentAgent ? $0 : nil }
             ))
         }
-        if let model, selectedProjectID == project.id || model.sessionId != nil || model.isRunning {
-            let key = model.sessionId.flatMap { cache[$0]?.stableKey } ?? .distantFuture
+        if let model, !deleted.contains(model.sessionId ?? ""),
+           !model.isPristine || model.isRunning || selectedProjectID == project.id {
+            let cached = model.sessionId.flatMap { cache[$0] }
+            let key = cached?.stableKey ?? .distantFuture
             rows.append((key, SidebarSession(
                 projectID: project.id, sessionId: model.sessionId, uid: model.uid,
-                title: model.sessionTitle ?? String(localized: "新对话"),
+                title: model.sessionTitle ?? cached?.title ?? String(localized: "新对话"),
                 updatedAt: nil, isCurrent: true, isRunning: model.isRunning
             )))
         }
@@ -577,7 +566,6 @@ private struct SessionLine: View {
                         LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing).frame(width: 24) // ui-lint:allow 仅作遮罩/淡出,非装饰
                     }
                 )
-            if let agent = item.foreignAgentID { AgentBadge(agentID: agent) }
             trailing
                 .frame(width: 76, height: 20, alignment: .trailing)
         }
@@ -658,11 +646,9 @@ private struct SessionLine: View {
             if !below.isEmpty {
                 OMMenuItem("归档下方全部", icon: "archive") { workbench.archiveSessions(below, in: item.projectID) }
             }
-            if !item.isCurrent, let model = workbench.sessions[item.projectID], model.capabilities.canDelete {
-                OMMenuDivider()
-                OMMenuItem("删除", icon: "trash", isDestructive: true) {
-                    model.deleteSession(SessionSummary(sessionId: id, cwd: item.projectID, title: item.title))
-                }
+            OMMenuDivider()
+            OMMenuItem("删除", icon: "trash", isDestructive: true) {
+                AppActions.shared.deleteSession(projectID: item.projectID, sessionId: id, title: item.title, agentID: item.foreignAgentID)
             }
         }
     }
@@ -685,27 +671,6 @@ private struct SessionLine: View {
         } else if let id = item.sessionId {
             workbench.openHistory(project: item.projectID, sessionId: id, title: item.title, agentID: item.foreignAgentID)
         }
-    }
-}
-
-/// 会话行上的引擎徽标:会话属于另一个 Agent(引擎)时显示其名称,点击该行会切回原引擎打开。
-private struct AgentBadge: View {
-    let agentID: String
-
-    private var name: String {
-        AgentRegistryModel.shared.data.allAgents.first { $0.id == agentID }?.name ?? agentID
-    }
-
-    var body: some View {
-        Text(verbatim: name)
-            .font(OMFonts.caption)
-            .foregroundStyle(OMColors.tertiaryText)
-            .lineLimit(1)
-            .padding(.horizontal, 5)
-            .frame(maxWidth: 72, minHeight: 16)
-            .background(OMColors.subtleFill, in: OMPillShape())
-            .help(String(localized: "属于 \(name):点击会切回该引擎打开"))
-            .accessibilityLabel(String(localized: "引擎 \(name)"))
     }
 }
 

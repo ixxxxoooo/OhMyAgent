@@ -162,7 +162,7 @@ struct ComposerView: View {
 
     private var placeholder: String {
         switch model.phase {
-        case .connecting: return model.connectNote ?? String(localized: "正在连接 Agent,可以先输入…")
+        case .connecting where model.connectNote != nil: return model.connectNote ?? ""
         case .failed: return String(localized: "Agent 未连接,发送将尝试重新连接")
         default:
             let commandToSend = sendKey == SendKey.commandEnter.rawValue
@@ -603,7 +603,7 @@ struct ComposerFooter: View {
     private var footerStatus: some View {
         switch model.phase {
         case .connecting:
-            HStack(spacing: 4) { ProgressView().controlSize(.mini); Text(model.connectNote == nil ? String(localized: "正在连接…") : String(localized: "正在安装适配器…")) }
+            DelayedConnectingHint(model: model)
         case .failed:
             HStack(spacing: 4) { OMStatusDot(.failure); Text("连接失败").foregroundStyle(OMColors.warning) }
         case .idle:
@@ -617,5 +617,25 @@ struct ComposerFooter: View {
     private func refresh() async {
         let directory = model.workspace
         head = await Task.detached(priority: .utility) { GitHead.read(at: directory) }.value
+    }
+}
+
+/// 连接中的弱提示:连接超过约 0.9 秒才出现(预热命中、秒连时完全无感);安装适配器这类长耗时操作立即提示。
+private struct DelayedConnectingHint: View {
+    let model: SessionModel
+    @State private var delayElapsed = false
+
+    var body: some View {
+        HStack(spacing: 4) {
+            if delayElapsed || model.connectNote != nil {
+                ProgressView().controlSize(.mini)
+                Text(model.connectNote == nil ? String(localized: "正在连接…") : String(localized: "正在安装适配器…"))
+            }
+        }
+        .task(id: model.uid) {
+            delayElapsed = false
+            try? await Task.sleep(for: .milliseconds(900))
+            if !Task.isCancelled { delayElapsed = true }
+        }
     }
 }

@@ -362,15 +362,21 @@ public struct DockLayout: Codable, Equatable, Sendable {
 
     /// 返回适合启动时恢复的布局:剔除不可恢复的临时标签(子 Agent、预览、终端)与已不存在项目的标签,并校正结构。
     /// - Parameter projectIDs: 当前仍存在的项目 ID
-    public func restoredForLaunch(projectIDs: Set<String>) -> DockLayout {
+    public func restoredForLaunch(projectIDs: Set<String>, keepChats: Set<ConversationKey> = []) -> DockLayout {
         var copy = self
         copy.maximizedGroupID = nil
-        // 会话进程不跨启动保留:每个项目只恢复一个会话标签,其余多开的会话标签丢弃
-        var chatProjects = Set<String>()
+        // 会话进程不跨启动保留,但有内容的会话标签会在原标签里恢复同一个会话(keepChats);
+        // 没有记录的会话标签每个项目只保留第一个(空白对话)
+        var blankKept = Set<String>()
+        let hasRecord = Set(keepChats.map(\.projectID))
         copy.closeTabs { tab in
             switch tab.kind {
             case .subagent, .preview, .terminal, .agentTerminal: return true
-            case .chat(let id, _): return !projectIDs.contains(id) || !chatProjects.insert(id).inserted
+            case .chat(let id, let slot):
+                guard projectIDs.contains(id) else { return true }
+                if keepChats.contains(ConversationKey(projectID: id, slot: slot)) { return false }
+                if hasRecord.contains(id) { return true }
+                return !blankKept.insert(id).inserted
             case .changes(let id), .history(let id, _): return !projectIDs.contains(id)
             case .file(let path), .diff(let path), .blame(let path):
                 return !projectIDs.contains { path == $0 || path.hasPrefix($0 + "/") } || !FileManager.default.fileExists(atPath: path)

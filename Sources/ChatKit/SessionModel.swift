@@ -268,6 +268,8 @@ public final class SessionModel {
     @ObservationIgnored public var attention: AttentionCenter = .shared
     /// 最近一次连接(启动适配器 + 握手 + 新建会话)耗时,用于诊断
     public private(set) var connectDuration: Duration?
+    /// 恢复模式的目标会话:连接成功后不创建新会话,直接加载它(见 `prepareRestore`)
+    @ObservationIgnored private var restoreTarget: SessionSummary?
     /// 当前工作区的历史会话(来自 `session/list`)
     public private(set) var history: [SessionSummary] = [] { didSet { onHistoryChanged?(history) } }
     /// 历史会话列表变化回调(工作台用于缓存,使项目树无需启动 Agent 即可显示会话)
@@ -397,16 +399,26 @@ public final class SessionModel {
                 let prepared = await self.prepareMCPServers(registry: registry, environment: tools.environment)
                 self.mcpServers = prepared.servers
                 self.bridge = prepared.bridge
-                let setup = try await self.newSessionAuthenticating(client: client, methods: result.authMethods, servers: prepared.servers)
-                self.sessionId = setup.sessionId
-                self.configOptions = setup.configOptions
+                // 恢复模式:目标是打开一个已有会话时跳过 session/new(不创建空会话),握手后直接 session/load
+                let restoring = self.restoreTarget
+                if restoring == nil {
+                    let setup = try await self.newSessionAuthenticating(client: client, methods: result.authMethods, servers: prepared.servers)
+                    self.sessionId = setup.sessionId
+                    self.configOptions = setup.configOptions
+                }
+                self.restoreTarget = nil
                 self.phase = .ready
                 self.startMappingObserver()
                 self.connectDuration = connectStart.duration(to: .now)
-                self.log.info("Agent 已就绪", ["agent": result.agentName, "ms": "\(OMLogger.milliseconds(since: connectStart))", "mcpServers": "\(prepared.servers.count)", "bridge": prepared.bridge == nil ? "off" : "on"])
+                self.log.info("Agent 已就绪", ["agent": result.agentName, "ms": "\(OMLogger.milliseconds(since: connectStart))", "mcpServers": "\(prepared.servers.count)", "bridge": prepared.bridge == nil ? "off" : "on", "restore": restoring == nil ? "no" : "yes"])
                 self.connectTask = nil
                 self.refreshHistory()
-                self.flushQueuedPrompt()
+                if let restoring {
+                    // 排队消息等会话回放完成后再发(openSession 末尾会 flush)
+                    self.openSession(restoring, force: true)
+                } else {
+                    self.flushQueuedPrompt()
+                }
             } catch {
                 self.log.error("连接 Agent 失败", error: error, ["agent": descriptor.id, "ms": "\(OMLogger.milliseconds(since: connectStart))"])
                 await supervisor.stop()
@@ -1160,10 +1172,33 @@ public final class SessionModel {
         }
     }
 
+    /// 为「尚未连接」的会话登记恢复目标:侧栏从点击瞬间起就以该会话 ID 标识这一行,
+    /// 连接后直接 `session/load`,不会先建一个空会话(杜绝顶部闪出「新对话」)。
+    /// - Parameter summary: 要恢复的会话摘要
+    public func prepareRestore(_ summary: SessionSummary) {
+        guard phase == .idle, restoreTarget == nil, sessionId == nil, !summary.sessionId.isEmpty else { return }
+        restoreTarget = summary
+        if let manual = ClientPrefs.sessionTitleOverrides()[summary.sessionId] {
+            titleSource = .manual; sessionTitle = manual
+        } else if let generated = ClientPrefs.generatedSessionTitles()[summary.sessionId] {
+            titleSource = .generated; sessionTitle = generated
+        } else {
+            titleSource = summary.title?.isEmpty == false ? .adapter : .none
+            sessionTitle = summary.title
+        }
+        sessionId = summary.sessionId
+        isReplaying = true
+    }
+
     /// 打开历史会话:优先 `session/load`(回放历史),否则 `session/resume`。
-    /// - Parameter summary: 会话摘要
-    public func openSession(_ summary: SessionSummary) {
-        guard let client, phase == .ready, summary.sessionId != sessionId, capabilities.loadSession || capabilities.canResume else { return }
+    /// - Parameters:
+    ///   - summary: 会话摘要
+    ///   - force: 恢复模式下 sessionId 已提前设为目标,需跳过「已是当前会话」的判断
+    public func openSession(_ summary: SessionSummary, force: Bool = false) {
+        guard let client, phase == .ready, force || summary.sessionId != sessionId, capabilities.loadSession || capabilities.canResume else {
+            if force { isReplaying = false; flushQueuedPrompt() }
+            return
+        }
         cancel()
         timeline.reset()
         goal = nil
@@ -1206,6 +1241,7 @@ public final class SessionModel {
             await self?.settleEvents()
             self?.timeline.finishStreaming()
             self?.isReplaying = false
+            self?.flushQueuedPrompt()
             // 回放后一条内容都没有:多半是 Agent 建会话时落盘、却从没发过消息的空会话。登记后从列表里隐藏
             if let self, self.timeline.entries.isEmpty, self.sessionId == summary.sessionId {
                 EmptySessionRegistry.hide(summary.sessionId)
@@ -1271,6 +1307,21 @@ public final class SessionModel {
         Task { [weak self] in
             try? await client.deleteSession(sessionId: summary.sessionId)
             self?.refreshHistory()
+        }
+    }
+
+    /// 在引擎侧删除任意会话(含当前正显示的会话,调用方负责随后关闭它)。
+    /// - Parameter sessionId: 协议会话 ID
+    /// - Returns: 引擎是否确认删除;引擎不支持或失败时为 false(仍应在客户端侧移除)
+    public func deleteOnEngine(_ sessionId: String) async -> Bool {
+        guard let client, capabilities.canDelete, !sessionId.isEmpty else { return false }
+        do {
+            try await client.deleteSession(sessionId: sessionId)
+            log.info("引擎侧已删除会话", ["target": String(sessionId.prefix(8))])
+            return true
+        } catch {
+            log.warning("引擎侧删除会话失败", ["target": String(sessionId.prefix(8)), "error": "\(error)"])
+            return false
         }
     }
 

@@ -23,6 +23,9 @@ final class AppEnvironment {
             guard let descriptor = AgentRegistryModel.shared.data.allAgents.first(where: { $0.id == agentID }) else { return nil }
             return AppEnvironment.makeSession(workspace: url, descriptor: descriptor)
         }
+        workbench.defaultAgentID = { Toolchain.defaultDescriptor().id }
+        // 待命会话被新对话/新标签认领后,立即补一个新的,下一次同样零等待
+        workbench.onWarmSessionTaken = { [weak self] in self?.scheduleEngineWarmup(delay: .milliseconds(800)) }
         workbench.warmPool.factory = { url, descriptor in AppEnvironment.makeSession(workspace: url, descriptor: descriptor) }
         // 多文件夹工作区:文件索引覆盖附加文件夹
         let wb = workbench
@@ -42,7 +45,10 @@ final class AppEnvironment {
         let enabled = AgentRegistryModel.shared.data.enabledAgents
         let recent = project.sessions.sorted { ($0.updatedAt ?? "") > ($1.updatedAt ?? "") }.compactMap(\.agentId)
         let plan = EngineWarmPlanner.plan(mode: mode, currentEngineID: current.descriptor.id, recentEngineIDs: recent, enabledEngineIDs: enabled.map(\.id))
-        let descriptors = plan.compactMap { wanted in enabled.first { $0.id == wanted } }
+        // 默认引擎的待命会话排第一:下一个新对话/历史标签直接认领(即使默认引擎正是当前引擎)
+        let defaultID = Toolchain.defaultDescriptor().id
+        let ordered = (enabled.contains { $0.id == defaultID } ? [defaultID] : []) + plan.filter { $0 != defaultID }
+        let descriptors = ordered.compactMap { wanted in enabled.first { $0.id == wanted } }
         workbench.warmPool.warmSequentially(descriptors, workspace: current.workspace, delay: delay)
     }
 

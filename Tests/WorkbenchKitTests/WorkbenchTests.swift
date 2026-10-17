@@ -221,7 +221,8 @@ struct WorkbenchTests {
         #expect(model.projects[0].collapsed)
         let history = (0..<40).map { SessionSummary(sessionId: "s\($0)", cwd: a, title: "会话\($0)", updatedAt: nil) }
         model.cacheHistory(history, for: a)
-        #expect(model.projects[0].sessions.count == 30)
+        // 缓存只增不减:一次刷新的 40 条全部保留
+        #expect(model.projects[0].sessions.count == 40)
         #expect(model.projects[0].sessions.first?.title == "会话0")
         model.shutdownAll()
     }
@@ -302,15 +303,19 @@ struct WorkbenchTests {
         #expect(ids == ["c1", "g1"])
         #expect(model.cachedAgentID(ofSession: "c1", in: a) == "claude-code")
         #expect(model.cachedAgentID(ofSession: "g1", in: a) == "antigravity")
-        // Antigravity 列表变化(g1 被删、g2 新增)不影响 Claude 的 c1
+        // Antigravity 列表变化(g2 新增、列表里不再返回 g1)不影响任何已有会话:只增不减
         model.cacheHistory([SessionSummary(sessionId: "g2", cwd: a, title: "新", updatedAt: nil)], agentID: "antigravity", for: a)
         ids = Set(model.projects[0].sessions.map(\.sessionId))
-        #expect(ids == ["c1", "g2"])
-        // 每个引擎各自最多 30 条
-        let many = (0..<40).map { SessionSummary(sessionId: "m\($0)", cwd: a, title: "m", updatedAt: nil) }
-        model.cacheHistory(many, agentID: "antigravity", for: a)
-        #expect(model.projects[0].sessions.filter { $0.agentId == "antigravity" }.count == 30)
-        #expect(model.projects[0].sessions.contains { $0.sessionId == "c1" })
+        #expect(ids == ["c1", "g1", "g2"])
+        // 引擎返回空列表也不会冲掉缓存
+        model.cacheHistory([], agentID: "antigravity", for: a)
+        #expect(Set(model.projects[0].sessions.map(\.sessionId)) == ["c1", "g1", "g2"])
+        // 删除后写入墓碑:之后引擎列表里再出现也不会加回
+        model.forgetSession("g1", in: a)
+        #expect(!model.projects[0].sessions.contains { $0.sessionId == "g1" })
+        model.cacheHistory(agy, agentID: "antigravity", for: a)
+        #expect(!model.projects[0].sessions.contains { $0.sessionId == "g1" })
+        #expect(model.isSessionDeleted("g1", in: a))
         model.shutdownAll()
     }
 

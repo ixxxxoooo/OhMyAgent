@@ -145,6 +145,8 @@ public struct ProjectEntry: Codable, Equatable, Sendable, Identifiable {
     public var pinnedSessions: [String] = []
     /// 已归档的会话 ID(不在列表中显示,可在「已归档」中恢复)
     public var archivedSessions: [String] = []
+    /// 已删除会话的墓碑 ID:引擎历史刷新时不再把它们加回侧栏(防止「删了又冒出来」)
+    public var deletedSessions: [String] = []
     /// 是否为「会话区」:不绑定任何项目的通用对话(ChatGPT 式问答),工作目录是应用支持目录下的空目录。
     /// 它复用项目的会话机制(历史、置顶、归档、标签),但不出现在项目列表里。
     public var isChatArea = false
@@ -163,7 +165,7 @@ public struct ProjectEntry: Codable, Equatable, Sendable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, addedAt, lastOpenedAt, pinned, collapsed, sessions, pinnedSessions, archivedSessions, isChatArea, icon, extraFolders
+        case id, name, addedAt, lastOpenedAt, pinned, collapsed, sessions, pinnedSessions, archivedSessions, deletedSessions, isChatArea, icon, extraFolders
     }
 
     /// 容错解码:新增字段缺失时使用默认值,旧版本状态文件可继续读取。
@@ -178,10 +180,33 @@ public struct ProjectEntry: Codable, Equatable, Sendable, Identifiable {
         sessions = try c.decodeIfPresent([CachedSession].self, forKey: .sessions) ?? []
         pinnedSessions = try c.decodeIfPresent([String].self, forKey: .pinnedSessions) ?? []
         archivedSessions = try c.decodeIfPresent([String].self, forKey: .archivedSessions) ?? []
+        deletedSessions = try c.decodeIfPresent([String].self, forKey: .deletedSessions) ?? []
         isChatArea = try c.decodeIfPresent(Bool.self, forKey: .isChatArea) ?? false
         icon = try c.decodeIfPresent(ProjectIcon.self, forKey: .icon)
         extraFolders = try c.decodeIfPresent([String].self, forKey: .extraFolders) ?? []
     }
+}
+
+/// 一个会话标签在退出时的状态:重启后据此在原标签里恢复同一个会话(而不是新建空白会话)。
+public struct ChatSlotRecord: Codable, Equatable, Sendable {
+    public var projectID: String
+    /// 标签槽位(nil 为项目主会话)
+    public var slot: String?
+    public var sessionId: String
+    /// 会话所属引擎
+    public var agentId: String?
+    public var title: String?
+
+    public init(projectID: String, slot: String?, sessionId: String, agentId: String?, title: String?) {
+        self.projectID = projectID
+        self.slot = slot
+        self.sessionId = sessionId
+        self.agentId = agentId
+        self.title = title
+    }
+
+    /// 与 `ConversationKey` 对应的键。
+    public var key: ConversationKey { ConversationKey(projectID: projectID, slot: slot) }
 }
 
 /// 持久化的工作台状态。
@@ -191,6 +216,8 @@ public struct WorkbenchState: Codable, Equatable, Sendable {
     public var selectedProjectID: String?
     /// 停靠布局(旧版本状态文件没有该字段)
     public var dock: DockLayout?
+    /// 退出时仍有内容的会话标签(旧版本状态文件没有该字段)
+    public var chatSlots: [ChatSlotRecord]?
 
     public init() {}
 }

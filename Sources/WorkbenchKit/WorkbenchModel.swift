@@ -44,7 +44,13 @@ public final class WorkbenchModel {
     /// 选中项目变化回调(应用层据此安排预热)。
     @ObservationIgnored public var onProjectSelected: (@MainActor (String) -> Void)?
     @ObservationIgnored public var makeAgentSession: (@MainActor (URL, String) -> SessionModel?)?
+    /// 默认引擎 ID(应用层注入):新会话优先认领它的待命会话,实现「新对话/打开历史几乎零等待」。
+    @ObservationIgnored public var defaultAgentID: (@MainActor () -> String?)?
+    /// 待命会话被认领后回调(应用层据此补充新的待命会话)。
+    @ObservationIgnored public var onWarmSessionTaken: (@MainActor () -> Void)?
     @ObservationIgnored private var saveTask: Task<Void, Never>?
+    /// 启动时从状态文件读到、尚未创建会话的标签记录:首次显示该标签时据此恢复原会话
+    @ObservationIgnored private var pendingRestores: [ConversationKey: ChatSlotRecord] = [:]
     @ObservationIgnored private let log = Log.session
     @ObservationIgnored private let autoConnect: Bool
 
@@ -63,7 +69,10 @@ public final class WorkbenchModel {
         projects = alive
         selectedProjectID = selected
         layout = state.layout
-        dock = (state.dock ?? DockLayout()).restoredForLaunch(projectIDs: Set(alive.map(\.id)))
+        let aliveIDs = Set(alive.map(\.id))
+        let records = (state.chatSlots ?? []).filter { aliveIDs.contains($0.projectID) && !$0.sessionId.isEmpty }
+        pendingRestores = Dictionary(records.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
+        dock = (state.dock ?? DockLayout()).restoredForLaunch(projectIDs: aliveIDs, keepChats: Set(pendingRestores.keys))
         self.healSessionCreationDates()
         log.info("工作台状态已加载", ["projects": "\(alive.count)", "selected": selected ?? "-"])
     }
@@ -189,6 +198,8 @@ public final class WorkbenchModel {
     /// 项目当前应显示的会话槽位:最近激活的;否则编辑区里已有的该项目会话标签;都没有时为 nil(主会话)。
     private func preferredSlot(for id: String) -> String? {
         if let slot = lastSlot[id], dock.tab(for: .chat(projectID: id, slot: slot)) != nil { return slot }
+        // 启动恢复:优先落在聚焦组里本来就激活着的该项目会话标签
+        if case .chat(let p, let slot)? = dock.focusedGroup?.active?.kind, p == id { return slot }
         for tab in dock.allTabs {
             if case .chat(let p, let slot) = tab.kind, p == id { return slot }
         }
@@ -609,7 +620,9 @@ public final class WorkbenchModel {
     ///   - agentID: 引擎 ID
     ///   - project: 项目
     public func takeWarmSession(agentID: String, project: ProjectEntry) -> SessionModel? {
-        project.isMultiRoot ? nil : warmPool.take(agentID: agentID, workspace: project.url)
+        guard !project.isMultiRoot, !project.isChatArea, let model = warmPool.take(agentID: agentID, workspace: project.url) else { return nil }
+        onWarmSessionTaken?()
+        return model
     }
 
     // MARK: 设置整页
@@ -649,6 +662,24 @@ public final class WorkbenchModel {
         scheduleSave()
     }
 
+    /// 在项目下用指定引擎开始新对话:总是新开标签(已有会话保持原样,切换引擎不影响任何已有会话)。
+    /// - Parameters:
+    ///   - id: 项目 ID
+    ///   - agentID: 承载新对话的引擎
+    public func newConversation(in id: String, agentID: String) {
+        guard let project = projects.first(where: { $0.id == id }) else { return }
+        selectedProjectID = id
+        mode = .workspace
+        let slot = UUID().uuidString
+        let title = project.isChatArea ? String(localized: "新对话") : String(localized: "新对话") + " · " + project.name
+        let tab = dock.open(.chat(projectID: id, slot: slot), title: title)
+        dock.activate(tab)
+        lastSlot[id] = .some(slot)
+        ensureSession(project: id, slot: slot, agentID: agentID)
+        closeSubagentTabs(in: id)
+        scheduleSave()
+    }
+
     /// 分叉会话并在新标签页中打开 (对标 Cursor Fork Chat)
     @discardableResult
     public func forkConversation(from source: SessionModel) -> UUID? {
@@ -669,6 +700,14 @@ public final class WorkbenchModel {
         closeSubagentTabs(in: projectID)
         scheduleSave()
         return tab
+    }
+
+    /// 缓存里某个会话的标题(没有时为 nil)。
+    /// - Parameters:
+    ///   - sessionId: 协议会话 ID
+    ///   - id: 项目 ID
+    func cachedTitle(ofSession sessionId: String, in id: String) -> String? {
+        projects.first { $0.id == id }?.sessions.first { $0.sessionId == sessionId }?.title
     }
 
     /// 缓存里某个会话所属的 Agent(旧数据或未登记为 nil)。
@@ -707,11 +746,19 @@ public final class WorkbenchModel {
             let tab = dock.open(.chat(projectID: id, slot: slot), title: title ?? project.name)
             dock.activate(tab)
             lastSlot[id] = .some(slot)
-            target = ensureSession(project: id, slot: slot, agentID: foreignAgent)
+            // 新标签走「恢复模式」:连接后直接 session/load,不先建空会话,侧栏也不会闪出「新对话」
+            let pending = SessionSummary(sessionId: sessionId, cwd: id, title: title ?? cachedTitle(ofSession: sessionId, in: id))
+            target = ensureSession(project: id, slot: slot, agentID: foreignAgent, restore: pending)
         } else {
             syncSelectionFromDock()
         }
         guard let model = target else { return }
+        // 恢复模式已接管:无需再走「等连接就绪后打开」
+        if model.sessionId == sessionId, model.isReplaying || model.phase != .ready {
+            closeSubagentTabs(in: id)
+            scheduleSave()
+            return
+        }
         let summary = model.history.first { $0.sessionId == sessionId } ?? SessionSummary(sessionId: sessionId, cwd: id, title: title)
         if model.phase == .ready {
             model.openSession(summary)
@@ -741,16 +788,35 @@ public final class WorkbenchModel {
     ///   - slot: 会话槽位(nil 为项目主会话)
     ///   - agentID: 指定承载的 Agent;nil 或工厂不认识时用默认 Agent
     @discardableResult
-    public func ensureSession(project id: String, slot: String?, agentID: String? = nil) -> SessionModel? {
+    public func ensureSession(project id: String, slot: String?, agentID: String? = nil, restore: SessionSummary? = nil) -> SessionModel? {
         let key = ConversationKey(projectID: id, slot: slot)
         if let existing = conversations[key] { return existing }
         guard let project = projects.first(where: { $0.id == id }) else { return nil }
-        let model = agentID.flatMap { takeWarmSession(agentID: $0, project: project) ?? makeAgentSession?(project.url, $0) } ?? makeSession(project.url)
+        // 启动恢复:这个标签退出前承载着一个会话,在原标签里恢复同一个会话(原引擎承载)
+        var agentID = agentID
+        var restore = restore
+        if restore == nil, agentID == nil, let record = pendingRestores.removeValue(forKey: key), !isSessionDeleted(record.sessionId, in: id) {
+            restore = SessionSummary(sessionId: record.sessionId, cwd: id, title: record.title)
+            if let owner = record.agentId, makeAgentSession != nil { agentID = owner }
+        }
+        // 指定引擎:先认领待命会话;未指定时认领默认引擎的待命会话(新对话/打开历史不再等启动与握手)
+        let model: SessionModel
+        if let agentID {
+            model = takeWarmSession(agentID: agentID, project: project) ?? makeAgentSession?(project.url, agentID) ?? makeSession(project.url)
+        } else if let defaultID = defaultAgentID?(), let warm = takeWarmSession(agentID: defaultID, project: project) {
+            model = warm
+        } else {
+            model = makeSession(project.url)
+        }
         if project.isChatArea { model.extraSystemPrompt = Self.chatAreaPrompt }
         model.additionalDirectories = project.extraFolders
         wire(model, project: id)
         conversations[key] = model
+        // 已连好的待命会话 phase 不是 idle,prepareRestore 会自动忽略,由调用方走常规 openSession
+        if let restore { model.prepareRestore(restore) }
         if autoConnect { model.connect() }
+        // 认领的待命会话可能已就绪:预热期间尚未接线,补刷一次历史列表让缓存同步
+        if model.phase == .ready { model.refreshHistory() }
         return model
     }
 
@@ -798,9 +864,10 @@ public final class WorkbenchModel {
         if model.phase == .ready { model.refreshHistory() }
     }
 
-    /// 缓存历史会话摘要(每个项目每个 Agent 最多 30 条);为每条会话保留真实创建时间作为恒定排序键。
+    /// 缓存历史会话摘要(只增不减:引擎列表没返回的条目照常保留,仅用户删除会写墓碑);
+    /// 为每条会话保留真实创建时间作为恒定排序键。
     ///
-    /// 会话按 Agent 分开保留:某个 Agent 的列表刷新只替换它自己的条目,**不会冲掉其他 Agent 的会话**
+    /// 会话按 Agent 记录归属:某个 Agent 的列表刷新**不会冲掉任何已有会话**
     /// (切换引擎后,原引擎的会话仍在侧栏,点击时会切回对应引擎打开)。
     /// - Parameters:
     ///   - history: 当前 Agent 返回的会话列表
@@ -810,8 +877,9 @@ public final class WorkbenchModel {
     func cacheHistory(_ history: [SessionSummary], agentID: String? = nil, for id: String, now: Date = Date()) {
         guard let index = projects.firstIndex(where: { $0.id == id }) else { return }
         let existing = projects[index].sessions
+        let tombstones = Set(projects[index].deletedSessions)
         let previous = Dictionary(existing.map { ($0.sessionId, $0) }, uniquingKeysWith: { first, _ in first })
-        let fresh = history.prefix(30).enumerated().map { (offset, item) -> CachedSession in
+        let fresh = history.filter { !tombstones.contains($0.sessionId) }.prefix(Self.cachedSessionLimit).enumerated().map { (offset, item) -> CachedSession in
             let existingCreated = previous[item.sessionId]?.createdAt ?? previous[item.sessionId]?.firstSeenAt
             let createdAt: String
             if let existingCreated, !existingCreated.isEmpty {
@@ -824,21 +892,61 @@ public final class WorkbenchModel {
                 let simulated = now.addingTimeInterval(-Double(offset) * 1.0)
                 createdAt = simulated.formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true))
             }
+            // 沿用已登记的所属引擎:避免旧缓存里的归属被无归属的刷新抹掉
             return CachedSession(
                 sessionId: item.sessionId, title: item.title, updatedAt: item.updatedAt,
-                createdAt: createdAt, firstSeenAt: createdAt, agentId: agentID
+                createdAt: createdAt, firstSeenAt: createdAt, agentId: agentID ?? previous[item.sessionId]?.agentId
             )
         }
-        // 其他 Agent 的条目原样保留(同一会话 ID 以新列表为准)
+        // 本次列表没有返回的条目一律保留:引擎列表可能分页、瞬时变短或失败,
+        // 侧栏必须稳定;只有用户主动删除(墓碑)才会让会话消失。
         let freshIDs = Set(fresh.map(\.sessionId))
-        let kept = agentID == nil ? [] : existing.filter { item in
-            guard let owner = item.agentId, owner != agentID else { return false }
-            return !freshIDs.contains(item.sessionId)
-        }
-        let cached = fresh + kept
+        let kept = existing.filter { !freshIDs.contains($0.sessionId) && !tombstones.contains($0.sessionId) }
+        let cached = Array((fresh + kept).prefix(Self.cachedSessionRetention))
         guard projects[index].sessions != cached else { return }
         projects[index].sessions = cached
         scheduleSave()
+    }
+
+    /// 每次刷新最多采纳的会话条数。
+    static let cachedSessionLimit = 100
+    /// 单个项目侧栏缓存保留的会话总数上限。
+    static let cachedSessionRetention = 400
+
+    /// 从侧栏与缓存中彻底移除一个会话:清理缓存/置顶/归档、写入墓碑、关闭正在显示它的标签。
+    /// 引擎侧的删除由调用方负责(需要对应引擎的连接);这里只处理客户端状态。
+    /// - Parameters:
+    ///   - sessionId: 协议会话 ID
+    ///   - id: 项目 ID
+    /// - Returns: 是否找到了项目
+    @discardableResult
+    public func forgetSession(_ sessionId: String, in id: String) -> Bool {
+        guard !sessionId.isEmpty, let index = projects.firstIndex(where: { $0.id == id }) else { return false }
+        projects[index].sessions.removeAll { $0.sessionId == sessionId }
+        projects[index].pinnedSessions.removeAll { $0 == sessionId }
+        projects[index].archivedSessions.removeAll { $0 == sessionId }
+        if !projects[index].deletedSessions.contains(sessionId) { projects[index].deletedSessions.append(sessionId) }
+        // 关闭正在显示该会话的标签
+        let slots: [String?] = conversations.filter { $0.key.projectID == id && $0.value.sessionId == sessionId }.map(\.key.slot)
+        if !slots.isEmpty {
+            dock.closeTabs { tab in
+                if case .chat(let projectID, let slot) = tab.kind { return projectID == id && slots.contains(slot) }
+                return false
+            }
+            if let last = lastSlot[id], slots.contains(last) { lastSlot[id] = nil }
+            syncSelectionFromDock()
+            // 该项目一个会话标签都不剩时补一个空白会话,保证主区域有内容可显示
+            let hasChatTab = dock.allTabs.contains { if case .chat(let projectID, _) = $0.kind { return projectID == id } else { return false } }
+            if selectedProjectID == id, !hasChatTab { select(project: id) }
+        }
+        log.info("删除会话", ["project": id, "session": String(sessionId.prefix(8))])
+        scheduleSave()
+        return true
+    }
+
+    /// 会话是否已被用户删除(墓碑)。
+    public func isSessionDeleted(_ sessionId: String, in id: String) -> Bool {
+        projects.first { $0.id == id }?.deletedSessions.contains(sessionId) ?? false
     }
 
     /// 记住某个会话(切换引擎或关闭前调用):列表刷新可能还没覆盖到它,这里直接写入缓存,保证不丢。
@@ -848,7 +956,8 @@ public final class WorkbenchModel {
     ///   - agentID: 所属 Agent
     ///   - id: 项目 ID
     func rememberSession(_ sessionId: String, title: String?, agentID: String, for id: String, now: Date = Date()) {
-        guard !sessionId.isEmpty, let index = projects.firstIndex(where: { $0.id == id }) else { return }
+        guard !sessionId.isEmpty, let index = projects.firstIndex(where: { $0.id == id }),
+              !projects[index].deletedSessions.contains(sessionId) else { return }
         let nowText = now.formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true))
         if let at = projects[index].sessions.firstIndex(where: { $0.sessionId == sessionId }) {
             var item = projects[index].sessions[at]
@@ -898,8 +1007,9 @@ public final class WorkbenchModel {
 
     /// 关闭所有会话(应用退出)。
     public func shutdownAll() {
-        for model in conversations.values { model.shutdown() }
+        // 先落盘再关闭会话:shutdown 会清空 sessionId,晚存就丢了「标签 → 会话」的恢复记录
         saveNow()
+        for model in conversations.values { model.shutdown() }
     }
 
     // MARK: 布局
@@ -1137,6 +1247,21 @@ public final class WorkbenchModel {
         }
     }
 
+    /// 当前仍有内容的会话标签记录(已创建会话的取实时状态;尚未显示的取启动时读到的记录),退出后用于恢复。
+    private func chatSlotRecords() -> [ChatSlotRecord] {
+        var result: [ConversationKey: ChatSlotRecord] = [:]
+        let openTabs = Set(dock.allTabs.compactMap { tab -> ConversationKey? in
+            if case .chat(let projectID, let slot) = tab.kind { return ConversationKey(projectID: projectID, slot: slot) }
+            return nil
+        })
+        for (key, record) in pendingRestores where openTabs.contains(key) { result[key] = record }
+        for (key, model) in conversations where openTabs.contains(key) {
+            guard let sessionId = model.sessionId, !model.isPristine || model.isReplaying else { continue }
+            result[key] = ChatSlotRecord(projectID: key.projectID, slot: key.slot, sessionId: sessionId, agentId: model.descriptor.id, title: model.sessionTitle)
+        }
+        return result.values.sorted { ($0.projectID, $0.slot ?? "") < ($1.projectID, $1.slot ?? "") }
+    }
+
     /// 立即写盘。
     public func saveNow() {
         saveTask?.cancel()
@@ -1145,6 +1270,7 @@ public final class WorkbenchModel {
         state.projects = projects
         state.selectedProjectID = selectedProjectID
         state.dock = dock
+        state.chatSlots = chatSlotRecords()
         do { try store.save(state) } catch { log.error("保存工作台状态失败", error: error, ["file": store.fileURL.path]) }
     }
 }
