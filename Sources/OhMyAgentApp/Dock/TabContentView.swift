@@ -44,6 +44,8 @@ struct TabContentView: View {
                 AutomationPage(workbench: workbench)
             } else if id == WorkbenchModel.customizeTabID {
                 CustomizePage(workbench: workbench)
+            } else if let browserID = WorkbenchModel.browserID(fromTab: id) {
+                BrowserTabView(browserID: browserID, workspace: workbench.selectedProjectID ?? NSHomeDirectory()).id(browserID)
             } else if let canvasID = WorkbenchModel.canvasID(fromTab: id) {
                 CanvasTabView(canvasID: canvasID).id(canvasID)
             } else {

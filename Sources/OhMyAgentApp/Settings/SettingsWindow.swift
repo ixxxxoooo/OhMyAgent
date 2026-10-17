@@ -13,7 +13,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
     case general, appearance, shortcuts
     case agent, providers, modelMapping, prompts, network, permissions, trust, agentExtensions
     case mcp, skills, subagents, hooks, plugins, memory
-    case editor, terminal, sourceControl, codeIntelligence
+    case editor, terminal, browser, sourceControl, codeIntelligence
     case usage, privacy, advanced, diagnostics
     var id: String { rawValue }
 
@@ -30,6 +30,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .agentExtensions: return ["acp", "registry", "codex", "gemini", "pi", "opencode", "注册表"]
         case .shortcuts: return ["快捷键", "shortcut", "keybinding"]
         case .sourceControl: return ["git", "提交", "commit", "署名", "co-authored-by", "提交说明", "scm", "工作树", "worktree"]
+        case .browser: return ["browser", "浏览器", "网页", "webview", "cookie", "审批", "localhost"]
         case .codeIntelligence: return ["lsp", "语言服务器", "诊断", "补全", "忽略", "ignore", "glob", "索引", "language server"]
         default: return []
         }
@@ -46,7 +47,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
     static let groups: [(title: String, pages: [SettingsPage])] = [
         (String(localized: "客户端"), [.general, .appearance, .shortcuts]),
         ("Agent", [.agent, .providers, .modelMapping, .prompts, .network, .permissions, .trust, .agentExtensions]),
-        (String(localized: "工作台"), [.editor, .terminal, .sourceControl, .codeIntelligence]),
+        (String(localized: "工作台"), [.editor, .terminal, .browser, .sourceControl, .codeIntelligence]),
         (String(localized: "其他"), [.usage, .privacy, .advanced, .diagnostics]),
     ]
 
@@ -72,6 +73,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .editor: return String(localized: "编辑器")
         case .terminal: return String(localized: "终端")
         case .sourceControl: return String(localized: "源代码管理")
+        case .browser: return String(localized: "浏览器")
         case .codeIntelligence: return String(localized: "代码智能")
         case .usage: return String(localized: "用量与成本")
         case .privacy: return String(localized: "隐私与遥测")
@@ -102,6 +104,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .editor: return "chevron.left.forwardslash.chevron.right"
         case .terminal: return "terminal"
         case .sourceControl: return "git-branch"
+        case .browser: return "globe"
         case .codeIntelligence: return "braces"
         case .usage: return "chart.bar"
         case .privacy: return "hand.raised"
@@ -276,6 +279,7 @@ struct SettingsView: View {
         case .editor: EditorPage()
         case .terminal: TerminalPage()
         case .sourceControl: SourceControlPage()
+        case .browser: BrowserPage()
         case .codeIntelligence: CodeIntelligencePage()
         case .shortcuts: ShortcutsPage()
         case .usage: UsagePage(paths: model.paths)

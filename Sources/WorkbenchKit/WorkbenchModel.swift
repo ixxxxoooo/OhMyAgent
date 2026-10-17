@@ -1238,6 +1238,48 @@ public final class WorkbenchModel {
         return tab
     }
 
+    // MARK: 浏览器标签
+
+    /// 浏览器标签的标识前缀(预览类标签,后缀为浏览器标签 id)。
+    public nonisolated static let browserTabPrefix = "oma-browser:"
+
+    /// 从预览标签标识里取浏览器标签 id;不是浏览器标签返回 nil。
+    /// - Parameter tabID: 预览标签标识
+    public nonisolated static func browserID(fromTab tabID: String) -> String? {
+        tabID.hasPrefix(browserTabPrefix) ? String(tabID.dropFirst(browserTabPrefix.count)) : nil
+    }
+
+    /// 打开(或切到)浏览器标签。
+    /// - Parameters:
+    ///   - id: 浏览器标签 id
+    ///   - title: 标签标题
+    ///   - activate: 是否切到该标签(Agent 在后台打开页面时为 false,不抢焦点)
+    @discardableResult
+    public func openBrowser(id: String, title: String, activate: Bool = true) -> UUID {
+        mode = .workspace
+        let tab = dock.open(.preview(id: Self.browserTabPrefix + id), title: title)
+        if activate {
+            dock.activate(tab)
+            syncSelectionFromDock()
+        }
+        return tab
+    }
+
+    /// 更新浏览器标签标题(页面标题变化时)。
+    /// - Parameters:
+    ///   - id: 浏览器标签 id
+    ///   - title: 新标题
+    public func setBrowserTitle(id: String, title: String) {
+        guard let tab = dock.allTabs.first(where: { $0.kind == .preview(id: Self.browserTabPrefix + id) }) else { return }
+        dock.setTitle(title, for: tab.id)
+    }
+
+    /// 浏览器标签当前是否仍在编辑区里。
+    /// - Parameter id: 浏览器标签 id
+    public func isBrowserOpen(id: String) -> Bool {
+        dock.allTabs.contains { $0.kind == .preview(id: Self.browserTabPrefix + id) }
+    }
+
     // MARK: 输出面板
 
     /// 输出面板在编辑区里的标签标识(放在编辑区时作为预览类标签)。

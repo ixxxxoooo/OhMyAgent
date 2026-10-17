@@ -12,10 +12,13 @@ import Synchronization
 public struct BridgeResult: Sendable, Equatable {
     public var text: String
     public var isError: Bool
+    /// 随文本一起返回的图片(PNG,如浏览器截图);作为 MCP 的 image 内容块
+    public var imagePNG: Data?
 
-    public init(_ text: String, isError: Bool = false) {
+    public init(_ text: String, isError: Bool = false, imagePNG: Data? = nil) {
         self.text = text
         self.isError = isError
+        self.imagePNG = imagePNG
     }
 }
 
@@ -45,6 +48,18 @@ public enum BridgeTool: String, CaseIterable, Sendable, Codable {
     case canvasUpdate = "canvas_update"
     case canvasList = "canvas_list"
     case searchCode = "search_code"
+    case browserNavigate = "browser_navigate"
+    case browserSnapshot = "browser_snapshot"
+    case browserClick = "browser_click"
+    case browserType = "browser_type"
+    case browserScroll = "browser_scroll"
+    case browserScreenshot = "browser_screenshot"
+    case browserConsole = "browser_console"
+    case browserNetwork = "browser_network"
+    case browserTabs = "browser_tabs"
+
+    /// 是否为浏览器类工具(受「浏览器」审批策略管理)。
+    public var isBrowser: Bool { rawValue.hasPrefix("browser_") }
 
     /// 工具说明(给模型看,英文更利于调用)。
     var summary: String {
@@ -66,6 +81,19 @@ public enum BridgeTool: String, CaseIterable, Sendable, Codable {
         case .searchCode:
             return "Fast indexed text search across the whole workspace (all workspace folders). Returns `path:line: text` per match. Prefer it over grep for broad "
                 + "exploration of large repositories: supports regex, whole-word, case sensitivity and a path substring filter. Narrow with `path` if there are too many matches."
+        case .browserNavigate:
+            return "Open a URL (http/https) in the built-in browser tab for this workspace and wait for it to load. The tab shares one persistent profile per workspace (cookies, logins), "
+                + "so you can reach pages the user is already signed in to. Use it to verify web apps you are building (e.g. http://localhost:3000)."
+        case .browserSnapshot:
+            return "Get a text snapshot of the current page: URL, title and a tree of visible elements. Interactive elements carry a `[ref=eN]` you pass to browser_click / browser_type / browser_scroll. "
+                + "Take a new snapshot after the page changes; refs are only valid for the latest snapshot."
+        case .browserClick: return "Click the element with the given ref from the latest browser_snapshot."
+        case .browserType: return "Type text into the input/textarea with the given ref (replaces its value). Set `submit` to press Enter afterwards."
+        case .browserScroll: return "Scroll the page (`direction`: up, down, top, bottom) or scroll the element with `ref` into view."
+        case .browserScreenshot: return "Take a screenshot (PNG) of the current page viewport to check layout and visuals."
+        case .browserConsole: return "Read recent console messages and uncaught errors of the current page (written since it was opened)."
+        case .browserNetwork: return "Read recent network requests (method, URL, status, duration) of the current page, newest last."
+        case .browserTabs: return "List the open browser tabs of this workspace (id, title, URL)."
         }
     }
 
@@ -91,6 +119,13 @@ public enum BridgeTool: String, CaseIterable, Sendable, Codable {
                            "case_sensitive": ["type": "boolean"], "whole_word": ["type": "boolean"],
                            "path": ["type": "string", "description": "Only search files whose path contains this substring"],
                            "max_results": ["type": "integer", "description": "Max matches to return (1-200, default 50)"]], required: ["query"])
+        case .browserNavigate: return object(["url": ["type": "string", "description": "http or https URL; a missing scheme defaults to https (http for localhost)"]], required: ["url"])
+        case .browserSnapshot, .browserScreenshot, .browserConsole, .browserNetwork, .browserTabs: return object([:], required: [])
+        case .browserClick: return object(["ref": ["type": "string", "description": "Element ref from the latest browser_snapshot, e.g. e12"]], required: ["ref"])
+        case .browserType:
+            return object(["ref": ["type": "string"], "text": ["type": "string"], "submit": ["type": "boolean", "description": "Press Enter after typing (default false)"]], required: ["ref", "text"])
+        case .browserScroll:
+            return object(["direction": ["type": "string", "description": "up, down (default), top or bottom"], "ref": ["type": "string", "description": "Scroll this element into view instead"]], required: [])
         }
     }
 
@@ -187,7 +222,9 @@ public final class BridgeServer: Sendable {
             guard let name = params?["name"]?.stringValue, let tool = BridgeTool(rawValue: name), enabled.contains(tool) else { return fail(-32602, "未知或已禁用的工具") }
             let result = await call(tool, arguments: params?["arguments"] ?? .object([:]), handler: handler)
             Log.bridge.info("Bridge 工具调用", ["tool": name, "isError": "\(result.isError)"])
-            return reply(["content": [["type": "text", "text": .string(result.text)]], "isError": .bool(result.isError)])
+            var content: [JSONValue] = [["type": "text", "text": .string(result.text)]]
+            if let image = result.imagePNG { content.append(["type": "image", "data": .string(image.base64EncodedString()), "mimeType": "image/png"]) }
+            return reply(["content": .array(content), "isError": .bool(result.isError)])
         default:
             return fail(-32601, "不支持的方法 \(method)")
         }
@@ -206,7 +243,7 @@ public final class BridgeServer: Sendable {
         case .notify:
             guard let message = arguments["message"]?.stringValue, !message.isEmpty else { return BridgeResult("缺少 message 参数", isError: true) }
             return await handler.notify(title: arguments["title"]?.stringValue ?? "OhMyAgent", message: message)
-        case .canvasCreate, .canvasUpdate, .canvasList, .searchCode:
+        case .canvasCreate, .canvasUpdate, .canvasList, .searchCode, .browserNavigate, .browserSnapshot, .browserClick, .browserType, .browserScroll, .browserScreenshot, .browserConsole, .browserNetwork, .browserTabs:
             return await handler.callExtended(tool, arguments: arguments)
         }
     }

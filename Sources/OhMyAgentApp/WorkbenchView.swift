@@ -259,6 +259,10 @@ struct WorkbenchView: View {
         // 调试:OMA_OPEN_CANVAS=<画布 id> 直接打开画布标签
         if let canvasID = env["OMA_OPEN_CANVAS"], !canvasID.isEmpty { workbench.openCanvas(id: canvasID, title: String(localized: "画布")) }
         if let filter = env["OMA_OPEN_CUSTOMIZE"] { workbench.openCustomize(filter: filter) }
+        // 调试:OMA_OPEN_BROWSER=<网址> 在浏览器标签里打开页面
+        if let raw = env["OMA_OPEN_BROWSER"], let url = BrowserArguments.normalize(raw), let workspace = workbench.selectedProjectID {
+            Task { _ = await BrowserController.shared.run(.navigate(url: url), workspace: workspace, activate: true) }
+        }
         // 启动稍后按间隔检查一次工作树数量(超限时询问是否清理;演示模式不触发)
         if env["OMA_DEMO"] == nil {
             Task { @MainActor in

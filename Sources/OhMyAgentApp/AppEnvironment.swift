@@ -31,6 +31,11 @@ final class AppEnvironment {
         // 多文件夹工作区:文件索引覆盖附加文件夹
         let wb = workbench
         WorkspaceIndexModel.shared.extraRootsProvider = { id in wb.projects.first(where: { $0.id == id })?.extraFolders ?? [] }
+        // Bridge 的 browser_*:在工作区的内置浏览器标签页上执行
+        BrowserController.shared.ephemeral = ProcessInfo.processInfo.environment["OMA_DEMO"] != nil
+        BrowserProvider.shared.install { workspace, command in
+            await BrowserController.shared.run(command, workspace: workspace)
+        }
         // Bridge 的 search_code:走三元组索引,覆盖主目录与全部附加文件夹
         CodeSearchProvider.shared.install { workspace, query in
             let (extras, cached) = await MainActor.run { () -> ([String], [String]?) in
