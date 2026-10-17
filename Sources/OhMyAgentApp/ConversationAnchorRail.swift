@@ -30,7 +30,7 @@ private final class AnchorCache {
         if store.structureRevision == structureRevision, store.entries.count == count { return anchors }
         var result: [ConversationAnchor] = []
         for (index, entry) in store.entries.enumerated() where entry.kind == .user && !entry.isSteered {
-            let firstLine = entry.text.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
+            let firstLine = entry.displayText.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
             let title = firstLine.trimmingCharacters(in: .whitespaces)
             result.append(ConversationAnchor(
                 id: entry.id, index: index, number: result.count + 1,

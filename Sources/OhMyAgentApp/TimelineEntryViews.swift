@@ -143,8 +143,8 @@ struct UserMessageView: View {
                     }
                 }
             }
-            if !entry.text.isEmpty {
-                CollapsibleUserText(text: entry.text)
+            if !entry.displayText.isEmpty {
+                CollapsibleUserText(text: entry.displayText)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

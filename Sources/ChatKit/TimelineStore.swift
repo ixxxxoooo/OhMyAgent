@@ -44,6 +44,14 @@ public final class TimelineEntry: Identifiable {
     public var attachments: [ImageAttachment] = []
     /// 该用户消息是运行中引导进当前轮次的(`kind == .user`)
     public var isSteered = false
+
+    /// 用于显示的正文:用户消息带图片附件时,去掉 Claude Code 写在原文里的 `[Image #N]` 占位符
+    /// (图片已作为缩略图显示,占位符只是噪音)。消息原文 `text` 不变,编辑重发仍用原文。
+    public var displayText: String {
+        guard kind == .user, !attachments.isEmpty, text.contains("[Image #") else { return text }
+        let stripped = text.replacingOccurrences(of: #"\[Image #\d+\]\s*"#, with: "", options: .regularExpression)
+        return stripped.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
     public let startedAt = Date()
     public var finishedAt: Date?
     /// 协议消息 ID,用于把分片归并到同一条消息
@@ -506,16 +514,25 @@ public final class TimelineStore {
     /// 文本分片归并:同类、仍在流式、消息 ID 兼容时追加,否则新建条目。
     private func appendChunk(kind: TimelineEntry.Kind, messageId: String?, content: ContentBlock) {
         let text: String
+        // 用户消息里的图片(历史重放)还原为图片附件,而不是退化成「[图片]」文字
+        var attachment: ImageAttachment?
         switch content {
         case .text(let value): text = value
         case .resourceLink(_, let name, _, let title): text = "[\(title ?? name)]"
-        case .image: text = String(localized: "[图片]")
+        case .image(let base64, let mimeType, _):
+            if kind == .user, let data = Data(base64Encoded: base64), !data.isEmpty {
+                attachment = ImageAttachment(data: data, mimeType: mimeType, name: String(localized: "图片"))
+                text = ""
+            } else {
+                text = String(localized: "[图片]")
+            }
         case .audio: text = String(localized: "[音频]")
         default: return
         }
         if let last = entries.last, last.kind == kind, last.isStreaming,
            messageId == nil || last.messageId == nil || last.messageId == messageId {
             last.text += text
+            if let attachment { last.attachments.append(attachment) }
             if last.messageId == nil { last.messageId = messageId }
             return
         }
@@ -528,6 +545,7 @@ public final class TimelineStore {
         }
         let entry = TimelineEntry(kind: kind, text: text, isStreaming: true)
         entry.messageId = messageId
+        if let attachment { entry.attachments = [attachment] }
         entries.append(entry)
     }
 }

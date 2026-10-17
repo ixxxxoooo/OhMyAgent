@@ -164,8 +164,8 @@ struct StickyUserCard: View {
                     }
                 }
             }
-            if !entry.text.isEmpty {
-                Text(verbatim: entry.text)
+            if !entry.displayText.isEmpty {
+                Text(verbatim: entry.displayText)
                     .font(OMFonts.reading)
                     .lineSpacing(OMFonts.readingLineSpacing)
                     .lineLimit(3)

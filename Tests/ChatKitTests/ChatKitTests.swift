@@ -11,6 +11,37 @@ import Testing
 @MainActor
 @Suite("时间线归并")
 struct TimelineStoreTests {
+    @Test("历史重放中的用户图片块还原为图片附件,不再退化成「[图片]」文字")
+    func replayedUserImageBecomesAttachment() {
+        let store = TimelineStore()
+        let png = Data([0x89, 0x50, 0x4E, 0x47]).base64EncodedString()
+        store.apply(.userMessageChunk(messageId: "u1", content: .text("看这张图")))
+        store.apply(.userMessageChunk(messageId: "u1", content: .image(data: png, mimeType: "image/png", uri: nil)))
+        #expect(store.entries.count == 1)
+        #expect(store.entries[0].text == "看这张图")
+        #expect(store.entries[0].attachments.count == 1)
+        #expect(store.entries[0].attachments[0].mimeType == "image/png")
+        // 图片先于文字到达:新建条目并带附件
+        let other = TimelineStore()
+        other.apply(.userMessageChunk(messageId: "u2", content: .image(data: png, mimeType: "image/png", uri: nil)))
+        #expect(other.entries[0].text.isEmpty)
+        #expect(other.entries[0].attachments.count == 1)
+        // 助手侧的图片仍保持文字占位
+        other.apply(.agentMessageChunk(messageId: "a1", content: .image(data: png, mimeType: "image/png", uri: nil)))
+        #expect(other.entries[1].text == "[图片]")
+    }
+
+    @Test("带图片附件的用户消息显示时去掉 [Image #N] 占位符,原文不变;无附件时保留")
+    func displayTextStripsImagePlaceholders() {
+        let entry = TimelineEntry(kind: .user, text: "[Image #12] 这个点不上最下面的。")
+        #expect(entry.displayText == entry.text)
+        entry.attachments = [ImageAttachment(data: Data([1]), mimeType: "image/png", name: "图片")]
+        #expect(entry.displayText == "这个点不上最下面的。")
+        #expect(entry.text.hasPrefix("[Image #12]"))
+        entry.text = "[Image #1] [Image #2]"
+        #expect(entry.displayText.isEmpty)
+    }
+
     @Test("同一消息的分片归并为一条,思维结束后开始助手文本")
     func mergesChunks() {
         let store = TimelineStore()
