@@ -48,9 +48,11 @@ final class StickyUserState {
 
     /// 结束编辑(取消或发送)。
     func finishEditing() {
-        editing = nil
-        editorPinned = false
-        editDraft = nil
+        omWithAnimation {
+            editing = nil
+            editorPinned = false
+            editDraft = nil
+        }
     }
 
     /// 编辑卡是否应显示在顶部悬浮层(而不是消息原位)。
@@ -111,6 +113,7 @@ struct StickyUserOverlay: View {
                     LinearGradient(colors: [OMColors.surface, OMColors.surface.opacity(0.92), OMColors.surface.opacity(0)], startPoint: .top, endPoint: .bottom) // ui-lint:allow 仅作遮罩/淡出,非装饰
                         .allowsHitTesting(false)
                 }
+                .transition(.opacity)
         } else if let target = state.target, target.stickyID != state.editing?.id,
                   let entry = model.timeline.entries.first(where: { $0.id == target.stickyID }) {
             // 正在原位编辑的那条不再吸顶,避免与行内编辑卡重复
@@ -221,7 +224,7 @@ struct UserMessageEditor: View {
         // 就地展开:占据原消息行的位置,随内容向下延展,会话流内容自然被推开
         card
             .omDismissOnClickOutside(perform: onClose)
-            .transition(.opacity.combined(with: .scale(scale: 0.985, anchor: .top)))
+            .transition(.opacity)
             .onExitCommand(perform: onClose)
             .onAppear { controller.focus() }
     }
@@ -315,6 +318,7 @@ struct OutsideClickAnchor: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
+        view.wantsLayer = true
         box.view = view
         return view
     }
@@ -329,12 +333,15 @@ struct OutsideClickAnchor: NSViewRepresentable {
 final class OutsideClickDismissCoordinator {
     let box = OutsideClickAnchorBox()
     private var monitor: Any?
+    /// 是否在等待当前点击手势的抬起事件,将其一并消费防止落入下层视图导致闪烁
+    private var pendingMouseUp = false
     var onDismiss: (() -> Void)?
 
     /// 安装全局鼠标点击监听(仅在编辑展示期间生效)。
     func install() {
         guard monitor == nil else { return }
-        monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+        pendingMouseUp = false
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .leftMouseUp, .rightMouseDown]) { [weak self] event in
             guard let self else { return event }
             let consumed = MainActor.assumeIsolated { self.handle(event) }
             return consumed ? nil : event
@@ -347,10 +354,21 @@ final class OutsideClickDismissCoordinator {
             NSEvent.removeMonitor(monitor)
             self.monitor = nil
         }
+        pendingMouseUp = false
     }
 
-    /// 命中检测:点在卡片内部放行;点在卡片外部(空白处)则调用取消并消费事件。
+    /// 命中检测与事件处理。
     func handle(_ event: NSEvent) -> Bool {
+        // 如果正在等待对应的 mouseUp:在抬起瞬间触发关闭,并完整吞掉该抬起事件
+        if pendingMouseUp {
+            if event.type == .leftMouseUp {
+                remove()
+                onDismiss?()
+                return true
+            }
+            return false
+        }
+
         // 如果当前有全局选择浮层(如模型切换面板)或右键菜单展示,外部点击交由其自身处理
         if PickerPanelController.shared.isPresented { return false }
         if OMContextMenuCenter.shared.isPresented { return false }
@@ -365,10 +383,20 @@ final class OutsideClickDismissCoordinator {
             return false
         }
 
-        // 点击在编辑窗口之外的空白处或其它区域,取消本次编辑
-        remove()
-        onDismiss?()
-        return true
+        // 点击在编辑窗口之外的空白处:
+        if event.type == .leftMouseDown {
+            pendingMouseUp = true
+            // 让当前窗口文本第一响应者平滑失焦,避免光标与文字选区在退出时撕裂闪烁
+            cardWindow.makeFirstResponder(nil)
+            return true
+        } else if event.type == .rightMouseDown {
+            remove()
+            cardWindow.makeFirstResponder(nil)
+            onDismiss?()
+            return true
+        }
+
+        return false
     }
 }
 

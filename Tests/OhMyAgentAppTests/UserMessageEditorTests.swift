@@ -91,6 +91,24 @@ struct UserMessageEditorTests {
         if let outsideEvent {
             let consumed = coordinator.handle(outsideEvent)
             #expect(consumed)
+            #expect(!dismissed)
+        }
+
+        // 3. 伴随的抬起事件在抬起瞬间触发关闭,并完整消费抬起事件
+        let outsideUpEvent = NSEvent.mouseEvent(
+            with: .leftMouseUp,
+            location: NSPoint(x: 50, y: 50),
+            modifierFlags: [],
+            timestamp: 0,
+            windowNumber: window.windowNumber,
+            context: nil,
+            eventNumber: 3,
+            clickCount: 1,
+            pressure: 0.0
+        )
+        if let outsideUpEvent {
+            let consumed = coordinator.handle(outsideUpEvent)
+            #expect(consumed)
             #expect(dismissed)
         }
     }
