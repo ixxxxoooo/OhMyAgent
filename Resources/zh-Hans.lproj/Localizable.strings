@@ -2407,3 +2407,9 @@
 "浏览器只允许 http/https 页面;file、javascript 等协议会被拦截。Agent 通过 browser_navigate / browser_snapshot / browser_click / browser_type 等工具操作它。" = "浏览器只允许 http/https 页面;file、javascript 等协议会被拦截。Agent 通过 browser_navigate / browser_snapshot / browser_click / browser_type 等工具操作它。";
 "网页" = "网页";
 "审批" = "审批";
+"输入框里没有可优化的提示词" = "输入框里没有可优化的提示词";
+"当前没有可用的模型来优化提示词(需要本机 claude 或已映射的模型提供商)" = "当前没有可用的模型来优化提示词(需要本机 claude 或已映射的模型提供商)";
+"提示词优化失败,请稍后重试" = "提示词优化失败,请稍后重试";
+"正在优化提示词,点击取消" = "正在优化提示词,点击取消";
+"撤销优化,还原原文" = "撤销优化,还原原文";
+"优化提示词" = "优化提示词";

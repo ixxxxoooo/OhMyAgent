@@ -150,6 +150,7 @@ ALLOWLIST = (
     ("Sources/ChatKit/CommitMessageGenerator.swift", None),  # 提交说明生成:提示词与中英文启发式文案,不是界面文案
     ("Sources/WorkbenchKit/WorkbenchModel.swift", None),  # 会话区系统提示词:发给 Agent 的指令,不是界面文案
     ("Sources/ChatKit/TitleGenerator.swift", None),       # 标题生成:发给小模型的提示词与前缀清洗,不是界面文案
+    ("Sources/ChatKit/PromptOptimizer.swift", None),      # 提示词优化:发给模型的系统提示词、前缀清洗与演示改写,不是界面文案
     ("Sources/OhMyAgentApp/Settings/SettingsWindow.swift", "服务器"),  # 设置搜索的中文别名关键词
     ("Sources/OhMyAgentApp/Settings/SettingsWindow.swift", "斜杠"),  # 设置搜索的中文别名关键词
     ("Sources/OhMyAgentApp/Settings/SettingsWindow.swift", "子代理"),  # 设置搜索的中文别名关键词

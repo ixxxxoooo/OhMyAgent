@@ -71,6 +71,7 @@ struct ComposerView: View {
             )
             .frame(height: textHeight)
             HStack(spacing: 6) {
+                PromptOptimizeButton(model: model)
                 OptionMenu(model: model, category: "mode", icon: "slider.horizontal.3")
                 OptionMenu(model: model, category: "model", icon: "cpu")
                 OptionMenu(model: model, category: "thought_level", icon: "brain")

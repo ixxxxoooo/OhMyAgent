@@ -2407,3 +2407,9 @@
 "浏览器只允许 http/https 页面;file、javascript 等协议会被拦截。Agent 通过 browser_navigate / browser_snapshot / browser_click / browser_type 等工具操作它。" = "The browser only allows http/https pages; file, javascript and similar schemes are blocked. The agent drives it with tools such as browser_navigate / browser_snapshot / browser_click / browser_type.";
 "网页" = "Web page";
 "审批" = "Approval";
+"输入框里没有可优化的提示词" = "There is no prompt in the input box to optimize";
+"当前没有可用的模型来优化提示词(需要本机 claude 或已映射的模型提供商)" = "No model is available to optimize prompts (needs a local claude or a mapped model provider)";
+"提示词优化失败,请稍后重试" = "Prompt optimization failed. Please try again later.";
+"正在优化提示词,点击取消" = "Optimizing the prompt. Click to cancel";
+"撤销优化,还原原文" = "Undo optimization and restore the original";
+"优化提示词" = "Optimize prompt";
