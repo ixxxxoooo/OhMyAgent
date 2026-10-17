@@ -47,4 +47,17 @@ struct FileIconTests {
             #expect(OMFileIconRenderer.image(icon: name, size: 16) != nil, "\(name) 渲染失败")
         }
     }
+
+    @Test("常见文件类型都有专属图标,不回退默认文件图标")
+    func commonTypesHaveDedicatedIcons() {
+        let common = """
+        json jsonc yaml yml toml xml plist md txt csv tsv xlsx xls docx doc pptx ppt pdf key pages numbers
+        swift kt java py js ts tsx jsx go rs rb php c cpp h cs sh zsh sql html css scss vue svelte
+        png jpg jpeg gif svg webp ico mp3 wav mp4 mov zip tar gz rar 7z dmg pkg log lock env
+        """.split(whereSeparator: { $0 == " " || $0 == "\n" })
+        for ext in common {
+            let icon = OMFileIconCatalog.iconName(for: "sample.\(ext)", isDirectory: false)
+            #expect(icon != FileIconData.defaultFile, "\(ext) 没有专属图标")
+        }
+    }
 }

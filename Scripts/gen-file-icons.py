@@ -12,6 +12,7 @@ EXTENSIONS = """swift m mm h hpp c cc cpp cs rs go py pyi rb php java kt kts sca
 js mjs cjs jsx ts tsx mts cts vue svelte astro html htm css scss sass less styl json jsonc json5 yaml yml toml ini conf cfg
 xml plist xcconfig entitlements strings xib storyboard md mdx markdown txt rtf log csv tsv sql graphql gql proto lock
 png jpg jpeg gif webp svg ico icns bmp tiff heic pdf mp3 wav mp4 mov zip tar gz tgz rar 7z dmg pkg
+xlsx xls xlsm xlsb ods docx doc docm odt pptx ppt odp key pages numbers epub ttf otf woff woff2 sqlite db
 dockerfile env gitignore gitattributes editorconfig diff patch tf wasm nix zig ex exs erl hs clj ml vim""".split()
 FILENAMES = """package.json package-lock.json pnpm-lock.yaml yarn.lock tsconfig.json Package.swift Package.resolved Podfile Cartfile
 Dockerfile docker-compose.yml docker-compose.yaml Makefile CMakeLists.txt README.md readme.md LICENSE LICENSE.md CHANGELOG.md
@@ -66,6 +67,16 @@ def parse_svg(path):
     root = ET.parse(path).getroot()
     vb = [float(x) for x in root.get("viewBox", "0 0 16 16").split()]
     shapes, skipped = [], 0
+    # 渐变填充没有对应的单色图层:取渐变第一个色标作为纯色近似,避免图标整体丢失
+    grads = {}
+    for g in root.iter():
+        if g.tag.split("}")[1] in ("linearGradient", "radialGradient") and g.get("id"):
+            stop = next((c for c in g if c.tag.split("}")[1] == "stop"), None)
+            col = stop.get("stop-color") if stop is not None else None
+            if col is None and stop is not None:
+                m = re.search(r"stop-color:\s*(#[0-9a-fA-F]{3,6})", stop.get("style", ""))
+                col = m.group(1) if m else None
+            if col: grads[g.get("id")] = col
     def walk(el, fill, opacity):
         nonlocal skipped
         tag = el.tag.split("}")[1]
@@ -80,7 +91,9 @@ def parse_svg(path):
         if d and fill and fill != "none" and not fill.startswith("url"):
             shapes.append((fill, op, d))
         elif d and fill and fill.startswith("url"):
-            skipped += 1
+            m = re.match(r"url\(#([^)]+)\)", fill)
+            if m and m.group(1) in grads: shapes.append((grads[m.group(1)], op, d))
+            else: skipped += 1
         for child in el: walk(child, fill, op)
     walk(root, "#000000", 1.0)
     return vb[2], shapes, skipped
@@ -89,11 +102,17 @@ def main():
     src = locate_src()
     theme = json.load(open(os.path.join(src, "dist/material-icons.json")))
     names = {theme["file"], theme["folder"], theme["folderExpanded"]}
-    ext_map = {e: theme["fileExtensions"][e] for e in EXTENSIONS if e in theme["fileExtensions"]}
+    # 扩展名与特殊文件名:Material Icon Theme 全量收录(保证常见文件都有专属图标),上面的清单只作语言 ID 兜底
+    ext_map = dict(theme["fileExtensions"])
+    for e in EXTENSIONS: ext_map.setdefault(e, theme["fileExtensions"].get(e))
+    ext_map = {k: v for k, v in ext_map.items() if v}
+    # 主题缺失但常见的类型:借用同类图标(iWork 文档/表格、安装包)
+    for e, like in {"pages": "docx", "numbers": "xlsx", "pkg": "dmg", "mpkg": "dmg"}.items():
+        if e not in ext_map and like in ext_map: ext_map[e] = ext_map[like]
     # 语言 ID 兜底(如 dockerfile、env)
     for e in EXTENSIONS:
         if e not in ext_map and e in theme["languageIds"]: ext_map[e] = theme["languageIds"][e]
-    name_map = {n: theme["fileNames"][n] for n in FILENAMES if n in theme["fileNames"]}
+    name_map = dict(theme["fileNames"])
     folder_map = {n: theme["folderNames"][n] for n in FOLDERS if n in theme["folderNames"]}
     folder_open = {n: theme["folderNamesExpanded"].get(n, theme["folderNames"][n] + "-open") for n in folder_map}
     for m in (ext_map, name_map, folder_map, folder_open): names.update(m.values())
