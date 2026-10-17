@@ -34,6 +34,7 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 - 重启应用(结束旧进程 → 构建 → 启动):`Scripts/restart.sh`(`OMA_AGENT=fake` 使用脚本化 Agent;`OMA_DEMO=1` 进入演示模式)
 - 演示模式(隔离沙盒 + 脚本化 Agent,测试会话流/工具卡/子 Agent/Git 的首选方式):`Scripts/demo.sh [--reset] [--scenario <名>]`(自动转发全部 `OMA_*` 变量);无人值守导览截图:`Scripts/demo-tour.sh [步骤前缀...]`;完整指南 `.specstory/history/docs/20261016_演示模式自动化演示指南.md`
 - 本地 CI(本地化扫描 + UI 规范扫描 + 零警告构建 + 全部测试 + plist/strings 校验):`Scripts/ci.sh`
+- 运行单元测试:`Scripts/test.sh [参数]`(结束后自动清理测试遗留在系统临时目录的目录;勿直接长期使用 `swift test`,macOS 的 `NSTemporaryDirectory()` 不读 `TMPDIR`,无法隔离)。清理历史遗留:`Scripts/clean-test-tmp.sh [--dry-run]`;新增测试若使用新的临时目录前缀,请加到该脚本的 `PREFIXES`
 - 性能门槛:`Scripts/perf.sh`;发布:`Scripts/release.sh`
 - 日志:`Scripts/logs.sh`(P1 之后可用)
 - 启用推送前 CI:`git config core.hooksPath .githooks`(已在本仓库启用)
