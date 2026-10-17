@@ -238,7 +238,7 @@ private struct PropertyRow: View {
             .accessibilityLabel(property.key)
             Spacer(minLength: 0)
         case .list:
-            FlowLayout(spacing: 5) {
+            OMFlowLayout(spacing: 5) {
                 ForEach(Array(property.items.enumerated()), id: \.offset) { index, item in
                     HStack(spacing: 3) {
                         Text(verbatim: item).font(OMFonts.caption)
@@ -285,39 +285,5 @@ private struct PropertyRow: View {
         guard items.indices.contains(index) else { return }
         items.remove(at: index)
         onChange { $0.setList(property.key, items) }
-    }
-}
-
-/// 自动换行的横向流式布局(标签列表用)。
-private struct FlowLayout: Layout {
-    var spacing: CGFloat = 6
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        arrange(width: proposal.width ?? .infinity, subviews: subviews).size
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let result = arrange(width: bounds.width, subviews: subviews)
-        for (index, origin) in result.origins.enumerated() {
-            subviews[index].place(at: CGPoint(x: bounds.minX + origin.x, y: bounds.minY + origin.y), proposal: .unspecified)
-        }
-    }
-
-    private func arrange(width: CGFloat, subviews: Subviews) -> (size: CGSize, origins: [CGPoint]) {
-        var origins: [CGPoint] = []
-        var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0, maxX: CGFloat = 0
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if x > 0, x + size.width > width {
-                x = 0
-                y += rowHeight + spacing
-                rowHeight = 0
-            }
-            origins.append(CGPoint(x: x, y: y))
-            x += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
-            maxX = max(maxX, x - spacing)
-        }
-        return (CGSize(width: maxX, height: y + rowHeight), origins)
     }
 }
