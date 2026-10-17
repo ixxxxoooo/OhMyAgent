@@ -278,9 +278,9 @@ struct TimelineEdgeFade: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: edges.top ? Self.topHeight : 0)
+            LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: edges.top ? Self.topHeight : 0) // ui-lint:allow 仅作遮罩/淡出,非装饰
             Rectangle().fill(OMColors.maskInk)
-            LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: edges.bottom ? Self.bottomHeight : 0)
+            LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: edges.bottom ? Self.bottomHeight : 0) // ui-lint:allow 仅作遮罩/淡出,非装饰
         }
         .allowsHitTesting(false)
     }

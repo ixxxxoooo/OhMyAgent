@@ -202,8 +202,8 @@ public struct OMStepSlider: View {
             GeometryReader { proxy in
                 let travel = max(proxy.size.width - thumb, 1)
                 ZStack(alignment: .leading) {
-                    Capsule().fill(OMColors.pressedFill).frame(height: 4).padding(.horizontal, thumb / 2)
-                    Capsule().fill(OMColors.actionFill)
+                    Capsule().fill(OMColors.pressedFill).frame(height: 4).padding(.horizontal, thumb / 2) // ui-lint:allow 滑块轨道几何
+                    Capsule().fill(OMColors.actionFill) // ui-lint:allow 滑块轨道几何
                         .frame(width: travel * fraction(current), height: 4)
                         .padding(.leading, thumb / 2)
                     ForEach(0..<stops.count, id: \.self) { tick in

@@ -97,7 +97,7 @@ struct CollapsibleOutput: View {
         }
         .overlay(alignment: .bottom) {
             if !expanded, contentHeight > Self.collapsedHeight {
-                LinearGradient(colors: [.clear, OMColors.card.opacity(0.55)], startPoint: .top, endPoint: .bottom)
+                LinearGradient(colors: [.clear, OMColors.card.opacity(0.55)], startPoint: .top, endPoint: .bottom) // ui-lint:allow 仅作遮罩/淡出,非装饰
                     .frame(height: 22)
                     .allowsHitTesting(false)
             }

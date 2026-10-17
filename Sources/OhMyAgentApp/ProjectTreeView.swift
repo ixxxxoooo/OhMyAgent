@@ -557,7 +557,7 @@ private struct SessionLine: View {
                 .mask(
                     HStack(spacing: 0) {
                         Rectangle()
-                        LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing).frame(width: 24)
+                        LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing).frame(width: 24) // ui-lint:allow 仅作遮罩/淡出,非装饰
                     }
                 )
             if let agent = item.foreignAgentID { AgentBadge(agentID: agent) }

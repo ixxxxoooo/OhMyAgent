@@ -5,7 +5,7 @@
   Scripts/ui-lint.py [--check]
     --check  CI 模式:存在违规时以非零状态退出(默认只打印)
 
-规则全文见 AGENTS.md「4.2 UI 组件与字号规范」。个别特例可在该行末尾追加注释 `// ui-lint:allow 原因` 豁免。
+规则全文见 AGENTS.md「4.2 UI 组件与字号规范」与「4.4 Cursor 纸感设计规范」。个别特例可在该行末尾追加注释 `// ui-lint:allow 原因` 豁免。
 @author ixxxxoooo
 """
 import os
@@ -30,8 +30,18 @@ RULES = [
     ("按钮", re.compile(r"buttonStyle\(\s*\.(bordered|borderedProminent|borderless)\s*\)"), "按钮用 OMButtonStyle(.omPrimary/.omSecondary/.omPlain/.omIcon)"),
     ("复制", re.compile(r"doc\.on\.doc|\"checkmark\"\s*:\s*\"doc"), "复制图标一律 copy → check(OMCopyButton)"),
     ("图标", re.compile(r"Image\(systemName"), "界面禁止 SF Symbol,使用 Image.om"),
+    ("字重", re.compile(r"weight:\s*\.(semibold|bold|heavy|black)\b|\.weight\([^()]*\.(semibold|bold|heavy|black)\b|\.fontWeight\(\s*\.(semibold|bold|heavy|black)|\.bold\(\)"), "字重上限 medium(AGENTS.md 4.4);内容强调需行内 ui-lint:allow"),
+    ("圆角", re.compile(r"cornerRadius:\s*\d"), "圆角必须用 OMRadius / OMMetrics 令牌(tag/control/card/floating/modal)"),
+    ("胶囊", re.compile(r"\bCapsule\(\)"), "标签/芯片/徽标用 OMPillShape;进度条、滚动条、滑块轨道等几何用途加 ui-lint:allow"),
+    ("渐变", re.compile(r"\b(LinearGradient|RadialGradient|AngularGradient|EllipticalGradient)\("), "禁止渐变装饰(AGENTS.md 4.4);仅作遮罩/淡出时加 ui-lint:allow"),
     ("选择", re.compile(r"pickerStyle\(\s*\.(menu|inline|radioGroup|wheel)\s*\)"), "选择类控件用 OMPickList,档位用 OMStepSlider"),
 ]
+# 规则级文件豁免:(规则名, 文件名) → 原因。图标描边粗细、示意图几何、迷你预览不属于文字/控件规范
+RULE_FILE_ALLOW = {
+    ("圆角", "MermaidRenderer.swift"): "图表节点几何,非界面控件",
+    ("字重", "CodeEditorView+Markdown.swift"): "编辑器 Markdown 标题/粗体属于内容渲染",
+    ("胶囊", "ThemeMiniWorkbench.swift"): "主题迷你预览的色块示意",
+}
 ALLOW = "ui-lint:allow"
 # 整文件豁免已全部收回:特例只能用行内 `// ui-lint:allow 原因`
 FILE_ALLOW = {}
@@ -53,6 +63,10 @@ def scan():
                         if ALLOW in line or line.lstrip().startswith("//"):
                             continue
                         for rule, regex, hint in RULES:
+                            if (rule, name) in RULE_FILE_ALLOW:
+                                continue
+                            if rule == "字重" and "Image.om" in line:
+                                continue  # 图标描边粗细不是文字字重
                             if regex.search(line):
                                 out.append((os.path.relpath(path, ROOT), number, rule, hint, line.strip()))
     return out

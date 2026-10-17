@@ -108,7 +108,7 @@ struct StickyUserOverlay: View {
                 .padding(.bottom, 16)
                 .frame(maxWidth: .infinity)
                 .background(alignment: .top) {
-                    LinearGradient(colors: [OMColors.surface, OMColors.surface.opacity(0.92), OMColors.surface.opacity(0)], startPoint: .top, endPoint: .bottom)
+                    LinearGradient(colors: [OMColors.surface, OMColors.surface.opacity(0.92), OMColors.surface.opacity(0)], startPoint: .top, endPoint: .bottom) // ui-lint:allow 仅作遮罩/淡出,非装饰
                         .allowsHitTesting(false)
                 }
         } else if let target = state.target, target.stickyID != state.editing?.id,
@@ -124,7 +124,7 @@ struct StickyUserOverlay: View {
                 .frame(maxWidth: .infinity)
                 .background(alignment: .top) {
                     // 卡片下缘渐隐进内容,和会话流顶部淡出衔接
-                    LinearGradient(colors: [OMColors.surface, OMColors.surface.opacity(0.92), OMColors.surface.opacity(0)], startPoint: .top, endPoint: .bottom)
+                    LinearGradient(colors: [OMColors.surface, OMColors.surface.opacity(0.92), OMColors.surface.opacity(0)], startPoint: .top, endPoint: .bottom) // ui-lint:allow 仅作遮罩/淡出,非装饰
                         .allowsHitTesting(false)
                 }
                 .offset(y: push)
