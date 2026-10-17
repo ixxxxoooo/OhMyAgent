@@ -72,7 +72,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let showDock = UserDefaults.standard.object(forKey: ClientPrefs.Key.showDock) as? Bool ?? true
         Log.app.info("应用启动完成", ["showDock": "\(showDock)", "agentOverride": ProcessInfo.processInfo.environment["OMA_AGENT"] ?? "-", "project": ProcessInfo.processInfo.environment["OMA_PROJECT_ROOT"] ?? "-"])
         NSApp.setActivationPolicy(showDock ? .regular : .accessory)
-        BridgeServer.removeLegacySockets()
+        // 旧版 socket 垫片的遗留文件清理:一次性并放到后台(临时目录条目很多时,同步枚举会让启动多卡 200ms 以上)
+        if !UserDefaults.standard.bool(forKey: "migration.legacySocketsCleaned") {
+            Task.detached(priority: .background) {
+                BridgeServer.removeLegacySockets()
+                UserDefaults.standard.set(true, forKey: "migration.legacySocketsCleaned")
+            }
+        }
         // 迁移:托盘改为默认开启,旧版本写入的「关闭」默认值不应继续生效(仅执行一次)
         if !UserDefaults.standard.bool(forKey: "migration.trayDefaultOn") {
             UserDefaults.standard.removeObject(forKey: ClientPrefs.Key.showMenuBar)
