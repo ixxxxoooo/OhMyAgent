@@ -107,10 +107,13 @@ struct ProjectSwitcherButton: View {
             }
             .padding(.horizontal, 8)
             .frame(height: 24)
-            .background(
-                RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous)
-                    .fill(hovering || shown ? OMColors.hoverFill : OMColors.subtleFill)
-            )
+            // 常态无背景轮廓,悬停/展开时才给填充反馈
+            .background {
+                if hovering || shown {
+                    RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous)
+                        .fill(OMColors.hoverFill)
+                }
+            }
             .contentShape(RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
         }
         .buttonStyle(.plain)

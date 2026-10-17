@@ -33,6 +33,11 @@ struct ChatView: View {
     /// 新会话(时间线为空):输入区居中显示,对齐 kuku/Cursor 的新对话首屏。
     private var isEmptySession: Bool { model.timeline.entries.isEmpty }
 
+    /// 输入区最大宽度:新会话再收窄一档(不超过「较窄」),会话开始后跟随聊天宽度设置。
+    private var composerMaxWidth: CGFloat {
+        isEmptySession ? min(contentMaxWidth, ChatWidth.narrow.points) : contentMaxWidth
+    }
+
     var body: some View {
         ZStack {
             OMColors.surface.ignoresSafeArea()
@@ -90,7 +95,7 @@ struct ChatView: View {
             ComposerView(model: model)
             ComposerFooter(model: model, usageOpen: $usageOpen)
         }
-        .frame(maxWidth: contentMaxWidth)
+        .frame(maxWidth: composerMaxWidth)
         .padding(.horizontal, 16)
         .padding(.bottom, isEmptySession ? 0 : 12)
         .frame(maxWidth: .infinity)
