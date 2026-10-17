@@ -15,14 +15,44 @@ struct MarkdownView: View {
     var streaming = false
 
     var body: some View {
-        let blocks = MarkdownCache.blocks(for: text, streaming: streaming)
+        let segments = MarkdownSegment.split(MarkdownCache.blocks(for: text, streaming: streaming))
         VStack(alignment: .leading, spacing: 10) {
-            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
-                // equatable:流式追加时只有末尾的块变化,其余块跳过 body 重算(含行内 Markdown 解析与代码高亮)
-                MarkdownBlockView(block: block).equatable()
+            ForEach(Array(segments.enumerated()), id: \.offset) { _, segment in
+                // equatable:流式追加时只有末尾的段变化,其余段跳过 body 重算(含行内 Markdown 解析与代码高亮)
+                switch segment {
+                case .textRun(let blocks):
+                    // 相邻文字块合并为一个 NSTextView,支持跨段落连续选择与复制
+                    MarkdownTextRunView(blocks: blocks).equatable()
+                case .block(let block):
+                    MarkdownBlockView(block: block).equatable()
+                }
             }
         }
         .textSelection(.enabled)
+    }
+}
+
+/// 渲染分段:连续的文字块合并为一段(AppKit 文本视图),其余块(代码、表格、分隔线)各自成段。
+enum MarkdownSegment: Hashable {
+    case textRun([MarkdownBlock])
+    case block(MarkdownBlock)
+
+    /// 把块序列切成渲染段。
+    /// - Parameter blocks: 块序列
+    /// - Returns: 渲染段序列
+    static func split(_ blocks: [MarkdownBlock]) -> [MarkdownSegment] {
+        var result: [MarkdownSegment] = []
+        var run: [MarkdownBlock] = []
+        for block in blocks {
+            if isTextRunBlock(block) {
+                run.append(block)
+            } else {
+                if !run.isEmpty { result.append(.textRun(run)); run = [] }
+                result.append(.block(block))
+            }
+        }
+        if !run.isEmpty { result.append(.textRun(run)) }
+        return result
     }
 }
 
@@ -125,17 +155,9 @@ struct MarkdownBlockView: View, Equatable {
 
     var body: some View {
         switch block {
-        case .heading(let level, let text):
-            InlineMarkdownText(text)
-                .font(OMFonts.custom(headingSize(level), weight: .medium))
-                .lineSpacing(OMFonts.lineSpacing(forSize: headingSize(level)))
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, level <= 2 ? 6 : 2)
-        case .paragraph(let text):
-            InlineMarkdownText(text)
-                .font(OMFonts.reading)
-                .lineSpacing(OMFonts.readingLineSpacing)
-                .fixedSize(horizontal: false, vertical: true)
+        case .heading, .paragraph, .list, .quote:
+            // 正常路径由 `MarkdownSegment` 合并为文字段;这里仅作兜底
+            MarkdownTextRunView(blocks: [block])
         case .code(let language, let code, let isClosed):
             // 围栏闭合后才渲染 Mermaid,避免流式输出中途反复解析失败
             if isClosed, language?.lowercased() == "mermaid" {
@@ -143,50 +165,11 @@ struct MarkdownBlockView: View, Equatable {
             } else {
                 CodeBlockView(language: language, code: code)
             }
-        case .list(let items):
-            VStack(alignment: .leading, spacing: 4) {
-                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        if let checked = item.checked {
-                            Image.om(checked ? "checkmark.square.fill" : "square")
-                                .foregroundStyle(checked ? OMColors.accent : OMColors.secondaryText)
-                                .font(OMFonts.small)
-                        } else {
-                            Text(item.marker).foregroundStyle(OMColors.secondaryText)
-                        }
-                        InlineMarkdownText(item.text)
-                            .lineSpacing(OMFonts.readingLineSpacing)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .font(OMFonts.reading)
-                    .padding(.leading, CGFloat(item.level) * 16)
-                }
-            }
-        case .quote(let text):
-            HStack(spacing: 10) {
-                RoundedRectangle(cornerRadius: 1.5).fill(OMColors.hairline).frame(width: 3) // ui-lint:allow 引用条细线圆角
-                InlineMarkdownText(text)
-                    .font(OMFonts.reading)
-                    .lineSpacing(OMFonts.readingLineSpacing)
-                    .foregroundStyle(OMColors.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
         case .table(let header, let rows):
             TableBlockView(header: header, rows: rows)
         case .rule:
             Divider().padding(.vertical, 4)
         }
-    }
-
-    private func headingSize(_ level: Int) -> CGFloat {
-        let base: CGFloat
-        switch level {
-        case 1: base = 20
-        case 2: base = 17
-        case 3: base = 15
-        default: base = 14
-        }
-        return base * OMScale.ui * OMScale.timeline
     }
 }
 
