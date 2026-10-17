@@ -321,6 +321,7 @@ public final class SessionModel {
     private var supervisor: AgentSupervisor?
     private var client: ACPClient?
     private var coalescer: EventCoalescer?
+    @ObservationIgnored private let eventBarrier = EventBarrier()
     private var pumpTasks: [Task<Void, Never>] = []
     private var promptTask: Task<Void, Never>?
     private var connectTask: Task<Void, Never>?
@@ -504,8 +505,14 @@ public final class SessionModel {
         self.coalescer = coalescer
         // 后台:读取事件并合并
         let snapshotter = snapshotter
+        let barrier = eventBarrier
         let reader = Task.detached(priority: .userInitiated) {
             for await event in client.events {
+                // 屏障:只做登记,不进入时间线
+                if case .notification(let method, let params) = event, method == ACPConnection.barrierMethod {
+                    if let token = params?["token"]?.stringValue { barrier.signal(token) }
+                    continue
+                }
                 if case .sessionUpdate(_, let update) = event {
                     Self.captureSnapshots(update, snapshotter)
                 }
@@ -520,6 +527,7 @@ public final class SessionModel {
                 guard let self else { return }
                 let span = Log.perf.span("事件批处理", warnMs: 16, quiet: true, ["events": "\(batch.count)"])
                 self.handle(batch)
+                coalescer.markApplied(batch.count)
                 span.end()
             }
         }
@@ -1062,7 +1070,6 @@ public final class SessionModel {
         // 先把已合并但尚未应用的事件落入时间线,再结束轮次
         watchdogTask?.cancel()
         watchdogTask = nil
-        coalescer?.flush()
         let turnMs = turnStart.map { OMLogger.milliseconds(since: $0) } ?? 0
         let summaryModel = currentMappedModel?.displayName ?? option(category: "model")?.currentDisplayName ?? ""
         let summaryBrand: ModelBrandHint? = currentMappedModel.map {
@@ -1075,8 +1082,13 @@ public final class SessionModel {
             PerfStats.shared.record(name: "回合总耗时", micros: turnMs * 1000)
         }
         Task { [weak self] in
-            // 让出一次,使 flush 产生的批次先被应用
-            await Task.yield()
+            // 响应可能先于尾部通知被处理:先用屏障确认此前的通知都已读入,再等它们全部应用到时间线
+            if let self, error == nil, let client = self.client {
+                let token = UUID().uuidString
+                await client.barrier(token)
+                if await self.eventBarrier.wait(token) == false { self.log.warning("等待事件屏障超时", ["turn": "\(self.turnNumber)"]) }
+            }
+            await self?.coalescer?.drain()
             guard let self else { return }
             self.timeline.finishTurn(aborted: error != nil || reason == .cancelled)
             if let stall = self.stallMessage {

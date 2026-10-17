@@ -253,6 +253,12 @@ public actor ACPClient {
         }
     }
 
+    /// 在事件流末尾插入屏障(事件流里表现为方法名 `ACPConnection.barrierMethod` 的通知,`token` 参数)。
+    /// - Parameter token: 屏障标识
+    public func barrier(_ token: String) async {
+        await connection.barrier(token)
+    }
+
     /// 关闭连接。
     public func close() async {
         await connection.close()

@@ -54,6 +54,16 @@ public actor ACPConnection {
         self.inboundContinuation = continuation
     }
 
+    /// 屏障通知的方法名:调用方用它确认「此前已读到的通知都已进入事件流」。
+    public static let barrierMethod = "_oma/barrier"
+
+    /// 向入站流末尾插入屏障。入站流严格有序,消费者读到该屏障时,此前读到的所有通知必然已被消费。
+    /// 用于回合结束时等待尾部事件(响应先于通知被处理会造成条目停在流式状态)。
+    /// - Parameter token: 屏障标识
+    public func barrier(_ token: String) {
+        inboundContinuation.yield(.notification(method: Self.barrierMethod, params: ["token": .string(token)]))
+    }
+
     /// 设置反向请求处理器。
     /// - Parameter handler: 处理器
     public func setRequestHandler(_ handler: any ACPRequestHandler) {
