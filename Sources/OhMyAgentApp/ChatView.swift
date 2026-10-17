@@ -117,6 +117,8 @@ struct ChatView: View {
                 ForEach(itemsCache.items(for: model.timeline, density: ToolDensity(rawValue: toolDensityRaw) ?? .standard)) { item in
                     // Equatable:结构不变时不因父视图重新求值而重建行(行内容由条目自身的可观察状态驱动)
                     TimelineItemView(item: item).equatable()
+                        // 原位编辑的那条要压在后面的行(如折叠的工具分组)之上;zIndex 必须设在列表直接子项上才对兄弟行生效
+                        .modifier(EditingElevation(id: item.id))
                 }
                 WorkingIndicatorView(model: model)
                 Color.clear.frame(height: 8).id("bottom")
@@ -271,5 +273,16 @@ struct TimelineEdgeFade: View {
             LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: edges.bottom ? Self.bottomHeight : 0) // ui-lint:allow 仅作遮罩/淡出,非装饰
         }
         .allowsHitTesting(false)
+    }
+}
+
+/// 原位编辑的那一行压在后面的行之上。
+/// 在修饰器里读取编辑状态:开始/结束编辑只会让对应行(而非整条时间线)重新求值。
+private struct EditingElevation: ViewModifier {
+    let id: UUID
+    @Environment(\.stickyUser) private var sticky
+
+    func body(content: Content) -> some View {
+        content.zIndex(sticky?.editing?.id == id ? 10 : 0)
     }
 }

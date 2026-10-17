@@ -165,6 +165,8 @@ struct StickyUserCard: View {
         .padding(.vertical, 10)
         .padding(.trailing, 18)
         .frame(maxWidth: .infinity, alignment: .leading)
+        // 吸顶卡压在会话流之上,玻璃会透出后面滚动的正文:先垫一层不透明内容底色
+        .background(OMColors.surface, in: RoundedRectangle(cornerRadius: OMRadius.modal, style: .continuous))
         .omGlass(in: RoundedRectangle(cornerRadius: OMRadius.modal, style: .continuous))
         .overlay(alignment: .bottomTrailing) {
             Button { sticky?.beginEditing(entry, pinned: true) } label: {
@@ -277,6 +279,8 @@ struct UserMessageEditor: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
+        // 原位编辑时卡片浮在会话流之上,玻璃会透出下方文字:先垫一层不透明内容底色(与吸顶编辑时的遮罩一致)
+        .background(OMColors.surface, in: RoundedRectangle(cornerRadius: OMRadius.modal, style: .continuous))
         .omGlass(in: RoundedRectangle(cornerRadius: OMRadius.modal, style: .continuous))
     }
 
