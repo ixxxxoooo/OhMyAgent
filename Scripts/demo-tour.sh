@@ -9,6 +9,7 @@
 #   --reset        第一步前重建演示沙盒
 #   --no-build     跳过构建(沿用 build/OhMyAgent.app)
 #   --list         只列出全部步骤名
+#   OMA_THEME=<主题 id>  环境变量:以指定主题运行(如 paper-light、paper-dark、cursor-light),用于主题对比截图
 #   步骤名前缀     只跑名字以其开头的步骤,如 `scenario-tools` `git-` `settings-`
 # 说明:
 #   - 禁止使用 osascript 发送按键;全部通过 OMA_* 调试钩子驱动,截图用 screencapture -l<窗口号>。
@@ -143,6 +144,7 @@ for entry in "${SELECTED[@]}"; do
   [[ -z "$first" || -z "$RESET" ]] && rm -f "$ROOT/support/workbench.json"
   args=(--env OMA_DEMO=1 --env "OMA_DEMO_ROOT=$ROOT" --env "OMA_PROJECT_ROOT=$PWD")
   if [[ -n "$first" && -n "$RESET" ]]; then args+=(--env OMA_DEMO_RESET=1); fi
+  [[ -n "${OMA_THEME:-}" ]] && args+=(--env "OMA_THEME=$OMA_THEME")   # 指定主题 id 做主题对比截图
   for kv in ${(s:;:)envs}; do
     args+=(--env "$kv")   # 值里的 \n 原样交给应用解释
   done

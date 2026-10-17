@@ -129,6 +129,11 @@ public final class AppearanceModel {
         ThemeRuntime.customThemes = CustomThemeStore.loadAll()
         theme = AppTheme(rawValue: string("theme") ?? "") ?? .system
         themeID = string("themePackage") ?? ThemePackage.defaultID
+        // 调试钩子:仅演示模式(偏好隔离)下允许用 OMA_THEME=<主题 id> 指定主题,便于无人值守对比截图
+        let env = ProcessInfo.processInfo.environment
+        if env["OMA_DEMO"] == "1", let forced = env["OMA_THEME"], ThemePackage.builtin.contains(where: { $0.id == forced }) {
+            themeID = forced
+        }
         accent = AccentChoice(rawValue: string("accent") ?? "") ?? .system
         customAccentHex = string("accentHex") ?? "#D97757"
         accent2 = AccentChoice(rawValue: string("accent2") ?? "") ?? .system
