@@ -106,19 +106,20 @@ enum HubSearchEngine {
             return items.isEmpty ? [] : [HubSection(id: segment.rawValue, title: segment.groupTitle, items: items)]
         }
         if trimmed.isEmpty {
-            // 「全部」且无查询:会话、项目、文件、操作、设置与主题全部展示代表项
+            // 「全部」且无查询:会话、项目、文件限量展示最近项;操作、设置与主题全量列出,
+            // 整个结果区可向下滚动,一路看到其他分类的内容。
             var result: [HubSection] = []
             let recent = rank("", grouped[.sessions] ?? [], limit: 6)
             if !recent.isEmpty { result.append(HubSection(id: "recent", title: String(localized: "最近会话"), items: recent)) }
-            let projects = rank("", grouped[.projects] ?? [], limit: 3)
+            let projects = rank("", grouped[.projects] ?? [], limit: 5)
             if !projects.isEmpty { result.append(HubSection(id: HubSegment.projects.rawValue, title: HubSegment.projects.title, items: projects)) }
-            let files = rank("", grouped[.files] ?? [], limit: 4)
+            let files = rank("", grouped[.files] ?? [], limit: 5)
             if !files.isEmpty { result.append(HubSection(id: HubSegment.files.rawValue, title: HubSegment.files.title, items: files)) }
-            let actions = rank("", grouped[.actions] ?? [], limit: 4)
+            let actions = rank("", grouped[.actions] ?? [], limit: Int.max)
             if !actions.isEmpty { result.append(HubSection(id: HubSegment.actions.rawValue, title: HubSegment.actions.title, items: actions)) }
-            let settings = rank("", grouped[.settings] ?? [], limit: 4)
+            let settings = rank("", grouped[.settings] ?? [], limit: Int.max)
             if !settings.isEmpty { result.append(HubSection(id: HubSegment.settings.rawValue, title: HubSegment.settings.title, items: settings)) }
-            let themes = rank("", grouped[.themes] ?? [], limit: 4)
+            let themes = rank("", grouped[.themes] ?? [], limit: Int.max)
             if !themes.isEmpty { result.append(HubSection(id: HubSegment.themes.rawValue, title: HubSegment.themes.title, items: themes)) }
             return result
         }

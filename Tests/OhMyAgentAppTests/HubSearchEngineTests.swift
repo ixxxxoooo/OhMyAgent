@@ -35,6 +35,20 @@ struct HubSearchEngineTests {
         #expect(sections.first { $0.id == "themes" }?.items.map(\.id) == ["th1"])
     }
 
+    @Test("全部分类无查询:操作、设置、主题全量列出,不被代表项上限截断")
+    func emptyAllListsEverything() {
+        var many = fixtures
+        for index in 0..<30 {
+            many.append(candidate("act\(index)", .actions, "操作\(index)"))
+            many.append(candidate("set\(index)", .settings, "设置页\(index)"))
+            many.append(candidate("thm\(index)", .themes, "主题\(index)"))
+        }
+        let sections = HubSearchEngine.sections(query: "", segment: .all, candidates: many)
+        #expect(sections.first { $0.id == "actions" }?.items.count == 31)
+        #expect(sections.first { $0.id == "settings" }?.items.count == 31)
+        #expect(sections.first { $0.id == "themes" }?.items.count == 31)
+    }
+
     @Test("单分类无查询:列出该分类全部候选")
     func emptySegment() {
         let sections = HubSearchEngine.sections(query: "", segment: .files, candidates: fixtures)

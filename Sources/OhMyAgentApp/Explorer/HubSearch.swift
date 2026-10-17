@@ -32,6 +32,8 @@ final class HubModel {
 
     /// 记录打开时的初始主题,用户取消(Escape)时回滚
     private var initialThemeID: String?
+    /// 已提交的主题:搜索窗打开期间键盘预览不算数,「当前使用」标示与初始定位都以它为准
+    var committedThemeID: String { initialThemeID ?? AppearanceModel.shared.themeID }
     /// 键盘监视器:打开期间处理 ↑↓ / ↵ / ⇥ / esc(底部提示里的快捷键)
     @ObservationIgnored private let keyMonitor = HubKeyMonitor()
 
@@ -100,7 +102,7 @@ final class HubModel {
     private func recompute() {
         sections = HubSearchEngine.sections(query: query, segment: segment, candidates: candidates)
         if segment == .themes && query.isEmpty {
-            if let cur = flatItems.firstIndex(where: { $0.candidate.action == .theme(id: AppearanceModel.shared.themeID) }) {
+            if let cur = flatItems.firstIndex(where: { $0.candidate.action == .theme(id: committedThemeID) }) {
                 selection = cur
             } else {
                 selection = 0
@@ -111,29 +113,15 @@ final class HubModel {
         updateLivePreview()
     }
 
-    /// 最近一次键盘移动时间戳,用于在键盘导航期间屏蔽由于重绘/滚动引起的误触 onHover
-    @ObservationIgnored private var lastKeyboardMoveTime: CFAbsoluteTime = 0
-
     /// 移动选中项(循环)。
     func move(_ step: Int) {
         let count = flatItems.count
         guard count > 0 else { return }
-        lastKeyboardMoveTime = CFAbsoluteTimeGetCurrent()
         selection = ((selection + step) % count + count) % count
         updateLivePreview()
     }
 
-    /// 悬停选中某项并实时预览。
-    func select(_ item: HubItem) {
-        // 键盘导航后 250ms 内忽略 hover 触发的选择,避免滚动或主题切换重绘时鼠标指针抢回选中项
-        guard CFAbsoluteTimeGetCurrent() - lastKeyboardMoveTime > 0.25 else { return }
-        if let index = flatItems.firstIndex(of: item), index != selection {
-            selection = index
-            updateLivePreview()
-        }
-    }
-
-    /// 实时预览(VS Code 交互:光标经过时即时生效全局主题)。
+    /// 实时预览:仅由键盘 ↑↓ 移动触发(鼠标悬浮不改变选中项,也不预览);点击才提交。
     private func updateLivePreview() {
         let items = flatItems
         guard items.indices.contains(selection) else { return }
@@ -405,9 +393,6 @@ struct HubOverlay: View {
                                 HubRow(item: item, selected: isSelected(item))
                                     .id(item.id)
                                     .onTapGesture { hub.run(item) }
-                                    .onHover { hovered in
-                                        if hovered { hub.select(item) }
-                                    }
                                     .accessibilityElement(children: .combine)
                                     .accessibilityAddTraits(isSelected(item) ? [.isButton, .isSelected] : .isButton)
                             }
@@ -483,14 +468,19 @@ struct HubOverlay: View {
 private struct HubRow: View {
     let item: HubItem
     let selected: Bool
+    /// 鼠标悬浮仅用于轻量底色提示,不影响选中项
+    @State private var hovering = false
 
     var body: some View {
-        if case .theme(let themeID) = item.candidate.action,
-           let package = ThemePackage.all.first(where: { $0.id == themeID }) {
-            HubThemeRow(item: item, package: package, selected: selected)
-        } else {
-            standardRow
+        Group {
+            if case .theme(let themeID) = item.candidate.action,
+               let package = ThemePackage.all.first(where: { $0.id == themeID }) {
+                HubThemeRow(item: item, package: package, selected: selected, hovering: hovering)
+            } else {
+                standardRow
+            }
         }
+        .onHover { hovering = $0 }
     }
 
     private var standardRow: some View {
@@ -509,7 +499,7 @@ private struct HubRow: View {
         }
         .padding(.horizontal, 10)
         .frame(height: 36)
-        .background(selected ? OMColors.selectedFill : .clear, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
+        .background(selected ? OMColors.selectedFill : (hovering ? OMColors.hoverFill : .clear), in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
         .contentShape(Rectangle())
     }
 
@@ -543,7 +533,9 @@ private struct HubThemeRow: View {
     let item: HubItem
     let package: ThemePackage
     let selected: Bool
-    private var isCurrent: Bool { AppearanceModel.shared.themeID == package.id }
+    let hovering: Bool
+    /// 「当前使用」以已提交主题为准,键盘预览期间不随预览项漂移
+    private var isCurrent: Bool { HubModel.shared.committedThemeID == package.id }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -604,7 +596,7 @@ private struct HubThemeRow: View {
         }
         .padding(.horizontal, 10)
         .frame(height: 50)
-        .background(selected ? OMColors.selectedFill : .clear, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
+        .background(selected ? OMColors.selectedFill : (hovering ? OMColors.hoverFill : .clear), in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
         .contentShape(Rectangle())
     }
 
