@@ -304,7 +304,7 @@ private struct NavRow: View {
         Button(action: action) {
             HStack(spacing: 8) {
                 Image.om(icon, size: 14).opacity(0.7).frame(width: 16)
-                Text(title).font(OMFonts.body)
+                Text(title).font(OMFonts.small)
                 Spacer()
                 if let shortcut { Text(shortcut).font(OMFonts.caption).monospacedDigit().foregroundStyle(OMColors.tertiaryText) }
             }
