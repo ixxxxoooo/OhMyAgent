@@ -3,6 +3,7 @@
 // 让回放出来的历史回合(含终端里跑的)也能显示「耗时 · 完成于」结束行。
 
 import Foundation
+import OMLog
 
 /// 会话记录里的一个回合。
 public struct TranscriptTurn: Sendable, Equatable {
@@ -27,7 +28,10 @@ public enum TranscriptTurns {
     /// - Returns: 回合列表;文件不可读时为空
     public static func parse(_ url: URL) -> [TranscriptTurn] {
         guard let data = try? Data(contentsOf: url, options: .mappedIfSafe) else { return [] }
-        return parse(data)
+        let span = Log.perf.span("会话记录解析", warnMs: 300, ["bytes": "\(data.count)"])
+        let turns = parse(data)
+        span.end(["turns": "\(turns.count)"])
+        return turns
     }
 
     /// 解析记录数据。

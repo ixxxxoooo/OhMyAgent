@@ -4,6 +4,7 @@
 
 import ACPKit
 import Foundation
+import OMLog
 
 /// 作为 MCP 工具源登记的 Agent(例如 `codex mcp-server`、`claude mcp serve`)。
 public struct AgentMCPEntry: Codable, Sendable, Hashable, Identifiable {
@@ -126,6 +127,8 @@ public struct AgentRegistryStore: Sendable {
 
     /// 读取;文件缺失或损坏时返回默认内容(损坏文件不会被覆盖,直到下一次保存)。
     public func load() -> AgentRegistryData {
+        let span = Log.perf.span("读取 Agent 注册表", warnMs: 16, quiet: true)
+        defer { span.end() }
         guard let data = try? Data(contentsOf: url), let value = try? JSONDecoder().decode(AgentRegistryData.self, from: data) else { return AgentRegistryData() }
         return value
     }

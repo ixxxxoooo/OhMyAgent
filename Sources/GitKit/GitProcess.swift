@@ -122,10 +122,12 @@ enum GitProcess {
         }
         let timedOut = process.terminationReason == .uncaughtSignal && process.terminationStatus == SIGTERM && !Task.isCancelled
         watchdog.cancel()
-        let elapsed = ContinuousClock.now - started
-        let milliseconds = elapsed.components.seconds * 1000 + elapsed.components.attoseconds / 1_000_000_000_000_000
+        let micros = OMLogger.microseconds(since: started)
+        let milliseconds = micros / 1000
+        PerfStats.shared.record(name: "git 命令", micros: micros)
         let output = GitOutput(status: process.terminationStatus, stdout: outData, stderr: String(decoding: errData, as: UTF8.self))
-        Log.git.debug("git 已执行", ["cmd": command, "status": "\(output.status)", "ms": "\(milliseconds)"])
+        let fields = ["cmd": command, "status": "\(output.status)", "ms": "\(milliseconds)", "outBytes": "\(outData.count)"]
+        if milliseconds >= 500 { Log.git.warning("git 命令较慢", fields) } else { Log.git.debug("git 已执行", fields) }
         if timedOut { throw GitError.timedOut(command) }
         try Task.checkCancellation()
         return output

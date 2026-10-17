@@ -324,6 +324,10 @@ public final class SessionModel {
     private let checkpoints = CheckpointStore()
     private var turnNumber = 0
     private var turnStart: ContinuousClock.Instant?
+    /// 本回合性能统计:首个输出耗时(TTFT)、输出分片数、工具调用数。
+    private var turnFirstChunkMs: Int?
+    private var turnChunks = 0
+    private var turnToolCalls = 0
     /// 带项目与会话标识的日志器。
     private var log: OMLogger {
         Log.session.with(["project": workspace.lastPathComponent, "session": sessionId.map { String($0.prefix(8)) } ?? "-"])
@@ -970,6 +974,9 @@ public final class SessionModel {
         turnNumber += 1
         if sessionTitle == nil, titleSource == .none { startAutoTitle(for: prompt, sessionId: sessionId) }
         turnStart = ContinuousClock.now
+        turnFirstChunkMs = nil
+        turnChunks = 0
+        turnToolCalls = 0
         turnStartedAt = Date()
         lastActivity = .now
         log.info("发送提示", ["turn": "\(turnNumber)", "chars": "\(prompt.count)", "blocks": "\(blocks.count)", "images": "\(images.count)"])
@@ -1059,7 +1066,8 @@ public final class SessionModel {
         if let error {
             log.error("轮次失败", error: error, ["turn": "\(turnNumber)", "ms": "\(turnMs)"])
         } else {
-            log.info("轮次结束", ["turn": "\(turnNumber)", "reason": reason.map { "\($0)" } ?? "-", "ms": "\(turnMs)", "changedFiles": "\(turnChangeOrder.count)"])
+            log.info("轮次结束", ["turn": "\(turnNumber)", "reason": reason.map { "\($0)" } ?? "-", "ms": "\(turnMs)", "ttftMs": turnFirstChunkMs.map(String.init) ?? "-", "chunks": "\(turnChunks)", "tools": "\(turnToolCalls)", "changedFiles": "\(turnChangeOrder.count)"])
+            PerfStats.shared.record(name: "回合总耗时", micros: turnMs * 1000)
         }
         Task { [weak self] in
             // 让出一次,使 flush 产生的批次先被应用
@@ -1751,12 +1759,32 @@ public final class SessionModel {
 
     // MARK: - 事件处理
 
+    /// 统计回合进度:首个输出分片(TTFT)、分片数、工具调用数。
+    private func noteTurnProgress(_ update: SessionUpdate) {
+        guard isRunning, let start = turnStart else { return }
+        switch update {
+        case .agentMessageChunk, .agentThoughtChunk:
+            turnChunks += 1
+            if turnFirstChunkMs == nil {
+                let ms = OMLogger.milliseconds(since: start)
+                turnFirstChunkMs = ms
+                PerfStats.shared.record(name: "首 token(TTFT)", micros: ms * 1000)
+                log.info("首个输出", ["turn": "\(turnNumber)", "ttftMs": "\(ms)"])
+            }
+        case .toolCall:
+            turnToolCalls += 1
+        default:
+            break
+        }
+    }
+
     private func handle(_ events: [ClientEvent]) {
         for event in events {
             switch event {
             case .sessionUpdate(let id, let update):
                 guard sessionId == nil || sessionId == id else { continue }
                 lastActivity = .now
+                noteTurnProgress(update)
                 handle(update)
             case .authStatus:
                 break   // 不展示账号状态:登录完全由本机 claude 管理

@@ -20,7 +20,7 @@ final class DiagnosticsStore {
     func markFirstFrame() {
         guard firstFrameDate == nil else { return }
         firstFrameDate = Date()
-        if let ms = firstFrameMilliseconds { Log.perf.info("首帧", ["ms": "\(ms)"]) }
+        if let ms = firstFrameMilliseconds { Log.perf.info("首帧", ["ms": "\(ms)"]); LaunchTrace.mark("首帧") }
         if let path = ProcessInfo.processInfo.environment["OMA_PERF_OUT"], !path.isEmpty, let ms = firstFrameMilliseconds {
             try? "\(ms)\n".write(toFile: path, atomically: true, encoding: .utf8)
         }

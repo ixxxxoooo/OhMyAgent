@@ -1269,6 +1269,8 @@ public final class WorkbenchModel {
         state.selectedProjectID = selectedProjectID
         state.dock = dock
         state.chatSlots = chatSlotRecords()
+        let span = Log.perf.span("保存工作台状态", warnMs: 30, quiet: true, ["projects": "\(projects.count)"])
+        defer { span.end() }
         do { try store.save(state) } catch { log.error("保存工作台状态失败", error: error, ["file": store.fileURL.path]) }
     }
 }

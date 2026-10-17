@@ -78,11 +78,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             UserDefaults.standard.removeObject(forKey: ClientPrefs.Key.showMenuBar)
             UserDefaults.standard.set(true, forKey: "migration.trayDefaultOn")
         }
+        LaunchTrace.mark("应用代理开始")
         if !DemoLaunch.isActive { AppNotifier.shared.install() }
         AppEnvironment.shared.bootstrap()
+        LaunchTrace.mark("引导完成")
         AutomationService.shared.start()
         StatusItemController.shared.start()
         AppearanceModel.shared.applyAll()
+        LaunchTrace.mark("启动完成")
         Task { await Toolchain.shared.setOverrides(ClientPrefs.pathOverrides()) }
         // 首帧之后再做自动更新检查,不占用启动关键路径
         if !DemoLaunch.isActive {
@@ -161,6 +164,7 @@ struct OhMyAgentApp: App {
         // 字体平滑偏好(AppleFontSmoothing)须早于任何文本控件创建
         FontSmoothing.applyAtLaunch()
         Log.bootstrap(process: "app")
+        LaunchTrace.mark("App 初始化")
         MainThreadHitchMonitor.shared.start()
         PerfStats.shared.startPeriodicReport()
         DemoLaunch.activateIfRequested()

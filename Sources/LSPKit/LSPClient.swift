@@ -267,6 +267,8 @@ public actor LSPClient {
     /// 带超时的请求:超时后取消底层请求(会向服务器发取消通知)。
     private func send(_ method: String, _ params: JSONValue?, timeout: Duration) async throws -> JSONValue {
         let connection = self.connection
+        let span = Log.perf.span("LSP 请求", warnMs: 500, quiet: true, ["method": method])
+        defer { span.end() }
         return try await withThrowingTaskGroup(of: JSONValue.self) { group in
             group.addTask { try await connection.request(method, params: params) }
             group.addTask {

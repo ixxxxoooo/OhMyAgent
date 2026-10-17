@@ -176,7 +176,7 @@ def is_allowed(rel, key):
 
 EXCLUDE_DIRS = ("Sources/DemoKit/", "Sources/ACPSpike/", "Sources/EditorSpike/", "Sources/FakeAgent/",
                 "Sources/ACPKit/DemoScenarios", "Sources/ACPKit/DemoHistory", "Sources/ACPKit/ScriptedAgent")
-LOG_RE = re.compile(r"\b(Log|log)\.\w+\.?(info|debug|warning|error)?\(|\blog\.(info|debug|warning|error)\(|\bLog\.\w+\.span\(|Logger\(|assertionFailure|precondition")
+LOG_RE = re.compile(r"\b(Log|log)\.\w+\.?(info|debug|warning|error)?\(|\blog\.(info|debug|warning|error)\(|\bLog\.\w+\.span\(|\bPerfStats\.shared\.record\(|\bLaunchTrace\.mark\(|Logger\(|assertionFailure|precondition")
 
 
 def scan_all(show_all=False):

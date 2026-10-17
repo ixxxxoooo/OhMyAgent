@@ -178,6 +178,8 @@ public enum RecentStore {
     /// 记录一次会话(同 sessionId 去重,最多保留 20 条)。
     public static func record(_ session: RecentSession, _ defaults: UserDefaults = RecentStore.defaults) {
         guard !session.sessionId.isEmpty, !session.workspacePath.isEmpty else { return }
+        let span = Log.perf.span("记录最近会话", warnMs: 16, quiet: true)
+        defer { span.end() }
         var list = sessions(defaults).filter { $0.sessionId != session.sessionId }
         list.insert(session, at: 0)
         if let data = try? JSONEncoder().encode(Array(list.prefix(20))) { defaults.set(data, forKey: sessionsKey) }

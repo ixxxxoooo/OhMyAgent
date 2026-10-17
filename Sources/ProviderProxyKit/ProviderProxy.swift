@@ -164,7 +164,7 @@ public actor ProviderProxy {
             Log.agent.info("代理开始透传", ["route": target.label, "alias": requested, "model": target.model ?? requested, "ms": "\(OMLogger.milliseconds(since: started))"])
             var headers = ["Cache-Control": "no-cache"]
             headers["Content-Type"] = response.http.value(forHTTPHeaderField: "Content-Type") ?? "application/json"
-            return .stream(status: response.http.statusCode, headers: headers, body: Self.relay(response.body, label: target.label))
+            return .stream(status: response.http.statusCode, headers: headers, body: Self.relay(response.body, label: target.label, started: started))
         } catch is CancellationError {
             return Self.error(status: 499, message: "cancelled")
         } catch let error as URLError {
@@ -177,16 +177,22 @@ public actor ProviderProxy {
     }
 
     /// 原样转发上游分块;客户端断开(流被放弃)时上游任务随之取消。
-    private static func relay(_ body: AsyncThrowingStream<Data, Error>, label: String) -> AsyncStream<Data> {
+    private static func relay(_ body: AsyncThrowingStream<Data, Error>, label: String, started: ContinuousClock.Instant) -> AsyncStream<Data> {
         AsyncStream { continuation in
             let task = Task {
+                var summary = StreamSummary(route: label, wire: "anthropic", started: started)
                 do {
-                    for try await chunk in body { continuation.yield(chunk) }
+                    for try await chunk in body {
+                        summary.noteChunk(bytes: chunk.count)
+                        continuation.yield(chunk)
+                    }
                 } catch is CancellationError {
-                    // 客户端断开
+                    summary.outcome = "cancelled"
                 } catch {
+                    summary.outcome = "error"
                     Log.agent.warning("代理透传中断", ["route": label, "error": "\(type(of: error))"])
                 }
+                summary.log()
                 continuation.finish()
             }
             continuation.onTermination = { _ in task.cancel() }
@@ -219,7 +225,7 @@ public actor ProviderProxy {
             }
             if mapped.stream {
                 Log.agent.info("代理开始流式转发", ["route": key, "alias": requested, "model": mapped.model, "ms": "\(OMLogger.milliseconds(since: started))"])
-                return .stream(status: 200, headers: ["Content-Type": "text/event-stream", "Cache-Control": "no-cache"], body: Self.translate(chunks: response.body, model: mapped.model, route: key))
+                return .stream(status: 200, headers: ["Content-Type": "text/event-stream", "Cache-Control": "no-cache"], body: Self.translate(chunks: response.body, model: mapped.model, route: key, started: started))
             }
             var data = Data()
             for try await chunk in response.body { data.append(chunk) }
@@ -238,26 +244,32 @@ public actor ProviderProxy {
     }
 
     /// 把上游 SSE 分块翻译成 Anthropic SSE;客户端断开时(流被取消)同时取消上游读取。
-    private static func translate(chunks: AsyncThrowingStream<Data, Error>, model: String, route: String) -> AsyncStream<Data> {
+    private static func translate(chunks: AsyncThrowingStream<Data, Error>, model: String, route: String, started: ContinuousClock.Instant) -> AsyncStream<Data> {
         AsyncStream { continuation in
             let task = Task {
                 var translator = StreamTranslator(model: model)
                 var splitter = LineSplitter()
+                var summary = StreamSummary(route: route, wire: "openai", started: started)
                 func handle(_ line: String) -> Bool {
                     guard line.hasPrefix("data:") else { return false }
                     let payload = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
+                    let convertStart = ContinuousClock.now
                     for piece in translator.consume(payload: payload) { continuation.yield(Data(piece.utf8)) }
+                    summary.convertMicros += OMLogger.microseconds(since: convertStart)
                     return translator.isFinished
                 }
+                defer { summary.log() }
                 do {
                     outer: for try await chunk in chunks {
+                        summary.noteChunk(bytes: chunk.count)
                         for line in splitter.push(chunk) where handle(line) { break outer }
                     }
                     if !translator.isFinished, let rest = splitter.flush() { _ = handle(rest) }
                     for piece in translator.finish() { continuation.yield(Data(piece.utf8)) }
                 } catch is CancellationError {
-                    // 客户端断开
+                    summary.outcome = "cancelled"
                 } catch {
+                    summary.outcome = "error"
                     Log.agent.warning("代理流式中断", ["route": route, "error": "\(type(of: error))"])
                     for piece in translator.failEvent(message: "upstream stream interrupted") { continuation.yield(Data(piece.utf8)) }
                 }
@@ -299,5 +311,44 @@ public actor ProviderProxy {
         if let hint = UpstreamHints.message(for: body) { message = hint }
         message = LogRedactor.redact(message)
         return error(status: status, message: message.isEmpty ? "upstream error \(status)" : message)
+    }
+}
+
+/// 一次代理流的汇总:首块耗时、块数、字节数、总耗时与协议转换耗时,流结束时输出一条 `代理流结束`。
+/// 不记录任何正文与密钥,`route` 只是路由标签。
+struct StreamSummary {
+    let route: String
+    let wire: String
+    let started: ContinuousClock.Instant
+    var chunks = 0
+    var bytes = 0
+    var firstChunkMs: Int?
+    /// OpenAI → Anthropic 转换累计耗时(微秒)。
+    var convertMicros = 0
+    /// completed / cancelled / error。
+    var outcome = "completed"
+
+    init(route: String, wire: String, started: ContinuousClock.Instant) {
+        self.route = route; self.wire = wire; self.started = started
+    }
+
+    /// 记录收到一块数据。
+    mutating func noteChunk(bytes count: Int) {
+        if firstChunkMs == nil { firstChunkMs = OMLogger.milliseconds(since: started) }
+        chunks += 1
+        bytes += count
+    }
+
+    /// 输出汇总日志(已取消按 info,出错按 warning)。
+    func log() {
+        let totalMicros = OMLogger.microseconds(since: started)
+        PerfStats.shared.record(name: "代理流(\(wire))", micros: totalMicros)
+        var fields = [
+            "route": route, "wire": wire, "outcome": outcome,
+            "firstChunkMs": firstChunkMs.map(String.init) ?? "-",
+            "chunks": "\(chunks)", "bytes": "\(bytes)", "totalMs": "\(totalMicros / 1000)",
+        ]
+        if wire == "openai" { fields["convertMs"] = String(format: "%.1f", Double(convertMicros) / 1000) }
+        if outcome == "error" { Log.perf.warning("代理流结束", fields) } else { Log.perf.info("代理流结束", fields) }
     }
 }

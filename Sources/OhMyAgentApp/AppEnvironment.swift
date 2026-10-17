@@ -14,6 +14,7 @@ final class AppEnvironment {
     let workbench: WorkbenchModel
 
     private init() {
+        defer { LaunchTrace.mark("工作台模型加载完成") }
         let store = DemoLaunch.environment.map { WorkbenchStore(fileURL: $0.workbenchStoreURL) } ?? WorkbenchStore()
         workbench = WorkbenchModel(store: store) { url in
             AppEnvironment.makeSession(workspace: url, descriptor: Toolchain.defaultDescriptor())
