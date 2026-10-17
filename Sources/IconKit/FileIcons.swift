@@ -59,7 +59,11 @@ enum OMFileIconRenderer {
         if let cached = cache.get(key) { return cached }
         guard let spec = FileIconData.icons[icon] else { return nil }
         let lines = spec.split(separator: "\n", omittingEmptySubsequences: true)
-        guard let first = lines.first, let viewBox = Double(first), viewBox > 0 else { return nil }
+        // 首行:视口边长,可选 viewBox 原点「minX minY」(Material Symbols 为 0 -960)
+        let head = lines.first?.split(separator: " ").compactMap { Double($0) } ?? []
+        guard let viewBox = head.first, viewBox > 0 else { return nil }
+        let originX = head.count >= 3 ? head[1] : 0
+        let originY = head.count >= 3 ? head[2] : 0
         var layers: [(NSColor, CGFloat, CGPath)] = []
         for line in lines.dropFirst() {
             let parts = line.split(separator: " ", maxSplits: 2, omittingEmptySubsequences: true)
@@ -75,6 +79,7 @@ enum OMFileIconRenderer {
         let image = NSImage(size: NSSize(width: size, height: size), flipped: true) { rect in
             guard let context = NSGraphicsContext.current?.cgContext else { return false }
             context.scaleBy(x: rect.width / viewBox, y: rect.height / viewBox)
+            context.translateBy(x: -originX, y: -originY)
             for (color, opacity, path) in layers {
                 context.setFillColor(color.withAlphaComponent(opacity).cgColor)
                 context.addPath(path)

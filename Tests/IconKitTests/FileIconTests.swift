@@ -33,6 +33,25 @@ struct FileIconTests {
         #expect(OMFileIconCatalog.iconName(for: "whatever", isDirectory: true, expanded: true) == FileIconData.defaultFolderOpen)
     }
 
+    @Test("每个图标的路径都落在视口内(防止 viewBox 原点非 0 的图标被画到画布外而不显示)")
+    func iconsStayInsideViewport() throws {
+        // 上游图标自身路径就超出 viewBox(被自身 viewBox 裁剪),不是原点问题,豁免
+        let upstreamOverflow: Set<String> = ["vedic"]
+        for (name, spec) in FileIconData.icons where !upstreamOverflow.contains(name) {
+            let lines = spec.split(separator: "\n", omittingEmptySubsequences: true)
+            let head = lines.first?.split(separator: " ").compactMap { Double($0) } ?? []
+            let side = try #require(head.first)
+            let origin = head.count >= 3 ? CGPoint(x: head[1], y: head[2]) : .zero
+            let viewport = CGRect(x: origin.x, y: origin.y, width: side, height: side).insetBy(dx: -side * 0.1, dy: -side * 0.1)
+            for line in lines.dropFirst() {
+                let parts = line.split(separator: " ", maxSplits: 2, omittingEmptySubsequences: true)
+                guard parts.count == 3 else { continue }
+                let box = try SVGPathParser.parse(String(parts[2])).cgPath.boundingBoxOfPath
+                #expect(viewport.contains(box), "\(name) 的路径超出视口:\(box)")
+            }
+        }
+    }
+
     @Test("映射表指向的图标全部存在,且每个内置图标都能解析并渲染")
     @MainActor
     func allIconsRender() {

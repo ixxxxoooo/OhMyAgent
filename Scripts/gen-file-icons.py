@@ -96,7 +96,7 @@ def parse_svg(path):
             else: skipped += 1
         for child in el: walk(child, fill, op)
     walk(root, "#000000", 1.0)
-    return vb[2], shapes, skipped
+    return (vb[2], vb[0], vb[1]), shapes, skipped
 
 def main():
     src = locate_src()
@@ -128,10 +128,13 @@ def main():
     def lit(s): return json.dumps(s, ensure_ascii=False)
     out = ["// @author ixxxxoooo",
            "// 自动生成,请勿手改:Scripts/gen-file-icons.py(来源 Material Icon Theme 5.x,MIT 许可,见 Resources/Licenses)。",
-           "// 格式:每个图标一段文本,首行为视口边长,其后每行「填充色 不透明度 path」。",
+           "// 格式:每个图标一段文本,首行为视口边长(可附 viewBox 原点 minX minY),其后每行「填充色 不透明度 path」。",
            "", "enum FileIconData {", "    static let icons: [String: String] = ["]
     for n, (size, shapes) in icons.items():
-        body = num(size) + "\\n" + "\\n".join(f"{c} {num(o) if o != 1 else '1'} {d}" for c, o, d in shapes)
+        side, minx, miny = size
+        # 首行:视口边长,viewBox 原点非 0(如 Material Symbols 的「0 -960 960 960」)时追加「 minX minY」
+        head = num(side) + (f" {num(minx)} {num(miny)}" if (minx, miny) != (0, 0) else "")
+        body = head + "\\n" + "\\n".join(f"{c} {num(o) if o != 1 else '1'} {d}" for c, o, d in shapes)
         out.append(f'        "{n}": "{body}",')
     out.append("    ]")
     def dict_lit(name, m):
