@@ -80,9 +80,12 @@ struct ChatView: View {
                     .transition(.opacity.combined(with: .offset(y: 6)))
             }
             ComposerDockView(model: model, workbench: AppEnvironment.shared.workbench)
-            HStack {
-                ProjectSwitcherButton(model: model, workbench: AppEnvironment.shared.workbench)
-                Spacer()
+            if isEmptySession {
+                // 新会话才显示项目切换 chip,会话开始后隐藏
+                HStack {
+                    ProjectSwitcherButton(model: model, workbench: AppEnvironment.shared.workbench)
+                    Spacer()
+                }
             }
             ComposerView(model: model)
             ComposerFooter(model: model, usageOpen: $usageOpen)
