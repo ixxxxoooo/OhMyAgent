@@ -93,6 +93,23 @@ extension EnvironmentValues {
     @Entry var stickyUser: StickyUserState?
 }
 
+/// 吸顶卡背后的底板:卡片范围内与背景同色(盖住后面滚动的内容),
+/// 卡片下缘再用一段渐变淡出,让内容从卡片下面平滑「淡入」而不是被硬切。
+/// 渐变只作遮罩/淡出,非装饰。
+struct StickyFadeBackdrop: View {
+    /// 卡片下缘的渐隐高度
+    static let fadeHeight: CGFloat = 28
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Rectangle().fill(OMColors.surface)
+            LinearGradient(colors: [OMColors.surface, OMColors.surface.opacity(0)], startPoint: .top, endPoint: .bottom) // ui-lint:allow 仅作遮罩/淡出,非装饰
+                .frame(height: Self.fadeHeight)
+        }
+        .allowsHitTesting(false)
+    }
+}
+
 /// 叠在会话流顶部的吸顶层。
 struct StickyUserOverlay: View {
     let model: SessionModel
@@ -107,12 +124,9 @@ struct StickyUserOverlay: View {
                 .frame(maxWidth: maxWidth)
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
-                .padding(.bottom, 16)
+                .padding(.bottom, StickyFadeBackdrop.fadeHeight)
                 .frame(maxWidth: .infinity)
-                .background(alignment: .top) {
-                    LinearGradient(colors: [OMColors.surface, OMColors.surface.opacity(0.92), OMColors.surface.opacity(0)], startPoint: .top, endPoint: .bottom) // ui-lint:allow 仅作遮罩/淡出,非装饰
-                        .allowsHitTesting(false)
-                }
+                .background(alignment: .top) { StickyFadeBackdrop() }
                 .transition(.opacity)
         } else if let target = state.target, target.stickyID != state.editing?.id,
                   let entry = model.timeline.entries.first(where: { $0.id == target.stickyID }) {
@@ -123,13 +137,10 @@ struct StickyUserOverlay: View {
                 .frame(maxWidth: maxWidth)
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
-                .padding(.bottom, 16)
+                .padding(.bottom, StickyFadeBackdrop.fadeHeight)
                 .frame(maxWidth: .infinity)
-                .background(alignment: .top) {
-                    // 卡片下缘渐隐进内容,和会话流顶部淡出衔接
-                    LinearGradient(colors: [OMColors.surface, OMColors.surface.opacity(0.92), OMColors.surface.opacity(0)], startPoint: .top, endPoint: .bottom) // ui-lint:allow 仅作遮罩/淡出,非装饰
-                        .allowsHitTesting(false)
-                }
+                // 卡片下缘渐隐进内容,和会话流底部淡出衔接
+                .background(alignment: .top) { StickyFadeBackdrop() }
                 .offset(y: push)
                 .transition(.opacity)
         }
