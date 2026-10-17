@@ -534,6 +534,31 @@ public final class WorkbenchModel {
         scheduleSave()
     }
 
+    // MARK: 项目图标
+
+    /// 图标图片目录:与状态文件同级的 `ProjectIcons`(演示模式因状态文件隔离而自动隔离)。
+    public var projectIconDirectory: URL {
+        store.fileURL.deletingLastPathComponent().appendingPathComponent("ProjectIcons", isDirectory: true)
+    }
+
+    /// 设置(或清除)项目图标;替换掉旧的图片图标时删除旧文件。
+    /// - Parameters:
+    ///   - icon: 新图标;nil 恢复默认
+    ///   - id: 项目 ID
+    public func setProjectIcon(_ icon: ProjectIcon?, for id: String) {
+        guard let index = projects.firstIndex(where: { $0.id == id }), projects[index].icon != icon else { return }
+        let old = projects[index].icon
+        projects[index].icon = icon
+        if old?.kind == .image, old != icon { ProjectIconFiles.removeFile(for: old, in: projectIconDirectory) }
+        scheduleSave()
+    }
+
+    /// 导入图片作为图标(复制到图标目录)。
+    /// - Returns: 成功返回图片图标(尚未应用到任何项目)
+    public func importProjectIcon(imageAt url: URL) -> ProjectIcon? {
+        ProjectIconFiles.importImage(from: url, into: projectIconDirectory)
+    }
+
     // MARK: 设置整页
 
     /// 进入设置整页。

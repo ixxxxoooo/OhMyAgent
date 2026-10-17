@@ -145,6 +145,10 @@ public struct ProjectEntry: Codable, Equatable, Sendable, Identifiable {
     /// 是否为「会话区」:不绑定任何项目的通用对话(ChatGPT 式问答),工作目录是应用支持目录下的空目录。
     /// 它复用项目的会话机制(历史、置顶、归档、标签),但不出现在项目列表里。
     public var isChatArea = false
+    /// 自定义侧栏图标(nil 为默认文件夹图标)
+    public var icon: ProjectIcon?
+    /// 工作区里额外的文件夹(绝对路径,不含主目录 `id`);Agent、搜索、文件树与 Git 面板会覆盖它们
+    public var extraFolders: [String] = []
 
     public var url: URL { URL(fileURLWithPath: id) }
 
@@ -156,7 +160,7 @@ public struct ProjectEntry: Codable, Equatable, Sendable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, addedAt, lastOpenedAt, pinned, collapsed, sessions, pinnedSessions, archivedSessions, isChatArea
+        case id, name, addedAt, lastOpenedAt, pinned, collapsed, sessions, pinnedSessions, archivedSessions, isChatArea, icon, extraFolders
     }
 
     /// 容错解码:新增字段缺失时使用默认值,旧版本状态文件可继续读取。
@@ -172,6 +176,8 @@ public struct ProjectEntry: Codable, Equatable, Sendable, Identifiable {
         pinnedSessions = try c.decodeIfPresent([String].self, forKey: .pinnedSessions) ?? []
         archivedSessions = try c.decodeIfPresent([String].self, forKey: .archivedSessions) ?? []
         isChatArea = try c.decodeIfPresent(Bool.self, forKey: .isChatArea) ?? false
+        icon = try c.decodeIfPresent(ProjectIcon.self, forKey: .icon)
+        extraFolders = try c.decodeIfPresent([String].self, forKey: .extraFolders) ?? []
     }
 }
 

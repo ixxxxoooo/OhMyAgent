@@ -416,9 +416,7 @@ private struct ProjectGroup: View {
 
     private func header(count: Int) -> some View {
         HStack(spacing: 6) {
-            Image.om(expanded ? "folder-open" : "folder", size: 14)
-                .opacity(isSelected ? 1 : 0.6)
-                .foregroundStyle(isSelected ? OMColors.accent : OMColors.secondaryText)
+            ProjectIconView(icon: project.icon, directory: workbench.projectIconDirectory, expanded: expanded, isSelected: isSelected)
             Text(project.name)
                 .font(OMFonts.small.weight(.medium))
                 .foregroundStyle(OMColors.secondaryText)
@@ -464,6 +462,7 @@ private struct ProjectGroup: View {
             OMMenuItem("选中此项目", icon: "folder-open") { workbench.select(project: project.id) }
             OMMenuDivider()
             OMMenuItem(verbatim: project.pinned ? String(localized: "取消置顶") : String(localized: "置顶"), icon: "pin") { workbench.togglePin(project.id) }
+            OMMenuItem("更换图标…", icon: "image") { ProjectIconPicker.present(project: project, workbench: workbench) }
             OMMenuItem("重命名项目…", icon: "pencil") {
                 guard let name = ExplorerActions.prompt(title: String(localized: "重命名项目"), message: String(localized: "只修改侧栏里的显示名,不会改动磁盘上的目录名。"), initial: project.name) else { return }
                 workbench.renameProject(project.id, to: name)

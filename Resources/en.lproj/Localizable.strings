@@ -2160,3 +2160,12 @@
 "智能:启动后稍作等待,提前连好当前项目最近用过的引擎,并在打开引擎选择器时预热其余引擎;全部:启动后依次连好所有已启用的引擎(最多 4 个)。切换引擎时直接认领已连好的会话。" = "Smart: shortly after launch, pre-connect the engines recently used in this project and warm the rest when the engine picker opens. All: connect every enabled engine one by one after launch (up to 4). Switching engines then adopts an already-connected session.";
 "预热的代价:每个引擎都是一个常驻 node 子进程(内存与电量),并各自挂载 MCP 与 Bridge;启动时多个进程同时握手会抢 CPU,所以只会逐个、延迟进行;需要登录的引擎可能在后台弹出授权;预热失败 5 分钟内不会重试。对启动速度不敏感时可选「关闭」。" = "Cost of warming up: each engine is a resident node process (memory and battery) with its own MCP and Bridge; simultaneous handshakes would compete for CPU, so warming is sequential and delayed; engines that need login may prompt for authorization in the background; a failed warm-up is not retried for 5 minutes. Choose Off if launch speed doesn't matter to you.";
 "名称不能包含 / 或为 . 与 .." = "The name can't contain / or be . or ..";
+"更换图标" = "Change Icon";
+"搜索图标" = "Search icons";
+"没有匹配的图标" = "No matching icons";
+"表情" = "Emoji";
+"输入任意表情" = "Enter any emoji";
+"选择图片…" = "Choose Image…";
+"无法使用这张图片" = "Can’t Use This Image";
+"请选择 10 MB 以内的 PNG、JPEG、GIF、HEIC、TIFF 或 WebP 图片。" = "Choose a PNG, JPEG, GIF, HEIC, TIFF or WebP image under 10 MB.";
+"更换图标…" = "Change Icon…";
