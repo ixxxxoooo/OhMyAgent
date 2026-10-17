@@ -13,3 +13,4 @@ alwaysApply: true
 - 配色:`#EFEFEF`(侧栏)/`#F6F6F7`(内容区)仅属于「跟随系统」与「Cursor 浅色」主题,其余主题由各自 `ThemePalette` 提供;设置页左栏宽度与工作台左栏一致;禁止写死色值(详见 AGENTS.md 4.1)。
 - UI 规范:字号只用 `OMFonts` 令牌、颜色只用 `OMColors`、图标只用 `Image.om`、按钮只用 `OMButtonStyle`、复制用 `OMCopyButton`、档位用 `OMStepSlider`、下拉选择用 `OMPickList`;`Scripts/ui-lint.py` 已接入 CI(详见 AGENTS.md 4.2)。
 - 主题渗透(AGENTS.md 4.3):颜色只用 `OMColors`/`ThemePalette` 令牌(含填充、状态、遮罩、阴影、图表序列),禁止系统色与 `Color.primary`;读取令牌自动随主题刷新,不要用 `.id` 强制重建;AppKit 桥接监听 `ThemeRuntime.didChange`。
+- 纸感规范(AGENTS.md 4.4):默认主题「Cursor 纸感」;字重 ≤ medium、圆角只用 `OMRadius`、标签用 `OMPillShape`、阴影三档、Ember 仅文字/强调、主按钮 Ink、`.omWarm`/`.omPositive` 语义按钮、禁止渐变发光与纯黑白;低语标题用 `omEditorialHeading`。
