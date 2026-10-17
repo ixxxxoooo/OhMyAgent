@@ -588,8 +588,7 @@ private struct SessionLine: View {
             RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous)
                 .fill(isSelected ? OMColors.selectedFill : (hovering ? OMColors.hoverFill : Color.clear))
         )
-        // 悬停时背景上扫过一条高光(流动效果);平时不创建动画视图
-        .background { if hovering { FlowSweep() } }
+        // 悬停时仅普通填充,不再叠加高光扫过的流动效果
         .transaction { $0.animation = nil }
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
