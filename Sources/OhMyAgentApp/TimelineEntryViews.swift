@@ -106,9 +106,7 @@ struct TurnSummaryView: View {
                 .buttonStyle(.plain)
                 .omTooltip("分叉出新会话 (Fork Chat)", icon: "git-branch")
 
-                Spacer(minLength: 4)
-
-                // 品牌与模型、耗时元数据
+                // 品牌与模型、耗时元数据(整体左对齐,紧跟操作按钮)
                 if let hint = summary.brand {
                     BrandIconView(BrandIcon.resolve(modelId: hint.modelId, providerPreset: hint.providerPreset, providerName: hint.providerName), size: 12)
                 }
@@ -117,6 +115,7 @@ struct TurnSummaryView: View {
                     .foregroundStyle(OMColors.tertiaryText)
                     .lineLimit(1)
                     .truncationMode(.tail)
+                    .layoutPriority(1)
             }
             .padding(.horizontal, 4)
             .padding(.vertical, 2)
