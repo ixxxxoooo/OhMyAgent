@@ -32,6 +32,8 @@ final class HubModel {
 
     /// 记录打开时的初始主题,用户取消(Escape)时回滚
     private var initialThemeID: String?
+    /// 键盘监视器:打开期间处理 ↑↓ / ↵ / ⇥ / esc(底部提示里的快捷键)
+    @ObservationIgnored private let keyMonitor = HubKeyMonitor()
 
     /// 平铺的结果(键盘选择用)。
     var flatItems: [HubItem] { sections.flatMap(\.items) }
@@ -48,6 +50,7 @@ final class HubModel {
         self.initialThemeID = AppearanceModel.shared.themeID
         selection = 0
         isPresented = true
+        keyMonitor.install { [weak self] command in self?.handle(command) ?? false }
         if WorkspaceIndexModel.shared.root != workbench.selectedProjectID || WorkspaceIndexModel.shared.files.isEmpty {
             WorkspaceIndexModel.shared.refresh(root: workbench.selectedProjectID)
         }
@@ -67,6 +70,21 @@ final class HubModel {
             initialThemeID = nil
         }
         isPresented = false
+        keyMonitor.remove()
+    }
+
+    /// 执行键盘指令(由本地事件监视器调用)。
+    /// - Parameter command: 解析后的指令
+    /// - Returns: 是否已处理(true 时事件不再传给文本框)
+    private func handle(_ command: HubKeyCommand) -> Bool {
+        guard isPresented else { return false }
+        switch command {
+        case .move(let step): move(step)
+        case .switchSegment(let step): segment = segment.next(by: step)
+        case .submit: runSelected()
+        case .dismiss: dismiss()
+        }
+        return true
     }
 
     /// 文件索引或工作台数据变化后重建候选。
@@ -166,14 +184,14 @@ enum HubCandidateBuilder {
                 let date = HubDates.parse(cached.updatedAt ?? cached.firstSeenAt)
                 let title = (cached.title?.isEmpty == false ? cached.title : nil) ?? String(localized: "新对话")
                 sessions.append((date ?? .distantPast, HubCandidate(
-                    id: "session:\(cached.sessionId)", segment: .sessions, title: title, subtitle: project.name,
+                    id: "session:\(cached.sessionId)", segment: .sessions, title: title, subtitle: project.isChatArea ? String(localized: "会话区") : project.name,
                     trailing: date.map(HubDates.relative), icon: .symbol("message-square"),
                     action: .session(workspace: project.id, sessionId: cached.sessionId, title: cached.title))))
             }
         }
         result += sessions.sorted { $0.0 > $1.0 }.map(\.1)
         // 项目:最近打开优先
-        for project in workbench.projects.sorted(by: { $0.lastOpenedAt > $1.lastOpenedAt }) {
+        for project in workbench.workspaceProjects.sorted(by: { $0.lastOpenedAt > $1.lastOpenedAt }) {
             result.append(HubCandidate(
                 id: "project:\(project.id)", segment: .projects, title: project.name,
                 subtitle: (project.id as NSString).abbreviatingWithTildeInPath, trailing: nil,
@@ -298,10 +316,6 @@ struct HubOverlay: View {
                 .font(OMFonts.custom(18))
                 .focused($focused)
                 .onSubmit { hub.runSelected() }
-                .onKeyPress(.downArrow) { hub.move(1); return .handled }
-                .onKeyPress(.upArrow) { hub.move(-1); return .handled }
-                .onKeyPress(.tab) { hub.segment = hub.segment.next(by: NSEvent.modifierFlags.contains(.shift) ? -1 : 1); return .handled }
-                .onKeyPress(.escape) { hub.dismiss(); return .handled }
         }
         .padding(.horizontal, 18)
         .frame(height: 56)
