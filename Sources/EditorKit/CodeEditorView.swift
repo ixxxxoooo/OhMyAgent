@@ -3,6 +3,7 @@
 
 import AppKit
 import DesignSystem
+import OMLog
 
 /// 行标记(用于 Diff 与 Agent 跟随)。
 public enum LineMarker: Sendable {
@@ -213,23 +214,34 @@ public final class CodeEditorView: NSView {
         // 先用文本长度粗判大文件(平均每行 40 字符),随后用精确行数修正
         let roughLarge = text.utf16.count / 40 > Self.largeFileLineThreshold
         applyLargeFileMode(roughLarge)
+        let layoutStart = ContinuousClock.now
         textView.layoutManagerEnsureViewport()
+        let layoutMs = Int((ContinuousClock.now - layoutStart).seconds * 1000)
+        var syncLexMs = 0
         // 小文件:行索引、词法着色同步完成,避免先显示一帧无色文本、行号错位再跳变(切换文件时的闪动)
         if text.utf16.count <= Self.syncLoadLimit {
             let index = LineIndex(text: text)
             lineIndex = index
             ruler.lineIndex = index
             if !usesMarkdownStyling {
+                let lexStart = ContinuousClock.now
                 paintSyncHighlight(SimpleLexer.lex(text, language: language))
+                syncLexMs = Int((ContinuousClock.now - lexStart).seconds * 1000)
             }
         }
         lastLoadDuration = (ContinuousClock.now - begin).seconds
+        // 装载耗时分解:主线程总耗时、首屏排版、同步词法;超过 40ms 记 warning(同类文件反复慢时据此定位阶段)
+        let loadMs = Int(lastLoadDuration * 1000)
+        let loadFields = ["chars": "\(text.utf16.count)", "ms": "\(loadMs)", "layoutMs": "\(layoutMs)", "lexMs": "\(syncLexMs)", "largeFile": isLargeFileMode ? "yes" : "no"]
+        if loadMs >= 40 { Log.perf.warning("编辑器装载偏慢", loadFields) } else { Log.perf.debug("编辑器装载", loadFields) }
+        let backgroundSpan = Log.perf.span("编辑器后台索引与词法", warnMs: 200, ["chars": "\(text.utf16.count)"])
 
         let engine = self.engine
         rebuildTask = Task { [weak self] in
             // 行索引与词法扫描均不在主线程
             let index = await Task.detached(priority: .userInitiated) { LineIndex(text: text) }.value
             _ = await engine.rebuild(text: text, language: language)
+            backgroundSpan.end(["lines": "\(index.lineCount)"])
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 guard let self, self.generation == current else { return }
@@ -578,6 +590,8 @@ public final class CodeEditorView: NSView {
         // 直接写入文本存储的前景色属性:TextKit 2 的渲染属性在新系统上不会被绘制。
         // 属性变更不改变字符串,不会触发 textDidChange 与撤销登记。
         guard let storage = textView.textStorage else { return }
+        let paintSpan = Log.perf.span("视口高亮应用", warnMs: 30, quiet: true, ["spans": "\(spans.count)", "chars": "\(desired.length)"])
+        defer { paintSpan.end() }
         let docRange = NSRange(location: 0, length: storage.length)
         let resetRange = NSIntersectionRange(NSUnionRange(highlightedRange, desired), docRange)
         storage.beginEditing()

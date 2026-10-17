@@ -101,9 +101,11 @@ final class EditorLSPController {
         currentText = text
         syncedText = text
         status = .starting
+        let span = Log.perf.span("语言服务器附加", warnMs: 300, ["file": (path as NSString).lastPathComponent, "bytes": "\(text.utf8.count)"])
         let stored = UserDefaults.standard.integer(forKey: ClientPrefs.Key.lspMaxWorkspaces)
         await manager.setMaxClients(stored == 0 ? 4 : stored)
         let result = await manager.open(path: path, projectRoot: projectRoot, text: text)
+        span.end()
         if closing {
             // 等待期间视图已消失:若已打开则立刻关闭
             if case .ready(let opened) = result { await manager.close(opened) }
