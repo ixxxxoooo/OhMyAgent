@@ -5,6 +5,11 @@
   perf-report.py report [--all]   最近一次运行的整体画像(内存、卡顿、耗时 Top、TTFT、代理流、启动阶段、容量峰值)
   perf-report.py mem [--all]      footprint / 子进程内存 / CPU 时序
   perf-report.py slow [--all]     perf 与 git 分类的 WARN/ERROR
+  perf-report.py check [阈值]     回归门槛:超阈值以非零状态退出(供 perf-soak.sh / CI 使用)
+      --max-mb N          本进程 footprint 峰值上限(默认 600)
+      --max-drift-mb N    前后半程均值增长上限(默认 80;采样不足 4 次不判)
+      --max-hitch-ms N    单次主线程卡顿上限(默认 1500)
+      --min-samples N     至少需要的资源采样次数(默认 3)
   perf-report.py turn <标识>      按会话前缀(session=/sid=)或回合串起相关日志
 默认只看最近一次启动的那个进程(按 pid 过滤,避免开发版与安装版混在一起);
 --all 看全部保留的日志;--pid N 指定进程。
@@ -171,6 +176,46 @@ def turn(entries, key):
             print(" ".join([e[0], e[1], f"[{e[2]}]", e[3]] + [f"{k}={v}" for k, v in f.items()]))
 
 
+def check(entries, opts):
+    """回归门槛:返回失败原因列表(空表示通过)。"""
+    problems = []
+    samples = [e for e in entries if e[3] == "资源采样"]
+    if len(samples) < opts["min_samples"]:
+        problems.append(f"资源采样只有 {len(samples)} 次(要求 ≥{opts['min_samples']}),采样可能没有运行")
+        return problems
+    fp = [num(e[4].get("footprintMB")) for e in samples]
+    peak = max(max(fp), max(num(e[4].get("peakMB")) for e in samples))
+    if peak > opts["max_mb"]:
+        problems.append(f"footprint 峰值 {peak:.0f} MB > {opts['max_mb']:.0f} MB")
+    if len(fp) >= 4:
+        half = len(fp) // 2
+        drift = statistics.mean(fp[half:]) - statistics.mean(fp[:half])
+        if drift > opts["max_drift_mb"]:
+            problems.append(f"前后半程均值增长 {drift:+.0f} MB > {opts['max_drift_mb']:.0f} MB(疑似持续增长)")
+    hitches = [num(e[4].get("ms")) for e in entries if e[3] == "主线程卡顿"]
+    if hitches and max(hitches) > opts["max_hitch_ms"]:
+        problems.append(f"主线程卡顿最长 {max(hitches):.0f} ms > {opts['max_hitch_ms']:.0f} ms")
+    snaps = [e for e in entries if e[3] == "容量快照"]
+    if snaps:
+        last = snaps[-1][4]
+        for key in ("backlog.acpLines.depth", "backlog.events.depth"):
+            if num(last.get(key)) > 0:
+                problems.append(f"{key} 结束时仍有积压 {last.get(key)}")
+    for name in ("内存增长较快", "内存占用偏高", "CPU 持续偏高"):
+        count = len([e for e in entries if e[3] == name])
+        if count:
+            problems.append(f"出现告警「{name}」{count} 次")
+    return problems
+
+
+def option(args, flag, default):
+    """取 `--flag 值`,返回 (值, 剩余参数)。"""
+    if flag in args:
+        index = args.index(flag)
+        return float(args[index + 1]), args[:index] + args[index + 2:]
+    return default, args
+
+
 def main():
     args = sys.argv[1:]
     if not args:
@@ -191,6 +236,19 @@ def main():
         mem(entries)
     elif cmd == "slow":
         slow(entries)
+    elif cmd == "check":
+        rest = args[1:]
+        opts = {}
+        for flag, key, default in (("--max-mb", "max_mb", 600.0), ("--max-drift-mb", "max_drift_mb", 80.0), ("--max-hitch-ms", "max_hitch_ms", 1500.0), ("--min-samples", "min_samples", 3.0)):
+            opts[key], rest = option(rest, flag, default)
+        opts["min_samples"] = int(opts["min_samples"])
+        problems = check(entries, opts)
+        if problems:
+            print("性能门槛未通过:")
+            for item in problems:
+                print("  ✗ " + item)
+            return 1
+        print("性能门槛通过")
     elif cmd == "turn" and len(args) > 1:
         turn(entries, args[1])
     else:

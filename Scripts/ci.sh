@@ -11,4 +11,9 @@ python3 Scripts/ui-lint.py --check
 swift build --scratch-path /tmp/oma-ci -Xswiftc -warnings-as-errors
 swift test
 plutil -lint Resources/Info.plist Resources/*.lproj/*.strings
+# 可选:性能浸泡回归(需先打包;默认不跑,避免拖慢 CI 与抢占本机应用)。OMA_CI_PERF=1 Scripts/ci.sh
+if [[ "${OMA_CI_PERF:-0}" == "1" ]]; then
+  Scripts/bundle.sh release
+  Scripts/perf-soak.sh "${OMA_CI_PERF_SECONDS:-90}"
+fi
 echo "CI 通过"
