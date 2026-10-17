@@ -93,28 +93,22 @@ struct ProjectSwitcherButton: View {
         Button {
             shown.toggle()
         } label: {
-            HStack(spacing: 5) {
-                Image.om(currentIcon, size: 13)
+            HStack(spacing: 4) {
+                Image.om(currentIcon, size: 12)
                     .foregroundStyle(OMColors.primaryText)
                 Text(currentTitle)
                     .font(OMFonts.small)
-                    .fontWeight(.medium)
                     .foregroundStyle(OMColors.primaryText)
                     .lineLimit(1)
                 Image.om("chevron-down", size: 9)
                     .foregroundStyle(OMColors.secondaryText)
-                    .opacity(hovering || shown ? 1.0 : 0.6)
+                    .opacity(hovering || shown ? 0.9 : 0.5)
             }
-            .padding(.horizontal, 8)
-            .frame(height: 24)
-            // 常态无背景轮廓,悬停/展开时才给填充反馈
-            .background {
-                if hovering || shown {
-                    RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous)
-                        .fill(OMColors.hoverFill)
-                }
-            }
-            .contentShape(RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
+            .padding(.horizontal, 6)
+            .frame(height: 22)
+            // 对齐分支切换 chip 的样式:平时无背景,悬停/展开才显示胶囊填充
+            .background(OMPillShape().fill(hovering || shown ? OMColors.hoverFill : Color.clear))
+            .contentShape(OMPillShape())
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
@@ -151,6 +145,7 @@ private struct ProjectPickerPopover: View {
 
     private var navigableIDs: [String] {
         var ids = filteredProjects.map(\.id)
+        ids.append("action:openFolder")
         ids.append("action:newProject")
         ids.append("action:quickStart")
         ids.append("action:noProject")
@@ -255,6 +250,18 @@ private struct ProjectPickerPopover: View {
 
     private var actionsSection: some View {
         VStack(alignment: .leading, spacing: 1) {
+            actionRow(
+                id: "action:openFolder",
+                icon: "folder-open",
+                title: String(localized: "打开文件夹"),
+                isChecked: false
+            ) {
+                shown = false
+                if let url = WorkspaceStore.chooseDirectory() {
+                    AppActions.shared.openWorkspace(url)
+                }
+            }
+
             actionRow(
                 id: "action:newProject",
                 icon: "folder-plus",
@@ -361,7 +368,12 @@ private struct ProjectPickerPopover: View {
 
     private func confirmSelection() {
         guard let id = highlightedID else { return }
-        if id == "action:newProject" {
+        if id == "action:openFolder" {
+            shown = false
+            if let url = WorkspaceStore.chooseDirectory() {
+                AppActions.shared.openWorkspace(url)
+            }
+        } else if id == "action:newProject" {
             shown = false
             if let url = WorkspaceStore.chooseDirectory() {
                 AppActions.shared.openWorkspace(url)
