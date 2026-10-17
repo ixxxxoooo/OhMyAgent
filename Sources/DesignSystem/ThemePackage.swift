@@ -153,6 +153,8 @@ public struct ThemeStyle: Sendable, Equatable {
     public var primaryButton: PrimaryButtonFill
     /// 选中态填充的色调来源。
     public var selectionTint: SelectionTint
+    /// 卡片是否完全平面(只描边、无阴影);纸感为 true。
+    public var flatCards: Bool
 
     /// 主按钮填充来源。
     public enum PrimaryButtonFill: Sendable, Equatable {
@@ -171,7 +173,7 @@ public struct ThemeStyle: Sendable, Equatable {
     }
 
     public init(cornerScale: Double = 1, strokeScale: Double = 1, shadowScale: Double = 1, glassTint: Double = 0, fillScale: Double = 1,
-                allowsGlass: Bool = true, radiusSet: ThemeRadiusSet? = nil, primaryButton: PrimaryButtonFill = .accent, selectionTint: SelectionTint = .accent) {
+                allowsGlass: Bool = true, radiusSet: ThemeRadiusSet? = nil, primaryButton: PrimaryButtonFill = .accent, selectionTint: SelectionTint = .accent, flatCards: Bool = false) {
         self.cornerScale = cornerScale
         self.strokeScale = strokeScale
         self.shadowScale = shadowScale
@@ -181,6 +183,7 @@ public struct ThemeStyle: Sendable, Equatable {
         self.radiusSet = radiusSet
         self.primaryButton = primaryButton
         self.selectionTint = selectionTint
+        self.flatCards = flatCards
     }
 
     /// 标准风格。
@@ -376,7 +379,7 @@ extension ThemePackage {
         $0.outline = ThemeRGB(hex: 0xCDCDC9)
         $0.selection = ThemeRGB(hex: 0x8BC4F8)
         $0.secondaryTextColor = ThemeRGB(hex: 0x6B6A63); $0.tertiaryTextColor = ThemeRGB(hex: 0xA1A19F)
-        $0.style = ThemeStyle(strokeScale: 0.75, shadowScale: 0.6, allowsGlass: false, radiusSet: .paper, primaryButton: .ink, selectionTint: .neutral)
+        $0.style = ThemeStyle(strokeScale: 0.75, allowsGlass: false, radiusSet: .paper, primaryButton: .ink, selectionTint: .neutral, flatCards: true)
     })
 
     /// 纸感暖墨(深色):以 Ink 为卡片色,暖色提亮满足对比度(由同一规则推导)。
@@ -391,7 +394,7 @@ extension ThemePackage {
         $0.onAccent = ThemeRGB(hex: 0x1B1A16)
         $0.outline = ThemeRGB(hex: 0x3F3E36)
         $0.selection = ThemeRGB(hex: 0x8BC4F8)
-        $0.style = ThemeStyle(strokeScale: 0.75, shadowScale: 0.6, allowsGlass: false, radiusSet: .paper, primaryButton: .ink, selectionTint: .neutral)
+        $0.style = ThemeStyle(strokeScale: 0.75, allowsGlass: false, radiusSet: .paper, primaryButton: .ink, selectionTint: .neutral, flatCards: true)
     })
 
     // Cursor 系

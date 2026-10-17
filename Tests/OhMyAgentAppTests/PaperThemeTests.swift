@@ -81,14 +81,14 @@ struct PaperThemeTests {
     func styleTokens() throws {
         let light = ThemePackage.find("paper-light")
         withRuntime(light) {
-            #expect(ThemeRuntime.style.allowsGlass == false)
+            #expect(ThemeRuntime.style.allowsGlass == false && ThemeRuntime.style.flatCards)
             #expect(OMRadius.tag == 4 && OMRadius.control == 4 && OMRadius.card == 4)
             #expect(OMRadius.floating == 8 && OMRadius.modal == 8)
             #expect(ThemeRuntime.style.primaryButton == .ink && ThemeRuntime.style.selectionTint == .neutral)
         }
     }
 
-    @Test("旧主题零变化:ThemeStyle 默认值保持旧行为")
+    @Test("旧主题:ThemeStyle 默认值保持旧行为(圆角令牌取旧值)")
     func legacyUnchanged() {
         let standard = ThemeStyle.standard
         #expect(standard.allowsGlass && standard.radiusSet == nil && standard.primaryButton == .accent && standard.selectionTint == .accent)
@@ -97,7 +97,7 @@ struct PaperThemeTests {
             #expect(palette.style.allowsGlass && palette.style.radiusSet == nil && palette.style.primaryButton == .accent, "\(package.id) 不应受纸感影响")
         }
         withRuntime(.system) {
-            #expect(OMRadius.card == 12 && OMRadius.control == 8 && OMRadius.tag == 5 && OMRadius.floating == 12 && OMRadius.modal == 22)
+            #expect(OMRadius.card == 12 && OMRadius.control == 8 && OMRadius.tag == 5 && OMRadius.floating == 14 && OMRadius.modal == 20)
         }
     }
 

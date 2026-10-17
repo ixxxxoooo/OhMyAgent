@@ -21,9 +21,9 @@ public extension View {
 
     /// 悬浮在输入区周围的功能卡片(任务坞、提问、权限、目标、待办):使用与输入框一致的 Liquid Glass。
     /// - Parameters:
-    ///   - cornerRadius: 圆角,默认 18(输入框为 22)
+    ///   - cornerRadius: 圆角,默认取弹窗令牌 `OMRadius.modal`
     ///   - tint: 可选着色
-    func omGlassCard(cornerRadius: CGFloat = 18, tint: Color? = nil) -> some View {
+    func omGlassCard(cornerRadius: CGFloat = OMRadius.modal, tint: Color? = nil) -> some View {
         omGlass(in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous), tint: tint)
     }
 
@@ -35,7 +35,7 @@ public extension View {
     }
 }
 
-/// 玻璃修饰器。
+/// 玻璃修饰器。主题风格 `allowsGlass == false`(纸感)时与「减少透明度」一样走不透明回退。
 struct OMGlassModifier<S: Shape>: ViewModifier {
     let shape: S
     let tint: Color?
@@ -43,7 +43,7 @@ struct OMGlassModifier<S: Shape>: ViewModifier {
     private let policy = MaterialPolicy.shared
 
     func body(content: Content) -> some View {
-        if policy.useGlass {
+        if policy.useGlass && ThemeRuntime.style.allowsGlass {
             content.glassEffect(.regular.tint(tint).interactive(interactive), in: shape)
         } else {
             content
@@ -69,7 +69,7 @@ public struct OMGlassGroup<Content: View>: View {
     }
 
     public var body: some View {
-        if policy.useGlass {
+        if policy.useGlass && ThemeRuntime.style.allowsGlass {
             GlassEffectContainer(spacing: spacing) { content }
         } else {
             content

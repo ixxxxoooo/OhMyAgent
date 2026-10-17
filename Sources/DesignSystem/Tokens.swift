@@ -22,7 +22,7 @@ public enum OMMetrics {
 
 /// 语义圆角令牌:界面里所有圆角都从这里取(禁止字面量,`Scripts/ui-lint.py` 扫描)。
 /// 主题提供 `ThemeRadiusSet`(纸感:控件/卡片/标签 4,浮层/弹窗 8)时用主题值;
-/// 否则沿用旧行为:标签 5、控件 8、卡片 12(后两者随 `cornerScale` 缩放)、浮层 12、弹窗 22。
+/// 否则沿用旧行为:标签 5、控件 8、卡片 12(后两者随 `cornerScale` 缩放)、浮层 14、弹窗 20。
 public enum OMRadius {
     /// 标签、徽标、紧凑按钮、行内 chip。
     public static var tag: CGFloat { value(\.tag, legacy: 5, scaled: false) }
@@ -31,9 +31,9 @@ public enum OMRadius {
     /// 卡片、代码块、工具卡。
     public static var card: CGFloat { value(\.card, legacy: 12, scaled: true) }
     /// 下拉、弹出菜单等轻浮层。
-    public static var floating: CGFloat { value(\.floating, legacy: 12, scaled: false) }
+    public static var floating: CGFloat { value(\.floating, legacy: 14, scaled: false) }
     /// 模态窗、搜索窗、输入框坞等大浮层。
-    public static var modal: CGFloat { value(\.modal, legacy: 22, scaled: false) }
+    public static var modal: CGFloat { value(\.modal, legacy: 20, scaled: false) }
 
     private static func value(_ keyPath: KeyPath<ThemeRadiusSet, Double>, legacy: CGFloat, scaled: Bool) -> CGFloat {
         if let set = ThemeRuntime.style.radiusSet { return CGFloat(set[keyPath: keyPath]) }
@@ -280,8 +280,14 @@ public extension View {
     /// - Parameters:
     ///   - cornerRadius: 与卡片一致的圆角
     ///   - yOffset: 垂直偏移,默认 4(向上弹出的浮层可传负值)
+    @ViewBuilder
     func omCardShadow(cornerRadius: CGFloat = OMMetrics.cardRadius, yOffset: CGFloat = 4) -> some View {
-        modifier(OMOuterShadow(cornerRadius: cornerRadius, opacity: 0.16, radius: 12, yOffset: yOffset))
+        if ThemeRuntime.style.flatCards {
+            // 纸感:卡片只靠描边分层,不要阴影
+            self
+        } else {
+            modifier(OMOuterShadow(cornerRadius: cornerRadius, opacity: 0.12, radius: 12, yOffset: yOffset))
+        }
     }
 
     /// 悬浮层(下拉选择、弹出菜单)的自然阴影:仿 macOS 原生菜单,
@@ -290,15 +296,16 @@ public extension View {
     /// - Parameters:
     ///   - cornerRadius: 与卡片一致的圆角
     ///   - yOffset: 垂直偏移(向上弹出的浮层传负值,阴影略偏向远离按钮的一侧)
-    func omFloatingShadow(cornerRadius: CGFloat = 12, yOffset: CGFloat = 6) -> some View {
-        modifier(OMOuterShadow(cornerRadius: cornerRadius, opacity: 0.10, radius: 18, yOffset: yOffset))
-            .modifier(OMOuterShadow(cornerRadius: cornerRadius, opacity: 0.14, radius: 3, yOffset: yOffset / 4))
+    func omFloatingShadow(cornerRadius: CGFloat = OMRadius.floating, yOffset: CGFloat = 6) -> some View {
+        modifier(OMOuterShadow(cornerRadius: cornerRadius, opacity: 0.06, radius: 18, yOffset: yOffset))
+            .modifier(OMOuterShadow(cornerRadius: cornerRadius, opacity: 0.10, radius: 3, yOffset: yOffset / 4))
     }
 
     /// 浮层级外侧阴影(搜索窗、悬浮窗等大块浮层)。
     /// - Parameter cornerRadius: 与浮层一致的圆角
-    func omFloatShadow(cornerRadius: CGFloat = 22) -> some View {
-        modifier(OMOuterShadow(cornerRadius: cornerRadius, opacity: 0.26, radius: 28, yOffset: 10))
+    func omFloatShadow(cornerRadius: CGFloat = OMRadius.modal) -> some View {
+        modifier(OMOuterShadow(cornerRadius: cornerRadius, opacity: 0.14, radius: 28, yOffset: 10))
+            .modifier(OMOuterShadow(cornerRadius: cornerRadius, opacity: 0.10, radius: 14, yOffset: 5))
     }
 }
 
