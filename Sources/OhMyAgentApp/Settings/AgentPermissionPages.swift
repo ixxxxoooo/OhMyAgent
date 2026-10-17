@@ -7,10 +7,13 @@ import ChatKit
 import ClaudeConfigKit
 import DesignSystem
 import SwiftUI
+import WorkbenchKit
 
 /// Agent 与模型。
 struct AgentModelPage: View {
     @Bindable var model: ClaudeSettingsModel
+
+    @AppStorage(WarmMode.preferenceKey) private var warmMode = WarmMode.smart.rawValue
 
     private let aliases = ["", "opus", "sonnet", "haiku", "opusplan"]
 
@@ -38,6 +41,17 @@ struct AgentModelPage: View {
                     TextField("", text: model.envBinding("CLAUDE_AUTOCOMPACT_PCT_OVERRIDE"), prompt: Text("默认")).frame(width: 110).multilineTextAlignment(.trailing)
                 }
                 Note("思考预算与自动压缩阈值通过环境变量 MAX_THINKING_TOKENS / CLAUDE_AUTOCOMPACT_PCT_OVERRIDE 写入 settings.json 的 env,新会话生效。")
+            }
+            Section("连接预热") {
+                Picker("预热模式", selection: $warmMode) {
+                    Text("关闭").tag(WarmMode.off.rawValue)
+                    Text("智能").tag(WarmMode.smart.rawValue)
+                    Text("全部").tag(WarmMode.all.rawValue)
+                }
+                .pickerStyle(.segmented)
+                .accessibilityLabel("预热模式")
+                Note("智能:启动后稍作等待,提前连好当前项目最近用过的引擎,并在打开引擎选择器时预热其余引擎;全部:启动后依次连好所有已启用的引擎(最多 4 个)。切换引擎时直接认领已连好的会话。")
+                Note("预热的代价:每个引擎都是一个常驻 node 子进程(内存与电量),并各自挂载 MCP 与 Bridge;启动时多个进程同时握手会抢 CPU,所以只会逐个、延迟进行;需要登录的引擎可能在后台弹出授权;预热失败 5 分钟内不会重试。对启动速度不敏感时可选「关闭」。")
             }
             Section("输出风格") {
                 TextField("Output style", text: model.stringBinding(["outputStyle"]), prompt: Text("Default / Explanatory / Learning 或自定义名称"))

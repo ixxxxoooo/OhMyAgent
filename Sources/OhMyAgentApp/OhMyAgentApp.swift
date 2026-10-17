@@ -120,6 +120,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 /// 退出前礼貌关闭所有语言服务器(shutdown → exit),最多等待 1.5 秒,避免残留子进程。
 @MainActor
 private func stopLanguageServers() {
+    AppEnvironment.shared.workbench.warmPool.shutdownAll()
     var finished = false
     Task {
         await LSPManager.shared.shutdownAll()

@@ -37,6 +37,10 @@ struct AgentMenu: View {
         .fixedSize()
         .help("切换 Agent(会在当前项目开始新会话),当前:\(model.descriptor.name)")
         .accessibilityLabel("切换 Agent")
+        .onChange(of: shown) { _, isShown in
+            // 打开引擎选择器时预热其余引擎:选中后几乎立即可用
+            if isShown { AppEnvironment.shared.warmOtherEngines(current: model) }
+        }
         .omPicker(isPresented: $shown, entries: entries, selectedID: model.descriptor.id, placeholder: String(localized: "搜索 Agent"), width: 220) { entry in
             if entry.id == Self.manageID {
                 AppActions.shared.openSettings(page: .agentExtensions)
@@ -53,7 +57,10 @@ struct AgentMenu: View {
         let workbench = AppEnvironment.shared.workbench
         guard let id = workbench.selectedProjectID, let current = workbench.activeSession, descriptor.id != current.descriptor.id else { return }
         Log.session.info("切换 Agent", ["project": id, "from": current.descriptor.id, "to": descriptor.id])
-        workbench.replaceSession(for: id, with: AppEnvironment.makeSession(workspace: current.workspace, descriptor: descriptor))
+        // 优先认领预热好的待命会话,没有再现场创建
+        let next = workbench.warmPool.take(agentID: descriptor.id, workspace: current.workspace)
+            ?? AppEnvironment.makeSession(workspace: current.workspace, descriptor: descriptor)
+        workbench.replaceSession(for: id, with: next)
     }
 }
 

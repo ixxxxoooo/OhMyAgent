@@ -39,6 +39,10 @@ public final class WorkbenchModel {
     @ObservationIgnored private let store: WorkbenchStore
     @ObservationIgnored private let makeSession: @MainActor (URL) -> SessionModel
     /// 按 Agent ID 创建会话模型的工厂(应用层注入):打开其他引擎的历史会话时,用原引擎承载。
+    /// 引擎预热池:切换/打开其他引擎时优先认领已连好的待命会话。
+    @ObservationIgnored public let warmPool = EngineWarmPool()
+    /// 选中项目变化回调(应用层据此安排预热)。
+    @ObservationIgnored public var onProjectSelected: (@MainActor (String) -> Void)?
     @ObservationIgnored public var makeAgentSession: (@MainActor (URL, String) -> SessionModel?)?
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private let log = Log.session
@@ -200,13 +204,16 @@ public final class WorkbenchModel {
         lastSlot[id] = .some(slot)
         ensureSession(project: id, slot: slot)
         mode = .workspace
+        warmPool.discardAll(except: project.url.path)
+        onProjectSelected?(id)
         scheduleSave()
     }
 
     /// 移除项目:关闭其会话(不删除磁盘上的任何内容)。
     public func removeProject(_ id: String) {
         guard let index = projects.firstIndex(where: { $0.id == id }) else { return }
-        projects.remove(at: index)
+        let removed = projects.remove(at: index)
+        warmPool.discard(workspace: removed.url.path)
         dock.closeTabs { Self.belongs($0.kind, toProject: id) }
         for key in conversations.keys where key.projectID == id {
             conversations[key]?.shutdown()
@@ -660,7 +667,7 @@ public final class WorkbenchModel {
         let key = ConversationKey(projectID: id, slot: slot)
         if let existing = conversations[key] { return existing }
         guard let project = projects.first(where: { $0.id == id }) else { return nil }
-        let model = agentID.flatMap { makeAgentSession?(project.url, $0) } ?? makeSession(project.url)
+        let model = agentID.flatMap { warmPool.take(agentID: $0, workspace: project.url) ?? makeAgentSession?(project.url, $0) } ?? makeSession(project.url)
         if project.isChatArea { model.extraSystemPrompt = Self.chatAreaPrompt }
         wire(model, project: id)
         conversations[key] = model
@@ -707,6 +714,8 @@ public final class WorkbenchModel {
         conversations[key] = model
         lastSlot[id] = .some(slot)
         if autoConnect { model.connect() }
+        // 认领的预热会话可能已就绪:补刷一次历史列表(预热期间尚未接线,回调没有生效)
+        if model.phase == .ready { model.refreshHistory() }
     }
 
     /// 缓存历史会话摘要(每个项目每个 Agent 最多 30 条);为每条会话保留/生成「首次出现时间」作为稳定排序键。
