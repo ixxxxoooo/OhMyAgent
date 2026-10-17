@@ -14,12 +14,38 @@ enum ScrollbarPolicy {
     ///   - root: 起点视图(一般为窗口内容视图)
     ///   - visibility: 目标设置;`.system` 不做任何修改(沿用系统)
     static func apply(to root: NSView, visibility: ScrollbarVisibility) {
-        guard visibility != .system else { return }
-        let style: NSScroller.Style = visibility == .autoHide ? .overlay : .legacy
-        walk(root) { scrollView in
-            if scrollView.scrollerStyle != style { scrollView.scrollerStyle = style }
-            scrollView.autohidesScrollers = visibility == .autoHide
+        switch visibility {
+        case .custom:
+            walk(root) { installCustomScrollers(in: $0) }
+        case .system:
+            // 跟随系统:只在之前装过自绘滚动条时还原成系统滚动条
+            walk(root) { restoreSystemScrollers(in: $0) }
+        case .autoHide, .always:
+            let style: NSScroller.Style = visibility == .autoHide ? .overlay : .legacy
+            walk(root) { scrollView in
+                restoreSystemScrollers(in: scrollView)
+                if scrollView.scrollerStyle != style { scrollView.scrollerStyle = style }
+                scrollView.autohidesScrollers = visibility == .autoHide
+            }
         }
+    }
+
+    /// 给滚动视图装上自绘滚动条(已装过则不重复设置)。
+    private static func installCustomScrollers(in scrollView: NSScrollView) {
+        if scrollView.scrollerStyle != .overlay { scrollView.scrollerStyle = .overlay }
+        scrollView.autohidesScrollers = true
+        if scrollView.hasVerticalScroller, !(scrollView.verticalScroller is OMScroller) {
+            scrollView.verticalScroller = OMScroller()
+        }
+        if scrollView.hasHorizontalScroller, !(scrollView.horizontalScroller is OMScroller) {
+            scrollView.horizontalScroller = OMScroller()
+        }
+    }
+
+    /// 把自绘滚动条换回系统滚动条。
+    private static func restoreSystemScrollers(in scrollView: NSScrollView) {
+        if scrollView.verticalScroller is OMScroller { scrollView.verticalScroller = NSScroller() }
+        if scrollView.horizontalScroller is OMScroller { scrollView.horizontalScroller = NSScroller() }
     }
 
     /// 对单个滚动视图应用设置(AppKit 自绘视图创建时调用)。
@@ -49,7 +75,7 @@ private struct ScrollbarPolicyEnforcer: NSViewRepresentable {
 
     @MainActor
     final class Coordinator {
-        var visibility: ScrollbarVisibility = .system
+        var visibility: ScrollbarVisibility = .custom
         private weak var anchor: NSView?
         private var task: Task<Void, Never>?
 
@@ -57,8 +83,8 @@ private struct ScrollbarPolicyEnforcer: NSViewRepresentable {
             anchor = view
             enforce()
             task?.cancel()
+            // 跟随系统不需要巡检;其余档位让新出现的滚动视图(切换标签、打开面板)在下一次巡检时被纳入
             guard visibility != .system else { return }
-            // 新出现的滚动视图(切换标签、打开面板)在下一次巡检时被纳入
             task = Task { [weak self] in
                 while !Task.isCancelled {
                     try? await Task.sleep(for: .seconds(1.5))
@@ -82,7 +108,7 @@ extension View {
 }
 
 private struct ScrollbarPolicyModifier: ViewModifier {
-    @AppStorage(ClientPrefs.Key.scrollbarVisibility) private var raw = ScrollbarVisibility.system.rawValue
+    @AppStorage(ClientPrefs.Key.scrollbarVisibility) private var raw = ScrollbarVisibility.custom.rawValue
 
     func body(content: Content) -> some View {
         let visibility = ScrollbarVisibility.resolve(raw)

@@ -125,7 +125,7 @@ struct AppearancePage: View {
     @AppStorage(ClientPrefs.Key.settingsWidth) private var settingsWidth = SettingsContentWidth.standard.rawValue
     @AppStorage(ClientPrefs.Key.settingsWidthCustom) private var settingsWidthCustom = SettingsContentWidth.customDefault
     @AppStorage(ClientPrefs.Key.workingVerbStyle) private var verbStyle = WorkingVerbStyle.classic.rawValue
-    @AppStorage(ClientPrefs.Key.scrollbarVisibility) private var scrollbar = ScrollbarVisibility.system.rawValue
+    @AppStorage(ClientPrefs.Key.scrollbarVisibility) private var scrollbar = ScrollbarVisibility.custom.rawValue
     @AppStorage(ClientPrefs.Key.toolDensity) private var toolDensityRaw = ToolDensity.standard.rawValue
     @AppStorage(ClientPrefs.Key.chatCodeWrap) private var codeWrap = false
     @AppStorage(FontSmoothing.preferenceKey) private var fontSmoothing = FontSmoothing.system.rawValue

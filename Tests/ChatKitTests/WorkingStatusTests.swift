@@ -78,7 +78,8 @@ struct WorkingVerbStyleTests {
         #expect(WorkingVerbStyle.resolve("???") == .classic)
         #expect(WorkingVerbStyle.resolve(nil) == .classic)
         #expect(ScrollbarVisibility.resolve("autoHide") == .autoHide)
-        #expect(ScrollbarVisibility.resolve("x") == .system)
+        #expect(ScrollbarVisibility.resolve("x") == .custom)
+        #expect(ScrollbarVisibility.resolve("system") == .system)
         let defaults = UserDefaults(suiteName: "WorkingVerbStyleTests")!
         defer { defaults.removePersistentDomain(forName: "WorkingVerbStyleTests") }
         defaults.set("geek", forKey: ClientPrefs.Key.workingVerbStyle)

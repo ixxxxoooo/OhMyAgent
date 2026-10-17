@@ -170,6 +170,11 @@ public enum OMColors {
 
     // MARK: 交互填充
 
+    /// 自绘滚动条滑块色:三级文字色 70%,浅深主题都有足够对比又不抢眼。
+    public static var scrollThumb: Color { tertiaryText.opacity(0.7) }
+    /// 自绘滚动条悬停/拖动时的滑块色:次级文字色 80%。
+    public static var scrollThumbActive: Color { secondaryText.opacity(0.8) }
+
     /// 极轻填充(斑马纹、代码框底):随主题前景 4%。
     public static var subtleFill: Color { primaryText.opacity(0.04 * ThemeRuntime.style.fillScale) }
     /// 悬停填充:随主题前景 7%。
