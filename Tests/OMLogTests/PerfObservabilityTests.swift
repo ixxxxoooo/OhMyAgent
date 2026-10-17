@@ -186,3 +186,34 @@ struct PerfSpanTests {
         #expect(MainThreadHitchMonitor.shared.totals.count >= 0)
     }
 }
+
+@Suite("会话汇总与进程标识")
+struct PerfSessionTests {
+    @Test("汇总字段包含运行时长、峰值与卡顿统计")
+    func fields() {
+        PerfSession.markStart()
+        let fields = PerfSession.fields(sampler: ResourceSampler(probe: SystemResourceProbe(), registry: ProcessRegistry(), gauges: GaugeRegistry(), stats: PerfStats(), logger: OMLogger(.perf, system: LogSystem(level: .debug, osLog: false))))
+        for key in ["uptimeSec", "peakMB", "samples", "hitches", "maxHitchMs"] { #expect(fields[key] != nil, "缺少 \(key)") }
+    }
+
+    @Test("诊断文本包含时序与耗时 Top 段落")
+    func reportLines() {
+        let stats = PerfStats()
+        stats.record(name: "保存", micros: 5_000)
+        let text = PerfSession.reportLines(stats: stats).joined(separator: "\n")
+        #expect(text.contains("footprint 时序"))
+        #expect(text.contains("耗时 Top 10"))
+        #expect(text.contains("保存"))
+    }
+
+    @Test("每条日志自动带 pid,显式传入的 pid 不被覆盖")
+    func pidField() {
+        let system = LogSystem(level: .info, osLog: false)
+        let logger = OMLogger(.app, system: system)
+        logger.info("a")
+        logger.info("b", ["pid": "42"])
+        let lines = system.recent().map(\.line)
+        #expect(lines[0].contains("pid=\(ProcessInfo.processInfo.processIdentifier)"))
+        #expect(lines[1].contains("pid=42"))
+    }
+}

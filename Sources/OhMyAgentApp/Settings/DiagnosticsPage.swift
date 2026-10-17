@@ -29,6 +29,11 @@ struct DiagnosticsPage: View {
     @AppStorage(LogSystem.DefaultsKey.traffic) private var logTraffic = false
     @AppStorage(LogSystem.DefaultsKey.hideHome) private var logHideHome = false
     @State private var showLogViewer = false
+    @AppStorage(ResourceSampler.intervalDefaultsKey) private var sampleInterval = ResourceSampler.defaultInterval
+    @AppStorage(LogSystem.DefaultsKey.categoryLevelPrefix + "perf") private var perfLevel = ""
+    @State private var lastSample: ResourceSample?
+    @State private var topSpans: [PerfStatRow] = []
+    @State private var hitchTotals = (count: 0, maxMs: 0)
 
     var body: some View {
         SettingsForm {
@@ -43,6 +48,30 @@ struct DiagnosticsPage: View {
                     LabeledContent("\(row.name) (\(row.id))") { Text(String(format: "%.0f MB · CPU %.1f%%", row.rssMB, row.cpu)).monospacedDigit() }
                 }
                 if rows.isEmpty { Text("正在读取…").foregroundStyle(OMColors.secondaryText) }
+            }
+            Section("性能") {
+                Picker("资源采样间隔", selection: $sampleInterval) {
+                    Text("关闭").tag(0)
+                    Text("10 秒").tag(10)
+                    Text("30 秒(默认)").tag(30)
+                    Text("60 秒").tag(60)
+                }
+                .onChange(of: sampleInterval) { _, _ in
+                    ResourceSampler.shared.start(intervalSeconds: ResourceSampler.configuredInterval()) { await PerfGauges.refresh() }
+                }
+                Toggle("性能详细日志(perf 分类输出 Debug)", isOn: Binding(get: { perfLevel == "debug" }, set: { perfLevel = $0 ? "debug" : "" }))
+                    .onChange(of: perfLevel) { _, value in LogSystem.shared.setLevel(LogLevel(text: value), for: .perf) }
+                if let sample = lastSample {
+                    LabeledContent("本进程内存") { Text(String(format: String(localized: "%.0f MB(峰值 %.0f MB)"), sample.footprintMB, sample.peakMB)).monospacedDigit() }
+                    LabeledContent("子进程内存合计") { Text(String(format: String(localized: "%.0f MB · %lld 个"), sample.childrenFootprintMB, sample.children.count)).monospacedDigit() }
+                } else {
+                    Text("尚无采样数据").foregroundStyle(OMColors.secondaryText)
+                }
+                LabeledContent("主线程卡顿") { Text(String(format: String(localized: "%lld 次 · 最长 %lld ms"), hitchTotals.count, hitchTotals.maxMs)).monospacedDigit() }
+                ForEach(topSpans, id: \.name) { row in
+                    LabeledContent(row.name) { Text(String(format: String(localized: "%.0f ms · %lld 次 · P95 %.0f ms"), row.totalMs, row.count, row.p95Ms)).monospacedDigit() }
+                }
+                Note("资源采样写入 perf 日志(资源采样 / 容量快照 / 性能汇总)。查看汇总:Scripts/logs.sh report。")
             }
             Section("日志") {
                 Picker("日志级别", selection: $logLevel) {
@@ -100,6 +129,9 @@ struct DiagnosticsPage: View {
     private func pollProcesses() async {
         while !Task.isCancelled {
             rows = await Self.sampleProcesses()
+            lastSample = ResourceSampler.shared.history().last
+            topSpans = PerfStats.shared.snapshot(top: 5)
+            hitchTotals = MainThreadHitchMonitor.shared.totals
             try? await Task.sleep(for: .seconds(2))
         }
     }
@@ -153,6 +185,7 @@ struct DiagnosticsPage: View {
         for model in AppEnvironment.shared.sessionModels {
             lines += ["", String(localized: "## Agent 日志(\(model.agentName))")] + model.diagnostics
         }
+        lines += ["", String(localized: "## 性能画像")] + PerfSession.reportLines()
         lines += ["", String(localized: "## 最近应用日志(最多 500 条)")] + LogSystem.shared.recent(limit: 500).map(\.line)
         let text = lines.joined(separator: "\n")
         return redact ? DiagnosticsRedactor.redact(text) : text

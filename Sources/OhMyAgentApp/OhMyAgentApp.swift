@@ -132,6 +132,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor
     func applicationWillTerminate(_ notification: Notification) {
         Log.app.info("应用即将退出", ["sessions": "\(AppEnvironment.shared.workbench.conversations.count)"])
+        PerfSession.logSummary()
         AppEnvironment.shared.workbench.shutdownAll()
         stopLanguageServers()
         LogSystem.shared.flush()
@@ -164,6 +165,7 @@ struct OhMyAgentApp: App {
         // 字体平滑偏好(AppleFontSmoothing)须早于任何文本控件创建
         FontSmoothing.applyAtLaunch()
         Log.bootstrap(process: "app")
+        PerfSession.markStart()
         LaunchTrace.mark("App 初始化")
         MainThreadHitchMonitor.shared.start()
         PerfStats.shared.startPeriodicReport()

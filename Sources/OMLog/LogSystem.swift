@@ -40,6 +40,7 @@ public final class LogSystem: @unchecked Sendable {
     private let ringCapacity = 2000
     private var loggers: [LogCategory: Logger] = [:]
     private let osEnabled: Bool
+    private static let pidText = "\(ProcessInfo.processInfo.processIdentifier)"
 
     /// 创建日志系统。
     /// - Parameters:
@@ -124,7 +125,10 @@ public final class LogSystem: @unchecked Sendable {
         guard level >= snapshot.0 else { return }
         let hide = snapshot.1
         let text = LogRedactor.redact(message(), hideHome: hide)
-        let safeFields = fields.mapValues { LogRedactor.redact($0, hideHome: hide) }
+        var redacted = fields.mapValues { LogRedactor.redact($0, hideHome: hide) }
+        // 多个进程(开发版、安装版、辅助进程)可能写同一个日志目录:每行带 pid,报告才能按进程拆分
+        if redacted["pid"] == nil { redacted["pid"] = Self.pidText }
+        let safeFields = redacted
         let entry: LogEntry = state.withLock { state in
             let entry = LogEntry(id: state.nextID, date: Date(), level: level, category: category, message: text, fields: safeFields, process: state.process)
             state.nextID += 1
