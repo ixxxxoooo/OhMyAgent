@@ -95,15 +95,16 @@ struct ProjectSwitcherButton: View {
         } label: {
             HStack(spacing: 4) {
                 Image.om(currentIcon, size: 12)
-                    .foregroundStyle(OMColors.primaryText)
+                    .foregroundStyle(OMColors.secondaryText)
                 Text(currentTitle)
-                    .font(OMFonts.small)
-                    .foregroundStyle(OMColors.primaryText)
+                    .font(OMFonts.caption)
+                    .foregroundStyle(OMColors.secondaryText)
                     .lineLimit(1)
                 Image.om("chevron-down", size: 9)
                     .foregroundStyle(OMColors.secondaryText)
                     .opacity(hovering || shown ? 0.9 : 0.5)
             }
+            .font(OMFonts.caption)
             .padding(.horizontal, 6)
             .frame(height: 22)
             // 对齐分支切换 chip 的样式:平时无背景,悬停/展开才显示胶囊填充
