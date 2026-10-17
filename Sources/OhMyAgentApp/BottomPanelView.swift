@@ -52,9 +52,8 @@ struct BottomPanelView: View {
                 switch currentPane {
                 case .output: LogViewerView()
                 case .terminal:
-                    // 底部面板使用项目级常驻终端;面板隐藏/切换标签都不会结束其中的进程
-                    let root = workbench.selectedProjectID ?? NSHomeDirectory()
-                    TerminalTabView(id: "bottom:\(root)", fallbackDirectory: root)
+                    // 底部面板使用项目级常驻终端(可有多个);面板隐藏/切换标签都不会结束其中的进程
+                    TerminalPanelView(workbench: workbench, root: workbench.selectedProjectID ?? NSHomeDirectory())
                 case .problems: EmptyView()
                 }
             }

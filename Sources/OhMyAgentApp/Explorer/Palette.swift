@@ -61,7 +61,11 @@ enum PaletteCommands {
             PaletteCommand(id: "fileBlame", title: String(localized: "查看当前文件的 Git Blame"), icon: "user", shortcut: nil) {
                 if case .file(let path)? = workbench.dock.focusedGroup?.active?.kind { workbench.openBlame(path) }
             },
-            PaletteCommand(id: "terminal", title: String(localized: "新建终端标签"), icon: "square-terminal", shortcut: key(.newTerminal)) { AppActions.shared.openTerminal() },
+            PaletteCommand(id: "terminal", title: String(localized: "新建终端"), icon: "square-terminal", shortcut: key(.newTerminal)) { AppActions.shared.newTerminal() },
+            PaletteCommand(id: "terminal-new-tab", title: String(localized: "新建终端标签"), icon: "square-terminal", shortcut: nil) { AppActions.shared.openTerminal() },
+            PaletteCommand(id: "terminal-next", title: String(localized: "下一个终端"), icon: "chevron-right", shortcut: nil) { AppActions.shared.cycleTerminal(1) },
+            PaletteCommand(id: "terminal-previous", title: String(localized: "上一个终端"), icon: "chevron-left", shortcut: nil) { AppActions.shared.cycleTerminal(-1) },
+            PaletteCommand(id: "terminal-close", title: String(localized: "关闭当前终端"), icon: "x", shortcut: nil) { AppActions.shared.closeActiveTerminal() },
             PaletteCommand(id: "explorer", title: String(localized: "显示文件资源管理器"), icon: "folder", shortcut: nil) { workbench.showRight(.files) },
             PaletteCommand(id: "gitPane", title: String(localized: "显示 Git"), icon: "git-branch", shortcut: nil) { workbench.showRight(.git) },
             PaletteCommand(id: "changesTab", title: String(localized: "在标签中查看本轮改动"), icon: "file-diff", shortcut: nil) {

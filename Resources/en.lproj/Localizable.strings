@@ -2222,3 +2222,13 @@
 "下划线" = "Underline";
 "项目根目录" = "Project Root";
 "主目录" = "Home Folder";
+"新建终端" = "New Terminal";
+"新建终端 (%@)" = "New Terminal (%@)";
+"恢复默认名称" = "Restore Default Name";
+"重命名终端" = "Rename Terminal";
+"关闭终端" = "Close Terminal";
+"终端数量已达上限" = "Terminal Limit Reached";
+"请先关闭不用的终端再新建。" = "Close unused terminals before creating a new one.";
+"下一个终端" = "Next Terminal";
+"上一个终端" = "Previous Terminal";
+"关闭当前终端" = "Close Current Terminal";

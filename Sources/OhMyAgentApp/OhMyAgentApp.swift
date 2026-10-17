@@ -233,7 +233,7 @@ struct WorkbenchCommands: Commands {
                 .keyboardShortcut(shortcuts.shortcut(for: .commandPalette))
             Button("在文件中搜索") { workbench.showRight(.search); SearchModel.shared.requestFocus() }
                 .keyboardShortcut(shortcuts.shortcut(for: .globalSearch))
-            Button("新建终端标签") { AppActions.shared.openTerminal() }
+            Button("新建终端") { AppActions.shared.newTerminal() }
                 .keyboardShortcut(shortcuts.shortcut(for: .newTerminal))
         }
         CommandGroup(replacing: .appSettings) {

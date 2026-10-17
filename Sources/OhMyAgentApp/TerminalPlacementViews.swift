@@ -130,7 +130,7 @@ struct TerminalSidePanel: View {
             .frame(height: TitlebarMetrics.height)
             .terminalDragHandle(workbench)
             Divider()
-            TerminalTabView(id: "bottom:\(root)", fallbackDirectory: root)
+            TerminalPanelView(workbench: workbench, root: root)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -28,7 +28,7 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
         case .quickOpen: return String(localized: "快速打开文件")
         case .commandPalette: return String(localized: "命令面板")
         case .globalSearch: return String(localized: "在文件中搜索")
-        case .newTerminal: return String(localized: "新建终端标签")
+        case .newTerminal: return String(localized: "新建终端")
         case .closeTab: return String(localized: "关闭标签")
         case .reopenTab: return String(localized: "重新打开已关闭的标签")
         case .nextTab: return String(localized: "下一个标签")

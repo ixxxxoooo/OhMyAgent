@@ -1,0 +1,114 @@
+// @author ixxxxoooo
+// 终端面板(底部/左右栏共用):顶部终端标签条(新建、切换、关闭、重命名)+ 当前终端。
+// 参考 Cursor 的终端列表:每个标签对应一个常驻 shell,切换与隐藏面板都不会结束进程。
+
+import ChatKit
+import DesignSystem
+import IconKit
+import SwiftUI
+import WorkbenchKit
+
+/// 终端面板内容。
+struct TerminalPanelView: View {
+    @Bindable var workbench: WorkbenchModel
+    /// 项目根目录(终端状态按它分组)
+    let root: String
+    private let store = TerminalPanelStore.shared
+
+    var body: some View {
+        let state = store.state(for: root)
+        VStack(spacing: 0) {
+            tabStrip(state)
+            Divider()
+            TerminalTabView(id: state.active.id, fallbackDirectory: root)
+                .id(state.active.id)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    // MARK: 标签条
+
+    private func tabStrip(_ state: TerminalPanelState) -> some View {
+        HStack(spacing: 2) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 2) {
+                    ForEach(state.instances) { instance in
+                        TerminalPanelTab(
+                            title: store.title(of: instance),
+                            isActive: instance.id == state.activeID,
+                            canClose: true,
+                            onSelect: { omWithAnimation { store.activate(instance.id, root: root) } },
+                            onClose: { close(instance.id) }
+                        )
+                        .omContextMenu { menu(for: instance, state: state) }
+                    }
+                }
+                .padding(.horizontal, 6)
+            }
+            Spacer(minLength: 0)
+            Button { AppActions.shared.newTerminal() } label: { Image.om("plus", size: 12) }
+                .buttonStyle(.omIcon)
+                .disabled(!state.canAdd)
+                .help(String(localized: "新建终端 (\(ShortcutStore.shared.binding(for: .newTerminal).display))"))
+                .accessibilityLabel("新建终端")
+                .padding(.trailing, 6)
+        }
+        .frame(height: 28)
+        .background(OMColors.surface)
+    }
+
+    @OMMenuBuilder
+    private func menu(for instance: TerminalInstance, state: TerminalPanelState) -> [MenuEntry] {
+        OMMenuItem("重命名…", icon: "pencil") { rename(instance) }
+        OMMenuItem("恢复默认名称", icon: "rotate-ccw", isEnabled: instance.customTitle != nil) { store.rename(instance.id, to: "", root: root) }
+        OMMenuDivider()
+        OMMenuItem("关闭", icon: "x") { close(instance.id) }
+        OMMenuItem("关闭其它", isEnabled: state.instances.count > 1) { store.closeOthers(keeping: instance.id, root: root) }
+    }
+
+    private func close(_ id: String) {
+        if store.close(id, root: root) == .closedLast { workbench.hideTerminal() }
+    }
+
+    private func rename(_ instance: TerminalInstance) {
+        guard let name = OMDialog.prompt(title: String(localized: "重命名终端"), initial: store.title(of: instance)) else { return }
+        store.rename(instance.id, to: name, root: root)
+    }
+}
+
+/// 终端标签:图标 + 标题 + 关闭按钮(悬停或激活时显示)。
+private struct TerminalPanelTab: View {
+    let title: String
+    let isActive: Bool
+    let canClose: Bool
+    let onSelect: () -> Void
+    let onClose: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image.om("square-terminal", size: 12)
+            Text(verbatim: title)
+                .font(OMFonts.small)
+                .lineLimit(1)
+                .frame(maxWidth: 150, alignment: .leading)
+            Button(action: onClose) {
+                Image.om("x", size: 10).frame(width: 16, height: 16).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .opacity(canClose && (hovering || isActive) ? 1 : 0)
+            .help("关闭终端")
+            .accessibilityLabel("关闭终端")
+        }
+        .foregroundStyle(isActive ? OMColors.primaryText : OMColors.secondaryText)
+        .padding(.leading, 8).padding(.trailing, 4)
+        .frame(height: 22)
+        .background(isActive ? OMColors.selectedFill : (hovering ? OMColors.hoverFill : .clear), in: OMPillShape())
+        .contentShape(OMPillShape())
+        .onTapGesture(perform: onSelect)
+        .onHover { hovering = $0 }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
+    }
+}
