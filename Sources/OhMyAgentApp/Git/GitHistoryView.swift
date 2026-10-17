@@ -145,7 +145,7 @@ struct CommitRow: View {
                 Text(ref.replacingOccurrences(of: "HEAD -> ", with: ""))
                     .font(OMFonts.caption)
                     .padding(.horizontal, 5).padding(.vertical, 1)
-                    .background(refColor(ref).opacity(0.18), in: Capsule())
+                    .background(refColor(ref).opacity(0.18), in: OMPillShape())
                     .foregroundStyle(refColor(ref))
                     .lineLimit(1)
                     .layoutPriority(1)
@@ -161,7 +161,7 @@ struct CommitRow: View {
         .padding(.trailing, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(height: Self.height)
-        .background(isSelected ? OMColors.accent.opacity(0.14) : .clear)
+        .background(isSelected ? OMColors.selectedFill : .clear)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(row.commit.shortHash) \(row.commit.subject) \(row.commit.author)")
@@ -252,7 +252,7 @@ private struct CommitDetailView: View {
                             Spacer()
                         }
                         .padding(.horizontal, 12).padding(.vertical, 3)
-                        .background(selectedFile == file.path ? OMColors.accent.opacity(0.14) : .clear)
+                        .background(selectedFile == file.path ? OMColors.selectedFill : .clear)
                         .contentShape(Rectangle())
                         .onTapGesture { selectedFile = file.path }
                         .accessibilityElement(children: .combine)

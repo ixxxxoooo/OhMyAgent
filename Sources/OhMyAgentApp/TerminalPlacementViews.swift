@@ -181,9 +181,9 @@ struct TerminalDropOverlay: View {
                 ZStack(alignment: .topLeading) {
                     if let target = drag.target {
                         let rect = target.highlight(in: proxy.size)
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(OMColors.accent.opacity(0.18))
-                            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(OMColors.accent.opacity(0.75), lineWidth: 2))
+                        RoundedRectangle(cornerRadius: OMRadius.control)
+                            .fill(OMColors.selectedFill)
+                            .overlay(RoundedRectangle(cornerRadius: OMRadius.control).strokeBorder(OMColors.accent.opacity(0.75), lineWidth: 2))
                             .overlay { Text(drag.panel.title + " → " + Self.title(target)).font(OMFonts.body.weight(.semibold)).foregroundStyle(OMColors.accent) }
                             .frame(width: max(0, rect.width - 8), height: max(0, rect.height - 8))
                             .position(x: rect.midX, y: rect.midY)

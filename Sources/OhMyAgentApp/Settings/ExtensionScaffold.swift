@@ -37,7 +37,7 @@ struct ExtensionHeader<Actions: View>: View {
             Image.om(icon, size: 18)
                 .foregroundStyle(OMColors.accent)
                 .frame(width: 38, height: 38)
-                .background(OMColors.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .background(OMColors.selectedFill, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(verbatim: title).font(OMFonts.title)
                 Text(verbatim: subtitle).font(OMFonts.small).foregroundStyle(OMColors.secondaryText).lineLimit(2)
@@ -141,7 +141,7 @@ struct ExtensionBanners: View {
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
-        .background(tint.opacity(0.1), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(tint.opacity(0.1), in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
     }
 }
 
@@ -193,7 +193,7 @@ struct ExtensionRow<Badges: View, Trailing: View, Detail: View>: View {
                 Image.om(icon, size: 14)
                     .foregroundStyle(tint)
                     .frame(width: 30, height: 30)
-                    .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Text(verbatim: title).font(OMFonts.body.weight(.medium)).lineLimit(1)
@@ -258,8 +258,8 @@ struct ExtensionSearchField: View {
         }
         .padding(.horizontal, 10)
         .frame(height: 30)
-        .background(OMColors.card, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
+        .background(OMColors.card, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
     }
 }
 

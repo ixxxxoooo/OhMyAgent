@@ -45,7 +45,7 @@ private struct OverlayButton: View {
         Button(action: action) {
             Image.om(icon, size: 14)
                 .frame(width: TitlebarMetrics.buttonSize, height: TitlebarMetrics.buttonSize)
-                .background(hovering && enabled ? OMColors.pressedFill : .clear, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .background(hovering && enabled ? OMColors.pressedFill : .clear, in: RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

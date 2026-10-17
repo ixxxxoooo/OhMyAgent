@@ -25,7 +25,7 @@ struct GoalChip: View {
                     .font(OMFonts.caption)
                     .foregroundStyle(OMColors.secondaryText)
                     .padding(.horizontal, 5)
-                    .background(Capsule().fill(OMColors.pressedFill))
+                    .background(OMPillShape().fill(OMColors.pressedFill))
                 Spacer(minLength: 4)
                 Button { model.clearGoal() } label: {
                     Image.om("x", size: 11).foregroundStyle(OMColors.secondaryText)
@@ -36,7 +36,7 @@ struct GoalChip: View {
             }
             .padding(.horizontal, 12)
             .frame(height: 30)
-            .omGlassCard(cornerRadius: 15)
+            .omGlassCard(cornerRadius: OMRadius.floating)
             .help(goal.objective)
         }
     }

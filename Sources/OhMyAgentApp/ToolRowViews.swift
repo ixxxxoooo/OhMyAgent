@@ -159,7 +159,7 @@ struct ToolRowView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
-        .background(hovering && (canExpand || openablePath(tool, p) != nil) ? OMColors.subtleFill : Color.clear, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .background(hovering && (canExpand || openablePath(tool, p) != nil) ? OMColors.subtleFill : Color.clear, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture { handleTap(tool, p, canExpand: canExpand, isExpanded: isExpanded) }
@@ -456,7 +456,7 @@ struct TextOutputBox: View {
         CollapsibleOutput(raw: ToolOutputText.stripFence(text), ansi: ansi)
             .padding(8)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
     }
 }
 
@@ -475,7 +475,7 @@ struct ToolErrorBox: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(8)
-        .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
         .accessibilityLabel(String(localized: "失败原因:\(text)"))
     }
 }
@@ -520,7 +520,7 @@ struct CommandBox: View {
             }
         }
         .padding(8)
-        .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
     }
 }
 
@@ -574,7 +574,7 @@ struct KeyValueBox: View {
         }
         .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
     }
 }
 
@@ -607,7 +607,7 @@ struct SearchResultsView: View {
                 }
             }
             .padding(.vertical, 3)
-            .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
         }
     }
 }
@@ -699,7 +699,7 @@ struct ExploreGroupView: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
-            .background(hovering ? OMColors.subtleFill : Color.clear, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .background(hovering ? OMColors.subtleFill : Color.clear, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
             .contentShape(Rectangle())
             .onHover { hovering = $0 }
             .onTapGesture {
@@ -771,6 +771,6 @@ struct TerminalOutputView: View {
         }
         .padding(10)
         .frame(maxHeight: fillHeight ? .infinity : nil, alignment: .top)
-        .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
     }
 }

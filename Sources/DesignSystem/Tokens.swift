@@ -134,6 +134,8 @@ public enum OMColors {
     public static var onAccent: Color { ThemeRuntime.palette?.onAccent?.color ?? Color.white }
     /// 小字号链接/强调文字用的强调色:纸感取加深的 Ember(≥ 4.5:1),其他主题即 `accent`。
     public static var accentText: Color { ThemeRuntime.palette?.accentText?.color ?? accent }
+    /// 内联链接色:纸感为加深的 Ember(链接是 Ember 的本职),其他主题为第二强调色。
+    public static var link: Color { ThemeRuntime.palette?.accentText?.color ?? accent2 }
     /// 主按钮与控件「开」态的填充:纸感为墨色(强调色只用于文字),其他主题为强调色。
     public static var actionFill: Color {
         ThemeRuntime.style.primaryButton == .ink ? primaryText : accent

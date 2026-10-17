@@ -39,9 +39,9 @@ struct LayoutDragEditor: View {
         let items = workbench.layout.items(in: zone)
         let isTargeted = targeted == zone
         return ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(isTargeted ? OMColors.accent.opacity(0.14) : OMColors.card)
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous)
+                .fill(isTargeted ? OMColors.selectedFill : OMColors.card)
+            RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous)
                 .strokeBorder(isTargeted ? OMColors.accent : OMColors.hairline, style: StrokeStyle(lineWidth: isTargeted ? 1.5 : 0.5, dash: zone == .editor ? [] : [4, 3]))
             VStack(alignment: .leading, spacing: 4) {
                 Text(Self.title(zone)).font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
@@ -72,7 +72,7 @@ struct LayoutDragEditor: View {
             Text(Self.title(item)).font(OMFonts.small).lineLimit(1)
         }
         .padding(.horizontal, 8).frame(height: 22)
-        .background(OMColors.accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .background(OMColors.selectedFill, in: RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))
         .foregroundStyle(OMColors.accent)
         .draggable(item.payload)
         .help(item.allowedZones.count == 2 ? String(localized: "拖到左栏或右栏") : String(localized: "拖到左栏、右栏、底部或编辑区"))

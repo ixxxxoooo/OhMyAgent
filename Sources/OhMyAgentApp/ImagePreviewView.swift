@@ -124,8 +124,8 @@ private struct ImagePreviewPanel: View {
             FloatingIconButton(icon: "x", help: "关闭") { onClose() }
         }
         .padding(.horizontal, 6).padding(.vertical, 4)
-        .background(.regularMaterial, in: Capsule())
-        .overlay(Capsule().strokeBorder(OMColors.onAccent.opacity(0.12)))
+        .background(.regularMaterial, in: OMPillShape())
+        .overlay(OMPillShape().strokeBorder(OMColors.onAccent.opacity(0.12)))
         .padding(.top, 14)
     }
 

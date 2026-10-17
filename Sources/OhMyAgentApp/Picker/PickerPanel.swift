@@ -66,8 +66,8 @@ final class PickerPanelController {
         let root = ZStack(alignment: placement.isAbove ? .bottom : .top) {
             Color.clear
             card
-                .omGlassCard(cornerRadius: 12)
-                .omFloatingShadow(cornerRadius: 12, yOffset: placement.isAbove ? -6 : 6)
+                .omGlassCard(cornerRadius: OMRadius.floating)
+                .omFloatingShadow(cornerRadius: OMRadius.floating, yOffset: placement.isAbove ? -6 : 6)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
                     PickerPanelController.shared.cardHeightChanged(height)
                 }

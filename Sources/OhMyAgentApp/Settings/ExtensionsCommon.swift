@@ -63,7 +63,7 @@ struct Tag: View {
             .font(OMFonts.caption)
             .foregroundStyle(color)
             .padding(.horizontal, 6).padding(.vertical, 1)
-            .background(color.opacity(0.12), in: Capsule())
+            .background(color.opacity(0.12), in: OMPillShape())
     }
 }
 

@@ -88,7 +88,7 @@ public enum ThemePersonality {
     public static func toneBadge(for package: ThemePackage) -> (text: String, bg: Color, fg: Color) {
         switch package.tone {
         case .system:
-            return (package.tone.displayName, OMColors.accent.opacity(0.12), OMColors.accent)
+            return (package.tone.displayName, OMColors.selectedFill, OMColors.accent)
         case .dark:
             return (package.tone.displayName, OMColors.accent2.opacity(0.15), OMColors.accent2)
         case .light:

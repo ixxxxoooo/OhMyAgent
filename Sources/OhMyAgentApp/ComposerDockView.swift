@@ -182,8 +182,8 @@ private struct DockChip: View {
             .padding(.horizontal, 11)
             .frame(height: 26)
             // Liquid Glass 胶囊:选中态带主题色着色,悬停由玻璃自带的交互反馈提供
-            .omGlass(in: Capsule(), tint: selected ? OMColors.accent.opacity(0.28) : nil, interactive: true)
-            .contentShape(Capsule())
+            .omGlass(in: OMPillShape(), tint: selected ? OMColors.accent.opacity(0.28) : nil, interactive: true)
+            .contentShape(OMPillShape())
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
@@ -219,7 +219,7 @@ private struct DockRowShell<Leading: View, Actions: View>: View {
         }
         .padding(.horizontal, 8)
         .frame(height: 30)
-        .background(hovering ? OMColors.hoverFill : Color.clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(hovering ? OMColors.hoverFill : Color.clear, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture { tap?() }

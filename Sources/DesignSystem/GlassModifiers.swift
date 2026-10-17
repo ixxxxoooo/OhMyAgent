@@ -16,7 +16,7 @@ public extension View {
 
     /// 玻璃胶囊的便捷写法。
     func omGlassCapsule(tint: Color? = nil, interactive: Bool = false) -> some View {
-        omGlass(in: Capsule(), tint: tint, interactive: interactive)
+        omGlass(in: OMPillShape(), tint: tint, interactive: interactive)
     }
 
     /// 悬浮在输入区周围的功能卡片(任务坞、提问、权限、目标、待办):使用与输入框一致的 Liquid Glass。

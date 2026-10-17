@@ -219,7 +219,7 @@ struct SettingsView: View {
             }
             .padding(.horizontal, 8)
             .frame(height: 26)
-            .background(RoundedRectangle(cornerRadius: 7).fill(OMColors.hoverFill))
+            .background(RoundedRectangle(cornerRadius: OMRadius.control).fill(OMColors.hoverFill))
             .padding(.horizontal, 12)
             .padding(.bottom, 8)
             List(selection: $router.page) {

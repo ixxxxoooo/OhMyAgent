@@ -75,7 +75,7 @@ public struct OMTag: View {
             .foregroundStyle(tint)
             .padding(.horizontal, 7)
             .padding(.vertical, 2)
-            .background(tint.opacity(0.12), in: Capsule())
+            .background(tint.opacity(0.12), in: OMPillShape())
     }
 }
 

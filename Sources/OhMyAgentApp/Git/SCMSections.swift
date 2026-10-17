@@ -164,7 +164,7 @@ private struct GraphCommitDetail: View {
             }
         }
         .padding(.bottom, 4)
-        .background(OMColors.accent.opacity(0.05))
+        .background(OMColors.selectedFill)
         .task { await loadFiles() }
         .task(id: openFile) { await loadDiff() }
     }
@@ -183,7 +183,7 @@ private struct GraphCommitDetail: View {
             Text(kind?.badge ?? "").font(OMFonts.caption.weight(.semibold)).foregroundStyle(color(kind))
         }
         .padding(.horizontal, 12).padding(.vertical, 3)
-        .background(openFile == file.path ? OMColors.accent.opacity(0.14) : .clear)
+        .background(openFile == file.path ? OMColors.selectedFill : .clear)
         .contentShape(Rectangle())
         .onTapGesture { omWithAnimation { openFile = openFile == file.path ? nil : file.path } }
         .accessibilityElement(children: .combine)

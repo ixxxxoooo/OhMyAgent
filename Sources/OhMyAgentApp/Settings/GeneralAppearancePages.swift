@@ -153,7 +153,7 @@ struct AppearancePage: View {
                 }
                 .padding(.horizontal, 10)
                 .frame(height: 28)
-                .background(RoundedRectangle(cornerRadius: 7).fill(OMColors.hoverFill))
+                .background(RoundedRectangle(cornerRadius: OMRadius.control).fill(OMColors.hoverFill))
 
                 if themeFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     ForEach(ThemeGroup.allCases.filter { $0 != .custom }, id: \.self) { group in
@@ -245,7 +245,7 @@ struct AppearancePage: View {
                 )
                 Text("预览:Claude 的回复会按这个大小显示。`let x = 1`").font(OMFonts.reading).padding(8)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(OMColors.card, in: RoundedRectangle(cornerRadius: 8))
+                    .background(OMColors.card, in: RoundedRectangle(cornerRadius: OMRadius.control))
             }
             Section("等待动画(Spinner Verbs)") {
                 ForEach(WorkingVerbStyle.allCases) { style in
@@ -357,8 +357,8 @@ struct ThemeCardPublic: View {
             VStack(alignment: .leading, spacing: 6) {
                 ThemeMiniWorkbench(package: package)
                     .frame(height: 72)
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
+                    .clipShape(RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
                 HStack(spacing: 4) {
                     Text(package.name).font(OMFonts.small).lineLimit(1)
                     Spacer(minLength: 0)
@@ -366,8 +366,8 @@ struct ThemeCardPublic: View {
                 }
             }
             .padding(6)
-            .background(selected ? OMColors.accent.opacity(0.10) : Color.clear, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(selected ? OMColors.accent : OMColors.hairline.opacity(0.6), lineWidth: selected ? 1.5 : 0.5))
+            .background(selected ? OMColors.selectedFill : Color.clear, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous).strokeBorder(selected ? OMColors.accent : OMColors.hairline.opacity(0.6), lineWidth: selected ? 1.5 : 0.5))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -427,9 +427,9 @@ private struct AccentPicker: View {
 private struct AccentPreview: View {
     var body: some View {
         HStack(spacing: 10) {
-            Text("主按钮").font(OMFonts.small).foregroundStyle(OMColors.onAccent)
+            Text("主按钮").font(OMFonts.small).foregroundStyle(OMColors.onAction)
                 .padding(.horizontal, 10).padding(.vertical, 4)
-                .background(OMColors.accent, in: Capsule())
+                .background(OMColors.actionFill, in: OMPillShape())
             Text("链接示例").font(OMFonts.small).foregroundStyle(OMColors.accent2).underline()
             Tag("徽标", color: OMColors.accent2)
             Tag("新增", color: OMColors.diffAdded)
@@ -437,6 +437,6 @@ private struct AccentPreview: View {
             Spacer(minLength: 0)
         }
         .padding(8)
-        .background(OMColors.card, in: RoundedRectangle(cornerRadius: 8))
+        .background(OMColors.card, in: RoundedRectangle(cornerRadius: OMRadius.control))
     }
 }

@@ -72,7 +72,7 @@ struct MermaidBlockView: View {
             Divider()
             content
         }
-        .omSolidCard(cornerRadius: 10)
+        .omSolidCard()
         .task(id: source) { if result == nil || !isCached { result = await renderMermaid(source) } }
     }
 

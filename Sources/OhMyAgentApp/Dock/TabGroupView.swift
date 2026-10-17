@@ -167,9 +167,9 @@ private struct DropOverlay: View {
                 case .top: CGRect(x: 0, y: 0, width: w, height: h / 2)
                 case .bottom: CGRect(x: 0, y: h / 2, width: w, height: h / 2)
                 }
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(OMColors.accent.opacity(0.18))
-                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(OMColors.accent.opacity(0.7), lineWidth: 1.5))
+                RoundedRectangle(cornerRadius: OMRadius.tag)
+                    .fill(OMColors.selectedFill)
+                    .overlay(RoundedRectangle(cornerRadius: OMRadius.tag).strokeBorder(OMColors.accent.opacity(0.7), lineWidth: 1.5))
                     .frame(width: rect.width - 8, height: rect.height - 8)
                     .position(x: rect.midX, y: rect.midY)
                     .transition(.opacity)

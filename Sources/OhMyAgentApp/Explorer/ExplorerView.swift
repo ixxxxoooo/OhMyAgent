@@ -162,7 +162,7 @@ private struct ExplorerRow: View {
             .padding(.vertical, 3)
             .padding(.trailing, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 5).fill(isActive ? OMColors.accent.opacity(0.18) : (hovering ? OMColors.hoverFill : .clear)).padding(.horizontal, 4))
+            .background(RoundedRectangle(cornerRadius: OMRadius.tag).fill(isActive ? OMColors.selectedFill : (hovering ? OMColors.hoverFill : .clear)).padding(.horizontal, 4))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

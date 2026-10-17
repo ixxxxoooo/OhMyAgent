@@ -239,7 +239,7 @@ private struct UsageTile: View {
             Image.om(icon, size: 15)
                 .foregroundStyle(OMColors.accent)
                 .frame(width: 30, height: 30)
-                .background(OMColors.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background(OMColors.selectedFill, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
             VStack(alignment: .leading, spacing: 1) {
                 Text(verbatim: value).font(OMFonts.title).lineLimit(1).minimumScaleFactor(0.7)
                 Text(verbatim: title).font(OMFonts.caption).foregroundStyle(OMColors.secondaryText).lineLimit(1)

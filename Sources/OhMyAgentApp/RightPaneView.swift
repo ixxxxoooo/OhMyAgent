@@ -37,7 +37,7 @@ struct RightPaneView: View {
                 Button { workbench.layout.rightPane = pane } label: {
                     Image.om(Self.icon(pane), size: 14)
                         .frame(width: 28, height: 24)
-                        .background(selected ? OMColors.accent.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 6))
+                        .background(selected ? OMColors.selectedFill : .clear, in: RoundedRectangle(cornerRadius: OMRadius.tag))
                         .overlay(alignment: .topTrailing) { if pane == .git { gitDot } }
                         .contentShape(Rectangle())
                 }

@@ -105,7 +105,7 @@ private struct HeaderIconButton: View {
             Image.om(icon, size: 13)
                 .foregroundStyle(tint ?? (hovering ? OMColors.primaryText : OMColors.secondaryText))
                 .frame(width: 24, height: 22)
-                .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(hovering ? OMColors.hoverFill : .clear))
+                .background(RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous).fill(hovering ? OMColors.hoverFill : .clear))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -146,7 +146,7 @@ private struct BreadcrumbButton: View {
                 .lineLimit(1).truncationMode(isLast ? .middle : .head)
                 .padding(.horizontal, 4)
                 .frame(height: 20)
-                .background(RoundedRectangle(cornerRadius: 5, style: .continuous).fill(hovering || isOpen ? OMColors.hoverFill : .clear))
+                .background(RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous).fill(hovering || isOpen ? OMColors.hoverFill : .clear))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

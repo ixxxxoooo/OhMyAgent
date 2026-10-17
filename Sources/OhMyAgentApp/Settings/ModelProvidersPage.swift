@@ -70,7 +70,7 @@ struct ModelProvidersPage: View {
                 }
                 .padding(.horizontal, 8)
                 .frame(width: 140, height: 24)
-                .background(RoundedRectangle(cornerRadius: 6).fill(OMColors.hoverFill))
+                .background(RoundedRectangle(cornerRadius: OMRadius.tag).fill(OMColors.hoverFill))
             }
             Menu {
                 ForEach(ProviderPreset.all) { preset in
@@ -129,9 +129,9 @@ struct ModelProvidersPage: View {
             content()
                 .padding(.horizontal, 10)
                 .frame(height: 26)
-                .background(Capsule().fill(selected ? OMColors.accent.opacity(0.14) : OMColors.subtleFill))
-                .overlay(Capsule().strokeBorder(selected ? OMColors.accent.opacity(0.6) : OMColors.hairline.opacity(0.6), lineWidth: selected ? 1 : 0.5))
-                .contentShape(Capsule())
+                .background(OMPillShape().fill(selected ? OMColors.selectedFill : OMColors.subtleFill))
+                .overlay(OMPillShape().strokeBorder(selected ? OMColors.accent.opacity(0.6) : OMColors.hairline.opacity(0.6), lineWidth: selected ? 1 : 0.5))
+                .contentShape(OMPillShape())
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? [.isSelected] : [])

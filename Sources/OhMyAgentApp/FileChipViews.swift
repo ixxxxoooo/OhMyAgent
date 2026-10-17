@@ -17,7 +17,7 @@ struct FileMentionChip: View {
     var removeOnHover = false
     @State private var hovering = false
 
-    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: compact ? 7 : 8, style: .continuous) }
+    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: compact ? OMRadius.tag : OMRadius.control, style: .continuous) }
 
     var body: some View {
         HStack(spacing: 5) {

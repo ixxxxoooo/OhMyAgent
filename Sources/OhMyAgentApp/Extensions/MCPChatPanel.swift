@@ -129,7 +129,7 @@ struct MCPPanelView: View {
                         .font(OMFonts.caption)
                         .foregroundStyle(OMColors.secondaryText)
                         .padding(.horizontal, 5)
-                        .background(Capsule().fill(OMColors.pressedFill))
+                        .background(OMPillShape().fill(OMColors.pressedFill))
                 }
                 Text(statusText(entry, health))
                     .font(OMFonts.small)

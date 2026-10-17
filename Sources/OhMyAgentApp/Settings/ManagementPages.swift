@@ -80,8 +80,8 @@ struct EditorPage: View {
                     .font(Font(previewFont))
                     .lineSpacing(EditorFontPrefs.lineSpacing(for: previewFont))
                     .padding(8).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(OMColors.surface, in: RoundedRectangle(cornerRadius: 8))
-                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(OMColors.hairline))
+                    .background(OMColors.surface, in: RoundedRectangle(cornerRadius: OMRadius.control))
+                    .overlay(RoundedRectangle(cornerRadius: OMRadius.control).strokeBorder(OMColors.hairline))
             }
             Section {
                 Note("编辑器用于查看 Agent 改动的文件;保存时处理(去尾随空白等)将在编辑能力开放后提供。")

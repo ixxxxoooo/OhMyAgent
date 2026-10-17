@@ -300,7 +300,7 @@ private struct NavRow: View {
             .padding(.horizontal, 10)
             .frame(height: 30)
             .contentShape(Rectangle())
-            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(hovering ? OMColors.hoverFill : .clear))
+            .background(RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous).fill(hovering ? OMColors.hoverFill : .clear))
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
@@ -449,7 +449,7 @@ private struct ProjectGroup: View {
         }
         .padding(.horizontal, 8)
         .frame(height: 30)
-        .background(hovering ? OMColors.hoverFill : Color.clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(hovering ? OMColors.hoverFill : Color.clear, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
         .transaction { $0.animation = nil }
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
@@ -568,8 +568,8 @@ private struct SessionLine: View {
         .padding(.trailing, 8)
         .frame(height: 30)
         .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(isSelected ? OMColors.accent.opacity(0.14) : (hovering ? OMColors.hoverFill : Color.clear))
+            RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous)
+                .fill(isSelected ? OMColors.selectedFill : (hovering ? OMColors.hoverFill : Color.clear))
         )
         // 悬停时背景上扫过一条高光(流动效果);平时不创建动画视图
         .background { if hovering { FlowSweep() } }
@@ -685,7 +685,7 @@ private struct AgentBadge: View {
             .lineLimit(1)
             .padding(.horizontal, 5)
             .frame(maxWidth: 72, minHeight: 16)
-            .background(OMColors.subtleFill, in: Capsule())
+            .background(OMColors.subtleFill, in: OMPillShape())
             .help(String(localized: "属于 \(name):点击会切回该引擎打开"))
             .accessibilityLabel(String(localized: "引擎 \(name)"))
     }

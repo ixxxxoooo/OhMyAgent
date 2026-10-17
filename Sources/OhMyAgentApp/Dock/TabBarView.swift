@@ -423,7 +423,7 @@ private struct TabOverflowRow: View {
                             .font(OMFonts.caption.monospacedDigit())
                             .foregroundStyle(OMColors.secondaryText)
                             .padding(.horizontal, 4)
-                            .background(OMColors.hoverFill, in: RoundedRectangle(cornerRadius: 3))
+                            .background(OMColors.hoverFill, in: RoundedRectangle(cornerRadius: OMRadius.tag))
                     }
                     if item.tab.isDirty { Circle().fill(OMColors.warning).frame(width: 6, height: 6).help("有未保存修改") }
                     if case .chat = item.tab.kind, let uid = workbench.session(forTab: item.tab)?.uid {

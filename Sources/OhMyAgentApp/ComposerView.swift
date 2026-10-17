@@ -73,7 +73,7 @@ struct ComposerView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .omGlass(in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .omGlass(in: RoundedRectangle(cornerRadius: OMRadius.modal, style: .continuous))
         .overlay(alignment: .topLeading) {
             if completion != nil, !items.isEmpty {
                 let popup = CompletionPopup(items: items, selected: selected, onPick: accept)
@@ -86,7 +86,7 @@ struct ComposerView: View {
         // 整张输入卡片都是图片拖放区(不只是文字那一行),拖入时显示高亮边框
         .overlay {
             if dropTargeted {
-                RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(OMColors.accent, style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+                RoundedRectangle(cornerRadius: OMRadius.modal, style: .continuous).strokeBorder(OMColors.accent, style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
                     .allowsHitTesting(false)
             }
         }
@@ -101,9 +101,9 @@ struct ComposerView: View {
         .overlay(alignment: .top) {
             if dropTargeted {
                 Text("松开以添加图片或引用文件")
-                    .font(OMFonts.caption).foregroundStyle(OMColors.onAccent)
+                    .font(OMFonts.caption).foregroundStyle(OMColors.onAction)
                     .padding(.horizontal, 10).padding(.vertical, 4)
-                    .background(OMColors.accent, in: Capsule())
+                    .background(OMColors.actionFill, in: OMPillShape())
                     .offset(y: -12)
                     .allowsHitTesting(false)
                     .transition(.opacity)
@@ -439,9 +439,9 @@ struct CompletionPopup: View {
             .onChange(of: selected) { _, value in proxy.scrollTo(value) }
         }
         .frame(width: 420, height: height)
-        .background(OMColors.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(OMColors.hairline))
-        .omCardShadow(cornerRadius: 12)
+        .background(OMColors.card, in: RoundedRectangle(cornerRadius: OMRadius.card, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: OMRadius.card, style: .continuous).strokeBorder(OMColors.hairline))
+        .omCardShadow(cornerRadius: OMRadius.card)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("补全候选")
     }
@@ -463,7 +463,7 @@ struct CompletionPopup: View {
                     .foregroundStyle(OMColors.secondaryText)
                     .lineLimit(1)
                     .padding(.horizontal, 5)
-                    .background(Capsule().fill(OMColors.pressedFill))
+                    .background(OMPillShape().fill(OMColors.pressedFill))
             }
             if let subtitle = item.subtitle, !subtitle.isEmpty {
                 Text(subtitle)
@@ -476,7 +476,7 @@ struct CompletionPopup: View {
         }
         .padding(.horizontal, 8)
         .frame(height: 36)
-        .background(isSelected ? OMColors.accent.opacity(0.18) : .clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(isSelected ? OMColors.selectedFill : .clear, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
         .contentShape(Rectangle())
     }
 

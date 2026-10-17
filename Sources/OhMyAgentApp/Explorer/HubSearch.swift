@@ -298,9 +298,9 @@ struct HubOverlay: View {
             footer
         }
         .frame(width: 720)
-        .omGlass(in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .omFloatShadow(cornerRadius: 22)
+        .omGlass(in: RoundedRectangle(cornerRadius: OMRadius.modal, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: OMRadius.modal, style: .continuous))
+        .omFloatShadow(cornerRadius: OMRadius.modal)
         .onAppear { focused = true }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("搜索")
@@ -344,8 +344,8 @@ struct HubOverlay: View {
                         .foregroundStyle(hub.segment == item ? OMColors.primaryText : OMColors.secondaryText)
                         .padding(.horizontal, 10)
                         .frame(height: 24)
-                        .background(hub.segment == item ? OMColors.selectedFill : .clear, in: Capsule())
-                        .contentShape(Capsule())
+                        .background(hub.segment == item ? OMColors.selectedFill : .clear, in: OMPillShape())
+                        .contentShape(OMPillShape())
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(hub.segment == item ? [.isSelected] : [])
@@ -449,7 +449,7 @@ struct HubOverlay: View {
                 .font(OMFonts.caption.weight(.medium))
                 .padding(.horizontal, 5)
                 .frame(minWidth: 18, minHeight: 16)
-                .background(OMColors.hoverFill, in: RoundedRectangle(cornerRadius: 4))
+                .background(OMColors.hoverFill, in: RoundedRectangle(cornerRadius: OMRadius.tag))
             Text(label).font(OMFonts.caption)
         }
         .foregroundStyle(OMColors.secondaryText)
@@ -486,7 +486,7 @@ private struct HubRow: View {
         }
         .padding(.horizontal, 10)
         .frame(height: 36)
-        .background(selected ? OMColors.accent.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .background(selected ? OMColors.selectedFill : .clear, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
         .contentShape(Rectangle())
     }
 
@@ -540,7 +540,7 @@ private struct HubThemeRow: View {
                         .foregroundStyle(badge.fg)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 1.5)
-                        .background(badge.bg, in: Capsule())
+                        .background(badge.bg, in: OMPillShape())
 
                     if isCurrent {
                         Text("当前使用")
@@ -548,7 +548,7 @@ private struct HubThemeRow: View {
                             .foregroundStyle(OMColors.accent)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 1)
-                            .background(OMColors.accent.opacity(0.12), in: Capsule())
+                            .background(OMColors.selectedFill, in: OMPillShape())
                     }
                 }
 
@@ -571,8 +571,8 @@ private struct HubThemeRow: View {
             }
             .padding(.horizontal, 6)
             .padding(.vertical, 4)
-            .background(OMColors.surface.opacity(0.6), in: Capsule())
-            .overlay(Capsule().strokeBorder(OMColors.hairline.opacity(0.4), lineWidth: 0.5))
+            .background(OMColors.surface.opacity(0.6), in: OMPillShape())
+            .overlay(OMPillShape().strokeBorder(OMColors.hairline.opacity(0.4), lineWidth: 0.5))
 
             if isCurrent {
                 Image.om("check", size: 12)
@@ -581,7 +581,7 @@ private struct HubThemeRow: View {
         }
         .padding(.horizontal, 10)
         .frame(height: 50)
-        .background(selected ? OMColors.accent.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(selected ? OMColors.selectedFill : .clear, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
         .contentShape(Rectangle())
     }
 

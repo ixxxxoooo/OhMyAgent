@@ -161,7 +161,7 @@ struct StickyUserCard: View {
         .padding(.vertical, 10)
         .padding(.trailing, 18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .omGlass(in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .omGlass(in: RoundedRectangle(cornerRadius: OMRadius.modal, style: .continuous))
         .overlay(alignment: .bottomTrailing) {
             Button { sticky?.beginEditing(entry, pinned: true) } label: {
                 Image.om("square-pen", size: 12).foregroundStyle(OMColors.secondaryText).frame(width: 24, height: 24).contentShape(Rectangle())
@@ -172,7 +172,7 @@ struct StickyUserCard: View {
             .help("放大编辑(双击)")
             .accessibilityLabel("放大编辑")
         }
-        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: OMRadius.modal, style: .continuous))
         .onHover { hovering = $0 }
         .onTapGesture(count: 2) { sticky?.beginEditing(entry, pinned: true) }
         .accessibilityElement(children: .contain)
@@ -262,7 +262,7 @@ struct UserMessageEditor: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .omGlass(in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .omGlass(in: RoundedRectangle(cornerRadius: OMRadius.modal, style: .continuous))
     }
 
     /// 模型切换按钮(没有可切换的模型时不显示)。

@@ -244,8 +244,8 @@ private struct SCMContent: View {
                 .omTooltip("根据改动与最近提交风格生成提交说明", icon: "sparkles")
             }
             .padding(8)
-            .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(OMColors.hairline.opacity(0.6), lineWidth: 0.5))
+            .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous).strokeBorder(OMColors.hairline.opacity(0.6), lineWidth: 0.5))
 
             if syncMode {
                 // 提交完成后(与 Cursor/VS Code 一致):主按钮变成「同步更改」,再点一次即拉取并推送到远端
@@ -288,7 +288,7 @@ private struct SCMContent: View {
                     .fixedSize()
                     .background(canCommit ? OMColors.actionPositive : OMColors.subtleFill)
                     .foregroundStyle(canCommit ? OMColors.onPositive : OMColors.tertiaryText)
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))
                 }
             }
             if model.amend, model.status.ahead == 0, model.status.upstream != nil {

@@ -313,8 +313,8 @@ public struct OMTooltipModifier: ViewModifier {
                     }
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3.5)
-                    .background(OMColors.card, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 5, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
+                    .background(OMColors.card, in: RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
                     .shadow(color: .black.opacity(0.18), radius: 3, y: 1.5)
                     .fixedSize()
                     .offset(y: -26)

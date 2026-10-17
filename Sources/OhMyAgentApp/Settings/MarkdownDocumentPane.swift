@@ -250,7 +250,7 @@ private struct PropertyRow: View {
                     }
                     .foregroundStyle(OMColors.secondaryText)
                     .padding(.horizontal, 7).frame(height: 20)
-                    .background(OMColors.accent.opacity(0.1), in: Capsule())
+                    .background(OMColors.selectedFill, in: OMPillShape())
                 }
                 if !isReadOnly {
                     TextField("", text: $listDraft, prompt: Text("添加…"))

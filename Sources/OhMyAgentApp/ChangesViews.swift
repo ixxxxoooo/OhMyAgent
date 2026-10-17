@@ -36,7 +36,7 @@ struct ChangesSummaryView: View {
                             .foregroundStyle(OMColors.secondaryText)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 3)
-                            .background(OMColors.hoverFill, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+                            .background(OMColors.hoverFill, in: RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))
                     }
                     .buttonStyle(.plain)
                     .omTooltip(String(localized: "审查全部差异"), icon: "file-diff")
@@ -49,7 +49,7 @@ struct ChangesSummaryView: View {
                     FileChangeRow(change: change)
                 }
             }
-            .omSolidCard(cornerRadius: 10)
+            .omSolidCard()
         }
     }
 }

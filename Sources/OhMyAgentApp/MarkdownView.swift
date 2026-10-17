@@ -29,7 +29,7 @@ func inlineMarkdown(_ source: String) -> AttributedString {
     let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
     guard var result = try? AttributedString(markdown: source, options: options) else { return AttributedString(source) }
     // 链接使用第二强调色(与主强调色区分)
-    let linkColor = OMColors.accent2
+    let linkColor = OMColors.link
     for run in result.runs where run.link != nil {
         result[run.range].foregroundColor = linkColor
     }
@@ -77,7 +77,7 @@ struct MarkdownBlockView: View {
             }
         case .quote(let text):
             HStack(spacing: 10) {
-                RoundedRectangle(cornerRadius: 1.5).fill(OMColors.hairline).frame(width: 3)
+                RoundedRectangle(cornerRadius: 1.5).fill(OMColors.hairline).frame(width: 3) // ui-lint:allow 引用条细线圆角
                 Text(inlineMarkdown(text))
                     .font(OMFonts.reading)
                     .foregroundStyle(OMColors.secondaryText)
@@ -143,7 +143,7 @@ struct CodeBlockView: View {
                     .fixedSize(horizontal: true, vertical: true)
             }
         }
-        .omSolidCard(cornerRadius: 10)
+        .omSolidCard()
     }
 }
 
@@ -169,6 +169,6 @@ struct TableBlockView: View {
             }
         }
         .padding(10)
-        .omSolidCard(cornerRadius: 10)
+        .omSolidCard()
     }
 }

@@ -81,8 +81,8 @@ private struct SideBySideHunkView: View {
             }
         }
         .background(OMDiffPalette.background(.context))
-        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
+        .clipShape(RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
     }
 
     /// 单侧:行号槽(独立底色 + 强调色条)+ 正文;空侧只显示灰底占位。

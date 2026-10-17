@@ -88,8 +88,8 @@ struct HunkView: View {
             }
         }
         .background(OMDiffPalette.background(.context))
-        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
+        .clipShape(RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
     }
 }
 

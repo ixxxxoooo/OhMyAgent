@@ -30,7 +30,7 @@ struct PermissionCard: View {
                 ShellCommandText(command: command, lineLimit: 6)
                     .padding(8)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))
             }
             preview
             HStack(spacing: 8) {

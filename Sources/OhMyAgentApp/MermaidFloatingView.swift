@@ -146,11 +146,11 @@ private struct MermaidFloatingPanel: View {
             content
         }
         .frame(width: frame.width, height: frame.height)
-        .background(OMColors.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 1))
+        .background(OMColors.surface, in: RoundedRectangle(cornerRadius: OMRadius.floating, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: OMRadius.floating, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: OMRadius.floating, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 1))
         .overlay { resizeHandles }
-        .omFloatShadow(cornerRadius: 12)
+        .omFloatShadow(cornerRadius: OMRadius.floating)
         .position(x: frame.midX, y: frame.midY)
         .onAppear {
             frame = (store.frame ?? FloatingPanelGeometry.initialFrame(in: container)).clamped(to: container)
@@ -365,8 +365,8 @@ struct FloatingIconButton: View {
             Image.om(icon, size: 14)
                 .frame(width: 28, height: 26)
                 .background(
-                    (active ? OMColors.accent.opacity(0.16) : (hovering ? OMColors.pressedFill : Color.clear)),
-                    in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    (active ? OMColors.selectedFill : (hovering ? OMColors.pressedFill : Color.clear)),
+                    in: RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous)
                 )
                 .contentShape(Rectangle())
         }

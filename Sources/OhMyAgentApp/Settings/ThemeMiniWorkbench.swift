@@ -35,7 +35,7 @@ struct ThemeMiniWorkbench: View {
     // MARK: 调色板绘制
 
     private func canvas(palette: ThemePalette, w: CGFloat, h: CGFloat) -> some View {
-        let radius = max(2, 5 * palette.style.cornerScale)
+        let radius = max(2, palette.style.radiusSet?.control ?? 5 * palette.style.cornerScale)
         let stroke = palette.hairline.color
         let sidebar = (palette.sidebarBackground ?? palette.surface).color
         let ink = palette.editorForeground.color

@@ -97,7 +97,7 @@ struct ContextUsagePanel: View {
             }
             .padding(8)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(OMColors.accent.opacity(0.07), in: RoundedRectangle(cornerRadius: OMMetrics.controlRadius, style: .continuous))
+            .background(OMColors.selectedFill, in: RoundedRectangle(cornerRadius: OMMetrics.controlRadius, style: .continuous))
         }
     }
 
@@ -145,7 +145,7 @@ struct ContextUsageBody: View {
             VStack(spacing: 5) {
                 ForEach(colored) { item in
                     HStack(spacing: 8) {
-                        RoundedRectangle(cornerRadius: 3).fill(item.color).frame(width: 11, height: 11)
+                        RoundedRectangle(cornerRadius: OMRadius.tag).fill(item.color).frame(width: 11, height: 11)
                         Text(item.category.name)
                             .font(OMFonts.small)
                             .foregroundStyle(item.category.kind == .free ? OMColors.secondaryText : OMColors.primaryText)
@@ -173,7 +173,7 @@ struct ContextUsageBody: View {
                 Spacer(minLength: 0)
             }
             .background(OMColors.pressedFill)
-            .clipShape(Capsule())
+            .clipShape(Capsule()) // ui-lint:allow 进度条轨道为功能性胶囊
         }
         .frame(height: 8)
         .accessibilityHidden(true)

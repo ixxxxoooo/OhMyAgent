@@ -37,7 +37,7 @@ struct BottomPanelView: View {
                         .font(OMFonts.small.weight(currentPane == pane ? .semibold : .regular))
                         .foregroundStyle(currentPane == pane ? OMColors.primaryText : OMColors.secondaryText)
                         .padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(currentPane == pane ? OMColors.accent.opacity(0.12) : .clear, in: Capsule())
+                        .background(currentPane == pane ? OMColors.selectedFill : .clear, in: OMPillShape())
                 }
                 Spacer()
                 Button { workbench.layout.bottomVisible = false } label: { Image.om("xmark") }

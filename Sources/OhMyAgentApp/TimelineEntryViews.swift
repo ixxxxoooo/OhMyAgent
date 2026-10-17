@@ -169,7 +169,7 @@ struct UserMessageView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .padding(.trailing, 18)
-        .omGlass(in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .omGlass(in: RoundedRectangle(cornerRadius: OMRadius.modal, style: .continuous))
         .overlay(alignment: .bottomTrailing) {
             if !entry.isSteered {
                 Button { sticky?.beginEditing(entry, pinned: false) } label: {
@@ -182,7 +182,7 @@ struct UserMessageView: View {
                 .accessibilityLabel("放大编辑")
             }
         }
-        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: OMRadius.modal, style: .continuous))
         .onHover { hovering = $0 }
         .onTapGesture(count: 2) { if !entry.isSteered { sticky?.beginEditing(entry, pinned: false) } }
         .contextMenu {
@@ -223,9 +223,9 @@ struct AttachmentThumbnail: View {
                 }
                 .frame(width: size, height: size)
                 .background(OMColors.card)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(hovering ? OMColors.accent.opacity(0.6) : OMColors.hairline))
-                .contentShape(RoundedRectangle(cornerRadius: 8))
+                .clipShape(RoundedRectangle(cornerRadius: OMRadius.control))
+                .overlay(RoundedRectangle(cornerRadius: OMRadius.control).strokeBorder(hovering ? OMColors.accent.opacity(0.6) : OMColors.hairline))
+                .contentShape(RoundedRectangle(cornerRadius: OMRadius.control))
             }
             .buttonStyle(.plain)
             .help("点击查看原图")
@@ -491,7 +491,7 @@ struct PlanDock: View {
                     PlanView(entry: entry).padding([.horizontal, .bottom], 4)
                 }
             }
-            .omGlassCard(cornerRadius: 16)
+            .omGlassCard(cornerRadius: OMRadius.floating)
         }
     }
 }

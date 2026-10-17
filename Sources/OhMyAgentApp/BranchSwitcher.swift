@@ -33,8 +33,8 @@ struct BranchSwitcher: View {
             }
             .padding(.horizontal, 6)
             .frame(height: 22)
-            .background(Capsule().fill(hovering || shown ? OMColors.hoverFill : .clear))
-            .contentShape(Capsule())
+            .background(OMPillShape().fill(hovering || shown ? OMColors.hoverFill : .clear))
+            .contentShape(OMPillShape())
         }
         .buttonStyle(.plain)
         .disabled(isBusy)

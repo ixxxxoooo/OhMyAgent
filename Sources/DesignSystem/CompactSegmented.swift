@@ -47,16 +47,16 @@ public struct OMCompactSegmented<Value: Hashable>: View {
                         .foregroundStyle(selected ? OMColors.primaryText : OMColors.secondaryText)
                         .padding(.horizontal, 9)
                         .frame(height: 20)
-                        .background(Capsule().fill(selected ? OMColors.pressedFill : .clear))
-                        .contentShape(Capsule())
+                        .background(OMPillShape().fill(selected ? OMColors.pressedFill : .clear))
+                        .contentShape(OMPillShape())
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
             }
         }
         .padding(2)
-        .background(Capsule().fill(OMColors.subtleFill))
-        .overlay(Capsule().strokeBorder(OMColors.hairline.opacity(0.6), lineWidth: 0.5))
+        .background(OMPillShape().fill(OMColors.subtleFill))
+        .overlay(OMPillShape().strokeBorder(OMColors.hairline.opacity(0.6), lineWidth: 0.5))
         .fixedSize()
         .accessibilityElement(children: .contain)
         .accessibilityLabel(accessibilityName)

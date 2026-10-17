@@ -149,7 +149,7 @@ struct SpreadsheetTabView: View {
                                 .font(OMFonts.small.weight(index == sheetIndex ? .semibold : .regular))
                                 .lineLimit(1)
                                 .padding(.horizontal, 10).frame(height: 22)
-                                .background(index == sheetIndex ? OMColors.accent.opacity(0.14) : Color.clear, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                .background(index == sheetIndex ? OMColors.selectedFill : Color.clear, in: RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
@@ -315,7 +315,7 @@ private struct HeaderCell: View {
                             Image.om(isFiltered ? "funnel" : "chevron-down", size: 10)
                         }
                         .frame(minWidth: 18, minHeight: 18)
-                        .background(open || hovering ? OMColors.pressedFill : Color.clear, in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+                        .background(open || hovering ? OMColors.pressedFill : Color.clear, in: RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -511,7 +511,7 @@ private struct GridRow: View {
             .truncationMode(.tail)
             .padding(.horizontal, 6)
             .frame(width: width, height: GridMetrics.rowHeight, alignment: value.kind == .number ? .trailing : .leading)
-            .background(isSelected ? OMColors.accent.opacity(0.12) : Color.clear)
+            .background(isSelected ? OMColors.selectedFill : Color.clear)
             .overlay { if isSelected { Rectangle().strokeBorder(OMColors.accent, lineWidth: 1.5) } }
             .overlay(alignment: .trailing) { Rectangle().fill(OMColors.hairline.opacity(0.6)).frame(width: 0.5) }
             .contentShape(Rectangle())

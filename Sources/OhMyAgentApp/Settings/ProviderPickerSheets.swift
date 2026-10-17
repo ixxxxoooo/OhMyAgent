@@ -34,7 +34,7 @@ struct ModelFetchSheet: View {
                 TextField("搜索模型", text: $query).textFieldStyle(.plain)
             }
             .padding(.horizontal, 8).frame(height: 26)
-            .background(RoundedRectangle(cornerRadius: 7).fill(OMColors.hoverFill))
+            .background(RoundedRectangle(cornerRadius: OMRadius.control).fill(OMColors.hoverFill))
             content
             HStack {
                 Button("全选") { selected.formUnion(visible.filter { !existing.contains($0) }) }.disabled(visible.isEmpty)

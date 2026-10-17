@@ -272,9 +272,9 @@ private struct QuestionBody: View {
     private func badge(_ index: Int, selected: Bool) -> some View {
         Text(letter(index))
             .font(OMFonts.custom(10.5, weight: .semibold, design: .rounded))
-            .foregroundStyle(selected ? OMColors.onAccent : OMColors.secondaryText)
+            .foregroundStyle(selected ? OMColors.onAction : OMColors.secondaryText)
             .frame(width: 18, height: 18)
-            .background(selected ? OMColors.accent : OMColors.pressedFill, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+            .background(selected ? OMColors.actionFill : OMColors.pressedFill, in: RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))
     }
 
     private func optionRow(index: Int, option: ElicitOption) -> some View {
@@ -327,9 +327,9 @@ private struct QuestionBody: View {
     }
 
     private func rowBackground(selected: Bool) -> some View {
-        RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .fill(selected ? OMColors.accent.opacity(0.12) : OMColors.subtleFill)
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
+        RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous)
+            .fill(selected ? OMColors.selectedFill : OMColors.subtleFill)
+            .overlay(RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous)
                 .strokeBorder(selected ? OMColors.accent.opacity(0.5) : OMColors.hairline, lineWidth: 0.5))
     }
 }
