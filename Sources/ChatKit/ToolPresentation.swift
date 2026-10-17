@@ -156,6 +156,9 @@ public struct ToolPresentation: Sendable, Equatable {
         category == .read || category == .search || category == .fetch
     }
 
+    /// 是否属于「只读/被动」类(读取、搜索、联网与 MCP 取数):标准/详细档把连续的这类工具折叠成一组。
+    public var isPassive: Bool { isExploration || category == .mcp }
+
     /// 完整的单行文本(无障碍与测试使用)。
     public var plainText: String {
         [verb, subject, detail].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")
@@ -440,13 +443,14 @@ public struct ExploreGroup: Identifiable {
     }
 
     var exploreSummary: String {
-        var reads = 0, searches = 0, fetches = 0
+        var reads = 0, searches = 0, fetches = 0, mcps = 0
         for entry in entries {
             guard let tool = entry.tool else { continue }
             switch ToolPresentation(tool: tool).category {
             case .read: reads += 1
             case .search: searches += 1
             case .fetch: fetches += 1
+            case .mcp: mcps += 1
             default: break
             }
         }
@@ -454,6 +458,7 @@ public struct ExploreGroup: Identifiable {
         if reads > 0 { parts.append(String(localized: "\(reads) 个文件")) }
         if searches > 0 { parts.append(String(localized: "\(searches) 次搜索")) }
         if fetches > 0 { parts.append(String(localized: "\(fetches) 次联网")) }
+        if mcps > 0 { parts.append(String(localized: "\(mcps) 次 MCP 调用")) }
         return (isRunning ? String(localized: "正在浏览 ") : String(localized: "已浏览 ")) + parts.joined(separator: String(localized: "、"))
     }
 }
@@ -475,7 +480,12 @@ public enum TimelineGrouping {
         func isExploreTool(_ entry: TimelineEntry) -> Bool {
             guard entry.kind == .tool, let tool = entry.tool else { return false }
             let presentation = ToolPresentation(tool: tool, hasChild: entry.childStore != nil)
-            if density != .compact { return presentation.isExploration }
+            if density != .compact {
+                guard presentation.category == .mcp else { return presentation.isExploration }
+                // MCP:等待授权的保持独立可见;画布工具要在行下方展示画布卡片,不并入分组
+                return tool.status != .pending && CanvasToolRef.of(tool) == nil
+                    && !(tool.name ?? "").contains("__canvas_")
+            }
             // 精简档:等待授权/子 Agent/计划/思考类工具保持独立可见
             if tool.status == .pending || entry.childStore != nil { return false }
             return ![.subagent, .plan, .think].contains(presentation.category)

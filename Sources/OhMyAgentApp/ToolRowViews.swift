@@ -343,12 +343,15 @@ struct ToolRowView: View {
         return false
     }
 
-    /// 默认展开策略:标准/精简档一律折叠(失败、Diff、运行中都不自动展开),由用户点击行自行展开;
+    /// 默认展开策略:标准/精简档折叠(Diff、运行中都不自动展开),由用户点击行自行展开;
+    /// 例外:标准档下失败的命令自动展开输出(出错时最需要看细节);
     /// 「详细」档下编辑/写入/命令默认展开为内联预览;调试开关 `OMA_EXPAND_ALL` 可在脚本化截图时强制展开。
     private func defaultExpanded(_ tool: ToolCall, _ p: ToolPresentation) -> Bool {
         if DebugFlags.expandAll { return true }
         // 提问结果(问了什么、怎么答的)默认展开
         if entry.elicitationOutcome != nil { return true }
+        // 标准档:命令失败时展开输出
+        if density == .standard, p.category == .terminal, tool.status == .failed { return true }
         // 「详细」档:编辑/写入/命令默认带内联预览;其余仍折叠
         return density == .detailed && [.edit, .write, .terminal].contains(p.category)
     }

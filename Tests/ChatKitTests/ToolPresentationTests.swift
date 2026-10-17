@@ -148,6 +148,28 @@ struct TimelineGroupingTests {
         if case .explore = TimelineGrouping.group(e.entries, density: .compact)[0] { Issue.record("单个编辑应保持独立") }
     }
 
+    @Test("标准档:连续 MCP 调用与读取/搜索合并为一组;等待授权与画布工具保持独立")
+    func mcpJoinsPassiveGroup() {
+        let s = TimelineStore()
+        s.apply(.toolCall(ToolCall(toolCallId: "m1", name: "Read", kind: .read, status: .completed)))
+        s.apply(.toolCall(ToolCall(toolCallId: "m2", name: "mcp__github__list_issues", kind: .other, status: .completed)))
+        s.apply(.toolCall(ToolCall(toolCallId: "m3", name: "mcp__github__get_issue", kind: .other, status: .completed)))
+        let items = TimelineGrouping.group(s.entries)
+        guard items.count == 1, case .explore(let group) = items[0] else { Issue.record("应合并为一组"); return }
+        #expect(group.toolCount == 3)
+        #expect(group.summary == "已浏览 1 个文件、2 次 MCP 调用")
+
+        let pending = TimelineStore()
+        pending.apply(.toolCall(ToolCall(toolCallId: "p1", name: "mcp__github__a", kind: .other, status: .completed)))
+        pending.apply(.toolCall(ToolCall(toolCallId: "p2", name: "mcp__github__b", kind: .other, status: .pending)))
+        #expect(TimelineGrouping.group(pending.entries).count == 2)
+
+        let canvas = TimelineStore()
+        canvas.apply(.toolCall(ToolCall(toolCallId: "c1", name: "mcp__ohmyagent__canvas_create", kind: .other, status: .completed)))
+        canvas.apply(.toolCall(ToolCall(toolCallId: "c2", name: "mcp__ohmyagent__canvas_update", kind: .other, status: .completed)))
+        #expect(TimelineGrouping.group(canvas.entries).count == 2)
+    }
+
     @Test("Shell 命令按意图归类:grep/find 算搜索,cat/ls 算读取,其余算运行命令")
     func shellIntent() {
         #expect(ShellIntent.classify("grep -rn foo Sources") == .search)
