@@ -51,6 +51,7 @@ final class TerminalController: Identifiable {
         terminalView.optionAsMetaKey = true
         view = terminalView
         terminalView.terminalDelegate = self
+        TerminalOSC.install(on: terminalView)
         applyTheme()
         // 主题切换/系统明暗变化:热更新终端配色(弱引用,控制器释放后回调为空操作)
         NotificationCenter.default.addObserver(forName: ThemeRuntime.didChange, object: nil, queue: .main) { [weak self] _ in
@@ -79,7 +80,7 @@ final class TerminalController: Identifiable {
         exitCode = nil
         let process = LocalProcess(delegate: self)
         self.process = process
-        process.startProcess(executable: executable, args: arguments, environment: Self.environment(extra: extraEnvironment), execName: nil, currentDirectory: directory)
+        process.startProcess(executable: executable, args: arguments, environment: Self.environment(extra: extraEnvironment, darkBackground: OMTerminalPalette.currentIsDark), execName: nil, currentDirectory: directory)
         isRunning = process.running
         Log.ui.info("终端已启动", ["id": id, "shell": (executable as NSString).lastPathComponent, "running": "\(isRunning)"])
     }
@@ -117,10 +118,15 @@ final class TerminalController: Identifiable {
     }
 
     /// 构造子进程环境:继承当前环境,去掉本应用的调试/凭据变量,设置终端能力。
-    nonisolated static func environment(extra: [String: String] = [:]) -> [String] {
+    /// - Parameters:
+    ///   - extra: 额外环境变量(覆盖同名项)
+    ///   - darkBackground: 终端背景是否深色;写入 `COLORFGBG`(`前景;背景` 的 ANSI 序号),
+    ///     供不发 OSC 11 查询的程序(旧版 vim、部分 TUI)判断深浅。nil 表示不设置
+    nonisolated static func environment(extra: [String: String] = [:], darkBackground: Bool? = nil) -> [String] {
         var env = ProcessInfo.processInfo.environment.filter { key, _ in
-            !key.hasPrefix("OMA_") && !key.hasPrefix("ANTHROPIC_")
+            !key.hasPrefix("OMA_") && !key.hasPrefix("ANTHROPIC_") && key != "COLORFGBG"
         }
+        if let darkBackground { env["COLORFGBG"] = darkBackground ? "15;0" : "0;15" }
         env["TERM"] = "xterm-256color"
         env["COLORTERM"] = "truecolor"
         env["TERM_PROGRAM"] = "OhMyAgent"

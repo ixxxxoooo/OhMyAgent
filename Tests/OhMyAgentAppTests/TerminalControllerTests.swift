@@ -1,6 +1,8 @@
 // @author ixxxxoooo
 // 终端控制器测试:真实 PTY 子进程的输出、退出码、环境净化、目录回退与按标签回收。
 
+import AppKit
+import DesignSystem
 import Foundation
 import Testing
 
@@ -56,6 +58,39 @@ struct TerminalControllerTests {
         #expect(env.contains("COLORTERM=truecolor"))
         #expect(env.contains("FOO=bar"))
         #expect(!env.contains { $0.hasPrefix("OMA_") || $0.hasPrefix("ANTHROPIC_") })
+    }
+
+    @Test("环境:COLORFGBG 随背景明暗写入,并覆盖继承来的旧值")
+    func colorFgBg() {
+        setenv("COLORFGBG", "7;0", 1)
+        defer { unsetenv("COLORFGBG") }
+        #expect(TerminalController.environment(darkBackground: false).contains("COLORFGBG=0;15"))
+        #expect(TerminalController.environment(darkBackground: true).contains("COLORFGBG=15;0"))
+        #expect(!TerminalController.environment().contains { $0.hasPrefix("COLORFGBG=") })
+    }
+
+    @Test("OSC 11 背景色查询得到正确回复(OpenCode 靠它判断深浅)")
+    func backgroundQueryAnswered() async {
+        // 子进程切原始模式后发 OSC 11 查询,读取终端回复并以可见文本打印
+        let script = "stty raw -echo; printf '\\033]11;?\\033\\\\'; IFS= read -r -s -t 5 -d '\\\\' r; stty sane; printf 'REPLY<%s>\\n' \"${r//$'\\033'/ESC}\""
+        let controller = TerminalController(id: "osc11", directory: NSTemporaryDirectory(), executable: "/bin/bash", arguments: ["-c", script])
+        await wait { controller.screenText.contains("REPLY<") && controller.screenText.contains(">") }
+        let text = controller.screenText
+        #expect(text.contains("REPLY<ESC]11;rgb:"), "实际输出:\(text)")
+        // 回复里的背景色应与终端当前背景一致
+        let expected = TerminalOSC.reply(code: 11, color: controller.view.nativeBackgroundColor)
+            .replacingOccurrences(of: "\u{1b}", with: "ESC").replacingOccurrences(of: "ESC\\", with: "")
+        #expect(text.contains(expected), "期望包含 \(expected),实际:\(text)")
+    }
+
+    @Test("OSC 颜色:回复格式与规格解析")
+    func oscFormatAndParse() {
+        let reply = TerminalOSC.reply(code: 11, color: NSColor(srgbRed: 1, green: 0, blue: 0.5, alpha: 1))
+        #expect(reply == "\u{1b}]11;rgb:ffff/0000/8000\u{1b}\\")
+        #expect(TerminalOSC.parse("rgb:ff/00/80")?.usingColorSpace(.sRGB)?.redComponent == 1)
+        #expect(TerminalOSC.parse("rgb:f/0/8") != nil)
+        #expect(abs((TerminalOSC.parse("#336699")?.usingColorSpace(.sRGB)?.blueComponent ?? 0) - 0.6) < 0.01)
+        #expect(TerminalOSC.parse("rgb:zz/00/00") == nil && TerminalOSC.parse("?") == nil && TerminalOSC.parse("#12") == nil)
     }
 
     @Test("仓库按标签回收:关闭后终止进程,底部面板终端常驻")
