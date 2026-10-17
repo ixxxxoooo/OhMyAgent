@@ -264,7 +264,7 @@ final class SubmitTextView: NSTextView {
         label.isHidden = !showing
         guard showing else { return }
         label.stringValue = placeholder
-        label.font = font ?? NSFont.systemFont(ofSize: 13.5)
+        label.font = font ?? NSFont.systemFont(ofSize: 13)
         let originX = textContainerInset.width + (textContainer?.lineFragmentPadding ?? 0)
         let size = label.intrinsicContentSize
         label.frame = NSRect(x: originX, y: textContainerInset.height, width: max(bounds.width - originX - 4, 0), height: size.height)
@@ -335,7 +335,7 @@ struct ComposerTextView: NSViewRepresentable {
     func makeNSView(context: Context) -> NSScrollView {
         let textView = SubmitTextView(usingTextLayoutManager: true)
         textView.delegate = context.coordinator
-        textView.font = .systemFont(ofSize: 13.5)
+        textView.font = .systemFont(ofSize: 13)
         textView.drawsBackground = false
         // 富文本模式只为容纳内联 chip 附件;粘贴/复制都已改成纯文本,见 SubmitTextView
         textView.isRichText = true

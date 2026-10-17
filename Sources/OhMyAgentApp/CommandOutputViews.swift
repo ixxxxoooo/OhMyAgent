@@ -34,7 +34,7 @@ struct ShellCommandText: View {
 struct CollapsibleOutput: View {
     /// 原始输出(可含 ANSI;已去围栏)
     let raw: String
-    var fontSize: CGFloat = 11.5
+    var fontSize: CGFloat = 12
     /// 运行中:输出增长时自动滚到末尾
     var followTail = false
     /// 是否按 ANSI 解析(普通文本输出传 false,原样展示)

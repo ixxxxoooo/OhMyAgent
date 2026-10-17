@@ -390,14 +390,14 @@ public enum OMScale {
     nonisolated(unsafe) public static var timeline: CGFloat = 1
 }
 
-/// 字体令牌:随「界面字号」缩放;`reading*` 额外乘以「时间线字号」。
+/// 字体令牌(默认界面 13、代码 12):随「界面字号」缩放;`reading*` 额外乘以「时间线字号」。
 public enum OMFonts {
-    public static var body: Font { .system(size: 13.5 * OMScale.ui) }
+    public static var body: Font { .system(size: 13 * OMScale.ui) }
     public static var small: Font { .system(size: 11.5 * OMScale.ui) }
     public static var caption: Font { .system(size: 11 * OMScale.ui) }
     public static var title: Font { .system(size: 15 * OMScale.ui, weight: .medium) }
-    public static var mono: Font { .system(size: 12.5 * OMScale.ui, design: .monospaced) }
-    public static var monoSmall: Font { .system(size: 11.5 * OMScale.ui, design: .monospaced) }
+    public static var mono: Font { .system(size: 12 * OMScale.ui, design: .monospaced) }
+    public static var monoSmall: Font { .system(size: 11 * OMScale.ui, design: .monospaced) }
     /// 设置页分组标题(与 `title` 同族,略小,中等字重;字重上限 medium,见 AGENTS.md 4.4)。
     public static var sectionTitle: Font { .system(size: 13 * OMScale.ui, weight: .medium) }
     /// 受控的自定义字号(随界面字号缩放):仅用于令牌表覆盖不到的特例(Markdown 标题、徽标数字等)。
@@ -409,9 +409,9 @@ public enum OMFonts {
         .system(size: size * OMScale.ui, weight: weight, design: design)
     }
     /// 时间线正文
-    public static var reading: Font { .system(size: 13.5 * OMScale.ui * OMScale.timeline) }
+    public static var reading: Font { .system(size: 13 * OMScale.ui * OMScale.timeline) }
     /// 时间线代码
-    public static var readingMono: Font { .system(size: 12.5 * OMScale.ui * OMScale.timeline, design: .monospaced) }
+    public static var readingMono: Font { .system(size: 12 * OMScale.ui * OMScale.timeline, design: .monospaced) }
 }
 
 /// 编辑性标题级别(页面级大标题备用令牌:字重 regular、系统字体、字号越大字距越紧;默认不被任何视图使用)。

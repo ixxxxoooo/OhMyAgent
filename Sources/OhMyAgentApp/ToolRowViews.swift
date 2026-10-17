@@ -732,7 +732,7 @@ struct TerminalOutputView: View {
     let session: TerminalSession
     var fillHeight = false
     var onInterrupt: (() -> Void)?
-    @AppStorage(ClientPrefs.Key.terminalFontSize) private var outputFontSize = 11.5
+    @AppStorage(ClientPrefs.Key.terminalFontSize) private var outputFontSize = 12.0
     @State private var copied = false
 
     var body: some View {

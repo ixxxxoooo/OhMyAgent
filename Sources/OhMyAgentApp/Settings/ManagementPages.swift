@@ -96,7 +96,7 @@ struct EditorPage: View {
 
 /// 终端。
 struct TerminalPage: View {
-    @AppStorage(ClientPrefs.Key.terminalFontSize) private var fontSize = 11.5
+    @AppStorage(ClientPrefs.Key.terminalFontSize) private var fontSize = 12.0
     @AppStorage(ClientPrefs.Key.terminalOutputKB) private var outputKB = 1024
     @AppStorage(ClientPrefs.Key.terminalInheritEnv) private var inheritEnv = true
     @AppStorage(ClientPrefs.Key.featureTerminal) private var terminalCapability = false

@@ -175,7 +175,7 @@ extension SubmitTextView {
         let pieces = mentionWorkspace.map {
             ComposerMentionLayout.pieces(for: plain, workspace: $0, allowTrailingEnd: allowTrailingEnd)
         } ?? (plain.isEmpty ? [] : [.text(plain)])
-        let baseFont = font ?? NSFont.systemFont(ofSize: 13.5)
+        let baseFont = font ?? NSFont.systemFont(ofSize: 13)
         let attributes: [NSAttributedString.Key: Any] = [.font: baseFont, .foregroundColor: NSColor(OMColors.primaryText)]
         let result = NSMutableAttributedString()
         for piece in pieces {

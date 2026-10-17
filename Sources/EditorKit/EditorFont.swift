@@ -1,6 +1,6 @@
 // @author ixxxxoooo
 // 编辑器字体偏好:字体族、字号、行高。对齐 kuku 的「字体与排版」设置
-// (代码字体默认系统等宽;编辑器字号默认 13、范围 11–20;行高 13px 时为 18px,随字号等比缩放)。
+// (代码字体默认系统等宽;编辑器字号默认 12、范围 11–20;行高 13px 时为 18px,随字号等比缩放)。
 
 import AppKit
 
@@ -15,8 +15,8 @@ public enum EditorFontPrefs {
     /// 「系统等宽」标签:作为字体族偏好的默认值,表示使用系统等宽字体。
     public static let systemMonospace = "System monospace"
 
-    /// 默认字号(pt),对齐 kuku 的 13。
-    public static let defaultSize: CGFloat = 13
+    /// 默认字号(pt):代码默认 12。
+    public static let defaultSize: CGFloat = 12
     /// 字号允许范围(pt),对齐 kuku 的 11–20。
     public static let sizeRange: ClosedRange<Double> = 11...20
 

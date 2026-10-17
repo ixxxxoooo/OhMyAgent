@@ -8,7 +8,7 @@ import SwiftUI
 /// 渲染含 ANSI 颜色的终端输出。
 struct ANSITextView: View {
     let raw: String
-    var fontSize: CGFloat = 11.5
+    var fontSize: CGFloat = 12
     /// 最多渲染的末尾行数(默认沿用解析器上限 400)
     var maxLines = 400
 

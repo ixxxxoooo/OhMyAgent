@@ -9,10 +9,10 @@ import Testing
 @MainActor
 @Suite("编辑器字体")
 struct EditorFontTests {
-    @Test("字号默认 13,并夹在 11–20 之间")
+    @Test("字号默认 12,并夹在 11–20 之间")
     func clampedSize() {
-        #expect(EditorFontPrefs.clampedSize(nil) == 13)
-        #expect(EditorFontPrefs.clampedSize(.nan) == 13)
+        #expect(EditorFontPrefs.clampedSize(nil) == 12)
+        #expect(EditorFontPrefs.clampedSize(.nan) == 12)
         #expect(EditorFontPrefs.clampedSize(9) == 11)
         #expect(EditorFontPrefs.clampedSize(12.5) == 12.5)
         #expect(EditorFontPrefs.clampedSize(28) == 20)

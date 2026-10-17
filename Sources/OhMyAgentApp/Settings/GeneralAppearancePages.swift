@@ -126,6 +126,8 @@ struct AppearancePage: View {
     @AppStorage(ClientPrefs.Key.settingsWidthCustom) private var settingsWidthCustom = SettingsContentWidth.customDefault
     @AppStorage(ClientPrefs.Key.workingVerbStyle) private var verbStyle = WorkingVerbStyle.classic.rawValue
     @AppStorage(ClientPrefs.Key.scrollbarVisibility) private var scrollbar = ScrollbarVisibility.system.rawValue
+    @AppStorage(FontSmoothing.preferenceKey) private var fontSmoothing = FontSmoothing.system.rawValue
+    @State private var smoothingAtLaunch = FontSmoothing.current().rawValue
     @Bindable private var workbench = AppEnvironment.shared.workbench
     @State private var themeFilter = ""
 
@@ -246,6 +248,19 @@ struct AppearancePage: View {
                 Text("预览:Claude 的回复会按这个大小显示。`let x = 1`").font(OMFonts.reading).padding(8)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(OMColors.card, in: RoundedRectangle(cornerRadius: OMRadius.control))
+            }
+            Section("字体平滑") {
+                Picker("字体平滑", selection: $fontSmoothing) {
+                    ForEach(FontSmoothing.allCases) { Text(LocalizedStringKey($0.title)).tag($0.rawValue) }
+                }
+                if fontSmoothing != smoothingAtLaunch {
+                    HStack {
+                        Note("字体平滑需要重新启动应用才会生效。")
+                        Spacer()
+                        Button("立即重启") { AppActions.shared.relaunch() }.buttonStyle(.omSecondary)
+                    }
+                }
+                Note("控制文字笔画粗细(对应 macOS 的 AppleFontSmoothing,只影响本应用):「关闭」最细,「强」最粗;「跟随系统」沿用系统设置。")
             }
             Section("等待动画(Spinner Verbs)") {
                 ForEach(WorkingVerbStyle.allCases) { style in

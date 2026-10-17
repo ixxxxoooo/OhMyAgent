@@ -2090,3 +2090,10 @@
 "纸感" = "Paper";
 "Cursor 纸感" = "Cursor Paper";
 "Cursor 纸感 · 暖墨" = "Cursor Paper · Warm Ink";
+"字体平滑" = "Font smoothing";
+"关闭(最细)" = "Off (thinnest)";
+"轻" = "Light";
+"强(最粗)" = "Strong (boldest)";
+"字体平滑需要重新启动应用才会生效。" = "Font smoothing takes effect after restarting the app.";
+"立即重启" = "Restart now";
+"控制文字笔画粗细(对应 macOS 的 AppleFontSmoothing,只影响本应用):「关闭」最细,「强」最粗;「跟随系统」沿用系统设置。" = "Controls text stroke weight (macOS AppleFontSmoothing, this app only): Off is thinnest, Strong is boldest; System follows the OS setting.";
