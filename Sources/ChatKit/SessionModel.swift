@@ -1610,7 +1610,10 @@ public final class SessionModel {
     private func cancelPendingPrompts() {
         for prompt in pendingPermissions { prompt.cancel() }
         pendingPermissions.removeAll()
-        for prompt in pendingElicitations { prompt.cancel() }
+        for prompt in pendingElicitations {
+            prompt.cancel()
+            if let outcome = prompt.outcome { timeline.attachElicitationOutcome(outcome) }
+        }
         pendingElicitations.removeAll()
     }
 
@@ -1634,6 +1637,9 @@ public final class SessionModel {
     /// 回答提问后从队列移除。
     /// - Parameter prompt: 已处理的提问
     public func dismiss(_ prompt: ElicitationPrompt) {
+        if let outcome = prompt.outcome, pendingElicitations.contains(where: { $0.id == prompt.id }) {
+            timeline.attachElicitationOutcome(outcome)
+        }
         pendingElicitations.removeAll { $0.id == prompt.id }
     }
 

@@ -101,18 +101,29 @@ struct ToolRowView: View {
 
     // MARK: 详情(含「详细」档的内联预览)
 
-    /// 详情区:「详细」档下默认展开的编辑/写入/命令只显示前一段预览(底部渐隐 + 「显示全部」),用户点开后显示完整内容。
+    /// 详情区:「详细」档下默认展开的编辑/写入/命令只显示前一段预览(硬裁切 + 「显示全部」,不做淡出),用户点开后显示完整内容。
     @ViewBuilder
     private func detailsBlock(_ tool: ToolCall, _ p: ToolPresentation) -> some View {
+        if let outcome = outcome(of: tool) {
+            QuestionAnswerView(outcome: outcome)
+        } else {
+            standardDetails(tool, p)
+        }
+    }
+
+    /// 提问结果:实时回答写入的快照优先,否则尝试从历史工具调用还原。
+    private func outcome(of tool: ToolCall) -> ElicitationOutcome? {
+        entry.elicitationOutcome ?? ElicitationOutcome.replayed(from: tool)
+    }
+
+    @ViewBuilder
+    private func standardDetails(_ tool: ToolCall, _ p: ToolPresentation) -> some View {
         let details = ToolDetailsView(entry: entry, tool: tool, presentation: p)
         if expanded == nil, density == .detailed, !DebugFlags.expandAll {
             VStack(alignment: .leading, spacing: 4) {
                 details
                     .frame(maxHeight: Self.previewHeight, alignment: .top)
                     .clipped()
-                    .mask(
-                        LinearGradient(stops: [.init(color: OMColors.surface, location: 0.75), .init(color: OMColors.surface.opacity(0), location: 1)], startPoint: .top, endPoint: .bottom) // ui-lint:allow 仅作遮罩/淡出,非装饰
-                    )
                 Button("显示全部") { expanded = true }
                     .buttonStyle(.omPlain)
                     .font(OMFonts.caption)
@@ -123,7 +134,7 @@ struct ToolRowView: View {
     }
 
     /// 「详细」档内联预览的最大高度。
-    private static let previewHeight: CGFloat = 150
+    private static let previewHeight: CGFloat = 180
 
     // MARK: 行
 
@@ -227,7 +238,7 @@ struct ToolRowView: View {
     /// 行首图标:固定为工具类型的功能图标;文件的彩色类型图标紧贴文件名(见 `subject`)。
     @ViewBuilder
     private func leadingIcon(_ tool: ToolCall, _ p: ToolPresentation) -> some View {
-        Image.om(ToolIcons.symbol(for: p.category), size: 11.5)
+        Image.om(ElicitationOutcome.isAskQuestion(tool) ? "message-circle-question-mark" : ToolIcons.symbol(for: p.category), size: 11.5)
             .frame(width: 16)
             .foregroundStyle(tool.status == .failed ? OMColors.danger : OMColors.secondaryText)
     }
@@ -308,6 +319,7 @@ struct ToolRowView: View {
 
     /// 是否有可展开的详情。
     private func hasDetails(_ tool: ToolCall, _ p: ToolPresentation) -> Bool {
+        if outcome(of: tool) != nil { return true }
         if !tool.content.isEmpty || entry.childStore != nil { return true }
         // 不经 content 回传结果的 Agent(Antigravity):结果在 rawOutput;失败原因必须能看到
         if tool.resultText != nil || tool.failureText != nil { return true }
@@ -329,6 +341,8 @@ struct ToolRowView: View {
     /// 「详细」档下编辑/写入/命令默认展开为内联预览;调试开关 `OMA_EXPAND_ALL` 可在脚本化截图时强制展开。
     private func defaultExpanded(_ tool: ToolCall, _ p: ToolPresentation) -> Bool {
         if DebugFlags.expandAll { return true }
+        // 提问结果(问了什么、怎么答的)默认展开
+        if entry.elicitationOutcome != nil { return true }
         // 「详细」档:编辑/写入/命令默认带内联预览;其余仍折叠
         return density == .detailed && [.edit, .write, .terminal].contains(p.category)
     }
@@ -751,9 +765,10 @@ struct ExploreGroupView: View {
                         TimelineEntryView(entry: entry)
                     }
                 }
-                .padding(.leading, 12)
+                // 竖线对齐标题图标中心线(x≈16),子内容整体右移到线的右侧,避免子行箭头压在线上
+                .padding(.leading, 28)
                 .overlay(alignment: .leading) {
-                    Rectangle().fill(OMColors.hairline).frame(width: 1.5).padding(.leading, 15)
+                    Rectangle().fill(OMColors.hairline).frame(width: 1).padding(.leading, 15.5)
                 }
                 .transition(.opacity)
             }

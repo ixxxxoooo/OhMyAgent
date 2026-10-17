@@ -231,16 +231,16 @@ private struct QuestionBody: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 6) {
+            // 短标签与题干同行:题干过长时在标签右侧换行;「可多选」放在行尾
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
                 if let header = question.header { OMTag(header, tint: OMColors.accent) }
+                Text(question.prompt)
+                    .font(OMFonts.body.weight(.medium))
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
                 if question.isMulti { OMTag(String(localized: "可多选")) }
             }
-            .opacity(question.header == nil && !question.isMulti ? 0 : 1)
-            .frame(height: question.header == nil && !question.isMulti ? 0 : nil)
-            Text(question.prompt)
-                .font(OMFonts.body.weight(.medium))
-                .textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
             ScrollView {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6, alignment: .top), count: columns), spacing: 6) {
                     ForEach(Array(question.options.enumerated()), id: \.element.id) { index, option in
@@ -331,5 +331,60 @@ private struct QuestionBody: View {
             .fill(selected ? OMColors.selectedFill : OMColors.subtleFill)
             .overlay(RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous)
                 .strokeBorder(selected ? OMColors.accent.opacity(0.5) : OMColors.hairline, lineWidth: 0.5))
+    }
+}
+
+// MARK: - 回答后的问答摘要
+
+/// 回答(或跳过)后在工具行下方展开的问答卡:每题一块——短标签 + 题干,下面是所选答案(带 `check`)。
+/// 对齐 Cursor:提问结束后保留「问了什么、怎么答的」。
+struct QuestionAnswerView: View {
+    let outcome: ElicitationOutcome
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(outcome.title, om: outcome.state == .answered ? "circle-check" : "circle-x")
+                .font(OMFonts.small.weight(.medium))
+                .foregroundStyle(OMColors.secondaryText)
+            ForEach(outcome.items) { item in
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        if let header = item.header { OMTag(header, tint: OMColors.accent) }
+                        Text(item.prompt)
+                            .font(OMFonts.body.weight(.medium))
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 0)
+                        if item.isMulti { OMTag(String(localized: "可多选")) }
+                    }
+                    if item.answers.isEmpty {
+                        Text(outcome.state == .answered ? "未回答" : "—")
+                            .font(OMFonts.small)
+                            .foregroundStyle(OMColors.tertiaryText)
+                    } else {
+                        ForEach(Array(item.answers.enumerated()), id: \.offset) { _, answer in
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                Image.om("check", size: 12, weight: .bold).foregroundStyle(OMColors.accent)
+                                Text(answer)
+                                    .font(OMFonts.body)
+                                    .textSelection(.enabled)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Spacer(minLength: 0)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 6)
+                            .background(OMColors.selectedFill, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous)
+                                .strokeBorder(OMColors.accent.opacity(0.4), lineWidth: 0.5))
+                        }
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .omSolidCard()
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(outcome.title)
     }
 }

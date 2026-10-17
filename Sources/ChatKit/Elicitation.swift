@@ -98,6 +98,8 @@ public final class ElicitationPrompt: Identifiable {
     public let mode: ElicitMode
     public let fields: [ElicitField]
     public var isResolved = false
+    /// 结果快照(AskUserQuestion 形态在回答/跳过/取消时生成;通用表单为 nil)
+    public private(set) var outcome: ElicitationOutcome?
     private var continuation: CheckedContinuation<JSONValue, Never>?
 
     init(message: String, mode: ElicitMode, fields: [ElicitField], continuation: CheckedContinuation<JSONValue, Never>) {
@@ -112,6 +114,7 @@ public final class ElicitationPrompt: Identifiable {
 
     /// 提交回答。
     public func accept() {
+        if !isResolved { outcome = makeOutcome(state: .answered) }
         var content: [String: JSONValue] = [:]
         for field in fields {
             if let value = field.jsonValue { content[field.id] = value }
@@ -126,11 +129,13 @@ public final class ElicitationPrompt: Identifiable {
 
     /// 拒绝回答。
     public func decline() {
+        if !isResolved { outcome = makeOutcome(state: .skipped) }
         resolve(["action": "decline"])
     }
 
     /// 取消(例如轮次被取消或窗口关闭)。
     public func cancel() {
+        if !isResolved { outcome = makeOutcome(state: .cancelled) }
         resolve(["action": "cancel"])
     }
 

@@ -64,6 +64,8 @@ public final class TimelineEntry: Identifiable {
     public var turn = 0
     /// 回合结束语(`kind == .turnSummary`)
     public var summary: TurnSummary?
+    /// 提问结果(`kind == .tool` 且为 AskUserQuestion:回答/跳过后写入,用于渲染问答卡)
+    public var elicitationOutcome: ElicitationOutcome?
 
     /// 创建条目。
     /// - Parameters:
@@ -403,6 +405,28 @@ public final class TimelineStore {
         default:
             structureRevision += 1
         }
+    }
+
+    /// 把提问结果挂到最近一条尚无结果的 AskUserQuestion 工具条目上;找不到(适配器没有回传工具调用)时补一条已完成的合成工具条目。
+    /// - Parameter outcome: 提问结果快照
+    public func attachElicitationOutcome(_ outcome: ElicitationOutcome) {
+        let target = entries.last { entry in
+            guard entry.kind == .tool, entry.elicitationOutcome == nil, let tool = entry.tool else { return false }
+            return ElicitationOutcome.isAskQuestion(tool)
+        }
+        if let target {
+            target.elicitationOutcome = outcome
+            if target.finishedAt == nil { target.finishedAt = Date() }
+        } else {
+            finishStreaming()
+            let entry = TimelineEntry(kind: .tool)
+            entry.tool = ToolCall(toolCallId: "elicit-\(UUID().uuidString)", name: "AskUserQuestion", title: "Asking for your input", kind: .other, status: .completed)
+            entry.elicitationOutcome = outcome
+            entry.finishedAt = Date()
+            entries.append(entry)
+        }
+        revision += 1
+        structureRevision += 1
     }
 
     /// 在本存储及其全部子存储中按工具调用 ID 查找条目(支持多层子 Agent)。

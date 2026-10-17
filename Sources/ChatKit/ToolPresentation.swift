@@ -74,6 +74,15 @@ public struct ToolPresentation: Sendable, Equatable {
             return
         }
 
+        if ElicitationOutcome.isAskQuestion(tool) {
+            // AskUserQuestion:标题固定为「向你提问」,摘要显示题数;适配器给的英文标题不展示
+            category = .other
+            verb = String(localized: "向你提问")
+            let count = input?["questions"]?.arrayValue?.count ?? 0
+            subject = count > 0 ? String(localized: "\(count) 个问题") : ""
+            return
+        }
+
         switch tool.kind {
         case .read:
             category = .read
