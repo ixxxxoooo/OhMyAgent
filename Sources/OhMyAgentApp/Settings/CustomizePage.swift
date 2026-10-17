@@ -153,11 +153,34 @@ struct CustomizePage: View {
         case .all: overview
         case .mcp: MCPSettingsPage(center: center)
         case .skills: SkillsSettingsPage(center: center, kind: .skill)
-        case .subagents: SkillsSettingsPage(center: center, kind: .agent)
+        case .subagents:
+            VStack(spacing: 0) {
+                builtinAgents
+                SkillsSettingsPage(center: center, kind: .agent)
+            }
         case .hooks: HooksSettingsPage(center: center)
         case .plugins: PluginsSettingsPage(center: center)
         case .rules: MemorySettingsPage(center: center)
         }
+    }
+
+    /// 内置子 Agent(Claude Code 自带,无需配置):Explore 用于快速只读检索,输入框 `/explore` 是快捷入口。
+    private var builtinAgents: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ExtensionSectionLabel(title: String(localized: "内置"), count: 1)
+            ExtensionCardList {
+                ExtensionRow(icon: "search", title: "Explore",
+                             subtitle: String(localized: "快速、只读地检索代码库并回答问题;配合 search_code 索引搜索。在输入框用 /explore 提问。")) {
+                    OMTag(String(localized: "内置"))
+                } trailing: {
+                    OMTag("/explore", tint: OMColors.accent)
+                }
+            }
+        }
+        .padding(.horizontal, 28)
+        .padding(.top, 12)
+        .frame(maxWidth: 760, alignment: .leading)
+        .frame(maxWidth: .infinity)
     }
 
     /// 「全部」视图:需要处理 + 已连接,两组卡片列表。

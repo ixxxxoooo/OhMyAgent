@@ -32,6 +32,7 @@ final class SessionBridge: BridgeHandler, @unchecked Sendable {
     func callExtended(_ tool: BridgeTool, arguments: JSONValue) async -> BridgeResult {
         switch tool {
         case .canvasCreate, .canvasUpdate, .canvasList: return await callCanvas(tool, arguments: arguments)
+        case .searchCode: return await callSearch(arguments: arguments)
         default: return BridgeResult("当前客户端不支持工具 \(tool.rawValue)", isError: true)
         }
     }

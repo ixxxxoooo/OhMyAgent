@@ -31,6 +31,23 @@ final class AppEnvironment {
         // 多文件夹工作区:文件索引覆盖附加文件夹
         let wb = workbench
         WorkspaceIndexModel.shared.extraRootsProvider = { id in wb.projects.first(where: { $0.id == id })?.extraFolders ?? [] }
+        // Bridge 的 search_code:走三元组索引,覆盖主目录与全部附加文件夹
+        CodeSearchProvider.shared.install { workspace, query in
+            let (extras, cached) = await MainActor.run { () -> ([String], [String]?) in
+                let index = WorkspaceIndexModel.shared
+                return (wb.projects.first(where: { $0.id == workspace })?.extraFolders ?? [], index.root == workspace && !index.files.isEmpty ? index.files : nil)
+            }
+            let options = SearchOptions(query: query.query, caseSensitive: query.caseSensitive, wholeWord: query.wholeWord, isRegex: query.isRegex, pathFilter: query.pathFilter)
+            let output = await WorkspaceSearch.searchRoots([(root: workspace, files: cached)] + extras.map { (root: $0, files: nil) }, options: options)
+            var matches: [CodeSearchMatch] = []
+            for file in output.files {
+                for hit in file.hits where matches.count < query.maxResults {
+                    matches.append(CodeSearchMatch(root: file.root ?? workspace, path: file.path, line: hit.line, preview: hit.preview))
+                }
+            }
+            return CodeSearchResult(matches: matches, totalHits: output.totalHits, fileCount: output.files.count, truncated: output.truncated,
+                                    error: output.error, indexed: output.indexed, scannedFiles: output.scannedFiles)
+        }
         // 切换项目后,为新项目重新安排预热
         workbench.onProjectSelected = { [weak self] _ in self?.scheduleEngineWarmup(delay: .seconds(2)) }
     }

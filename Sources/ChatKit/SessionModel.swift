@@ -713,6 +713,12 @@ public final class SessionModel {
             timeline.appendNotice(ChatL10n.t("账号登录由本机 `claude` 管理"), detail: String(localized: "OhMyAgent 不处理登录/登出。请在终端运行 `claude`,执行 `/login` 或 `/logout`。"))
         case .modelMenu:
             timeline.appendNotice(ChatL10n.t("当前模型"), detail: modelListMarkdown())
+        case .explore(let question):
+            if question.isEmpty {
+                timeline.appendNotice(ChatL10n.t("用法:`/explore 要弄清的问题`"), severity: "warning")
+            } else {
+                send(LocalCommands.explorePrompt(question), bypassLocal: true)
+            }
         case .exportTranscript, .settings, .extensions, .mcpPanel, .history:
             if let onLocalCommand {
                 onLocalCommand(command)

@@ -1,6 +1,7 @@
 // @author ixxxxoooo
 // Agent 终端辅助测试:环境标记、输出清洗、沙箱配置与(可用时)真实沙箱拦截。
 
+import ACPKit
 import Foundation
 import Testing
 
@@ -96,5 +97,12 @@ struct TerminalSandboxTests {
         #expect(bypassResult.exitCode == 0)
         let again = try await terminals.create(command: "true", args: [], env: [:], cwd: nil, outputByteLimit: nil)
         #expect(await terminals.isSandboxed(again))
+    }
+
+    @Test("Bridge 工具清单包含 search_code,且必填 query")
+    func searchCodeTool() {
+        #expect(BridgeTool.allCases.contains(.searchCode))
+        #expect(BridgeTool.searchCode.rawValue == "search_code")
+        #expect(BridgeTool.searchCode.schema["required"]?.arrayValue?.compactMap(\.stringValue) == ["query"])
     }
 }

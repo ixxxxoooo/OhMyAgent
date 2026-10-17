@@ -44,6 +44,7 @@ public enum BridgeTool: String, CaseIterable, Sendable, Codable {
     case canvasCreate = "canvas_create"
     case canvasUpdate = "canvas_update"
     case canvasList = "canvas_list"
+    case searchCode = "search_code"
 
     /// 工具说明(给模型看,英文更利于调用)。
     var summary: String {
@@ -62,6 +63,9 @@ public enum BridgeTool: String, CaseIterable, Sendable, Codable {
         case .canvasUpdate:
             return "Update an existing Canvas by id: change the title, replace all blocks (`blocks`), or add to the end (`append_blocks`). Same block format as canvas_create."
         case .canvasList: return "List existing Canvases (id, title, update time) so you can update or reference one."
+        case .searchCode:
+            return "Fast indexed text search across the whole workspace (all workspace folders). Returns `path:line: text` per match. Prefer it over grep for broad "
+                + "exploration of large repositories: supports regex, whole-word, case sensitivity and a path substring filter. Narrow with `path` if there are too many matches."
         }
     }
 
@@ -81,6 +85,12 @@ public enum BridgeTool: String, CaseIterable, Sendable, Codable {
                            "blocks": ["type": "array", "items": ["type": "object"]],
                            "append_blocks": ["type": "array", "items": ["type": "object"]]], required: ["id"])
         case .canvasList: return object([:], required: [])
+        case .searchCode:
+            return object(["query": ["type": "string", "description": "Text or regular expression to find"],
+                           "regex": ["type": "boolean", "description": "Treat query as a regular expression (default false)"],
+                           "case_sensitive": ["type": "boolean"], "whole_word": ["type": "boolean"],
+                           "path": ["type": "string", "description": "Only search files whose path contains this substring"],
+                           "max_results": ["type": "integer", "description": "Max matches to return (1-200, default 50)"]], required: ["query"])
         }
     }
 
@@ -196,7 +206,7 @@ public final class BridgeServer: Sendable {
         case .notify:
             guard let message = arguments["message"]?.stringValue, !message.isEmpty else { return BridgeResult("缺少 message 参数", isError: true) }
             return await handler.notify(title: arguments["title"]?.stringValue ?? "OhMyAgent", message: message)
-        case .canvasCreate, .canvasUpdate, .canvasList:
+        case .canvasCreate, .canvasUpdate, .canvasList, .searchCode:
             return await handler.callExtended(tool, arguments: arguments)
         }
     }

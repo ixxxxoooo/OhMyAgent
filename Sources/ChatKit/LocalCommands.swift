@@ -31,6 +31,8 @@ public enum LocalCommand: Sendable, Equatable {
     case setModel(String)
     /// 提示账号相关命令由 `claude` 自己管理
     case accountNotice
+    /// 交给 Explore 子 Agent 做只读的代码库探索(`/explore <问题>`;问题为空时提示用法)
+    case explore(String)
 }
 
 /// 命令目录条目(用于补全菜单与 `/help`)。
@@ -67,12 +69,20 @@ public enum LocalCommands {
         LocalCommandSpec(name: "rename", summary: ChatL10n.t("重命名当前会话"), hint: ChatL10n.t("新名称")),
         LocalCommandSpec(name: "export", summary: ChatL10n.t("把当前对话导出为 Markdown")),
         LocalCommandSpec(name: "doctor", summary: ChatL10n.t("打开诊断页检查安装与配置")),
+        LocalCommandSpec(name: "explore", summary: ChatL10n.t("让 Explore 子 Agent 只读检索代码库"), hint: ChatL10n.t("要弄清的问题")),
         LocalCommandSpec(name: "usage", summary: ChatL10n.t("打开用量与花费统计")),
         LocalCommandSpec(name: "cost", summary: ChatL10n.t("打开用量与花费统计")),
     ]
 
     /// 目录中的命令名集合。
     public static var names: Set<String> { Set(catalog.map(\.name)) }
+
+    /// `/explore` 发给 Agent 的提示:明确要求用 Explore 子 Agent、只读、返回关键路径。
+    /// - Parameter question: 用户的问题
+    public static func explorePrompt(_ question: String) -> String {
+        "Use the Explore subagent (fast, read-only codebase search) to investigate the question below. Do not modify any files. "
+            + "Prefer the `search_code` tool for broad searches. Report the key findings with file paths and line numbers.\n\nQuestion: \(question)"
+    }
 
     /// 解析输入框文本;不是客户端命令(或带有应交给 Agent 的参数)时返回 nil。
     /// - Parameter text: 用户输入(整条消息)
@@ -105,6 +115,7 @@ public enum LocalCommands {
         case "rename": return .rename(argument)
         case "export": return .exportTranscript
         case "login", "logout": return .accountNotice
+        case "explore": return .explore(argument)
         default: return nil
         }
     }

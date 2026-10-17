@@ -181,6 +181,10 @@ public struct SearchOutput: Sendable {
     public var truncated: Bool
     /// 正则非法等错误
     public var error: String?
+    /// 是否用索引缩小了候选范围(状态展示、测试与性能基准用)
+    public var indexed = false
+    /// 实际扫描的文件数
+    public var scannedFiles = 0
 }
 
 public enum WorkspaceSearch {
@@ -200,14 +204,21 @@ public enum WorkspaceSearch {
     ///   - root: 工作区根目录
     ///   - options: 搜索选项
     ///   - files: 已有的相对路径索引(为空则现场建立)
-    public static func search(root: String, options: SearchOptions, files: [String]? = nil) async -> SearchOutput {
+    ///   - index: 三元组索引(可选):就绪时先用它缩小候选文件;未就绪时在后台开始构建并回退全量扫描
+    public static func search(root: String, options: SearchOptions, files: [String]? = nil, index: SearchIndex? = nil) async -> SearchOutput {
         guard !options.query.isEmpty else { return SearchOutput(files: [], totalHits: 0, truncated: false, error: nil) }
         let regex: NSRegularExpression
         do { regex = try makeRegex(options) }
         catch { return SearchOutput(files: [], totalHits: 0, truncated: false, error: error.localizedDescription) }
         let paths = files ?? WorkspaceFiles.index(root: root)
         let filter = options.pathFilter.lowercased()
-        let candidates = filter.isEmpty ? paths : paths.filter { $0.lowercased().contains(filter) }
+        var scanPaths = paths
+        var usedIndex = false
+        if let index {
+            await index.sync(files: paths)
+            if let narrowed = await index.candidates(for: options, files: paths) { scanPaths = narrowed; usedIndex = true }
+        }
+        let candidates = filter.isEmpty ? scanPaths : scanPaths.filter { $0.lowercased().contains(filter) }
         let rootPath = root.hasSuffix("/") ? root : root + "/"
 
         let results: [SearchFileResult] = await withTaskGroup(of: SearchFileResult?.self) { group in
@@ -239,7 +250,8 @@ public enum WorkspaceSearch {
             total += hits.count
             limited.append(SearchFileResult(path: file.path, hits: hits))
         }
-        return SearchOutput(files: limited, totalHits: total, truncated: results.reduce(0) { $0 + $1.hits.count } > total || total >= maxHits, error: nil)
+        return SearchOutput(files: limited, totalHits: total, truncated: results.reduce(0) { $0 + $1.hits.count } > total || total >= maxHits, error: nil,
+                            indexed: usedIndex, scannedFiles: candidates.count)
     }
 
     /// 在多个工作区文件夹里搜索并合并结果(主目录在前);命中带 `root` 标注。
@@ -251,10 +263,15 @@ public enum WorkspaceSearch {
         var merged: [SearchFileResult] = []
         var total = 0
         var truncated = false
+        var usedIndex = false
+        var scanned = 0
         for item in roots {
             if Task.isCancelled { break }
-            let output = await search(root: item.root, options: options, files: item.files)
+            let index = await SearchIndexRegistry.shared.index(for: item.root)
+            let output = await search(root: item.root, options: options, files: item.files, index: index)
             if output.error != nil { return output }
+            usedIndex = usedIndex || output.indexed
+            scanned += output.scannedFiles
             for file in output.files {
                 guard total < maxHits else { truncated = true; break }
                 let hits = Array(file.hits.prefix(maxHits - total)).map { hit -> SearchHit in
@@ -267,7 +284,7 @@ public enum WorkspaceSearch {
             }
             if output.truncated { truncated = true }
         }
-        return SearchOutput(files: merged, totalHits: total, truncated: truncated, error: nil)
+        return SearchOutput(files: merged, totalHits: total, truncated: truncated, error: nil, indexed: usedIndex, scannedFiles: scanned)
     }
 
     /// 搜索单个文件;二进制与超大文件返回 nil。
