@@ -126,7 +126,7 @@ public final class AppearanceModel {
         // 自定义主题体积很小(单个 JSON),启动时同步读取,避免先闪一下系统主题
         ThemeRuntime.customThemes = CustomThemeStore.loadAll()
         theme = AppTheme(rawValue: string("theme") ?? "") ?? .system
-        themeID = string("themePackage") ?? ThemePackage.system.id
+        themeID = string("themePackage") ?? ThemePackage.defaultID
         accent = AccentChoice(rawValue: string("accent") ?? "") ?? .system
         customAccentHex = string("accentHex") ?? "#D97757"
         accent2 = AccentChoice(rawValue: string("accent2") ?? "") ?? .system
@@ -160,20 +160,20 @@ public final class AppearanceModel {
         return package
     }
 
-    /// 删除自定义主题;若正在使用则回退为「跟随系统」。
+    /// 删除自定义主题;若正在使用则回退为默认主题(Cursor 纸感)。
     /// - Parameter id: 主题 id
     public func deleteCustomTheme(id: String) {
         CustomThemeStore.delete(id: id)
-        if themeID == id { themeID = ThemePackage.system.id }
+        if themeID == id { themeID = ThemePackage.defaultID }
         reloadCustomThemes()
     }
 
     /// 动画:减弱动效时返回 nil。
-    public var animation: Animation? { reduceMotion || NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : .easeOut(duration: 0.15) }
+    public var animation: Animation? { reduceMotion || NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : OMMotion.standard }
 
     /// 恢复默认外观。
     public func reset() {
-        theme = .system; themeID = ThemePackage.system.id; accent = .system; accent2 = .system
+        theme = .system; themeID = ThemePackage.defaultID; accent = .system; accent2 = .system
         customAccentHex = "#D97757"; customAccent2Hex = "#5769F7"; uiFontScale = 1; timelineFontScale = 1
         isCompact = false; reduceMotion = false; alwaysOpaque = false; fallbackOnLowPower = true
     }
@@ -261,6 +261,6 @@ public func omShouldReduceMotion() -> Bool {
 ///   - animation: 正常情况下使用的动画
 ///   - body: 状态变更闭包
 @MainActor
-public func omWithAnimation(_ animation: Animation = .snappy(duration: 0.2), _ body: () -> Void) {
+public func omWithAnimation(_ animation: Animation = OMMotion.standard, _ body: () -> Void) {
     if omShouldReduceMotion() { body() } else { withAnimation(animation, body) }
 }

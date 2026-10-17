@@ -2087,3 +2087,6 @@
 "归档下方全部" = "Archive All Below";
 "添加项目目录后,可以直接在该项目下向 Claude Code 提问;也可以不打开项目,直接开始一个通用会话。" = "After adding a project folder you can ask Claude Code directly in it; or start a general chat without opening a project.";
 "开始会话(无需项目)" = "Start a Chat (No Project)";
+"纸感" = "Paper";
+"Cursor 纸感" = "Cursor Paper";
+"Cursor 纸感 · 暖墨" = "Cursor Paper · Warm Ink";

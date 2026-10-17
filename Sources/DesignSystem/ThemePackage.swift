@@ -51,6 +51,24 @@ public struct ThemeRGB: Sendable, Equatable {
 
     /// 相对亮度(用于判断前景色)。
     public var luminance: Double { 0.2126 * red + 0.7152 * green + 0.0722 * blue }
+
+    /// WCAG 相对亮度(sRGB 线性化)。
+    private var wcagLuminance: Double {
+        func linear(_ v: Double) -> Double { v <= 0.03928 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4) }
+        return 0.2126 * linear(red) + 0.7152 * linear(green) + 0.0722 * linear(blue)
+    }
+
+    /// 与另一颜色的 WCAG 对比度(1…21)。
+    /// - Parameter other: 另一颜色
+    public func contrast(with other: ThemeRGB) -> Double {
+        let a = wcagLuminance, b = other.wcagLuminance
+        return (max(a, b) + 0.05) / (min(a, b) + 0.05)
+    }
+
+    /// 在填充色 `self` 之上,从 `light`/`dark` 两个候选里选对比度更高的前景。
+    public func readableForeground(light: ThemeRGB, dark: ThemeRGB) -> ThemeRGB {
+        contrast(with: light) >= contrast(with: dark) ? light : dark
+    }
 }
 
 /// 主题调色板。
@@ -87,6 +105,27 @@ public struct ThemePalette: Sendable, Equatable {
     public var property: ThemeRGB
     /// 主题风格(圆角/描边/阴影/玻璃着色);默认标准风格。
     public var style: ThemeStyle = .standard
+    // 纸感规范新增的可选令牌(nil 时回退到旧行为,其他主题零变化)
+    /// 强调色实底上的前景;nil 为白色。
+    public var onAccent: ThemeRGB? = nil
+    /// 小字号链接/强调用的加深强调色(保证 ≥ 4.5:1);nil 时取 `accent`。
+    public var accentText: ThemeRGB? = nil
+    /// 「继续/执行计划」类暖色动作按钮填充;nil 时取 `warning`。
+    public var actionWarm: ThemeRGB? = nil
+    /// 「提交/创建 PR」类正向动作按钮填充;nil 时取 `success`。
+    public var actionPositive: ThemeRGB? = nil
+    /// 输入框、次按钮等描边色;nil 时取 `hairline`。
+    public var outline: ThemeRGB? = nil
+    /// 在任意填充色上选取可读前景(候选为纸感的 Parchment / Ink)。
+    public func readableForeground(on fill: ThemeRGB) -> ThemeRGB {
+        fill.readableForeground(light: ThemeRGB(hex: 0xF7F7F4), dark: ThemeRGB(hex: 0x26251E))
+    }
+    /// 文字选区底色;nil 时取强调色。
+    public var selection: ThemeRGB? = nil
+    /// 次要文字显式取色;nil 时由前景向底色混合推导。
+    public var secondaryTextColor: ThemeRGB? = nil
+    /// 三级文字显式取色;nil 时由前景向底色混合推导。
+    public var tertiaryTextColor: ThemeRGB? = nil
     /// 终端 ANSI 16 色(0–7 标准色,8–15 高亮色);nil 时由语义色与语法色推导。
     public var ansi: [ThemeRGB]? = nil
 
@@ -106,17 +145,71 @@ public struct ThemeStyle: Sendable, Equatable {
     public var glassTint: Double
     /// 悬停/选中填充强度倍率
     public var fillScale: Double
+    /// 是否允许 Liquid Glass;false 时所有玻璃走不透明回退(卡片色 + 描边),纸感主题为 false。
+    public var allowsGlass: Bool
+    /// 语义圆角集合;nil 沿用旧行为(按 `cornerScale` 缩放的默认取值)。
+    public var radiusSet: ThemeRadiusSet?
+    /// 主按钮与控件「开」态的填充来源。
+    public var primaryButton: PrimaryButtonFill
+    /// 选中态填充的色调来源。
+    public var selectionTint: SelectionTint
 
-    public init(cornerScale: Double = 1, strokeScale: Double = 1, shadowScale: Double = 1, glassTint: Double = 0, fillScale: Double = 1) {
+    /// 主按钮填充来源。
+    public enum PrimaryButtonFill: Sendable, Equatable {
+        /// 强调色实底(旧行为)
+        case accent
+        /// 墨色实底(纸感:强调色只用于文字)
+        case ink
+    }
+
+    /// 选中态色调来源。
+    public enum SelectionTint: Sendable, Equatable {
+        /// 强调色洗色(旧行为)
+        case accent
+        /// 中性墨色填充(纸感:不使用强调色洗色)
+        case neutral
+    }
+
+    public init(cornerScale: Double = 1, strokeScale: Double = 1, shadowScale: Double = 1, glassTint: Double = 0, fillScale: Double = 1,
+                allowsGlass: Bool = true, radiusSet: ThemeRadiusSet? = nil, primaryButton: PrimaryButtonFill = .accent, selectionTint: SelectionTint = .accent) {
         self.cornerScale = cornerScale
         self.strokeScale = strokeScale
         self.shadowScale = shadowScale
         self.glassTint = glassTint
         self.fillScale = fillScale
+        self.allowsGlass = allowsGlass
+        self.radiusSet = radiusSet
+        self.primaryButton = primaryButton
+        self.selectionTint = selectionTint
     }
 
     /// 标准风格。
     public static let standard = ThemeStyle()
+}
+
+/// 语义圆角集合(单位 pt)。纸感主题:控件/卡片/标签 4,浮层/弹窗 8。
+public struct ThemeRadiusSet: Sendable, Equatable {
+    /// 标签、徽标、紧凑按钮、行内 chip
+    public var tag: Double
+    /// 按钮、输入框、列表行
+    public var control: Double
+    /// 卡片、代码块、工具卡
+    public var card: Double
+    /// 下拉、弹出菜单等轻浮层
+    public var floating: Double
+    /// 模态窗、搜索窗、输入框坞等大浮层
+    public var modal: Double
+
+    public init(tag: Double, control: Double, card: Double, floating: Double, modal: Double) {
+        self.tag = tag
+        self.control = control
+        self.card = card
+        self.floating = floating
+        self.modal = modal
+    }
+
+    /// 纸感:全站 4,浮层/弹窗 8。
+    public static let paper = ThemeRadiusSet(tag: 4, control: 4, card: 4, floating: 8, modal: 8)
 }
 
 // MARK: - 派生令牌
@@ -125,9 +218,9 @@ extension ThemePalette {
     /// 正文前景色。
     public var foreground: ThemeRGB { editorForeground }
     /// 次要文字:前景向底色混合。
-    public var secondaryText: ThemeRGB { editorForeground.mixed(with: surface, 0.40) }
+    public var secondaryText: ThemeRGB { secondaryTextColor ?? editorForeground.mixed(with: surface, 0.40) }
     /// 三级文字(占位、禁用)。
-    public var tertiaryText: ThemeRGB { editorForeground.mixed(with: surface, 0.62) }
+    public var tertiaryText: ThemeRGB { tertiaryTextColor ?? editorForeground.mixed(with: surface, 0.62) }
     /// 分隔线:底色向前景轻微混合。
     public var hairline: ThemeRGB { surface.mixed(with: editorForeground, 0.14 * style.strokeScale) }
 
@@ -166,7 +259,10 @@ public enum ThemeTone: String, Sendable {
 
 /// 主题分组(设置页分组展示)。
 public enum ThemeGroup: String, CaseIterable, Sendable {
-    case system, cursor, anthropic, claudeCode, opencode
+    case system
+    /// Cursor 纸感(默认主题,规范见 AGENTS.md 4.4)
+    case paper
+    case cursor, anthropic, claudeCode, opencode
     /// 经典配色(Nord、Dracula、Solarized 等社区流行方案)
     case classic
     /// 用户自定义/导入的主题
@@ -175,6 +271,7 @@ public enum ThemeGroup: String, CaseIterable, Sendable {
     public var title: String {
         switch self {
         case .system: return String(localized: "系统")
+        case .paper: return String(localized: "纸感")
         case .cursor: return "Cursor"
         case .anthropic: return "Anthropic"
         case .claudeCode: return "Claude Code"
@@ -263,6 +360,39 @@ extension ThemePalette {
 extension ThemePackage {
     /// 跟随系统。
     public static let system = ThemePackage(id: "system", name: String(localized: "跟随系统"), group: .system, tone: .system, palette: nil)
+
+    // 纸感系(默认):暖纸画布、墨色文字、强调色只用于文字;规范见 AGENTS.md 4.4
+    /// 纸感浅色:Parchment 画布 / Bone 卡片 / Ink 墨色 / Ember 文字强调。
+    static let paperLight = ThemePackage(id: "paper-light", name: String(localized: "Cursor 纸感"), group: .paper, tone: .light, palette: .make(.lightBase) {
+        $0.setBackgrounds(surface: 0xF7F7F4, card: 0xF2F1ED, gutter: 0xF2F1ED, currentLine: 0xECEBE6, sidebar: 0xEFEEE9)
+        $0.editorForeground = ThemeRGB(hex: 0x26251E); $0.gutterForeground = ThemeRGB(hex: 0x7A7974)
+        $0.accent = ThemeRGB(hex: 0xF54E00); $0.accent2 = ThemeRGB(hex: 0x34785C)
+        $0.accentText = ThemeRGB(hex: 0xC23E00)
+        $0.success = ThemeRGB(hex: 0x34785C); $0.danger = ThemeRGB(hex: 0xCF2D56); $0.warning = ThemeRGB(hex: 0x8F6118)
+        $0.actionWarm = ThemeRGB(hex: 0xC08532); $0.actionPositive = ThemeRGB(hex: 0x34785C)
+        $0.diffAdded = $0.surface.mixed(with: $0.success, 0.13); $0.diffRemoved = $0.surface.mixed(with: $0.danger, 0.11)
+        $0.setSyntax(keyword: 0x1F7A6A, string: 0xB8407C, comment: 0x8A8A8A, number: 0x8A6A1A, type: 0x1F5FA8, function: 0xB35A1F, property: 0x6A4FB8)
+        $0.onAccent = ThemeRGB(hex: 0xF7F7F4)
+        $0.outline = ThemeRGB(hex: 0xCDCDC9)
+        $0.selection = ThemeRGB(hex: 0x8BC4F8)
+        $0.secondaryTextColor = ThemeRGB(hex: 0x6B6A63); $0.tertiaryTextColor = ThemeRGB(hex: 0xA1A19F)
+        $0.style = ThemeStyle(strokeScale: 0.75, shadowScale: 0.6, allowsGlass: false, radiusSet: .paper, primaryButton: .ink, selectionTint: .neutral)
+    })
+
+    /// 纸感暖墨(深色):以 Ink 为卡片色,暖色提亮满足对比度(由同一规则推导)。
+    static let paperDark = ThemePackage(id: "paper-dark", name: String(localized: "Cursor 纸感 · 暖墨"), group: .paper, tone: .dark, palette: .make(.darkBase) {
+        $0.setBackgrounds(surface: 0x1B1A16, card: 0x26251E, gutter: 0x1F1E19, currentLine: 0x2E2D25, sidebar: 0x15140F)
+        $0.editorForeground = ThemeRGB(hex: 0xF2F1ED); $0.gutterForeground = ThemeRGB(hex: 0x7A7974)
+        $0.accent = ThemeRGB(hex: 0xFF7A3D); $0.accent2 = ThemeRGB(hex: 0x5FB48F)
+        $0.success = ThemeRGB(hex: 0x5FB48F); $0.danger = ThemeRGB(hex: 0xFF6F8E); $0.warning = ThemeRGB(hex: 0xDDA24A)
+        $0.actionWarm = ThemeRGB(hex: 0xC08532); $0.actionPositive = ThemeRGB(hex: 0x34785C)
+        $0.diffAdded = $0.surface.mixed(with: $0.success, 0.16); $0.diffRemoved = $0.surface.mixed(with: $0.danger, 0.16)
+        $0.setSyntax(keyword: 0x83D6C5, string: 0xE394DC, comment: 0x7A7974, number: 0xEBC88D, type: 0x87C3FF, function: 0xEFB080, property: 0xAAA0FA)
+        $0.onAccent = ThemeRGB(hex: 0x1B1A16)
+        $0.outline = ThemeRGB(hex: 0x3F3E36)
+        $0.selection = ThemeRGB(hex: 0x8BC4F8)
+        $0.style = ThemeStyle(strokeScale: 0.75, shadowScale: 0.6, allowsGlass: false, radiusSet: .paper, primaryButton: .ink, selectionTint: .neutral)
+    })
 
     // Cursor 系
     static let cursorLight = ThemePackage(id: "cursor-light", name: String(localized: "Cursor 浅色"), group: .cursor, tone: .light, palette: .make(.lightBase) {
@@ -489,6 +619,7 @@ extension ThemePackage {
     /// 内置主题(不含用户自定义)。
     public static let builtin: [ThemePackage] = [
         system,
+        paperLight, paperDark,
         cursorLight, cursorLightColorblind, cursorDark, cursorDarkHC,
         anthropicLight, anthropicDark,
         claudeDark, claudeLight, claudeDarkDaltonized, claudeLightDaltonized, claudeDarkANSI, claudeLightANSI,
@@ -498,6 +629,9 @@ extension ThemePackage {
 
     /// 全部主题:内置 + 用户自定义(设置页按分组展示)。
     public static var all: [ThemePackage] { builtin + ThemeRuntime.customThemes }
+
+    /// 默认主题 id(Cursor 纸感浅色)。
+    public static let defaultID = "paper-light"
 
     /// 按 id 查找,未知回退系统。
     public static func find(_ id: String) -> ThemePackage { all.first { $0.id == id } ?? .system }

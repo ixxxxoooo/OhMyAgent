@@ -6,8 +6,10 @@ import SwiftUI
 
 /// 尺寸令牌:圆角随主题风格(`ThemeStyle.cornerScale`)缩放。
 public enum OMMetrics {
-    public static var cardRadius: CGFloat { 12 * CGFloat(ThemeRuntime.style.cornerScale) }
-    public static var controlRadius: CGFloat { 8 * CGFloat(ThemeRuntime.style.cornerScale) }
+    /// 卡片圆角(等同 `OMRadius.card`)。
+    public static var cardRadius: CGFloat { OMRadius.card }
+    /// 控件圆角(等同 `OMRadius.control`)。
+    public static var controlRadius: CGFloat { OMRadius.control }
     public static let sidebarWidth: CGFloat = 248
     public static let toolbarHeight: CGFloat = 44
     public static let timelineMaxWidth: CGFloat = 820
@@ -16,6 +18,44 @@ public enum OMMetrics {
     public static let fileIconInline: CGFloat = 14
     /// 文件类型图标尺寸:列表行(资源管理器、搜索结果),与 11.5pt 小字相配,不再偏大
     public static let fileIconList: CGFloat = 14
+}
+
+/// 语义圆角令牌:界面里所有圆角都从这里取(禁止字面量,`Scripts/ui-lint.py` 扫描)。
+/// 主题提供 `ThemeRadiusSet`(纸感:控件/卡片/标签 4,浮层/弹窗 8)时用主题值;
+/// 否则沿用旧行为:标签 5、控件 8、卡片 12(后两者随 `cornerScale` 缩放)、浮层 12、弹窗 22。
+public enum OMRadius {
+    /// 标签、徽标、紧凑按钮、行内 chip。
+    public static var tag: CGFloat { value(\.tag, legacy: 5, scaled: false) }
+    /// 按钮、输入框、列表行。
+    public static var control: CGFloat { value(\.control, legacy: 8, scaled: true) }
+    /// 卡片、代码块、工具卡。
+    public static var card: CGFloat { value(\.card, legacy: 12, scaled: true) }
+    /// 下拉、弹出菜单等轻浮层。
+    public static var floating: CGFloat { value(\.floating, legacy: 12, scaled: false) }
+    /// 模态窗、搜索窗、输入框坞等大浮层。
+    public static var modal: CGFloat { value(\.modal, legacy: 22, scaled: false) }
+
+    private static func value(_ keyPath: KeyPath<ThemeRadiusSet, Double>, legacy: CGFloat, scaled: Bool) -> CGFloat {
+        if let set = ThemeRuntime.style.radiusSet { return CGFloat(set[keyPath: keyPath]) }
+        return scaled ? legacy * CGFloat(ThemeRuntime.style.cornerScale) : legacy
+    }
+}
+
+/// 间距令牌:4pt 基础单位,元素间距默认 8。
+public enum OMSpacing {
+    public static let xs: CGFloat = 4
+    public static let sm: CGFloat = 8
+    public static let md: CGFloat = 12
+    public static let lg: CGFloat = 16
+    public static let xl: CGFloat = 20
+    public static let xxl: CGFloat = 24
+    public static let xxxl: CGFloat = 32
+}
+
+/// 动效令牌:标准过渡 150ms,`cubic-bezier(0.4, 0, 0.2, 1)`。
+public enum OMMotion {
+    /// 标准过渡(颜色/背景/悬停)。
+    public static let standard: Animation = .timingCurve(0.4, 0, 0.2, 1, duration: 0.15)
 }
 
 /// 颜色令牌。系统主题下使用系统语义色;选择主题包后,**所有**颜色按调色板取色(无公共例外)。
@@ -90,8 +130,34 @@ public enum OMColors {
     public static var success: Color { diffAdded }
     /// 警示/危险色(负向语义:删除、报错)。
     public static var danger: Color { diffRemoved }
-    /// 强调色实底上的前景(按钮文字、选中徽标):恒为白色,保证在任意强调色上的对比度。
-    public static var onAccent: Color { Color.white }
+    /// 强调色实底上的前景(按钮文字、选中徽标):主题未指定时为白色(纸感用 Parchment,禁用纯白)。
+    public static var onAccent: Color { ThemeRuntime.palette?.onAccent?.color ?? Color.white }
+    /// 小字号链接/强调文字用的强调色:纸感取加深的 Ember(≥ 4.5:1),其他主题即 `accent`。
+    public static var accentText: Color { ThemeRuntime.palette?.accentText?.color ?? accent }
+    /// 主按钮与控件「开」态的填充:纸感为墨色(强调色只用于文字),其他主题为强调色。
+    public static var actionFill: Color {
+        ThemeRuntime.style.primaryButton == .ink ? primaryText : accent
+    }
+    /// `actionFill` 之上的前景。
+    public static var onAction: Color {
+        ThemeRuntime.style.primaryButton == .ink ? surface : onAccent
+    }
+    /// 暖色动作按钮填充(继续、执行计划)。
+    public static var actionWarm: Color { ThemeRuntime.palette?.actionWarm?.color ?? warning }
+    /// 暖色动作按钮上的前景:按填充色自动取 Parchment / Ink 中对比度更高者(保证 ≥ 4.5:1)。
+    public static var onWarm: Color {
+        guard let palette = ThemeRuntime.palette else { return onAccent }
+        return palette.readableForeground(on: palette.actionWarm ?? palette.warning).color
+    }
+    /// 正向动作按钮填充(提交、创建 PR)。
+    public static var actionPositive: Color { ThemeRuntime.palette?.actionPositive?.color ?? success }
+    /// 正向动作按钮上的前景(同 `onWarm` 的取色规则)。
+    public static var onPositive: Color {
+        guard let palette = ThemeRuntime.palette else { return onAccent }
+        return palette.readableForeground(on: palette.actionPositive ?? palette.success).color
+    }
+    /// 输入框、次按钮等的描边(纸感为 Stone);未指定时同分隔线。
+    public static var outline: Color { ThemeRuntime.palette?.outline?.color ?? hairline }
     /// 主强调色:用户选择 > 主题默认 > 系统强调色。
     public static var accent: Color { ThemeRuntime.accent?.color ?? Color.accentColor }
     /// 第二强调色:链接、次要徽标;未指定时回退主强调色。
@@ -103,8 +169,11 @@ public enum OMColors {
     public static var subtleFill: Color { primaryText.opacity(0.04 * ThemeRuntime.style.fillScale) }
     /// 悬停填充:随主题前景 7%。
     public static var hoverFill: Color { primaryText.opacity(0.07 * ThemeRuntime.style.fillScale) }
-    /// 选中填充:强调色 14%(让每个主题的选中态有自己的色相)。
-    public static var selectedFill: Color { accent.opacity(0.14 * ThemeRuntime.style.fillScale) }
+    /// 选中填充:默认强调色 14%(让每个主题的选中态有自己的色相);纸感为中性墨色 8%(不洗色)。
+    public static var selectedFill: Color {
+        if ThemeRuntime.style.selectionTint == .neutral { return primaryText.opacity(0.08 * ThemeRuntime.style.fillScale) }
+        return accent.opacity(0.14 * ThemeRuntime.style.fillScale)
+    }
     /// 按压/强悬停填充:随主题前景 12%。
     public static var pressedFill: Color { primaryText.opacity(0.12 * ThemeRuntime.style.fillScale) }
 
@@ -164,7 +233,8 @@ public enum OMTerminalPalette {
     }
     /// 选区底色
     public static var selection: NSColor {
-        (ThemeRuntime.accent?.nsColor ?? NSColor.controlAccentColor).withAlphaComponent(0.30)
+        if let picked = ThemeRuntime.palette?.selection { return picked.nsColor.withAlphaComponent(0.55) }
+        return (ThemeRuntime.accent?.nsColor ?? NSColor.controlAccentColor).withAlphaComponent(0.30)
     }
     /// 当前是否深色:主题包按调色板,系统主题按应用的有效外观。
     public static var currentIsDark: Bool {
