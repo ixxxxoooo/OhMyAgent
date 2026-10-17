@@ -20,6 +20,7 @@ enum WorkspaceStore {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
         panel.prompt = String(localized: "打开项目")
         panel.message = String(localized: "选择 Agent 要在其中工作的项目目录")
         return panel.runModal() == .OK ? panel.url : nil
@@ -41,6 +42,24 @@ enum WorkspaceStore {
             return url
         } catch {
             Log.ui.error("新建项目文件夹失败", ["path": url.path, "error": "\(error)"])
+            return nil
+        }
+    }
+
+    /// 快速启动:在默认项目位置自动创建一个时间戳临时项目目录并直接打开。
+    @MainActor
+    static func createQuickStartDirectory() -> URL? {
+        let base = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Documents", isDirectory: true)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd_HHmmss"
+        let name = "QuickStart_\(formatter.string(from: Date()))"
+        let dir = base.appendingPathComponent("OhMyAgent/\(name)", isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            return dir
+        } catch {
+            Log.ui.error("创建快速启动目录失败", ["path": dir.path, "error": "\(error)"])
             return nil
         }
     }

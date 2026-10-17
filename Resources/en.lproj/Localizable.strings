@@ -2187,3 +2187,10 @@
 "它包含工作区已有的文件夹 %@,请先移除后再添加。" = "It contains the workspace folder %@. Remove that one first.";
 "一个工作区最多包含 %lld 个附加文件夹。" = "A workspace can include at most %lld extra folders.";
 "偏好设置" = "Preferences";
+"搜索项目" = "Search Projects";
+"新建项目" = "New Project";
+"快速启动" = "Quick Start";
+"无项目" = "No Project";
+"没有匹配的项目" = "No matching projects";
+"切换项目" = "Switch Project";
+"当前项目: %@" = "Current project: %@";

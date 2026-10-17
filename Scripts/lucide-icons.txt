@@ -183,3 +183,5 @@ folder-pen
 archive-restore
 message-circle-plus
 folder-clock
+folder-symlink
+square-slash
