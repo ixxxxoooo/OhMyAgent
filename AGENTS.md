@@ -24,6 +24,7 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 - `DesignSystem`:设计令牌(含 `OMDiffPalette` 不透明 Diff 配色、主题包 `ThemePackage`)、玻璃材质、标签活动状态(`TabActivity`)。
 - `OhMyAgentApp`:应用本体(SwiftUI/AppKit 视图)。
 - `SpreadsheetKit`:xlsx 原生解析(ZIP + zlib 解压、OOXML SAX、单元格格式化、工作簿模型;无视图)。
+- `CanvasKit`:Canvas 画布(对照 Cursor Canvases,原生块渲染而非 React):`CanvasDocument`/`CanvasBlock`(标题、Markdown、统计卡、表格、图表、提示框、代码、图片、Mermaid、分区)、宽松 JSON 解码与带路径的校验错误 `CanvasParser`、落盘存储 `CanvasStore`(`~/Library/Application Support/OhMyAgent/canvases`);无视图。Agent 经 Bridge 工具 `canvas_create/update/list` 使用,界面见 `OhMyAgentApp/Canvas`(标签页 `oma-canvas:<id>`、时间线画布卡片、⌘K「画布」)。
 - `AutomationKit`:自动化(定时与 cron 子集、自动化/运行记录模型、`AutomationCenter` 调度/并发/超时/补跑/持久化、表单草稿、模板;无视图,运行器由应用层注入)。
 - `DemoKit`:演示模式(无视图):沙盒路径、隔离层 `DemoEnvironment`、确定性生成演示项目与 Git 仓库、预置工作台状态与演示 `.claude`。
 - `FakeAgent`:辅助可执行文件。

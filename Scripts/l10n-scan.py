@@ -140,6 +140,9 @@ ALLOWLIST = (
     ("Sources/AgentHost/BridgeServer.swift", None),      # MCP Bridge 返回给 Agent 的错误
     ("Sources/AgentHost/TerminalManager.swift", None),
     ("Sources/ChatKit/SessionBridge.swift", None),
+    ("Sources/ChatKit/CanvasBridge.swift", None),          # Canvas 工具返回给 Agent 的错误文本
+    ("Sources/CanvasKit/", None),                          # 画布校验错误(给模型看,带路径便于重试)
+    ("Sources/OhMyAgentApp/Explorer/HubSearch.swift", "报告"),  # 画布搜索的中文别名关键词
     ("Sources/IconKit/BrandIcons.swift", None),           # 厂商匹配关键字(用户自建提供商名称),不是界面文案
     ("Sources/ChatKit/SessionModel.swift", "仅允许写入工作区内的文件: \u0000"),
     ("Sources/LSPKit/LSPClient.swift", "未实现: \u0000"),

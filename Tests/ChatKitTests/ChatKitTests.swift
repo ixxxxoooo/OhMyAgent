@@ -3,6 +3,7 @@
 
 import ACPKit
 import AgentHost
+import CanvasKit
 import Foundation
 import Testing
 
@@ -852,5 +853,60 @@ struct AttentionTests {
         for index in 0..<60 { RecentStore.markUnread("s\(index)", defaults) }
         #expect(RecentStore.unreadSessionIDs(defaults).count == 50)
         #expect(RecentStore.unreadSessionIDs(defaults).contains("s59"))
+    }
+}
+
+@Suite("Canvas 工具引用")
+struct CanvasToolRefTests {
+    private func tool(name: String, status: ToolStatus, text: String) -> ToolCall {
+        ToolCall(toolCallId: "t", name: name, title: name, kind: .other, status: status, content: [.content(.text(text))],
+                 rawInput: ["title": "周报"])
+    }
+
+    @Test("完成的 canvas_create/update 解析出画布 id,其他工具与未完成不解析")
+    func parsesRef() {
+        let ok = CanvasToolRef.of(tool(name: "mcp__ohmyagent__canvas_create", status: .completed, text: "Canvas created. canvas_id: report-ab12cd\ntitle: x"))
+        #expect(ok == CanvasToolRef(canvasID: "report-ab12cd", title: "周报", isUpdate: false))
+        let update = CanvasToolRef.of(tool(name: "mcp__ohmyagent__canvas_update", status: .completed, text: "canvas_id: report-ab12cd"))
+        #expect(update?.isUpdate == true)
+        #expect(CanvasToolRef.of(tool(name: "mcp__ohmyagent__canvas_create", status: .pending, text: "canvas_id: a")) == nil)
+        #expect(CanvasToolRef.of(tool(name: "mcp__other__canvas_create_x", status: .completed, text: "canvas_id: a")) == nil)
+        #expect(CanvasToolRef.of(tool(name: "mcp__ohmyagent__canvas_create", status: .completed, text: "canvas_id: ../../etc")) == nil)
+    }
+}
+
+@MainActor
+@Suite("Canvas Bridge 工具", .serialized)
+struct CanvasBridgeTests {
+    @Test("canvas_create/update/list 经会话落盘,并发出打开请求与修订广播")
+    func createUpdateList() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("cv-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let model = SessionModel(workspace: URL(fileURLWithPath: "/tmp/proj"), descriptor: .claudeCode)
+        model.canvasStore = CanvasStore(directory: dir)
+        let bridge = SessionBridge(model: model)
+
+        let created = await bridge.callExtended(.canvasCreate, arguments: [
+            "title": "周报", "blocks": [["type": "heading", "text": "标题"], ["type": "table", "columns": ["a"], "rows": [["1"]]]],
+        ])
+        #expect(!created.isError)
+        let ref = CanvasToolRef.extractID(from: created.text)
+        let id = try #require(ref)
+        #expect(model.canvasRequest?.canvasID == id)
+        #expect(CanvasHub.shared.revision(of: id) == 1)
+
+        let updated = await bridge.callExtended(.canvasUpdate, arguments: ["id": .string(id), "append_blocks": [["type": "divider"]]])
+        #expect(!updated.isError && updated.text.contains("revision: 2"))
+        #expect(CanvasHub.shared.revision(of: id) == 2)
+
+        let list = await bridge.callExtended(.canvasList, arguments: .object([:]))
+        #expect(list.text.contains(id) && list.text.contains("3 blocks"))
+
+        // 参数错误:缺 blocks、非法块、未知画布
+        #expect(await bridge.callExtended(.canvasCreate, arguments: ["title": "x"]).isError)
+        let bad = await bridge.callExtended(.canvasCreate, arguments: ["title": "x", "blocks": [["type": "nope"]]])
+        #expect(bad.isError && bad.text.contains("blocks[0]"))
+        #expect(await bridge.callExtended(.canvasUpdate, arguments: ["id": "missing-id", "title": "t"]).isError)
+        #expect(await bridge.callExtended(.canvasUpdate, arguments: ["id": .string(id)]).isError)
     }
 }

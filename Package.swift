@@ -33,25 +33,27 @@ let package = Package(
         .target(name: "MermaidKit"),
         // 表格:xlsx(ZIP + OOXML)原生读取,流式解析为行列矩阵(无视图)
         .target(name: "SpreadsheetKit"),
+        // Canvas:声明式画布文档(块列表)的模型、校验与落盘存储(无视图)
+        .target(name: "CanvasKit", dependencies: ["OMLog"]),
         .target(name: "AutomationKit", dependencies: ["OMLog"]),
         // Git:git 命令的类型化封装与输出解析(后台子进程,无 UI)
         .target(name: "GitKit", dependencies: ["DiffKit", "OMLog"]),
         // LSP 客户端:Content-Length 分帧、客户端 actor、服务器定位与管理(复用 ACPKit 的 JSON-RPC 连接,无 UI)
         .target(name: "LSPKit", dependencies: ["ACPKit", "OMLog"]),
         // 演示模式数据:确定性生成演示项目、Git 仓库、历史会话与演示用 Claude 配置(无视图)
-        .target(name: "DemoKit", dependencies: ["ACPKit", "OMLog", "WorkbenchKit"]),
+        .target(name: "DemoKit", dependencies: ["ACPKit", "CanvasKit", "OMLog", "WorkbenchKit"]),
         // Liquid Glass 设计系统
         .target(name: "DesignSystem", dependencies: ["IconKit", "OMLog"]),
         // 模型协议代理:本地回环 HTTP,把 Anthropic /v1/messages 转换为 OpenAI /chat/completions(无视图)
         .target(name: "ProviderProxyKit", dependencies: ["OMLog"]),
         // 聊天核心:时间线模型、事件合并、Markdown 解析、会话模型(不含视图)
-        .target(name: "ChatKit", dependencies: ["ACPKit", "AgentHost", "DiffKit", "OMLog", "ProviderProxyKit"]),
+        .target(name: "ChatKit", dependencies: ["ACPKit", "AgentHost", "CanvasKit", "DiffKit", "OMLog", "ProviderProxyKit"]),
         // 工作台:项目/会话树、布局、持久化(不含视图)
         .target(name: "WorkbenchKit", dependencies: ["ACPKit", "AgentHost", "ChatKit", "OMLog"]),
         // 应用本体
         .executableTarget(
             name: "OhMyAgentApp",
-            dependencies: ["ACPKit", "AgentHost", "ChatKit", "ClaudeConfigKit", "DiffKit", "EditorKit", "DesignSystem", "IconKit", "MermaidKit", "GitKit", "LSPKit", "DemoKit", "OMLog", "SpreadsheetKit", "AutomationKit", "WorkbenchKit",
+            dependencies: ["ACPKit", "AgentHost", "ChatKit", "ClaudeConfigKit", "DiffKit", "EditorKit", "DesignSystem", "IconKit", "MermaidKit", "GitKit", "LSPKit", "DemoKit", "OMLog", "SpreadsheetKit", "AutomationKit", "WorkbenchKit", "CanvasKit",
                            .product(name: "SwiftTerm", package: "SwiftTerm")]
         ),
         // 脚本化 ACP Agent,用于测试与预览
@@ -72,10 +74,11 @@ let package = Package(
         .testTarget(name: "IconKitTests", dependencies: ["IconKit"]),
         .testTarget(name: "LSPKitTests", dependencies: ["LSPKit", "ACPKit"]),
         .testTarget(name: "SpreadsheetKitTests", dependencies: ["SpreadsheetKit"]),
+        .testTarget(name: "CanvasKitTests", dependencies: ["CanvasKit"]),
         .testTarget(name: "AutomationKitTests", dependencies: ["AutomationKit"]),
         .testTarget(name: "EditorKitTests", dependencies: ["EditorKit"]),
         .testTarget(name: "MermaidKitTests", dependencies: ["MermaidKit"]),
-        .testTarget(name: "OhMyAgentAppTests", dependencies: ["OhMyAgentApp", "ChatKit", "ACPKit", "DesignSystem", "EditorKit", "LSPKit"]),
+        .testTarget(name: "OhMyAgentAppTests", dependencies: ["OhMyAgentApp", "ChatKit", "ACPKit", "DesignSystem", "EditorKit", "LSPKit", "CanvasKit", "DemoKit"]),
         .testTarget(name: "WorkbenchKitTests", dependencies: ["WorkbenchKit", "ChatKit", "ACPKit", "AgentHost", "FakeAgent"]),
     ]
 )

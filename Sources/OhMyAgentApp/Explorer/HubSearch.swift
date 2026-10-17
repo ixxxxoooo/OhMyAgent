@@ -60,6 +60,12 @@ final class HubModel {
             WorkspaceIndexModel.shared.refresh(root: workbench.selectedProjectID)
         }
         rebuildCandidates()
+        // 画布列表在后台读盘,读完再重建候选(避免主线程读磁盘)
+        Task { [weak self] in
+            await CanvasListCache.shared.refresh()
+            guard let self, self.isPresented else { return }
+            self.rebuildCandidates()
+        }
         Log.ui.info("打开中央搜索", ["segment": segment.rawValue])
     }
 
@@ -164,6 +170,8 @@ final class HubModel {
             AppActions.shared.openSettings(page: SettingsPage.resolve(page))
         case .theme(let id):
             AppearanceModel.shared.themeID = id
+        case .canvas(let id, let title):
+            workbench.openCanvas(id: id, title: title)
         }
     }
 }
@@ -218,6 +226,15 @@ enum HubCandidateBuilder {
                     keywords: fileKeywords,
                     action: .file(root: item.root, relativePath: item.path)))
             }
+        }
+        // 画布:已缓存的列表(打开搜索窗时后台刷新),当前项目的优先
+        let canvasKeywords = ["画布", "canvas", "报告", "图表", "report"]
+        let canvasRoot = workbench.selectedProjectID
+        for item in CanvasListCache.shared.items.sorted(by: { ($0.projectPath == canvasRoot ? 1 : 0, $0.updatedAt) > ($1.projectPath == canvasRoot ? 1 : 0, $1.updatedAt) }) {
+            result.append(HubCandidate(
+                id: "canvas:\(item.id)", segment: .canvases, title: item.title,
+                subtitle: item.projectPath.map { ($0 as NSString).lastPathComponent }, trailing: HubDates.relative(item.updatedAt),
+                icon: .symbol("chart-column"), keywords: canvasKeywords, action: .canvas(id: item.id, title: item.title)))
         }
         // 操作:命令面板里的全部命令
         var table: [String: PaletteCommand] = [:]
@@ -346,11 +363,12 @@ struct HubOverlay: View {
         switch hub.segment {
         case .themes: return String(localized: "搜索主题 (如 Cursor, Dracula, Tokyo, 浅色…)")
         case .files: return String(localized: "搜索文件 (如文件名或路径…)")
+        case .canvases: return String(localized: "搜索画布…")
         case .actions: return String(localized: "搜索操作与快捷键…")
         case .settings: return String(localized: "搜索设置项…")
         case .sessions: return String(localized: "搜索历史会话…")
         case .projects: return String(localized: "搜索项目…")
-        case .all: return String(localized: "搜索会话、项目、文件、操作、设置与主题")
+        case .all: return String(localized: "搜索会话、项目、文件、画布、操作、设置与主题")
         }
     }
 

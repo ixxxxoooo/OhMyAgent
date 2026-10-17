@@ -15,6 +15,7 @@ public enum DemoSeed {
     ///   - now: 基准时间
     public static func seed(paths: DemoPaths, infos: [DemoProjectInfo], now: Date = Date()) throws {
         try DemoClaudeHome.write(home: paths.home, atlasPath: paths.project("atlas-web").path)
+        try DemoCanvas.write(home: paths.home, projectPath: paths.project("atlas-web").path, now: now)
         if !FileManager.default.fileExists(atPath: paths.workbenchFile.path) {
             try WorkbenchStore(fileURL: paths.workbenchFile).save(workbenchState(infos: infos, now: now))
             Log.app.info("演示工作台状态已预置", ["file": paths.workbenchFile.path, "projects": "\(infos.count)"])

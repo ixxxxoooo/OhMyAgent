@@ -197,7 +197,7 @@ struct AgentExtensionsPage: View {
                 .disabled(!registry.data.bridge.enabled)
                 .padding(.leading, 16)
             }
-            Note("每个会话在应用内置的本机回环端点上注册一个不可猜测的 HTTP MCP 地址(服务器名 `ohmyagent`,无需额外进程),暴露:打开文件、显示改动、读取你在输入框中选中的文字、发送系统通知。会话结束即注销。")
+            Note("每个会话在应用内置的本机回环端点上注册一个不可猜测的 HTTP MCP 地址(服务器名 `ohmyagent`,无需额外进程),暴露:打开文件、显示改动、读取你在输入框中选中的文字、发送系统通知、创建/更新画布(Canvas)。会话结束即注销。")
         }
     }
 }

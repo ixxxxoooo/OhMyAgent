@@ -25,6 +25,14 @@ public protocol BridgeHandler: Sendable {
     func showDiff(path: String) async -> BridgeResult
     func selection() async -> BridgeResult
     func notify(title: String, message: String) async -> BridgeResult
+    /// 扩展工具(Canvas、浏览器、搜索……):参数原样交给实现方解析;默认不支持。
+    func callExtended(_ tool: BridgeTool, arguments: JSONValue) async -> BridgeResult
+}
+
+public extension BridgeHandler {
+    func callExtended(_ tool: BridgeTool, arguments: JSONValue) async -> BridgeResult {
+        BridgeResult("当前客户端不支持工具 \(tool.rawValue)", isError: true)
+    }
 }
 
 /// Bridge 暴露的工具名(设置页可逐个开关)。
@@ -33,6 +41,9 @@ public enum BridgeTool: String, CaseIterable, Sendable, Codable {
     case showDiff = "show_diff"
     case getSelection = "get_selection"
     case notify = "notify"
+    case canvasCreate = "canvas_create"
+    case canvasUpdate = "canvas_update"
+    case canvasList = "canvas_list"
 
     /// 工具说明(给模型看,英文更利于调用)。
     var summary: String {
@@ -41,6 +52,16 @@ public enum BridgeTool: String, CaseIterable, Sendable, Codable {
         case .showDiff: return "Show the pending changes of a file made in this session in the OhMyAgent diff viewer."
         case .getSelection: return "Get the text currently selected by the user in the OhMyAgent editor or conversation."
         case .notify: return "Show a macOS notification to the user (use sparingly, e.g. when a long task finishes)."
+        case .canvasCreate:
+            return "Create a Canvas: a live, reopenable visual artifact shown beside the chat. Prefer it over long markdown when the answer is data-dense "
+                + "(tables, metrics, charts), needs images or diagrams, or the user will iterate on it (reports, dashboards, comparisons, audits, timelines). "
+                + "Content is a list of blocks. Block types (field `type`): heading{text,level 1-3}, markdown{text}, stats{items:[{label,value,delta?,tone?}]}, "
+                + "table{columns:[..],rows:[[..]],title?}, chart{kind: bar|line|area|pie, labels:[..], series:[{name,values:[numbers matching labels]}], title?}, "
+                + "callout{tone: info|success|warning|danger, title?, text}, code{language?,text}, image{source: absolute path or https URL, caption?}, "
+                + "mermaid{text}, section{title,collapsed?,blocks:[..]}, divider. Returns the canvas id."
+        case .canvasUpdate:
+            return "Update an existing Canvas by id: change the title, replace all blocks (`blocks`), or add to the end (`append_blocks`). Same block format as canvas_create."
+        case .canvasList: return "List existing Canvases (id, title, update time) so you can update or reference one."
         }
     }
 
@@ -53,6 +74,13 @@ public enum BridgeTool: String, CaseIterable, Sendable, Codable {
         case .showDiff: return object(["path": ["type": "string"]], required: ["path"])
         case .getSelection: return object([:], required: [])
         case .notify: return object(["title": ["type": "string"], "message": ["type": "string"]], required: ["message"])
+        case .canvasCreate:
+            return object(["title": ["type": "string"], "blocks": ["type": "array", "items": ["type": "object"]]], required: ["title", "blocks"])
+        case .canvasUpdate:
+            return object(["id": ["type": "string"], "title": ["type": "string"],
+                           "blocks": ["type": "array", "items": ["type": "object"]],
+                           "append_blocks": ["type": "array", "items": ["type": "object"]]], required: ["id"])
+        case .canvasList: return object([:], required: [])
         }
     }
 
@@ -168,6 +196,8 @@ public final class BridgeServer: Sendable {
         case .notify:
             guard let message = arguments["message"]?.stringValue, !message.isEmpty else { return BridgeResult("缺少 message 参数", isError: true) }
             return await handler.notify(title: arguments["title"]?.stringValue ?? "OhMyAgent", message: message)
+        case .canvasCreate, .canvasUpdate, .canvasList:
+            return await handler.callExtended(tool, arguments: arguments)
         }
     }
 }

@@ -70,6 +70,7 @@ func tabIcon(_ kind: TabKind) -> String {
     case .preview(let id):
         if id == WorkbenchModel.automationTabID { return "workflow" }
         if id == WorkbenchModel.customizeTabID { return "sliders-horizontal" }
+        if WorkbenchModel.canvasID(fromTab: id) != nil { return "chart-column" }
         return id == WorkbenchModel.outputTabID ? "file-text" : "eye"
     case .history: return "git-graph"
     case .blame: return "user"

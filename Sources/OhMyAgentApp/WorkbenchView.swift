@@ -256,6 +256,8 @@ struct WorkbenchView: View {
             workbench.openSettings()
         }
         // 调试:OMA_OPEN_CUSTOMIZE=all|plugins|skills|subagents|rules|mcp|hooks 直接打开「自定义」页
+        // 调试:OMA_OPEN_CANVAS=<画布 id> 直接打开画布标签
+        if let canvasID = env["OMA_OPEN_CANVAS"], !canvasID.isEmpty { workbench.openCanvas(id: canvasID, title: String(localized: "画布")) }
         if let filter = env["OMA_OPEN_CUSTOMIZE"] { workbench.openCustomize(filter: filter) }
     }
 }
@@ -281,6 +283,17 @@ struct CenterColumn: View {
             model.viewerRequest = nil
             workbench.openFile(request.path, line: request.line)
         }
+        .onChange(of: pendingCanvasRequest) { _, request in
+            // Agent 通过 Bridge 新建画布 → 在标签页中打开
+            guard let request, let model = workbench.allSessions.first(where: { $0.canvasRequest == request }) else { return }
+            model.canvasRequest = nil
+            workbench.openCanvas(id: request.canvasID, title: request.title)
+        }
+    }
+
+    /// 任一会话中待处理的画布打开请求。
+    private var pendingCanvasRequest: CanvasOpenRequest? {
+        workbench.allSessions.lazy.compactMap(\.canvasRequest).first
     }
 
     /// 任一会话中待处理的文件查看请求。

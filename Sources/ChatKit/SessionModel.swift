@@ -3,6 +3,7 @@
 // 后台:事件接收与合并;主 actor:只应用合并后的批次。
 
 import ACPKit
+import CanvasKit
 import AgentHost
 import DiffKit
 import Foundation
@@ -312,6 +313,10 @@ public final class SessionModel {
     @ObservationIgnored public var onAgentEdit: ((AgentEdit) -> Void)?
     /// 需要在编辑器面板中打开的文件
     public var viewerRequest: FileViewRequest?
+    /// 需要在标签页中打开的画布(Agent 通过 Bridge 新建画布时设置,应用层消费后置空)
+    public var canvasRequest: CanvasOpenRequest?
+    /// 画布存储(默认在 Application Support;测试/演示可替换)
+    @ObservationIgnored public var canvasStore = CanvasStore(directory: CanvasStore.defaultDirectory())
 
     private var supervisor: AgentSupervisor?
     private var client: ACPClient?

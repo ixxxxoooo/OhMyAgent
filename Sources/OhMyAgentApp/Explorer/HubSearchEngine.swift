@@ -6,7 +6,7 @@ import WorkbenchKit
 
 /// 搜索分类(窗口顶部的分段)。
 enum HubSegment: String, CaseIterable, Identifiable {
-    case all, sessions, projects, files, actions, settings, themes
+    case all, sessions, projects, files, canvases, actions, settings, themes
     var id: String { rawValue }
 
     /// 分段标题。
@@ -16,6 +16,7 @@ enum HubSegment: String, CaseIterable, Identifiable {
         case .sessions: return String(localized: "会话")
         case .projects: return String(localized: "项目")
         case .files: return String(localized: "文件")
+        case .canvases: return String(localized: "画布")
         case .actions: return String(localized: "操作")
         case .settings: return String(localized: "设置")
         case .themes: return String(localized: "主题")
@@ -41,6 +42,7 @@ enum HubAction: Equatable {
     case command(id: String)
     case settings(page: String)
     case theme(id: String)
+    case canvas(id: String, title: String)
 }
 
 /// 候选图标。
@@ -85,7 +87,7 @@ struct HubSection: Identifiable, Equatable {
 /// 搜索引擎:按分类与查询对候选排序、分组。
 enum HubSearchEngine {
     /// 分组展示顺序。
-    static let order: [HubSegment] = [.sessions, .projects, .files, .actions, .settings, .themes]
+    static let order: [HubSegment] = [.sessions, .projects, .files, .canvases, .actions, .settings, .themes]
 
     /// 排序并分组。
     /// - Parameters:
@@ -115,6 +117,8 @@ enum HubSearchEngine {
             if !projects.isEmpty { result.append(HubSection(id: HubSegment.projects.rawValue, title: HubSegment.projects.title, items: projects)) }
             let files = rank("", grouped[.files] ?? [], limit: 5)
             if !files.isEmpty { result.append(HubSection(id: HubSegment.files.rawValue, title: HubSegment.files.title, items: files)) }
+            let canvases = rank("", grouped[.canvases] ?? [], limit: 5)
+            if !canvases.isEmpty { result.append(HubSection(id: HubSegment.canvases.rawValue, title: HubSegment.canvases.title, items: canvases)) }
             let actions = rank("", grouped[.actions] ?? [], limit: Int.max)
             if !actions.isEmpty { result.append(HubSection(id: HubSegment.actions.rawValue, title: HubSegment.actions.title, items: actions)) }
             let settings = rank("", grouped[.settings] ?? [], limit: Int.max)

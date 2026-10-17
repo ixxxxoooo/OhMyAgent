@@ -9,7 +9,7 @@ import OMLog
 
 /// Bridge 工具的会话实现(弱引用会话模型,窗口关闭后调用返回错误)。
 final class SessionBridge: BridgeHandler, @unchecked Sendable {
-    private weak var model: SessionModel?
+    weak var model: SessionModel?
 
     init(model: SessionModel) { self.model = model }
 
@@ -27,6 +27,13 @@ final class SessionBridge: BridgeHandler, @unchecked Sendable {
 
     func notify(title: String, message: String) async -> BridgeResult {
         await MainActor.run { model?.bridgeNotify(title: title, message: message) ?? BridgeResult("会话已关闭", isError: true) }
+    }
+
+    func callExtended(_ tool: BridgeTool, arguments: JSONValue) async -> BridgeResult {
+        switch tool {
+        case .canvasCreate, .canvasUpdate, .canvasList: return await callCanvas(tool, arguments: arguments)
+        default: return BridgeResult("当前客户端不支持工具 \(tool.rawValue)", isError: true)
+        }
     }
 }
 

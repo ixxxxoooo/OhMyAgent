@@ -1191,6 +1191,30 @@ public final class WorkbenchModel {
         return tab
     }
 
+    // MARK: Canvas
+
+    /// 画布标签的标识前缀(预览类标签,后缀为画布 id)。
+    public nonisolated static let canvasTabPrefix = "oma-canvas:"
+
+    /// 从预览标签标识里取画布 id;不是画布标签返回 nil。
+    /// - Parameter tabID: 预览标签标识
+    public nonisolated static func canvasID(fromTab tabID: String) -> String? {
+        tabID.hasPrefix(canvasTabPrefix) ? String(tabID.dropFirst(canvasTabPrefix.count)) : nil
+    }
+
+    /// 打开(或切到)画布标签。
+    /// - Parameters:
+    ///   - id: 画布 id
+    ///   - title: 标签标题
+    @discardableResult
+    public func openCanvas(id: String, title: String) -> UUID {
+        mode = .workspace
+        let tab = dock.open(.preview(id: Self.canvasTabPrefix + id), title: title)
+        dock.activate(tab)
+        syncSelectionFromDock()
+        return tab
+    }
+
     // MARK: 输出面板
 
     /// 输出面板在编辑区里的标签标识(放在编辑区时作为预览类标签)。

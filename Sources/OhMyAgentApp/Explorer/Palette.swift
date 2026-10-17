@@ -77,13 +77,15 @@ enum PaletteCommands {
                 ? PaletteCommand(id: "bottom", title: workbench.layout.bottomVisible ? String(localized: "隐藏底部面板") : String(localized: "显示底部面板"), icon: "panel-bottom", shortcut: key(.togglePanel)) { workbench.toggleBottom() }
                 : PaletteCommand(id: "bottom", title: workbench.isTerminalShown ? String(localized: "隐藏终端") : String(localized: "显示终端"), icon: "square-terminal", shortcut: key(.togglePanel)) { workbench.toggleTerminal() },
             PaletteCommand(id: "automation", title: String(localized: "打开自动化"), icon: "workflow", shortcut: nil) { workbench.openAutomation() },
+            PaletteCommand(id: "customize", title: String(localized: "打开自定义"), icon: "sliders-horizontal", shortcut: nil) { workbench.openCustomize() },
+            PaletteCommand(id: "canvas", title: String(localized: "打开画布…"), icon: "chart-column", shortcut: nil) { HubModel.shared.present(.canvases, workbench: workbench) },
             PaletteCommand(id: "output", title: workbench.isOutputShown ? String(localized: "隐藏输出面板") : String(localized: "显示输出面板"), icon: "panel-bottom", shortcut: nil) {
                 workbench.toggleOutput()
             },
             PaletteCommand(id: "resetLayout", title: String(localized: "恢复默认布局"), icon: "undo-2", shortcut: nil) { workbench.resetLayout() },
             PaletteCommand(id: "settings", title: String(localized: "设置…"), icon: "settings", shortcut: "⌘,") { AppActions.shared.openSettings() },
             PaletteCommand(id: "themePicker", title: String(localized: "切换颜色主题…"), icon: "paintbrush", shortcut: nil) { HubModel.shared.presentThemes(workbench: workbench) },
-            PaletteCommand(id: "tools", title: String(localized: "工具与扩展…"), icon: "puzzle", shortcut: key(.extensions)) { AppActions.shared.openSettings(page: .mcp) },
+            PaletteCommand(id: "tools", title: String(localized: "工具与扩展…"), icon: "puzzle", shortcut: key(.extensions)) { workbench.openCustomize() },
             PaletteCommand(id: "shortcuts", title: String(localized: "快捷键设置"), icon: "keyboard", shortcut: nil) { AppActions.shared.openSettings(page: .shortcuts) },
         ]
     }

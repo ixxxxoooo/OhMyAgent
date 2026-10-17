@@ -46,7 +46,7 @@ typeset -a STEPS
 add() { STEPS+=("$1|$2|$3"); }
 
 # 1) 场景:自动跑完的(展开所有工具卡)
-for s in tools-files tools-shell tools-web-mcp tools-plan-todo subagents subagents-parallel subagents-background \
+for s in tools-files tools-shell tools-web-mcp canvas tools-plan-todo subagents subagents-parallel subagents-background \
          states-notices states-errors states-streaming roles markdown mermaid; do
   add "scenario-$s" 12 "OMA_DEMO_SCENARIO=$s;OMA_EXPAND_ALL=1"
 done
@@ -89,6 +89,8 @@ add "bottom-panel" 8 "OMA_SHOW_BOTTOM=1;OMA_BOTTOM_PANE=terminal"
 for p in general appearance shortcuts agent providers prompts network permissions trust agentExtensions editor terminal usage privacy advanced diagnostics; do
   add "settings-$p" 8 "OMA_OPEN_SETTINGS=1;OMA_SETTINGS_PAGE=$p"
 done
+# 5a) 画布标签页(演示沙盒预置了 demo-quarterly-report)
+add "canvas-tab" 10 "OMA_OPEN_CANVAS=demo-quarterly-report"
 # 5b) 自定义页(原设置页「扩展」分组合并而来)
 for f in all mcp skills subagents hooks plugins rules; do
   add "customize-$f" 8 "OMA_OPEN_CUSTOMIZE=$f"

@@ -83,6 +83,12 @@ struct ToolRowView: View {
             let isExpanded = canExpand && (expanded ?? defaultExpanded(tool, presentation))
             VStack(alignment: .leading, spacing: 0) {
                 row(tool, presentation, canExpand: canExpand, isExpanded: isExpanded)
+                // Canvas 工具完成后,在工具行下方给出可点击的画布卡片
+                if let ref = CanvasToolRef.of(tool) {
+                    CanvasCardView(ref: ref)
+                        .padding(.leading, 23)
+                        .padding(.vertical, 6)
+                }
                 if isExpanded {
                     detailsBlock(tool, presentation)
                         .padding(.leading, 23)

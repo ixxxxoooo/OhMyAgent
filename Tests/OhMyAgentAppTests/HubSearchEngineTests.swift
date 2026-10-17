@@ -89,6 +89,15 @@ struct HubSearchEngineTests {
         #expect(HubSegment.all.next(by: -1) == .themes)
     }
 
+    @Test("画布候选可被单独或全局检索")
+    func canvasSearch() {
+        let canvas = candidate("c1", .canvases, "季度质量周报", keywords: ["画布", "canvas"])
+        let global = HubSearchEngine.sections(query: "canvas", segment: .all, candidates: fixtures + [canvas])
+        #expect(global.first { $0.id == "canvases" }?.items.first?.id == "c1")
+        let single = HubSearchEngine.sections(query: "周报", segment: .canvases, candidates: fixtures + [canvas])
+        #expect(single.first?.items.map(\.id) == ["c1"])
+    }
+
     @Test("主题候选可被单独或全局检索")
     func themeSearch() {
         let theme = candidate("t-dracula", .themes, "Dracula", keywords: ["深色", "暗黑", "主题"])
