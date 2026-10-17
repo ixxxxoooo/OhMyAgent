@@ -701,6 +701,27 @@ public final class SessionModel {
         timeline.appendNotice(String(localized: "会话已重命名为「\(clean)」。"))
     }
 
+    /// 应用外部(侧栏)对某个会话的重命名:同步历史列表里的标题;若正是当前会话,标题一并更新。
+    /// 标题本身由调用方写入 `ClientPrefs`。
+    /// - Parameters:
+    ///   - title: 新标题
+    ///   - target: 被重命名的会话 ID
+    public func applyRenamedTitle(_ title: String, sessionId target: String) {
+        // 只在确实包含该会话时才改写历史:避免空列表触发 onHistoryChanged 把侧栏缓存冲掉
+        if history.contains(where: { $0.sessionId == target }) {
+            history = history.map { item in
+                var copy = item
+                if copy.sessionId == target { copy.title = title }
+                return copy
+            }
+        }
+        if target == sessionId {
+            titleTask?.cancel()
+            titleSource = .manual
+            sessionTitle = title
+        }
+    }
+
     /// 按名称(值或显示名,不区分大小写,支持前缀)切换模型。
     private func switchModel(named name: String) {
         guard let option = option(category: "model") else {
@@ -790,8 +811,14 @@ public final class SessionModel {
     /// 会话 `_meta`:提供商元数据 + 客户端选项(代理/超时/追加提示词/CLAUDE.md);仅对真实 Claude 通道合并。
     private func effectiveMeta() -> JSONValue? {
         guard activeDescriptor.kind == .claudeACP else { return providerMeta }
-        return SessionOptions(defaults: .standard).merged(into: providerMeta ?? defaultGatewayMeta)
+        var options = SessionOptions(defaults: .standard)
+        if let extra = extraSystemPrompt, !extra.isEmpty {
+            options.appendPrompt = [options.appendPrompt.trimmingCharacters(in: .whitespacesAndNewlines), extra].filter { !$0.isEmpty }.joined(separator: "\n\n")
+        }
+        return options.merged(into: providerMeta ?? defaultGatewayMeta)
     }
+    /// 额外追加到系统提示末尾的文本(会话区用它约束为纯文字问答);须在连接前设置。
+    public var extraSystemPrompt: String?
     /// 未启用提供商、但 ~/.claude 配置了第三方网关时,仅含「关闭服务端 auto 分类器探测」开关的 `_meta`
     @ObservationIgnored private var defaultGatewayMeta: JSONValue?
     /// 本机网关地址(发送前探测用)

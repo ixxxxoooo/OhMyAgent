@@ -122,7 +122,7 @@ struct WorkbenchTests {
         state.projects = [ProjectEntry(url: env.dirs[0]), ProjectEntry(url: env.root.appendingPathComponent("已删除"))]
         try env.store.save(state)
         let model = makeModel(env.store)
-        #expect(model.layout.leftWidth == 180 && model.layout.rightWidth == 800 && model.layout.bottomHeight == 120)
+        #expect(model.layout.leftWidth == 200 && model.layout.rightWidth == 800 && model.layout.bottomHeight == 120)
         #expect(model.projects.count == 1)
         model.shutdownAll()
     }
@@ -351,6 +351,110 @@ struct WorkbenchTests {
         model.shutdownAll()
     }
 
+    @Test("导航历史由模型自己记录:不依赖视图的 onChange,连续激活也不丢记录")
+    func navigationRecordedByModel() throws {
+        let env = try makeEnvironment()
+        defer { try? FileManager.default.removeItem(at: env.root) }
+        let model = makeModel(env.store)
+        _ = try #require(model.openProject(env.dirs[0]))
+        let t0 = model.dock.focusedGroup?.activeID
+        let t1 = model.openFile(env.dirs[0].appendingPathComponent("a.txt").path, preview: false)
+        let t2 = model.openFile(env.dirs[0].appendingPathComponent("b.txt").path, preview: false)
+        #expect(model.nav.canGoBack)
+        model.goBack()
+        #expect(model.dock.focusedGroup?.activeID == t1)
+        model.goBack()
+        #expect(model.dock.focusedGroup?.activeID == t0)
+        model.goForward()
+        model.goForward()
+        #expect(model.dock.focusedGroup?.activeID == t2)
+        model.shutdownAll()
+    }
+
+    @Test("会话区:不进项目列表,会话落在独立空目录,重启后保留")
+    func chatArea() throws {
+        let env = try makeEnvironment()
+        defer { try? FileManager.default.removeItem(at: env.root) }
+        let model = makeModel(env.store)
+        #expect(model.chatAreaID == nil)
+        model.newGeneralConversation()
+        let id = try #require(model.chatAreaID)
+        #expect(model.workspaceProjects.isEmpty && model.orderedProjects.isEmpty)
+        #expect(model.projects.count == 1 && model.projects[0].isChatArea)
+        #expect(model.selectedProject == nil && model.isChatAreaSelected)
+        #expect(FileManager.default.fileExists(atPath: id))
+        #expect(id == env.store.fileURL.deletingLastPathComponent().appendingPathComponent("Chats").standardizedFileURL.path)
+        #expect(model.activeSession?.extraSystemPrompt == WorkbenchModel.chatAreaPrompt)
+        #expect(model.isChatAreaWorkspace(URL(fileURLWithPath: id)))
+        // 空白会话再点「新会话」复用同一标签
+        let tabCount = model.dock.allTabs.count
+        model.newGeneralConversation()
+        #expect(model.dock.allTabs.count == tabCount)
+        // 打开会话区目录等价于进入会话区,不会被登记成普通项目
+        #expect(model.openProject(URL(fileURLWithPath: id)) == id)
+        #expect(model.workspaceProjects.isEmpty)
+        // 折叠全部只作用于真实项目
+        #expect(!model.allProjectsCollapsed)
+        model.saveNow()
+        let restored = makeModel(env.store)
+        #expect(restored.chatAreaID == id)
+        #expect(restored.workspaceProjects.isEmpty)
+        model.shutdownAll()
+        restored.shutdownAll()
+    }
+
+    @Test("新对话落点:选中项目时在项目下,没有项目或停在会话区时在会话区")
+    func newConversationContext() throws {
+        let env = try makeEnvironment()
+        defer { try? FileManager.default.removeItem(at: env.root) }
+        let model = makeModel(env.store)
+        model.newConversationInContext()
+        let chat = try #require(model.chatAreaID)
+        #expect(model.selectedProjectID == chat)
+        let project = try #require(model.openProject(env.dirs[0]))
+        model.newConversationInContext()
+        #expect(model.selectedProjectID == project)
+        // 会话区条目不参与「选中真实项目」的回退
+        model.removeProject(project)
+        #expect(model.selectedProject == nil)
+        model.shutdownAll()
+    }
+
+    @Test("侧栏菜单:重命名会话/项目、批量归档")
+    func sidebarMenuActions() throws {
+        let env = try makeEnvironment()
+        defer { try? FileManager.default.removeItem(at: env.root) }
+        let model = makeModel(env.store)
+        let project = try #require(model.openProject(env.dirs[0]))
+        let index = try #require(model.projects.firstIndex { $0.id == project })
+        let ids = (0..<3).map { "test-\(UUID().uuidString)-\($0)" }
+        model.cacheHistory(ids.map { SessionSummary(sessionId: $0, cwd: project, title: "旧标题", updatedAt: nil) }, for: project)
+        defer { ids.forEach { ClientPrefs.setSessionTitle(nil, for: $0) } }
+
+        func title(_ id: String) -> String? { model.projects[index].sessions.first { $0.sessionId == id }?.title }
+        #expect(model.projects[index].sessions.count == 3)
+        model.renameSession(ids[0], in: project, to: "  新标题  ")
+        #expect(title(ids[0]) == "新标题")
+        model.renameSession(ids[1], in: project, to: "   ")
+        #expect(title(ids[1]) == "旧标题")
+
+        model.archiveSessions([ids[1], ids[2], "", ids[1]], in: project)
+        #expect(model.isSessionArchived(ids[1], in: project) && model.isSessionArchived(ids[2], in: project))
+        #expect(!model.isSessionArchived(ids[0], in: project))
+        #expect(model.projects[index].archivedSessions.count == 2)
+
+        model.toggleSessionPin(ids[0], in: project)
+        model.archiveAllSessions(in: project)
+        #expect(model.isSessionArchived(ids[0], in: project))
+        #expect(!model.isSessionPinned(ids[0], in: project))
+
+        model.renameProject(project, to: "  我的项目 ")
+        #expect(model.projects[index].name == "我的项目")
+        model.renameProject(project, to: " ")
+        #expect(model.projects[index].name == "我的项目")
+        model.shutdownAll()
+    }
+
     @Test("回退/前进:在已激活过的标签之间移动")
     func backAndForward() throws {
         let env = try makeEnvironment()
@@ -385,7 +489,7 @@ struct WorkbenchTests {
 struct PanelMetricsTests {
     @Test("宽度限制在允许范围内")
     func clamping() {
-        #expect(PanelMetrics.clamp(100, side: .left) == 180)
+        #expect(PanelMetrics.clamp(100, side: .left) == 200)
         #expect(PanelMetrics.clamp(900, side: .left) == 520)
         #expect(PanelMetrics.clamp(100, side: .right) == 240)
         #expect(PanelMetrics.clamp(2000, side: .right) == 800)
@@ -395,7 +499,7 @@ struct PanelMetricsTests {
     @Test("拖动换算:左栏向右变宽,右栏向左变宽,并受范围约束")
     func resizing() {
         #expect(PanelMetrics.resized(base: 260, translation: 40, side: .left) == 300)
-        #expect(PanelMetrics.resized(base: 260, translation: -200, side: .left) == 180)
+        #expect(PanelMetrics.resized(base: 260, translation: -200, side: .left) == 200)
         #expect(PanelMetrics.resized(base: 340, translation: -60, side: .right) == 400)
         #expect(PanelMetrics.resized(base: 340, translation: 500, side: .right) == 240)
     }

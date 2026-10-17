@@ -95,8 +95,9 @@ struct ProjectTreeView: View {
                             SessionLine(workbench: workbench, item: item, mode: .pinned)
                         }
                     }
+                    generalSection
                     SectionTitle(title: "工作区") {
-                        if !workbench.projects.isEmpty {
+                        if !workbench.workspaceProjects.isEmpty {
                             let collapsed = workbench.allProjectsCollapsed
                             SectionIconButton(
                                 icon: collapsed ? "chevrons-up-down" : "chevrons-down-up",
@@ -104,12 +105,17 @@ struct ProjectTreeView: View {
                             ) { workbench.setAllProjectsCollapsed(!collapsed) }
                         }
                         filterMenu
-                        SectionIconButton(icon: "folder.badge.plus", label: String(localized: "添加项目…")) {
-                            if let url = WorkspaceStore.chooseDirectory() { AppActions.shared.openWorkspace(url) }
-                        }
+                        addProjectMenu
                     }
                     // 「工作区」标题行同时是拖动手柄:拖到窗口左/右半边即可把项目栏换到那一侧
                     .terminalDragHandle(workbench, panel: .sidebar)
+                    if workbench.workspaceProjects.isEmpty {
+                        Text("添加一个项目目录,或把文件夹拖到这里。")
+                            .font(OMFonts.small)
+                            .foregroundStyle(OMColors.tertiaryText)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                    }
                     ForEach(workbench.orderedProjects) { project in
                         ProjectGroup(workbench: workbench, project: project, showArchived: showArchived)
                     }
@@ -118,15 +124,6 @@ struct ProjectTreeView: View {
                 .padding(.bottom, 16)
             }
             .scrollIndicators(.never)
-            .overlay {
-                if workbench.projects.isEmpty {
-                    OMEmptyState {
-                        Label("没有项目", om: "folder.badge.plus", size: 28)
-                    } description: {
-                        Text("添加一个项目目录,或把文件夹拖到这里。")
-                    }
-                }
-            }
             footer
         }
         .dropDestination(for: URL.self) { urls, _ in
@@ -138,15 +135,26 @@ struct ProjectTreeView: View {
         }
     }
 
+    // MARK: 会话区
+
+    /// 会话区:不绑定项目的通用对话(ChatGPT 式问答),位于「工作区」之上。
+    @ViewBuilder
+    private var generalSection: some View {
+        SectionTitle(title: "会话") {
+            SectionIconButton(icon: "message-circle-plus", label: String(localized: "新会话(无需项目)")) { workbench.newGeneralConversation() }
+        }
+        GeneralSessionList(workbench: workbench, showArchived: showArchived)
+    }
+
     // MARK: 顶部主操作
 
     /// 主操作区:新对话、搜索(点击展开输入框)、自动化(打开自动化页)。
     private var navigation: some View {
         VStack(spacing: 2) {
+            // 选中项目时在该项目下新对话;没有项目或停在会话区时开一个不绑定项目的通用对话
             NavRow(title: "新对话", icon: "square.and.pencil", shortcut: ShortcutStore.shared.binding(for: .newConversation).display) {
-                if let id = workbench.selectedProjectID { workbench.newConversation(in: id) }
+                workbench.newConversationInContext()
             }
-            .disabled(workbench.selectedProjectID == nil)
             NavRow(title: "搜索", icon: "magnifyingglass", shortcut: ShortcutStore.shared.binding(for: .hubSearch).display) {
                 HubModel.shared.present(.all, workbench: workbench)
             }
@@ -171,6 +179,41 @@ struct ProjectTreeView: View {
         .fixedSize()
         .help("筛选")
         .accessibilityLabel("筛选")
+    }
+
+    /// 「添加项目」菜单:最近项目 / 打开文件夹 / 新建文件夹。
+    private var addProjectMenu: some View {
+        let opened = Set(workbench.workspaceProjects.map(\.id))
+        let recents = RecentStore.projects().filter { !opened.contains($0) }.prefix(6)
+        return Menu {
+            if !recents.isEmpty {
+                Section("最近项目") {
+                    ForEach(Array(recents), id: \.self) { path in
+                        Button { AppActions.shared.openWorkspace(URL(fileURLWithPath: path)) } label: {
+                            Text(verbatim: (path as NSString).lastPathComponent)
+                        }
+                    }
+                }
+            }
+            Section {
+                Button("打开文件夹…") {
+                    if let url = WorkspaceStore.chooseDirectory() { AppActions.shared.openWorkspace(url) }
+                }
+                Button("新建文件夹…") {
+                    if let url = WorkspaceStore.createFolder() { AppActions.shared.openWorkspace(url) }
+                }
+            }
+        } label: {
+            Image.om("folder.badge.plus", size: 12)
+                .frame(width: 22, height: 22)
+                .foregroundStyle(OMColors.tertiaryText)
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("添加项目…")
+        .accessibilityLabel("添加项目…")
     }
 
     // MARK: 底部
@@ -264,6 +307,57 @@ private struct NavRow: View {
     }
 }
 
+/// 会话区的会话列表:每次最多预览 5 条,其余走「显示更多」;置顶的会话在顶部「置顶」分区。
+private struct GeneralSessionList: View {
+    private static let previewCount = 5
+
+    let workbench: WorkbenchModel
+    let showArchived: Bool
+    @State private var showAll = false
+
+    private var rows: [SidebarSession] {
+        guard let entry = workbench.projects.first(where: \.isChatArea) else { return [] }
+        return workbench.sidebarSessions(for: entry).filter { item in
+            guard let id = item.sessionId else { return true }
+            if entry.pinnedSessions.contains(id) { return false }
+            return showArchived || !entry.archivedSessions.contains(id)
+        }
+    }
+
+    /// 列表里排在 `item` 之后、已有会话 ID 的行(用于「归档下方全部」)。
+    static func idsBelow(_ item: SidebarSession, in all: [SidebarSession]) -> [String] {
+        guard let index = all.firstIndex(where: { $0.id == item.id }) else { return [] }
+        return all[(index + 1)...].compactMap(\.sessionId)
+    }
+
+    var body: some View {
+        let all = rows
+        let visible = showAll ? all : Array(all.prefix(Self.previewCount))
+        VStack(alignment: .leading, spacing: 2) {
+            if all.isEmpty {
+                Text("还没有会话,直接提问即可")
+                    .font(OMFonts.small)
+                    .foregroundStyle(OMColors.tertiaryText)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+            }
+            ForEach(visible) { item in
+                SessionLine(workbench: workbench, item: item, mode: .general, below: Self.idsBelow(item, in: all))
+            }
+            if all.count > Self.previewCount {
+                Button(showAll ? String(localized: "收起") : String(localized: "显示更多(还有 \(all.count - Self.previewCount) 条)")) {
+                    omWithAnimation(.snappy(duration: 0.18)) { showAll.toggle() }
+                }
+                .buttonStyle(.plain)
+                .font(OMFonts.small)
+                .foregroundStyle(OMColors.secondaryText)
+                .padding(.leading, 8)
+                .padding(.vertical, 4)
+            }
+        }
+    }
+}
+
 /// 工作区分组:标题行(文件夹图标 + 名称 + 会话数/悬停「+」,点击折叠)+ 会话行。
 private struct ProjectGroup: View {
     /// 每个分组默认展示的会话条数,超出走「显示更多」
@@ -303,7 +397,7 @@ private struct ProjectGroup: View {
                 }
                 let visible = showAll ? all : Array(all.prefix(Self.previewCount))
                 ForEach(visible) { item in
-                    SessionLine(workbench: workbench, item: item, mode: .tree)
+                    SessionLine(workbench: workbench, item: item, mode: .tree, below: GeneralSessionList.idsBelow(item, in: all))
                     if item.isCurrent { SubagentRows(workbench: workbench, projectID: project.id) }
                 }
                 if all.count > Self.previewCount {
@@ -370,11 +464,26 @@ private struct ProjectGroup: View {
             Button("选中此项目") { workbench.select(project: project.id) }
             Divider()
             Button(project.pinned ? String(localized: "取消置顶") : String(localized: "置顶")) { workbench.togglePin(project.id) }
+            Button("重命名项目…") {
+                guard let name = ExplorerActions.prompt(title: String(localized: "重命名项目"), message: String(localized: "只修改侧栏里的显示名,不会改动磁盘上的目录名。"), initial: project.name) else { return }
+                workbench.renameProject(project.id, to: name)
+            }
             Button("在 Finder 中显示") { NSWorkspace.shared.activateFileViewerSelecting([project.url]) }
+            let ides = IDELauncher.installed
+            if !ides.isEmpty {
+                Menu("在 IDE 中打开") {
+                    ForEach(ides) { ide in
+                        Button { IDELauncher.open(project.url, with: ide) } label: { Text(verbatim: ide.name) }
+                    }
+                }
+            }
             Button("拷贝路径") {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(project.id, forType: .string)
             }
+            Divider()
+            Button("全部标为已读") { AttentionCenter.shared.markAllRead(inWorkspace: project.id) }
+            Button("归档全部会话") { workbench.archiveAllSessions(in: project.id) }
             Divider()
             Button("移除项目", role: .destructive) { workbench.removeProject(project.id) }
         }
@@ -418,10 +527,12 @@ private struct SubagentRows: View {
 
 /// 会话行:状态点 + 渐隐标题 + 固定 76pt 保留区(相对时间 ⇄ 悬停时的置顶/归档按钮),对齐 kuku 的 SessionRow。
 private struct SessionLine: View {
-    enum Mode { case tree, pinned }
+    enum Mode { case tree, pinned, general }
     let workbench: WorkbenchModel
     let item: SidebarSession
     let mode: Mode
+    /// 列表中排在本行下方的会话 ID(用于「归档下方全部」)
+    var below: [String] = []
     @State private var hovering = false
 
     private var isSelected: Bool { item.isCurrent && workbench.selectedProjectID == item.projectID }
@@ -516,7 +627,19 @@ private struct SessionLine: View {
         Button("打开", action: open)
         if let id = item.sessionId {
             Button(isPinned ? String(localized: "取消置顶") : String(localized: "置顶")) { workbench.toggleSessionPin(id, in: item.projectID) }
+            Button("重命名…") { rename(id) }
+            if isSelected, let model = workbench.sessions[item.projectID] {
+                Button("分支") { _ = workbench.forkConversation(from: model) }
+            }
+            Menu("拷贝") {
+                Button("会话 ID") { copy(id) }
+                Button("标题") { copy(item.title) }
+            }
+            Divider()
             Button(isArchived ? String(localized: "取消归档") : String(localized: "归档")) { workbench.setSessionArchived(!isArchived, sessionId: id, in: item.projectID) }
+            if !below.isEmpty {
+                Button("归档下方全部") { workbench.archiveSessions(below, in: item.projectID) }
+            }
             if !item.isCurrent, let model = workbench.sessions[item.projectID], model.capabilities.canDelete {
                 Divider()
                 Button("删除", role: .destructive) {
@@ -524,6 +647,18 @@ private struct SessionLine: View {
                 }
             }
         }
+    }
+
+    /// 弹出输入框重命名会话。
+    private func rename(_ id: String) {
+        guard let name = ExplorerActions.prompt(title: String(localized: "重命名会话"), initial: item.title) else { return }
+        workbench.renameSession(id, in: item.projectID, to: name)
+    }
+
+    /// 写入剪贴板。
+    private func copy(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
 
     private func open() {

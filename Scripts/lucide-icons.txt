@@ -170,3 +170,14 @@ trending-up
 list-plus
 chart-no-axes-column
 messages-square
+funnel
+funnel-x
+arrow-up-a-z
+arrow-down-z-a
+bell-dot
+git-fork
+app-window
+folder-pen
+archive-restore
+message-circle-plus
+folder-clock

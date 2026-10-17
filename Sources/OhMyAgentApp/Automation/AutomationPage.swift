@@ -289,7 +289,7 @@ struct AutomationPage: View {
 
     /// 按入口 ID 开始新建(`blank` 或 `tpl:<模板 ID>`)。
     private func startNew(with id: String) {
-        let project = workbench.projects.first { $0.id == workbench.selectedProjectID } ?? workbench.orderedProjects.first
+        let project = workbench.selectedProject ?? workbench.orderedProjects.first
         let path = project?.url.path ?? ""
         if id.hasPrefix("tpl:"), let template = AutomationTemplate.all.first(where: { "tpl:" + $0.id == id }) {
             draft = AutomationDraft(template: template, projectPath: path)

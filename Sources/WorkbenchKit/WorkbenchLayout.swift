@@ -142,6 +142,9 @@ public struct ProjectEntry: Codable, Equatable, Sendable, Identifiable {
     public var pinnedSessions: [String] = []
     /// 已归档的会话 ID(不在列表中显示,可在「已归档」中恢复)
     public var archivedSessions: [String] = []
+    /// 是否为「会话区」:不绑定任何项目的通用对话(ChatGPT 式问答),工作目录是应用支持目录下的空目录。
+    /// 它复用项目的会话机制(历史、置顶、归档、标签),但不出现在项目列表里。
+    public var isChatArea = false
 
     public var url: URL { URL(fileURLWithPath: id) }
 
@@ -153,7 +156,7 @@ public struct ProjectEntry: Codable, Equatable, Sendable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, addedAt, lastOpenedAt, pinned, collapsed, sessions, pinnedSessions, archivedSessions
+        case id, name, addedAt, lastOpenedAt, pinned, collapsed, sessions, pinnedSessions, archivedSessions, isChatArea
     }
 
     /// 容错解码:新增字段缺失时使用默认值,旧版本状态文件可继续读取。
@@ -168,6 +171,7 @@ public struct ProjectEntry: Codable, Equatable, Sendable, Identifiable {
         sessions = try c.decodeIfPresent([CachedSession].self, forKey: .sessions) ?? []
         pinnedSessions = try c.decodeIfPresent([String].self, forKey: .pinnedSessions) ?? []
         archivedSessions = try c.decodeIfPresent([String].self, forKey: .archivedSessions) ?? []
+        isChatArea = try c.decodeIfPresent(Bool.self, forKey: .isChatArea) ?? false
     }
 }
 

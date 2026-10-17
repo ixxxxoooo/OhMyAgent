@@ -120,6 +120,13 @@ public final class AttentionCenter {
         for id in unread { markRead(id) }
     }
 
+    /// 把某个工作区下的未读全部标记已读。
+    /// - Parameter workspacePath: 工作区(项目)路径
+    public func markAllRead(inWorkspace workspacePath: String) {
+        let unread = items.values.filter { $0.state == .unreadDone && $0.workspacePath == workspacePath }.map(\.id)
+        for id in unread { markRead(id) }
+    }
+
     /// 设置当前被查看的会话;若该会话有未读则立即清除。
     /// - Parameter id: 会话标识;nil 表示没有会话被查看
     public func setFocus(_ id: String?) {

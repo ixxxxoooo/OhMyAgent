@@ -8,9 +8,9 @@ public enum PanelSide: String, Codable, Equatable, Sendable {
     case left, right
 }
 
-/// 面板尺寸范围与默认值(对齐 kuku:左栏 180–520,右栏 240–800)。
+/// 面板尺寸范围与默认值(对齐 kuku:左栏 200–520(须容纳顶部浮层的 198pt),右栏 240–800)。
 public enum PanelMetrics {
-    public static let leftRange: ClosedRange<Double> = 180...520
+    public static let leftRange: ClosedRange<Double> = 200...520
     public static let rightRange: ClosedRange<Double> = 240...800
     public static let leftDefault: Double = 260
     public static let rightDefault: Double = 340

@@ -199,16 +199,44 @@ struct JumpToLatestButton: View {
 struct EmptyStateView: View {
     let model: SessionModel
 
+    /// 会话区(无项目)的通用对话:显示问候与起手式,而不是工作目录。
+    private var isGeneralChat: Bool { AppEnvironment.shared.workbench.isChatAreaWorkspace(model.workspace) }
+
+    /// 起手式:点击把提示语填进输入框,光标留在末尾继续写。
+    private var starters: [(title: String, prompt: String)] {
+        [
+            (String(localized: "解释一个概念"), String(localized: "请用通俗易懂的话解释:")),
+            (String(localized: "润色一段文字"), String(localized: "请帮我润色下面这段文字,保持原意:\n")),
+            (String(localized: "翻译"), String(localized: "请把下面的内容翻译成英文:\n")),
+            (String(localized: "写一段代码"), String(localized: "请用 Python 写一个函数:")),
+        ]
+    }
+
     var body: some View {
         VStack(spacing: 10) {
-            Text("有什么可以帮你?")
-                .font(OMFonts.title)
-            Text(model.workspace.abbreviatingHome)
-                .font(OMFonts.small)
-                .foregroundStyle(OMColors.secondaryText)
+            if isGeneralChat {
+                Text("今天想聊点什么?")
+                    .font(OMFonts.title)
+                Text("不需要打开项目,直接提问即可")
+                    .font(OMFonts.small)
+                    .foregroundStyle(OMColors.secondaryText)
+                HStack(spacing: 8) {
+                    ForEach(starters, id: \.title) { starter in
+                        Button(starter.title) { model.draft = starter.prompt }
+                            .buttonStyle(.omSecondary)
+                    }
+                }
+                .padding(.top, 6)
+            } else {
+                Text("有什么可以帮你?")
+                    .font(OMFonts.title)
+                Text(model.workspace.abbreviatingHome)
+                    .font(OMFonts.small)
+                    .foregroundStyle(OMColors.secondaryText)
+            }
         }
         .frame(maxWidth: .infinity)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
     }
 }
 

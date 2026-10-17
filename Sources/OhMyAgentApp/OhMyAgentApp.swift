@@ -24,6 +24,26 @@ enum WorkspaceStore {
         panel.message = String(localized: "选择 Agent 要在其中工作的项目目录")
         return panel.runModal() == .OK ? panel.url : nil
     }
+
+    /// 弹出保存面板让用户命名并创建一个新的空文件夹。
+    /// - Returns: 已创建的目录;取消或创建失败时为 nil
+    @MainActor
+    static func createFolder() -> URL? {
+        let panel = NSSavePanel()
+        panel.title = String(localized: "新建项目文件夹")
+        panel.prompt = String(localized: "创建")
+        panel.message = String(localized: "为新项目选择位置并命名")
+        panel.nameFieldStringValue = String(localized: "新项目")
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let url = panel.url else { return nil }
+        do {
+            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+            return url
+        } catch {
+            Log.ui.error("新建项目文件夹失败", ["path": url.path, "error": "\(error)"])
+            return nil
+        }
+    }
 }
 
 /// 应用代理:激活策略与退出清理。
@@ -146,11 +166,10 @@ struct WorkbenchCommands: Commands {
 
     var body: some Commands {
         CommandGroup(after: .newItem) {
-            Button("新对话") {
-                if let id = workbench.selectedProjectID { workbench.newConversation(in: id) }
-            }
-            .keyboardShortcut(shortcuts.shortcut(for: .newConversation))
-            .disabled(workbench.activeSession?.phase != .ready)
+            Button("新对话") { workbench.newConversationInContext() }
+                .keyboardShortcut(shortcuts.shortcut(for: .newConversation))
+                .disabled(workbench.activeSession.map { $0.phase != .ready } ?? false)
+            Button("新会话(无需项目)") { workbench.newGeneralConversation() }
             Button("打开项目…") {
                 if let url = WorkspaceStore.chooseDirectory() { AppActions.shared.openWorkspace(url) }
             }
@@ -172,6 +191,13 @@ struct WorkbenchCommands: Commands {
                 .keyboardShortcut(shortcuts.shortcut(for: .nextTab))
             Button("上一个标签") { workbench.cycleTab(by: -1) }
                 .keyboardShortcut(shortcuts.shortcut(for: .previousTab))
+            Divider()
+            Button("回退") { workbench.goBack() }
+                .keyboardShortcut(shortcuts.shortcut(for: .goBack))
+                .disabled(!workbench.nav.canGoBack)
+            Button("前进") { workbench.goForward() }
+                .keyboardShortcut(shortcuts.shortcut(for: .goForward))
+                .disabled(!workbench.nav.canGoForward)
             Divider()
             ForEach(1...9, id: \.self) { number in
                 Button(number == 9 ? String(localized: "最后一个标签") : String(localized: "第 \(number) 个标签")) { workbench.selectTab(number: number) }

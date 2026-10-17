@@ -41,11 +41,13 @@ struct WorkbenchView: View {
         .onAppear {
             DiagnosticsStore.shared.markFirstFrame()
             actions.capture(openWindow: openWindow)
+            MouseNavigationMonitor.install(workbench: workbench)
         }
         .onChange(of: workbench.dock.allTabs.compactMap(\.terminalID)) { _, ids in
             // 终端标签被关闭 → 结束其 shell 进程
             TerminalStore.shared.prune(keeping: Set(ids))
         }
+        .onChange(of: workbench.selectedProject?.id, initial: true) { _, id in WorkspaceWatchCenter.shared.watch(root: id) }
         .onChange(of: workbench.activeSession?.uid) { _, _ in updateFocus() }
         .onChange(of: workbench.activeSession?.phase) { _, _ in consumeSessionRequest() }
         .onChange(of: actions.sessionRequest) { _, _ in consumeSessionRequest() }
@@ -124,7 +126,7 @@ struct WorkbenchView: View {
     // MARK: 标题与布局
 
     private var title: String {
-        workbench.activeSession?.sessionTitle ?? workbench.selectedProject?.name ?? "OhMyAgent"
+        workbench.activeSession?.sessionTitle ?? workbench.selectedEntry?.name ?? "OhMyAgent"
     }
 
     // MARK: 行为

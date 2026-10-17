@@ -141,6 +141,12 @@ final class AppActions {
         }
     }
 
+    /// 依次关闭一批标签;含未保存文件的标签会逐个询问(取消只影响那一个)。
+    /// - Parameter ids: 标签 ID 列表
+    func requestCloseTabs(_ ids: [UUID]) {
+        for id in ids { requestCloseTab(id) }
+    }
+
     /// 在当前项目目录新建终端标签。
     func openTerminal() {
         let workbench = AppEnvironment.shared.workbench
@@ -169,8 +175,7 @@ final class AppActions {
 
     /// 在当前项目下开始新对话并前置主窗口。
     func newConversation() {
-        let workbench = AppEnvironment.shared.workbench
-        if let id = workbench.selectedProjectID { workbench.newConversation(in: id) }
+        AppEnvironment.shared.workbench.newConversationInContext()
         showMainWindow()
     }
 

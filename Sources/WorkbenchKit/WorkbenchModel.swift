@@ -32,7 +32,7 @@ public final class WorkbenchModel {
     /// 主窗口当前显示的内容:工作台或设置整页(不持久化,启动时总是工作台)。
     public var mode: WorkbenchMode = .workspace
     /// 停靠布局:标签组与分屏(持久化)。
-    public var dock: DockLayout { didSet { if dock != oldValue { reapConversations(); scheduleSave() } } }
+    public var dock: DockLayout { didSet { if dock != oldValue { reapConversations(); recordNavigation(); scheduleSave() } } }
 
     /// 最近关闭的标签(⌘⇧T 恢复,不持久化)。
     @ObservationIgnored private var closedTabs = ClosedTabStack()
@@ -53,8 +53,9 @@ public final class WorkbenchModel {
         self.store = store
         self.makeSession = makeSession
         let state = store.load() ?? WorkbenchState()
-        let alive = state.projects.filter { FileManager.default.fileExists(atPath: $0.id) }
-        let selected = alive.contains { $0.id == state.selectedProjectID } ? state.selectedProjectID : alive.first?.id
+        // 会话区的目录由应用自己维护(缺失时在首次使用时重建),不能因为目录暂时不存在就丢掉它的历史缓存
+        let alive = state.projects.filter { $0.isChatArea || FileManager.default.fileExists(atPath: $0.id) }
+        let selected = alive.contains { $0.id == state.selectedProjectID } ? state.selectedProjectID : alive.first { !$0.isChatArea }?.id
         projects = alive
         selectedProjectID = selected
         layout = state.layout
@@ -64,7 +65,17 @@ public final class WorkbenchModel {
 
     // MARK: 查询
 
-    public var selectedProject: ProjectEntry? { projects.first { $0.id == selectedProjectID } }
+    /// 当前选中的**真实项目**(选中的是会话区时为 nil:文件树、Git、搜索等项目能力据此显示空态)。
+    public var selectedProject: ProjectEntry? { projects.first { $0.id == selectedProjectID && !$0.isChatArea } }
+
+    /// 当前选中的条目(含会话区)。
+    public var selectedEntry: ProjectEntry? { projects.first { $0.id == selectedProjectID } }
+
+    /// 真实项目列表(不含会话区)。
+    public var workspaceProjects: [ProjectEntry] { projects.filter { !$0.isChatArea } }
+
+    /// 当前选中的是否为会话区。
+    public var isChatAreaSelected: Bool { selectedEntry?.isChatArea ?? false }
 
     /// 会话模型所属的项目 ID。
     public func projectID(of model: SessionModel) -> String? {
@@ -114,7 +125,7 @@ public final class WorkbenchModel {
     /// 项目排序(对齐 kuku):置顶优先 → 添加时间倒序 → 路径兜底。
     /// 不再按「最近打开」排序:选中/切换项目不会让左栏项目换位。
     public var orderedProjects: [ProjectEntry] {
-        projects.sorted { lhs, rhs in
+        workspaceProjects.sorted { lhs, rhs in
             if lhs.pinned != rhs.pinned { return lhs.pinned }
             if lhs.addedAt != rhs.addedAt { return lhs.addedAt > rhs.addedAt }
             return lhs.id < rhs.id
@@ -122,13 +133,13 @@ public final class WorkbenchModel {
     }
 
     /// 所有项目是否都已折叠(无项目时为 false)。
-    public var allProjectsCollapsed: Bool { !projects.isEmpty && projects.allSatisfy(\.collapsed) }
+    public var allProjectsCollapsed: Bool { !workspaceProjects.isEmpty && workspaceProjects.allSatisfy(\.collapsed) }
 
     /// 一键折叠/展开左栏里的所有项目分组。
     /// - Parameter collapsed: true 折叠全部;false 展开全部
     public func setAllProjectsCollapsed(_ collapsed: Bool) {
-        guard projects.contains(where: { $0.collapsed != collapsed }) else { return }
-        for index in projects.indices { projects[index].collapsed = collapsed }
+        guard workspaceProjects.contains(where: { $0.collapsed != collapsed }) else { return }
+        for index in projects.indices where !projects[index].isChatArea { projects[index].collapsed = collapsed }
         scheduleSave()
     }
 
@@ -153,6 +164,12 @@ public final class WorkbenchModel {
             return nil
         }
         let id = standardized.path
+        // 托盘/通知用会话区目录打开会话:走会话区自己的入口,避免被当成普通项目登记
+        if id == chatAreaURL.standardizedFileURL.path {
+            guard let chatID = ensureChatArea(now: now) else { return nil }
+            select(project: chatID)
+            return chatID
+        }
         if let index = projects.firstIndex(where: { $0.id == id }) {
             projects[index].lastOpenedAt = now
         } else {
@@ -207,6 +224,58 @@ public final class WorkbenchModel {
         guard let index = projects.firstIndex(where: { $0.id == id }) else { return }
         projects[index].pinned.toggle()
         scheduleSave()
+    }
+
+    // MARK: 会话区(无项目的通用对话)
+
+    /// 会话区的工作目录:状态文件同级的 `Chats` 空目录(演示模式下随沙盒隔离)。
+    public var chatAreaURL: URL { store.fileURL.deletingLastPathComponent().appendingPathComponent("Chats", isDirectory: true) }
+
+    /// 会话区条目的 ID(尚未使用过时为 nil)。
+    public var chatAreaID: String? { projects.first { $0.isChatArea }?.id }
+
+    /// 会话区追加给 Agent 的系统提示:像 ChatGPT 一样直接用文字回答,不碰文件与命令。
+    public nonisolated static let chatAreaPrompt = """
+    你现在处于「会话区」:没有打开任何项目,工作目录是一个空的临时目录。请像通用对话助手一样直接用文字回答问题,\
+    使用 Markdown 排版,回答语言跟随用户的提问。除非用户明确要求,不要读写文件、执行命令或联网搜索。
+    """
+
+    /// 确保会话区条目与目录存在(幂等)。
+    /// - Returns: 会话区 ID;目录无法创建时为 nil
+    @discardableResult
+    public func ensureChatArea(now: Date = Date()) -> String? {
+        let url = chatAreaURL.standardizedFileURL
+        do {
+            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        } catch {
+            log.error("创建会话区目录失败", error: error, ["path": url.path])
+            return nil
+        }
+        if let existing = chatAreaID { return existing }
+        var entry = ProjectEntry(url: url, now: now)
+        entry.name = String(localized: "会话")
+        entry.isChatArea = true
+        projects.append(entry)
+        log.info("创建会话区", ["path": url.path])
+        scheduleSave()
+        return entry.id
+    }
+
+    /// 某工作目录是否就是会话区的目录。
+    public func isChatAreaWorkspace(_ url: URL) -> Bool {
+        guard let id = chatAreaID else { return false }
+        return id == url.standardizedFileURL.path
+    }
+
+    /// 在会话区开始一次新对话(不需要打开项目;当前会话区标签仍是空白时直接复用)。
+    public func newGeneralConversation() {
+        guard let id = ensureChatArea() else { return }
+        newConversation(in: id)
+    }
+
+    /// 新对话的落点:选中项目时在该项目下,否则(无项目或停在会话区)在会话区。
+    public func newConversationInContext() {
+        if let project = selectedProject { newConversation(in: project.id) } else { newGeneralConversation() }
     }
 
     // MARK: 标签与停靠
@@ -403,6 +472,61 @@ public final class WorkbenchModel {
         scheduleSave()
     }
 
+    /// 重命名会话:标题写入客户端偏好(适配器没有改名接口),并同步缓存与已打开的会话。
+    /// - Parameters:
+    ///   - sessionId: 协议会话 ID
+    ///   - project: 项目 ID
+    ///   - title: 新标题(去除首尾空白后不能为空)
+    public func renameSession(_ sessionId: String, in project: String, to title: String) {
+        let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !sessionId.isEmpty, !clean.isEmpty, let index = projects.firstIndex(where: { $0.id == project }) else { return }
+        ClientPrefs.setSessionTitle(clean, for: sessionId)
+        if let at = projects[index].sessions.firstIndex(where: { $0.sessionId == sessionId }) { projects[index].sessions[at].title = clean }
+        for (key, model) in conversations where key.projectID == project { model.applyRenamedTitle(clean, sessionId: sessionId) }
+        for tab in dock.allTabs {
+            if case .chat(let p, let slot) = tab.kind, p == project, conversations[ConversationKey(projectID: p, slot: slot)]?.sessionId == sessionId {
+                dock.setTitle(clean, for: tab.id)
+            }
+        }
+        scheduleSave()
+    }
+
+    /// 批量归档会话(归档同时取消置顶)。
+    /// - Parameters:
+    ///   - sessionIds: 会话 ID 列表
+    ///   - project: 项目 ID
+    public func archiveSessions(_ sessionIds: [String], in project: String) {
+        guard let index = projects.firstIndex(where: { $0.id == project }) else { return }
+        var seen = Set<String>()
+        let ordered = sessionIds.filter { !$0.isEmpty && seen.insert($0).inserted }
+        guard !ordered.isEmpty else { return }
+        let ids = Set(ordered)
+        projects[index].archivedSessions.removeAll { ids.contains($0) }
+        projects[index].archivedSessions.append(contentsOf: ordered)
+        projects[index].pinnedSessions.removeAll { ids.contains($0) }
+        scheduleSave()
+    }
+
+    /// 归档某项目下的全部会话(包含已缓存与当前打开的,当前空白对话除外)。
+    public func archiveAllSessions(in project: String) {
+        guard let entry = projects.first(where: { $0.id == project }) else { return }
+        var ids = entry.sessions.map(\.sessionId)
+        for (key, model) in conversations where key.projectID == project { if let id = model.sessionId { ids.append(id) } }
+        var seen = Set<String>()
+        archiveSessions(ids.filter { seen.insert($0).inserted }, in: project)
+    }
+
+    /// 修改项目在侧栏中显示的名称(不改磁盘上的目录名)。
+    /// - Parameters:
+    ///   - id: 项目 ID
+    ///   - name: 新名称(去除首尾空白后不能为空)
+    public func renameProject(_ id: String, to name: String) {
+        let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty, let index = projects.firstIndex(where: { $0.id == id }) else { return }
+        projects[index].name = clean
+        scheduleSave()
+    }
+
     // MARK: 设置整页
 
     /// 进入设置整页。
@@ -431,7 +555,8 @@ public final class WorkbenchModel {
             return
         }
         let slot = UUID().uuidString
-        let tab = dock.open(.chat(projectID: id, slot: slot), title: String(localized: "新对话") + " · " + project.name)
+        let title = project.isChatArea ? String(localized: "新对话") : String(localized: "新对话") + " · " + project.name
+        let tab = dock.open(.chat(projectID: id, slot: slot), title: title)
         dock.activate(tab)
         lastSlot[id] = .some(slot)
         ensureSession(project: id, slot: slot)
@@ -536,6 +661,7 @@ public final class WorkbenchModel {
         if let existing = conversations[key] { return existing }
         guard let project = projects.first(where: { $0.id == id }) else { return nil }
         let model = agentID.flatMap { makeAgentSession?(project.url, $0) } ?? makeSession(project.url)
+        if project.isChatArea { model.extraSystemPrompt = Self.chatAreaPrompt }
         wire(model, project: id)
         conversations[key] = model
         if autoConnect { model.connect() }

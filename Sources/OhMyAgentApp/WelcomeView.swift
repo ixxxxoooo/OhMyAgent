@@ -16,9 +16,10 @@ struct WelcomeView: View {
                 .foregroundStyle(OMColors.accent)
             Text("打开一个项目开始")
                 .font(OMFonts.title)
-            Text("添加项目目录后,可以直接在该项目下向 Claude Code 提问。")
+            Text("添加项目目录后,可以直接在该项目下向 Claude Code 提问;也可以不打开项目,直接开始一个通用会话。")
                 .font(OMFonts.small)
                 .foregroundStyle(OMColors.secondaryText)
+                .multilineTextAlignment(.center)
             Button {
                 if let url = WorkspaceStore.chooseDirectory() { AppActions.shared.openWorkspace(url) }
             } label: {
@@ -26,6 +27,12 @@ struct WelcomeView: View {
             }
             .buttonStyle(.omPrimary)
             .controlSize(.large)
+            Button {
+                workbench.newGeneralConversation()
+            } label: {
+                Label("开始会话(无需项目)", om: "message-circle-plus")
+            }
+            .buttonStyle(.omSecondary)
             let recents = RecentStore.projects().prefix(5)
             if !recents.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {

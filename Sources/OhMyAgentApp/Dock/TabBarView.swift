@@ -263,11 +263,33 @@ struct TabItemView: View {
         }
     }
 
+    /// 本标签右侧的标签 ID。
+    private var rightIDs: Set<UUID> {
+        guard let index = group.tabs.firstIndex(where: { $0.id == tab.id }) else { return [] }
+        return Set(group.tabs[(index + 1)...].map(\.id))
+    }
+
+    /// 同组内满足条件、且未固定的标签 ID(批量关闭不动固定标签)。
+    private func closableIDs(_ matching: (WorkbenchTab) -> Bool) -> [UUID] {
+        group.tabs.filter { !$0.isPinned && matching($0) }.map(\.id)
+    }
+
     @ViewBuilder
     private var menu: some View {
         Button("关闭") { AppActions.shared.requestCloseTab(tab.id) }
-        Button("关闭其它") { workbench.dock.closeOthers(tab.id) }
-            .disabled(group.tabs.count < 2)
+        Button("关闭其它") { AppActions.shared.requestCloseTabs(closableIDs { $0.id != tab.id }) }
+            .disabled(closableIDs { $0.id != tab.id }.isEmpty)
+        Button("关闭右侧") { AppActions.shared.requestCloseTabs(closableIDs { rightIDs.contains($0.id) }) }
+            .disabled(closableIDs { rightIDs.contains($0.id) }.isEmpty)
+        Button("关闭全部") { AppActions.shared.requestCloseTabs(closableIDs { _ in true }) }
+            .disabled(closableIDs { _ in true }.isEmpty)
+        if case .chat(let projectID, _) = tab.kind, let sessionId = workbench.session(forTab: tab)?.sessionId {
+            Divider()
+            Button("重命名标签…") {
+                guard let name = ExplorerActions.prompt(title: String(localized: "重命名会话"), initial: workbench.displayTitle(tab)) else { return }
+                workbench.renameSession(sessionId, in: projectID, to: name)
+            }
+        }
         Divider()
         Button(tab.isPinned ? String(localized: "取消固定") : String(localized: "固定")) { workbench.dock.togglePinned(tab.id) }
         Button("向右拆分") {

@@ -10,9 +10,9 @@ import WorkbenchKit
 @MainActor
 @Suite("面板摆放(界面侧)")
 struct PanelPlacementViewTests {
-    @Test("浮层让位宽度:默认一个开关时与旧常量一致(170 / 34),没有开关时为 0")
+    @Test("浮层让位宽度:默认一个开关时为 198 / 34(含搜索、回退、前进),没有开关时为 0")
     func clusterWidths() {
-        #expect(TitlebarMetrics.leftClusterWidth(toggles: 1) == 170)
+        #expect(TitlebarMetrics.leftClusterWidth(toggles: 1) == 198)
         #expect(TitlebarMetrics.rightClusterWidth(toggles: 1) == 34)
         #expect(TitlebarMetrics.rightClusterWidth(toggles: 0) == 0)
         #expect(TitlebarMetrics.leftClusterWidth(toggles: 2) > TitlebarMetrics.leftClusterWidth(toggles: 1))

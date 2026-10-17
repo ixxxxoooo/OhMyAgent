@@ -18,10 +18,13 @@ enum TitlebarMetrics {
     /// 浮层图标按钮的边长与按钮间距。
     static let buttonSize: CGFloat = 26
     static let buttonSpacing: CGFloat = 2
-    /// 左上浮层(红绿灯让位 + 回退/前进 + `toggles` 个面板开关)的总宽度:`toggles == 1` 时为 170(对齐 kuku)。
-    /// 修改浮层按钮构成时必须同步此函数。
+    /// 左上浮层固定按钮数:搜索、回退、前进(面板开关另计)。
+    static let fixedLeftButtons = 3
+    /// 左上浮层(红绿灯让位 + `toggles` 个面板开关 + 搜索/回退/前进)的总宽度:`toggles == 1` 时为 198(对齐 Cursor 的
+    /// 「红绿灯 → 侧栏开关 → 搜索 → 后退 → 前进」)。修改浮层按钮构成时必须同步此函数。
     static func leftClusterWidth(toggles: Int) -> CGFloat {
-        trafficLightInset + buttonSize * CGFloat(2 + toggles) + buttonSpacing * CGFloat(1 + toggles)
+        let count = fixedLeftButtons + toggles
+        return trafficLightInset + buttonSize * CGFloat(count) + buttonSpacing * CGFloat(count - 1)
     }
 
     /// 右上浮层(`toggles` 个面板开关 + 边距)占用的宽度:`toggles == 1` 时为 34;没有开关时为 0。
@@ -64,9 +67,21 @@ struct TitlebarOverlay: View {
     var body: some View {
         HStack(spacing: 0) {
             HStack(spacing: TitlebarMetrics.buttonSpacing) {
-                OverlayButton(icon: "arrow-left", label: String(localized: "回退"), enabled: workbench.nav.canGoBack) { workbench.goBack() }
-                OverlayButton(icon: "arrow-right", label: String(localized: "前进"), enabled: workbench.nav.canGoForward) { workbench.goForward() }
+                // 对齐 Cursor:红绿灯 → 侧栏开关 → 搜索 → 回退 → 前进
                 ForEach(toggles(on: .left)) { toggleButton($0, side: .left) }
+                OverlayButton(icon: "search", label: String(localized: "搜索") + " (\(ShortcutStore.shared.binding(for: .hubSearch).display))") {
+                    HubModel.shared.present(.all, workbench: workbench)
+                }
+                OverlayButton(
+                    icon: "arrow-left",
+                    label: String(localized: "回退") + " (\(ShortcutStore.shared.binding(for: .goBack).display))",
+                    enabled: workbench.nav.canGoBack
+                ) { workbench.goBack() }
+                OverlayButton(
+                    icon: "arrow-right",
+                    label: String(localized: "前进") + " (\(ShortcutStore.shared.binding(for: .goForward).display))",
+                    enabled: workbench.nav.canGoForward
+                ) { workbench.goForward() }
             }
             .padding(.leading, TitlebarMetrics.trafficLightInset)
             Spacer(minLength: 0)
@@ -162,6 +177,29 @@ enum WindowChrome {
             button?.isHidden = false
             // 标题栏透明后系统可能把容器淡出,红绿灯随之消失,这里强制保持可见
             button?.superview?.alphaValue = 1
+        }
+    }
+}
+
+/// 鼠标侧键导航:侧键后退(按键编号 3)/前进(按键编号 4),与浏览器、VS Code 一致。
+@MainActor
+enum MouseNavigationMonitor {
+    private static var token: Any?
+
+    /// 安装全局(本应用内)侧键监视器,幂等。
+    /// - Parameter workbench: 工作台
+    static func install(workbench: WorkbenchModel) {
+        guard token == nil else { return }
+        token = NSEvent.addLocalMonitorForEvents(matching: .otherMouseDown) { event in
+            let handled = MainActor.assumeIsolated { () -> Bool in
+                guard workbench.mode == .workspace else { return false }
+                switch event.buttonNumber {
+                case 3: workbench.goBack(); return true
+                case 4: workbench.goForward(); return true
+                default: return false
+                }
+            }
+            return handled ? nil : event
         }
     }
 }
