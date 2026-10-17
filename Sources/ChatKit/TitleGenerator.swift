@@ -116,7 +116,7 @@ public enum TitleGenerator {
                 return nil
             }
             let title = responseText(from: data).flatMap(cleanGenerated)
-            Log.session.info("生成标题完成", ["ms": "\((ContinuousClock.now - started).components.seconds * 1000)", "ok": "\(title != nil)"])
+            Log.session.info("生成标题完成", ["ms": "\(OMLogger.milliseconds(since: started))", "ok": "\(title != nil)"])
             return title
         } catch {
             Log.session.warning("生成标题请求出错", ["reason": error.localizedDescription])

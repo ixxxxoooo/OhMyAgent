@@ -113,7 +113,7 @@ final class GitModel {
             Log.git.error("Git 操作失败", ["op": title, "error": String((lastError ?? "").prefix(300))])
         }
         busy = nil
-        Log.git.info("Git 操作完成", ["op": title, "ok": "\(success)", "ms": "\((ContinuousClock.now - started).components.seconds * 1000)"])
+        Log.git.info("Git 操作完成", ["op": title, "ok": "\(success)", "ms": "\(OMLogger.milliseconds(since: started))"])
         await refresh(full: true)
         return success
     }

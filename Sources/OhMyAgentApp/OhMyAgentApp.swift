@@ -162,6 +162,7 @@ struct OhMyAgentApp: App {
         FontSmoothing.applyAtLaunch()
         Log.bootstrap(process: "app")
         MainThreadHitchMonitor.shared.start()
+        PerfStats.shared.startPeriodicReport()
         DemoLaunch.activateIfRequested()
         // Bundle ID 变更迁移:须早于外观、快捷键等偏好的首次读取(演示模式使用隔离沙盒,不迁移)
         if !DemoLaunch.isActive { LegacyDefaultsMigration.migrateIfNeeded() }

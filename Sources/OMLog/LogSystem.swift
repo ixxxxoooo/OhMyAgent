@@ -16,12 +16,16 @@ public final class LogSystem: @unchecked Sendable {
     /// UserDefaults 键。
     public enum DefaultsKey {
         public static let level = "log.level"
+        /// 按分类覆盖级别的键前缀,如 `log.level.perf`。
+        public static let categoryLevelPrefix = "log.level."
         public static let traffic = "log.traffic"
         public static let hideHome = "log.hideHome"
     }
 
     private struct State {
         var level: LogLevel = .info
+        /// 按分类覆盖的级别(优先于全局级别)。
+        var categoryLevels: [LogCategory: LogLevel] = [:]
         var traffic = false
         var hideHome = false
         var process = "app"
@@ -70,6 +74,20 @@ public final class LogSystem: @unchecked Sendable {
         set { state.withLock { $0.level = newValue } }
     }
 
+    /// 某分类的生效级别(有覆盖用覆盖,否则用全局级别)。
+    /// - Parameter category: 分类
+    public func level(for category: LogCategory) -> LogLevel {
+        state.withLock { $0.categoryLevels[category] ?? $0.level }
+    }
+
+    /// 单独设置某分类的级别,传 nil 清除覆盖。
+    /// - Parameters:
+    ///   - level: 级别;nil 表示跟随全局
+    ///   - category: 分类
+    public func setLevel(_ level: LogLevel?, for category: LogCategory) {
+        state.withLock { $0.categoryLevels[category] = level }
+    }
+
     /// 是否记录 ACP 协议流量。
     public var trafficEnabled: Bool {
         get { state.withLock { $0.traffic } }
@@ -86,6 +104,11 @@ public final class LogSystem: @unchecked Sendable {
     public func loadConfiguration(defaults: UserDefaults = .standard, environment: [String: String] = ProcessInfo.processInfo.environment) {
         if let text = environment["OMA_LOG_LEVEL"], let value = LogLevel(text: text) { level = value }
         else if let text = defaults.string(forKey: DefaultsKey.level), let value = LogLevel(text: text) { level = value }
+        for category in LogCategory.allCases {
+            let envKey = "OMA_LOG_LEVEL_" + category.rawValue.uppercased()
+            if let text = environment[envKey], let value = LogLevel(text: text) { setLevel(value, for: category) }
+            else if let text = defaults.string(forKey: DefaultsKey.categoryLevelPrefix + category.rawValue), let value = LogLevel(text: text) { setLevel(value, for: category) }
+        }
         trafficEnabled = environment["OMA_LOG_TRAFFIC"] == "1" || defaults.bool(forKey: DefaultsKey.traffic)
         hideHome = defaults.bool(forKey: DefaultsKey.hideHome)
     }
@@ -97,7 +120,7 @@ public final class LogSystem: @unchecked Sendable {
     ///   - message: 延迟求值的消息(级别不满足时不会计算)
     ///   - fields: 附加键值
     public func log(_ level: LogLevel, _ category: LogCategory, _ message: @autoclosure () -> String, fields: [String: String] = [:]) {
-        let snapshot = state.withLock { ($0.level, $0.hideHome, $0.writer) }
+        let snapshot = state.withLock { ($0.categoryLevels[category] ?? $0.level, $0.hideHome, $0.writer) }
         guard level >= snapshot.0 else { return }
         let hide = snapshot.1
         let text = LogRedactor.redact(message(), hideHome: hide)
@@ -217,10 +240,15 @@ public struct OMLogger: Sendable {
         return try body()
     }
 
-    /// 自给定起点起经过的毫秒数。
+    /// 自给定起点起经过的毫秒数(全仓库统一计时口径,禁止再手写 `components.seconds * 1000`)。
     public static func milliseconds(since start: ContinuousClock.Instant) -> Int {
+        microseconds(since: start) / 1000
+    }
+
+    /// 自给定起点起经过的微秒数。
+    public static func microseconds(since start: ContinuousClock.Instant) -> Int {
         let d = ContinuousClock.now - start
-        return Int(d.components.seconds * 1000 + d.components.attoseconds / 1_000_000_000_000_000)
+        return Int(d.components.seconds * 1_000_000 + d.components.attoseconds / 1_000_000_000_000)
     }
 
     /// 记录协议流量。

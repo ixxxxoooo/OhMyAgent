@@ -255,7 +255,7 @@ public enum CommitMessageGenerator {
                 return nil
             }
             let message = responseText(from: data).flatMap(clean)
-            Log.git.info("生成提交说明完成", ["ms": "\((ContinuousClock.now - started).components.seconds * 1000)", "files": "\(context.files.count)", "ok": "\(message != nil)"])
+            Log.git.info("生成提交说明完成", ["ms": "\(OMLogger.milliseconds(since: started))", "files": "\(context.files.count)", "ok": "\(message != nil)"])
             return message
         } catch {
             Log.git.warning("生成提交说明请求出错", ["reason": error.localizedDescription])
