@@ -13,7 +13,7 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 - `ACPKit`:JSON-RPC、ACP v1 模型、连接 actor、脚本化 Agent(测试用)与声明式场景引擎(`ScenarioEngine`、演示场景目录 `DemoScenarios`、演示历史会话 `DemoHistory`)。
 - `AgentHost`:子进程、工具链定位、Agent 注册表、Bridge(进程内 HTTP MCP,挂在 `LocalGateway` 上,无辅助进程)。
 - `ChatKit`:会话模型(含运行中引导/排队/图片/目标)、时间线、补全(来源徽标、@子 Agent)、等待文案(`WorkingStatus`)、AskUserQuestion 向导模型(`ElicitationQuestions`)、客户端斜杠命令(`LocalCommands`)、Markdown 解析、更新检查、AttentionCenter(运行/未读状态)、RecentStore(无视图);提供商模型 `ProviderModels`、模型映射 `ModelMapping`(Claude Code 槽位 → 任意提供商模型)/`ProviderBridge`(注册到网关)、模式色调 `ModeTone`、`OpenCodeImporter`(两阶段导入,确认前不读密钥);Claude Code 内置命令清单 `ClaudeBuiltinCommands`、自动跟随状态机 `FollowState`、会话标题生成 `TitleGenerator`、草稿文件提及解析 `FileMentions`、输入框内联 chip 布局 `ComposerMentionLayout`、回合提前结束启发式 `TurnEndHeuristics`、设置页宽度 `SettingsContentWidth`、MCP 按需加载 `McpToolSearch`、上下文优化建议 `ContextAdvisor`。
-- `WorkbenchKit`:工作台模型(多项目、项目→会话树、布局与状态持久化、标签页 LRU 保活 `TabKeepAlive`、标签导航历史 `NavHistory`、侧栏尺寸 `PanelMetrics`、标签快捷操作 `TabShortcuts`、面板摆放 `PanelPlacement`(终端与输出放底部/左右栏/编辑区,项目栏与工具栏可换边;含拖动落点几何与拖拽布局编辑器用的 `PanelItem`/`PanelZone`)、每会话一标签的会话表 `conversations`,无视图)。
+- `WorkbenchKit`:工作台模型(含项目图标 `ProjectIcon`、多文件夹工作区 `WorkspaceFolders`、引擎待命池 `EngineWarmPool`;多项目、项目→会话树、布局与状态持久化、标签页 LRU 保活 `TabKeepAlive`、标签导航历史 `NavHistory`、侧栏尺寸 `PanelMetrics`、标签快捷操作 `TabShortcuts`、面板摆放 `PanelPlacement`(终端与输出放底部/左右栏/编辑区,项目栏与工具栏可换边;含拖动落点几何与拖拽布局编辑器用的 `PanelItem`/`PanelZone`)、每会话一标签的会话表 `conversations`,无视图)。
 - `ClaudeConfigKit`:读写 `~/.claude`、`.mcp.json` 等配置。
 - `DiffKit` / `EditorKit`:Diff 与编辑器(含 `CodeHighlighter` 代码高亮缓存、`MarkdownLive` 就地渲染)。
 - `GitKit`:`git` 命令的类型化封装与输出解析(状态、暂存、提交、分支、历史、blame、stash、冲突;块级补丁 `HunkPatch`、图标状态 `GitBadge`;无 UI)。
@@ -95,6 +95,8 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 - 少量互斥选项:工具条/标题栏用 `OMCompactSegmented`,设置表单内可用系统 `.segmented` 选择器;开关用 `OMSwitch`(行内说明用设置行的 `Toggle`,固定 `.small`);
 - 档位/数值调节(宽度、字号等)用 `OMStepSlider`(带刻度的横向滑块),不用下拉;
 - 下拉式选择(模型、模式、思考强度、分支、面包屑、Agent、标签溢出、日志级别等)统一用 `OMPickList`:无箭头浮层、顶部搜索、↑↓ 切换、回车选中、Esc 关闭、当前项打勾;不使用 `.popover`/`Menu`/`.pickerStyle(.menu)` 做选择。
+
+**右键菜单与对话框**:右键菜单只用 `omContextMenu { OMMenuItem… }`(`OhMyAgentApp/Menu/OMContextMenu.swift`),禁止 `.contextMenu`;模态对话框只用 `OMDialog.confirm/prompt/alert` 或 `OMModal.run`(`Dialog/OMDialog.swift`),禁止 `NSAlert`;`ui-lint.py` 的「菜单」「对话框」规则守卫。自动化验证这类自绘子窗口用键盘,不要依赖合成点击。
 
 **设置页**:分组标题 `sectionTitle`;行标题 `body`;说明 `Note`(`caption` + `secondaryText`);所有数字输入用 `SettingsNumericField`;右侧内容宽度由「外观 → 设置页宽度」统一控制;页面骨架用 `SettingsForm`/`ExtensionPage`,不要自己拼 `ScrollView`。
 **浮层与卡片**:沿用 `omGlassCard`、`OMMetrics.cardRadius`/`controlRadius`;阴影、描边用令牌,不另起一套。
