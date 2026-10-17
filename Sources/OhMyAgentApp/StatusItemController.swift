@@ -1,6 +1,7 @@
 // @author ixxxxoooo
 // 菜单栏托盘:NSStatusItem + NSMenu。
-// 图标右下角的状态点:运行中闪烁(蓝)、待处理闪烁(橙)、未读完成常亮(绿);已读后消失。
+// 图标为系统 template 星形(由菜单栏自动按明暗/壁纸着色,不会再出现黑色);
+// 右下角状态点是独立的子视图图层,颜色取主题强调色:运行中实心呼吸、待处理空心环呼吸、未读完成静止实心点;已读后消失。
 // 不使用 SwiftUI MenuBarExtra(它在状态变化时的刷新循环曾造成 CPU 空转),菜单仅在打开时构建。
 
 import IconKit
@@ -14,8 +15,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     static let shared = StatusItemController()
 
     private var statusItem: NSStatusItem?
-    private var blinkTimer: Timer?
-    private var blinkVisible = true
+    private var dotView: TrayDotView?
     private var isSyncing = false
     private let attention = AttentionCenter.shared
 
@@ -28,6 +28,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         }
         // 主题切换:托盘状态点颜色随主题重绘
         NotificationCenter.default.addObserver(forName: ThemeRuntime.didChange, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refresh() }
+        }
+        // 系统「减弱动态效果」切换:重新决定是否呼吸
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
         }
         syncVisibility()
@@ -52,47 +56,30 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         } else if !enabled, let item = statusItem {
             NSStatusBar.system.removeStatusItem(item)
             statusItem = nil
-            stopBlink()
+            dotView?.removeFromSuperview()
+            dotView = nil
             Log.app.info("托盘已隐藏")
         }
     }
 
     // MARK: 图标与闪烁
 
-    /// 刷新图标与闪烁定时器。
+    /// 刷新图标、状态点与提示。
     func refresh() {
         guard let button = statusItem?.button else { return }
-        let indicator = attention.indicator
-        let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-        let blinks = (indicator == .running || indicator == .needsInput) && !reduceMotion
-        if blinks { startBlink() } else { stopBlink() }
-        let dark = button.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        button.image = Self.icon(indicator: indicator, dotVisible: blinks ? blinkVisible : true, dark: dark)
+        if button.image == nil || button.image?.isTemplate != true { button.image = Self.templateIcon() }
+        if dotView == nil || dotView?.superview !== button {
+            let dot = TrayDotView()
+            dot.attach(to: button)
+            dotView = dot
+        }
+        dotView?.apply(TrayDotSpec.make(indicator: attention.indicator, reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion),
+                       color: Self.dotColor(attention.indicator))
         button.toolTip = Self.tooltip(attention)
         NSApp.dockTile.badgeLabel = {
             let n = attention.count(of: .unreadDone) + attention.count(of: .needsInput)
             return n > 0 ? "\(n)" : nil
         }()
-    }
-
-    private func startBlink() {
-        guard blinkTimer == nil else { return }
-        let timer = Timer(timeInterval: 0.6, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                self.blinkVisible.toggle()
-                self.refresh()
-            }
-        }
-        timer.tolerance = 0.1
-        RunLoop.main.add(timer, forMode: .common)
-        blinkTimer = timer
-    }
-
-    private func stopBlink() {
-        blinkTimer?.invalidate()
-        blinkTimer = nil
-        blinkVisible = true
     }
 
     private static func tooltip(_ attention: AttentionCenter) -> String {
@@ -114,26 +101,16 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         }
     }
 
-    /// 绘制菜单栏图标:四角星(按菜单栏明暗取白/黑)+ 右下角状态点。
-    /// 不依赖绘制闭包里的动态颜色解析(状态栏按钮中不稳定),而是显式传入明暗。
-    static func icon(indicator: TrayIndicator, dotVisible: Bool, dark: Bool) -> NSImage {
+    /// 菜单栏图标:系统 template 星形(仅 alpha 有效,由菜单栏按明暗与壁纸着色)。
+    static func templateIcon() -> NSImage {
         let size = NSSize(width: 18, height: 18)
-        let ink: NSColor = dark ? NSColor(OMColors.onAccent) : NSColor(OMColors.maskInk).withAlphaComponent(0.9) // ui-lint:allow 菜单栏前景由系统菜单栏明暗决定
-        let image = NSImage(size: size, flipped: false) { rect in
-            ink.setFill()
+        let image = NSImage(size: size, flipped: false) { _ in
+            NSColor.black.setFill() // ui-lint:allow template 图像仅取 alpha,由系统着色
             starPath(center: NSPoint(x: 8.2, y: 9.8), radius: 7.2).fill()
             starPath(center: NSPoint(x: 13.6, y: 14.2), radius: 3.0).fill()
-            if let color = dotColor(indicator), dotVisible {
-                let dotRect = NSRect(x: rect.maxX - 5.8, y: 0.6, width: 4.8, height: 4.8)
-                // 点外围留一圈细描边,在深浅菜单栏上都清晰
-                (dark ? NSColor(OMColors.maskInk).withAlphaComponent(0.55) : NSColor(OMColors.onAccent).withAlphaComponent(0.7)).setFill()
-                NSBezierPath(ovalIn: dotRect.insetBy(dx: -0.6, dy: -0.6)).fill()
-                color.setFill()
-                NSBezierPath(ovalIn: dotRect).fill()
-            }
             return true
         }
-        image.isTemplate = false
+        image.isTemplate = true
         return image
     }
 
@@ -287,4 +264,88 @@ private final class ClosureMenuItem: NSMenuItem {
     required init(coder: NSCoder) { fatalError("init(coder:) 不可用") }
 
     @objc private func fire() { handler() }
+}
+
+/// 托盘状态点的呈现规格(纯数据,便于测试)。
+struct TrayDotSpec: Equatable {
+    /// 是否空心环(待处理);否则为实心点
+    let ring: Bool
+    /// 呼吸单程时长(秒);nil 表示静止
+    let breathPeriod: Double?
+
+    /// 按指示器与「减弱动态效果」生成规格;无状态返回 nil(不显示点)。
+    static func make(indicator: TrayIndicator, reduceMotion: Bool) -> TrayDotSpec? {
+        switch indicator {
+        case .none: return nil
+        case .running: return TrayDotSpec(ring: false, breathPeriod: reduceMotion ? nil : 0.6)
+        case .needsInput: return TrayDotSpec(ring: true, breathPeriod: reduceMotion ? nil : 0.9)
+        case .unread: return TrayDotSpec(ring: false, breathPeriod: nil)
+        }
+    }
+}
+
+/// 托盘按钮右下角的状态点:独立图层,呼吸用 Core Animation(不重绘图标、不占主线程定时器)。
+@MainActor
+private final class TrayDotView: NSView {
+    private let diameter: CGFloat = 6
+    private var current: TrayDotSpec?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        isHidden = true
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { nil }
+
+    /// 挂到状态栏按钮右下角(自动布局,不依赖坐标系翻转)。
+    func attach(to button: NSView) {
+        translatesAutoresizingMaskIntoConstraints = false
+        button.addSubview(self)
+        NSLayoutConstraint.activate([
+            widthAnchor.constraint(equalToConstant: diameter),
+            heightAnchor.constraint(equalToConstant: diameter),
+            trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -3),
+            bottomAnchor.constraint(equalTo: button.bottomAnchor, constant: -3)
+        ])
+    }
+
+    /// 应用规格与颜色;规格未变时只更新颜色,避免打断呼吸动画。
+    func apply(_ spec: TrayDotSpec?, color: NSColor?) {
+        guard let spec, let color else {
+            isHidden = true
+            layer?.removeAllAnimations()
+            current = nil
+            return
+        }
+        isHidden = false
+        guard let layer else { return }
+        layer.cornerRadius = diameter / 2
+        if spec.ring {
+            layer.backgroundColor = NSColor.clear.cgColor
+            layer.borderWidth = 1.5
+            layer.borderColor = color.cgColor
+        } else {
+            layer.backgroundColor = color.cgColor
+            layer.borderWidth = 0
+        }
+        guard spec != current else { return }
+        current = spec
+        layer.removeAllAnimations()
+        guard let period = spec.breathPeriod else { return }
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 1.0
+        fade.toValue = 0.4
+        let scale = CABasicAnimation(keyPath: "transform.scale")
+        scale.fromValue = 1.0
+        scale.toValue = 0.78
+        let group = CAAnimationGroup()
+        group.animations = [fade, scale]
+        group.duration = period
+        group.autoreverses = true
+        group.repeatCount = .infinity
+        group.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        layer.add(group, forKey: "breath")
+    }
 }
