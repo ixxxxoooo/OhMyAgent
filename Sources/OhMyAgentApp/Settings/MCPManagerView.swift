@@ -309,7 +309,7 @@ struct MCPEditorSheet: View {
                 }
             }
             FormRow(label: String(localized: "传输")) {
-                Picker("", selection: $transport) { ForEach(MCPTransportKind.allCases) { Text($0.displayName).tag($0) } }.labelsHidden().fixedSize()
+                OMSelectField(options: MCPTransportKind.allCases.map { ($0, $0.displayName) }, selection: $transport, accessibilityName: String(localized: "传输"))
             }
             if transport == .stdio {
                 FormRow(label: String(localized: "命令")) { TextField("npx", text: $command).textFieldStyle(.omField).font(OMFonts.mono) }

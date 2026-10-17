@@ -114,7 +114,7 @@ struct HookEditorSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(target.entry == nil ? String(localized: "添加 Hook") : String(localized: "编辑 Hook")).font(OMFonts.title)
             FormRow(label: String(localized: "事件")) {
-                Picker("", selection: $event) { ForEach(HooksStore.events, id: \.self) { Text($0).tag($0) } }.labelsHidden().fixedSize().disabled(target.entry != nil)
+                OMSelectField(options: HooksStore.events.map { ($0, $0) }, selection: $event, accessibilityName: String(localized: "事件")).disabled(target.entry != nil)
             }
             FormRow(label: String(localized: "匹配器"), hint: String(localized: "工具名或正则,如 Bash、Edit|Write;留空表示全部")) { TextField("", text: $matcher).textFieldStyle(.omField).font(OMFonts.mono) }
             if target.entry == nil {
@@ -123,7 +123,7 @@ struct HookEditorSheet: View {
                 }
             }
             FormRow(label: String(localized: "类型")) {
-                Picker("", selection: $type) { ForEach(HooksStore.handlerTypes, id: \.self) { Text($0).tag($0) } }.labelsHidden().fixedSize()
+                OMSelectField(options: HooksStore.handlerTypes.map { ($0, $0) }, selection: $type, accessibilityName: String(localized: "类型"))
             }
             switch type {
             case "command": FormRow(label: String(localized: "命令"), hint: String(localized: "通过 stdin 接收事件 JSON;退出码 2 表示阻止")) { TextField("", text: $command).textFieldStyle(.omField).font(OMFonts.mono) }
