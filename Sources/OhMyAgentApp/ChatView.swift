@@ -86,11 +86,12 @@ struct ChatView: View {
             }
             ComposerDockView(model: model, workbench: AppEnvironment.shared.workbench)
             if isEmptySession {
-                // 新会话才显示项目切换 chip,会话开始后隐藏
+                // 新会话才显示项目切换 chip,会话开始后隐藏;缩进对齐下方 Git 分支 chip(页脚内缩 12pt)
                 HStack {
                     ProjectSwitcherButton(model: model, workbench: AppEnvironment.shared.workbench)
                     Spacer()
                 }
+                .padding(.horizontal, 12)
             }
             ComposerView(model: model)
             ComposerFooter(model: model, usageOpen: $usageOpen)
