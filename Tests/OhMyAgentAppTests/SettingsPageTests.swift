@@ -23,11 +23,13 @@ struct SettingsPageTests {
         #expect(ExtensionSection.memory.page == .memory)
     }
 
-    @Test("所有设置页都出现在侧栏分组里且不重复")
+    @Test("除已并入「自定义」页的扩展页外,设置页都出现在侧栏分组里且不重复")
     func groupsCoverAllPages() {
         let listed = SettingsPage.groups.flatMap(\.pages)
         #expect(Set(listed).count == listed.count)
-        #expect(Set(listed) == Set(SettingsPage.allCases))
+        let movedToCustomize = SettingsPage.allCases.filter { CustomizeFilter.from(page: $0) != nil }
+        #expect(Set(listed).isDisjoint(with: movedToCustomize))
+        #expect(Set(listed) == Set(SettingsPage.allCases).subtracting(movedToCustomize))
     }
 
     @Test("搜索关键词能命中扩展页")

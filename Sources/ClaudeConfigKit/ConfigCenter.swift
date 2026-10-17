@@ -15,6 +15,8 @@ public struct ConfigSnapshot: Sendable {
     public var memory: [MemoryFile] = []
     /// 各区块读取失败的原因(如 JSON 损坏),键为区块名
     public var errors: [String: String] = [:]
+
+    public init() {}
 }
 
 /// 配置中心。

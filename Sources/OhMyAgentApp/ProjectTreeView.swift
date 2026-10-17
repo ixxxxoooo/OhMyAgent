@@ -149,7 +149,7 @@ struct ProjectTreeView: View {
 
     // MARK: 顶部主操作
 
-    /// 主操作区:新对话、自动化(打开自动化页);搜索入口在标题栏的搜索图标与 ⌘K。
+    /// 主操作区:新对话、自动化、自定义(MCP/技能/插件等的合并页);搜索入口在标题栏的搜索图标与 ⌘K。
     private var navigation: some View {
         VStack(spacing: 2) {
             // 选中项目时在该项目下新对话;没有项目或停在会话区时开一个不绑定项目的通用对话
@@ -157,6 +157,7 @@ struct ProjectTreeView: View {
                 workbench.newConversationInContext()
             }
             NavRow(title: "自动化", icon: "workflow", shortcut: nil) { workbench.openAutomation() }
+            NavRow(title: "自定义", icon: "sliders-horizontal", shortcut: nil) { workbench.openCustomize() }
         }
         .padding(.horizontal, 10)
         .padding(.bottom, 8)

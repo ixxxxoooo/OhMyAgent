@@ -46,7 +46,6 @@ enum SettingsPage: String, CaseIterable, Identifiable {
     static let groups: [(title: String, pages: [SettingsPage])] = [
         (String(localized: "客户端"), [.general, .appearance, .shortcuts]),
         ("Agent", [.agent, .providers, .modelMapping, .prompts, .network, .permissions, .trust, .agentExtensions]),
-        (String(localized: "扩展"), [.mcp, .skills, .subagents, .hooks, .plugins, .memory]),
         (String(localized: "工作台"), [.editor, .terminal, .sourceControl, .codeIntelligence]),
         (String(localized: "其他"), [.usage, .privacy, .advanced, .diagnostics]),
     ]

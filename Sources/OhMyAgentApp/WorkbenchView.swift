@@ -255,6 +255,8 @@ struct WorkbenchView: View {
         if env["OMA_OPEN_SETTINGS"] != nil {
             workbench.openSettings()
         }
+        // 调试:OMA_OPEN_CUSTOMIZE=all|plugins|skills|subagents|rules|mcp|hooks 直接打开「自定义」页
+        if let filter = env["OMA_OPEN_CUSTOMIZE"] { workbench.openCustomize(filter: filter) }
     }
 }
 

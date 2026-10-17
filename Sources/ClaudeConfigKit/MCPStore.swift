@@ -85,6 +85,14 @@ public struct MCPServerEntry: Sendable, Equatable, Identifiable {
     public var isDisabled: Bool
     /// 项目级服务器尚未获得用户批准
     public var needsApproval: Bool
+
+    public init(config: MCPServerConfig, scope: ConfigScope, overriddenBy: ConfigScope? = nil, isDisabled: Bool = false, needsApproval: Bool = false) {
+        self.config = config
+        self.scope = scope
+        self.overriddenBy = overriddenBy
+        self.isDisabled = isDisabled
+        self.needsApproval = needsApproval
+    }
 }
 
 /// `claude mcp list` 的连接状态。
@@ -93,6 +101,12 @@ public struct MCPHealthStatus: Sendable, Equatable {
     public var name: String
     public var state: State
     public var detail: String
+
+    public init(name: String, state: State, detail: String = "") {
+        self.name = name
+        self.state = state
+        self.detail = detail
+    }
 }
 
 /// MCP 存储。

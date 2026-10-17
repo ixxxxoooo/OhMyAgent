@@ -86,8 +86,12 @@ add "editor-mermaid" 10 "OMA_OPEN_MERMAID=graph TD\\nA[开始]-->B{判断}\\nB--
 add "terminal-tab" 12 "OMA_OPEN_TERMINAL=1;OMA_TERM_INPUT=git status\\n"
 add "bottom-panel" 8 "OMA_SHOW_BOTTOM=1;OMA_BOTTOM_PANE=terminal"
 # 5) 设置页
-for p in general appearance shortcuts agent providers prompts network permissions trust agentExtensions mcp skills subagents hooks plugins memory editor terminal usage privacy advanced diagnostics; do
+for p in general appearance shortcuts agent providers prompts network permissions trust agentExtensions editor terminal usage privacy advanced diagnostics; do
   add "settings-$p" 8 "OMA_OPEN_SETTINGS=1;OMA_SETTINGS_PAGE=$p"
+done
+# 5b) 自定义页(原设置页「扩展」分组合并而来)
+for f in all mcp skills subagents hooks plugins rules; do
+  add "customize-$f" 8 "OMA_OPEN_CUSTOMIZE=$f"
 done
 
 if [[ -n "$LIST" ]]; then

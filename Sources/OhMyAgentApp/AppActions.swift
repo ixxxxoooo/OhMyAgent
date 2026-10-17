@@ -61,6 +61,12 @@ final class AppActions {
 
     /// 打开设置整页(并入主窗口,可深链到某页)。
     func openSettings(page: SettingsPage? = nil) {
+        // 扩展类页面(MCP/技能/子 Agent/Hooks/插件/记忆)已合并进侧栏「自定义」页:深链改为打开它并预选类型
+        if let page, let filter = CustomizeFilter.from(page: page) {
+            AppEnvironment.shared.workbench.openCustomize(filter: filter.rawValue)
+            showMainWindow()
+            return
+        }
         if let page { SettingsRouter.shared.go(page) }
         AppEnvironment.shared.workbench.openSettings()
         showMainWindow()

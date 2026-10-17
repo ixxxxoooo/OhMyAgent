@@ -1171,6 +1171,26 @@ public final class WorkbenchModel {
         return tab
     }
 
+    // MARK: 自定义页
+
+    /// 自定义页(MCP / 技能 / 子 Agent / Hooks / 插件 / 记忆)在编辑区里的标签标识(预览类标签)。
+    public nonisolated static let customizeTabID = "oma-customize"
+
+    /// 自定义页当前的类型筛选(`all/plugins/skills/subagents/rules/mcp/hooks`)。
+    public var customizeFilter = "all"
+
+    /// 打开(或切到)自定义页标签。
+    /// - Parameter filter: 预选的类型筛选;nil 保持当前
+    @discardableResult
+    public func openCustomize(filter: String? = nil) -> UUID {
+        if let filter { customizeFilter = filter }
+        mode = .workspace
+        let tab = dock.open(.preview(id: Self.customizeTabID), title: String(localized: "自定义"))
+        dock.activate(tab)
+        syncSelectionFromDock()
+        return tab
+    }
+
     // MARK: 输出面板
 
     /// 输出面板在编辑区里的标签标识(放在编辑区时作为预览类标签)。

@@ -2289,3 +2289,10 @@
 "%lld 个问题" = "%lld questions";
 "未回答" = "Unanswered";
 "细滚动条(自绘)" = "Thin scrollbars (custom)";
+"搜索插件、技能、MCP…" = "Search plugins, skills, MCP…";
+"浏览市场" = "Browse marketplace";
+"浏览插件市场" = "Browse plugin marketplace";
+"没有匹配的内容" = "Nothing matches";
+"换个关键词,或到「插件」里浏览市场添加。" = "Try another keyword, or browse the marketplace under Plugins.";
+"需要处理" = "Needs attention";
+"管理 %@" = "Manage %@";
