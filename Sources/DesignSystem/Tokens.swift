@@ -83,7 +83,7 @@ public enum OMColors {
             ? NSColor(srgbRed: 0.118, green: 0.122, blue: 0.133, alpha: 1)
             : NSColor(srgbRed: 0xF6 / 255, green: 0xF6 / 255, blue: 0xF7 / 255, alpha: 1)
     })
-    /// 左右侧栏(含设置页左栏)背景:仅「跟随系统」与 Cursor 浅色主题为 #EFEFEF;其余主题取各自调色板的 `sidebarBackground`(未指定则由内容色推导)。
+    /// 左侧栏(含设置页左栏)背景:仅「跟随系统」与 Cursor 浅色主题为 #EFEFEF;其余主题取各自调色板的 `sidebarBackground`(未指定则由内容色推导)。
     public static var sidebar: Color {
         if let palette = ThemeRuntime.palette {
             return (palette.sidebarBackground

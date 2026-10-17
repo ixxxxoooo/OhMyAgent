@@ -25,8 +25,8 @@ struct RightPaneView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .task(id: workbench.selectedProjectID) { await pollGitBadge() }
-        // 与左侧栏同一材质(侧栏材质),不再使用正文白底
-        .background(SidebarBackground())
+        // 与中间内容区背景一致(OMColors.surface),不与左侧栏一致
+        .background(OMColors.surface)
     }
 
     /// 图标分段条:文件 / 搜索 / Git(对齐 VSCode 与 Cursor 的侧栏视图);当前视图标题显示在右侧。
@@ -93,7 +93,7 @@ struct RightPaneView: View {
             Circle()
                 .fill(badge.isOnlyBehind ? OMColors.accent2 : OMColors.accent)
                 .frame(width: 7, height: 7)
-                .overlay(Circle().strokeBorder(OMColors.sidebar, lineWidth: 1))
+                .overlay(Circle().strokeBorder(OMColors.surface, lineWidth: 1))
                 .offset(x: -2, y: 2)
                 .accessibilityHidden(true)
         }
@@ -127,7 +127,7 @@ struct RightPaneView: View {
     }
 }
 
-/// 侧栏背景:左右栏与设置页左栏共用的同一纯色(浅色 #EFEFEF,见 OMColors.sidebar)。
+/// 侧栏背景:左侧栏与设置页左栏共用的同一纯色(浅色 #EFEFEF,见 OMColors.sidebar)。
 struct SidebarBackground: View {
     var body: some View {
         OMColors.sidebar

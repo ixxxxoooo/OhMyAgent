@@ -77,7 +77,7 @@ public struct ThemePalette: Sendable, Equatable {
     /// 内容区背景(会话流、编辑区、设置页右侧)。
     public var surface: ThemeRGB
     public var card: ThemeRGB
-    /// 左/右侧栏与设置页左栏背景;nil 时由 `surface` 与前景色混合推导。
+    /// 左侧栏与设置页左栏背景;nil 时由 `surface` 与前景色混合推导。
     public var sidebarBackground: ThemeRGB? = nil
     // 编辑器
     public var editorBackground: ThemeRGB

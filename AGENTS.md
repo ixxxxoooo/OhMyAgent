@@ -66,7 +66,7 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit,无 WebView)的 Cursor 
 - 无障碍:仅图标的控件必须有 `accessibilityLabel`;动画经 `omWithAnimation` 以遵循「减弱动态效果」。
 
 ## 4.1 界面配色与布局约定
-- 左侧栏、右侧栏、设置页左栏背景统一取 `OMColors.sidebar`(`SidebarBackground`);中间内容区(会话流、编辑区、设置页右侧)背景统一取 `OMColors.surface` / `OMColors.contentBackground`。
+- 左侧栏、设置页左栏背景统一取 `OMColors.sidebar`(`SidebarBackground`);中间内容区(会话流、编辑区、设置页右侧)与右侧栏背景统一取 `OMColors.surface` / `OMColors.contentBackground`。
 - **`#EFEFEF`(侧栏)/`#F6F6F7`(内容区)只属于「跟随系统」浅色与「Cursor 浅色」主题**;其他主题(深色、Anthropic、Claude Code、OpenCode 等)必须在 `ThemePalette` 里提供各自的 `surface` 与 `sidebarBackground`(未提供时才由内容色与前景混合推导),禁止把这两个色值套到所有主题。新增主题必须同时给出内容色与侧栏色,并保证 `sidebar != surface`(`ThemeColorTests` 守卫)。
 - 深色与主题包由令牌派生,禁止在视图里写死色值或另起背景材质。
 - 设置页左栏宽度必须与工作台左栏一致(取 `WorkbenchModel.layout.leftWidth`),切换设置页时侧栏不跳动。
