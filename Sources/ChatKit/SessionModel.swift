@@ -249,6 +249,8 @@ public final class SessionModel {
     public private(set) var configOptions: [SessionConfigOption] = []
     public private(set) var availableCommands: [AvailableCommand] = []
     public private(set) var usage: UsageUpdate?
+    /// 提示缓存统计(本次打开会话以来各轮的主对话用量;不支持缓存时为 nil)。
+    public private(set) var promptCache: PromptCacheStats?
     /// 上下文分类明细(`/context` 探测结果;未探测或 Agent 不支持时为 nil)。
     public private(set) var contextUsage: ContextUsage?
     /// 正在探测上下文明细:非 nil 时拦截消息分片(按 messageId 累积),不进入时间线。
@@ -716,14 +718,14 @@ public final class SessionModel {
             switchModel(named: name)
         case .accountNotice:
             timeline.appendNotice(ChatL10n.t("账号登录由本机 `claude` 管理"), detail: String(localized: "OhMyAgent 不处理登录/登出。请在终端运行 `claude`,执行 `/login` 或 `/logout`。"))
-        case .modelMenu:
-            timeline.appendNotice(ChatL10n.t("当前模型"), detail: modelListMarkdown())
         case .explore(let question):
             if question.isEmpty {
                 timeline.appendNotice(ChatL10n.t("用法:`/explore 要弄清的问题`"), severity: "warning")
             } else {
                 send(LocalCommands.explorePrompt(question), bypassLocal: true)
             }
+        case .modelMenu:
+            timeline.appendNotice(ChatL10n.t("当前模型"), detail: modelListMarkdown())
         case .exportTranscript, .settings, .extensions, .mcpPanel, .history, .worktree, .applyWorktree, .deleteWorktree, .bestOfN:
             if let onLocalCommand {
                 onLocalCommand(command)
@@ -1103,6 +1105,7 @@ public final class SessionModel {
         watchdogTask?.cancel()
         watchdogTask = nil
         let turnMs = turnStart.map { OMLogger.milliseconds(since: $0) } ?? 0
+        if let usage, error == nil { promptCache = PromptCacheStats.recording(usage, onto: promptCache) }
         let summaryModel = currentMappedModel?.displayName ?? option(category: "model")?.currentDisplayName ?? ""
         let summaryBrand: ModelBrandHint? = currentMappedModel.map {
             ModelBrandHint(modelId: $0.modelId, providerPreset: $0.presetId, providerName: $0.providerName)
@@ -1194,6 +1197,7 @@ public final class SessionModel {
         goal = nil
         followUps.removeAll()
         usage = nil
+        promptCache = nil
         turnChanges.removeAll()
         turnChangeOrder.removeAll()
         Task { await checkpoints.reset() }
@@ -1283,6 +1287,7 @@ public final class SessionModel {
             sessionTitle = summary.title
         }
         usage = nil
+        promptCache = nil
         sessionId = summary.sessionId
         isReplaying = true
         // 会话记录(耗时/完成时间)与回放并行解析:回放一结束就能补上每回合的结束行,不用再等一轮磁盘解析
@@ -1498,6 +1503,18 @@ public final class SessionModel {
             }
         } catch {
             log.warning("上下文明细探测失败", ["session": sessionId, "error": "\(error)"])
+        }
+    }
+
+    /// 主动刷新套餐限额(仅 Claude Code;演示模式不探测,30 秒内复用上次结果)。
+    public func refreshPlanUsage() async {
+        guard activeDescriptor.kind == .claudeACP, !Toolchain.isDemoMode else { return }
+        let cwd = workspace.path
+        let tools = await Toolchain.shared.resolve()
+        guard let claude = tools.claudePath else { return }
+        let environment = tools.environment
+        await PlanUsageCenter.shared.refresh(offBy: PlanUsageProbe.offBy(environment: environment)) {
+            await PlanUsageProbe.fetch(claude: claude, environment: environment, cwd: cwd)
         }
     }
 
@@ -1894,7 +1911,15 @@ public final class SessionModel {
                     sessionTitle = title
                 }
             }
-        case .usage(let value): usage = value
+        case .usage(var value):
+            // 限额事件、压缩后的用量不带费用:沿用之前的累计费用
+            if value.costAmount == nil {
+                value.costAmount = usage?.costAmount
+                value.costCurrency = usage?.costCurrency
+            }
+            if let info = value.rateLimit { PlanUsageCenter.shared.apply(rateLimitInfo: info) }
+            value.rateLimit = nil
+            usage = value
         case .agentMessageChunk(let messageId, let content) where contextProbeChunks != nil:
             // 上下文探测期间的输出属于 `/context` 命令,只累积不展示;适配器可能以不同 messageId 重复发送整份输出
             if case .text(let text) = content { contextProbeChunks?[messageId ?? "default", default: ""] += text }

@@ -448,8 +448,16 @@ public actor ScriptedAgent: ACPRequestHandler {
         for extra in steered.removeValue(forKey: sessionId) ?? [] {
             await update(sessionId, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": .string("(已收到引导:\(extra))")]])
         }
-        if defaultUsage { await update(sessionId, ["sessionUpdate": "usage_update", "used": 1200, "size": 200_000, "cost": ["amount": 0.0123, "currency": "USD"]]) }
-        // 与真实适配器一致:响应里带本轮 token 用量(回合结束摘要据此显示 token 与 tps)
-        return ["stopReason": "end_turn", "usage": ["inputTokens": 1200, "outputTokens": 360, "cachedReadTokens": 0, "cachedWriteTokens": 0, "totalTokens": 1560]]
+        if defaultUsage {
+            await update(sessionId, ["sessionUpdate": "usage_update", "used": 1200, "size": 200_000, "cost": ["amount": 0.0123, "currency": "USD"]])
+            // 与真实适配器一致:套餐限额经 `_meta["_claude/rateLimit"]` 转发(utilization 0...1,resetsAt 为秒级时间戳)
+            let now = Date().timeIntervalSince1970
+            for (type, utilization, resetsIn) in [("five_hour", 0.43, 90.0 * 60), ("seven_day", 0.14, (5 * 24 + 10) * 3600.0)] {
+                let info: JSONValue = ["status": "allowed", "rateLimitType": .string(type), "utilization": .double(utilization), "resetsAt": .int(Int(now + resetsIn))]
+                await update(sessionId, ["sessionUpdate": "usage_update", "used": 1200, "size": 200_000, "_meta": ["_claude/rateLimit": info]])
+            }
+        }
+        // 与真实适配器一致:响应里带本轮 token 用量(回合结束摘要据此显示 token 与 tps;输入大部分来自提示缓存)
+        return ["stopReason": "end_turn", "usage": ["inputTokens": 60, "outputTokens": 360, "cachedReadTokens": 1100, "cachedWriteTokens": 40, "totalTokens": 1560]]
     }
 }

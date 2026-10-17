@@ -251,12 +251,15 @@ public struct UsageUpdate: Sendable, Hashable {
     public var size: Int?
     public var costAmount: Double?
     public var costCurrency: String?
+    /// 套餐限额事件(claude-agent-acp 在 `_meta["_claude/rateLimit"]` 转发的 `rate_limit_info`)
+    public var rateLimit: JSONValue?
 
-    public init(used: Int? = nil, size: Int? = nil, costAmount: Double? = nil, costCurrency: String? = nil) {
+    public init(used: Int? = nil, size: Int? = nil, costAmount: Double? = nil, costCurrency: String? = nil, rateLimit: JSONValue? = nil) {
         self.used = used
         self.size = size
         self.costAmount = costAmount
         self.costCurrency = costCurrency
+        self.rateLimit = rateLimit
     }
 }
 
@@ -394,7 +397,8 @@ public enum SessionUpdate: Sendable {
                 used: json["used"]?.intValue,
                 size: json["size"]?.intValue,
                 costAmount: json["cost"]?["amount"]?.doubleValue,
-                costCurrency: json["cost"]?["currency"]?.stringValue
+                costCurrency: json["cost"]?["currency"]?.stringValue,
+                rateLimit: json["_meta"]?["_claude/rateLimit"]
             ))
         case "notice":
             self = .notice(
