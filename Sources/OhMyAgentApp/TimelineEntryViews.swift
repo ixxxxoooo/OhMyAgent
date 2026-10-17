@@ -241,8 +241,21 @@ struct AttachmentThumbnail: View {
 /// 缩略图解码缓存。
 @MainActor
 enum AttachmentImageCache {
-    private static let cache = NSCache<NSUUID, NSImage>()
-    private static let lightCache = NSCache<NSUUID, NSNumber>()
+    /// 缩略图解码缓存:限制条数与解码后体积,避免长会话里大量图片附件把内存撑起来。
+    private static let cache: NSCache<NSUUID, NSImage> = {
+        let cache = NSCache<NSUUID, NSImage>()
+        cache.countLimit = 64
+        cache.totalCostLimit = 64 * 1024 * 1024
+        return cache
+    }()
+    private static let lightCache: NSCache<NSUUID, NSNumber> = {
+        let cache = NSCache<NSUUID, NSNumber>()
+        cache.countLimit = 512
+        return cache
+    }()
+    /// 解码缓存的累计命中/未命中(容量快照用)。
+    private(set) static var hits = 0
+    private(set) static var misses = 0
 
     /// 图片右上角区域是否偏亮(决定叠在上面的按钮用深色还是浅色)。
     /// 缩到 8×8 取右上 3×3 的平均亮度,结果按附件缓存;解码失败按「偏亮」处理(主题底色多为浅色)。
@@ -287,9 +300,12 @@ enum AttachmentImageCache {
 
     static func image(for attachment: ImageAttachment) -> NSImage? {
         let key = attachment.id as NSUUID
-        if let hit = cache.object(forKey: key) { return hit }
+        if let hit = cache.object(forKey: key) { hits += 1; return hit }
+        misses += 1
         guard let image = NSImage(data: attachment.data) else { return nil }
-        cache.setObject(image, forKey: key)
+        // cost 按解码后位图的字节数估算(宽 × 高 × 4),而不是压缩后的原始数据大小
+        let cost = max(Int(image.size.width * image.size.height) * 4, attachment.data.count)
+        cache.setObject(image, forKey: key, cost: cost)
         return image
     }
 }
