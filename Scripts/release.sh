@@ -58,10 +58,27 @@ else
   echo "跳过公证(需要 DEVELOPER_ID 与 NOTARY_PROFILE)"
 fi
 
-# 7. DMG
+# 7. DMG:暂存目录放 app 与「Applications」快捷方式,用户可直接拖动安装;
+#    构建前清掉 dist 里旧的 dmg(只保留本次产物),暂存目录与挂载点用 trap 兜底清理。
 DMG="dist/OhMyAgent-$VERSION.dmg"
-rm -f "$DMG"
-hdiutil create -quiet -volname "OhMyAgent $VERSION" -srcfolder "$APP" -ov -format UDZO "$DMG"
+find dist -maxdepth 1 -name "*.dmg" -delete 2>/dev/null || true
+STAGE="$(mktemp -d "${TMPDIR:-/tmp}/oma-dmg.XXXXXX")"
+VERIFY_MOUNT=""
+cleanup_dmg() {
+  if [[ -n "$VERIFY_MOUNT" ]]; then hdiutil detach -quiet "$VERIFY_MOUNT" 2>/dev/null || true; fi
+  rm -rf "$STAGE"
+}
+trap cleanup_dmg EXIT
+ditto "$APP" "$STAGE/OhMyAgent.app"
+ln -s /Applications "$STAGE/Applications"
+hdiutil create -quiet -volname "OhMyAgent $VERSION" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
+# 挂载校验:必须同时包含 app 与 Applications 快捷方式
+VERIFY_MOUNT="$(mktemp -d "${TMPDIR:-/tmp}/oma-dmg-verify.XXXXXX")"
+hdiutil attach -quiet -nobrowse -readonly -mountpoint "$VERIFY_MOUNT" "$DMG"
+[[ -d "$VERIFY_MOUNT/OhMyAgent.app" && -L "$VERIFY_MOUNT/Applications" ]] || { echo "错误:dmg 内容不完整(缺少 app 或 Applications 快捷方式)"; exit 1; }
+hdiutil detach -quiet "$VERIFY_MOUNT"
+rmdir "$VERIFY_MOUNT" 2>/dev/null || true
+VERIFY_MOUNT=""
 if [[ "$IDENTITY" != "-" ]]; then
   codesign --force --sign "$IDENTITY" --timestamp "$DMG"
   if [[ -n "${NOTARY_PROFILE:-}" ]]; then
