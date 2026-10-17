@@ -413,6 +413,8 @@ public enum OMFonts {
     public static var reading: Font { .system(size: 13 * OMScale.ui * OMScale.timeline) }
     /// 时间线代码
     public static var readingMono: Font { .system(size: 12 * OMScale.ui * OMScale.timeline, design: .monospaced) }
+    /// 时间线正文的行距(行高为字号的 1.5 倍):系统默认行高约 1.2 倍,`lineSpacing` 补足差值 0.3 倍。
+    public static var readingLineSpacing: CGFloat { 13 * OMScale.ui * OMScale.timeline * 0.3 }
 }
 
 /// 编辑性标题级别(页面级大标题备用令牌:字重 regular、系统字体、字号越大字距越紧;默认不被任何视图使用)。

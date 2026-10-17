@@ -162,6 +162,7 @@ struct UserMessageView: View {
             if !entry.text.isEmpty {
                 Text(entry.text)
                     .font(OMFonts.reading)
+                    .lineSpacing(OMFonts.readingLineSpacing)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

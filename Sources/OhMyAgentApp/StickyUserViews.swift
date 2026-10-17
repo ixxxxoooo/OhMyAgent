@@ -156,6 +156,7 @@ struct StickyUserCard: View {
             if !entry.text.isEmpty {
                 Text(verbatim: entry.text)
                     .font(OMFonts.reading)
+                    .lineSpacing(OMFonts.readingLineSpacing)
                     .lineLimit(3)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }

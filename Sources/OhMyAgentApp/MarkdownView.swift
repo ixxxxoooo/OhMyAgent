@@ -49,7 +49,7 @@ struct MarkdownBlockView: View {
         case .paragraph(let text):
             Text(inlineMarkdown(text))
                 .font(OMFonts.reading)
-                .lineSpacing(3)
+                .lineSpacing(OMFonts.readingLineSpacing)
                 .fixedSize(horizontal: false, vertical: true)
         case .code(let language, let code, let isClosed):
             // 围栏闭合后才渲染 Mermaid,避免流式输出中途反复解析失败
@@ -69,7 +69,9 @@ struct MarkdownBlockView: View {
                         } else {
                             Text(item.marker).foregroundStyle(OMColors.secondaryText)
                         }
-                        Text(inlineMarkdown(item.text)).fixedSize(horizontal: false, vertical: true)
+                        Text(inlineMarkdown(item.text))
+                            .lineSpacing(OMFonts.readingLineSpacing)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     .font(OMFonts.reading)
                     .padding(.leading, CGFloat(item.level) * 16)
@@ -80,6 +82,7 @@ struct MarkdownBlockView: View {
                 RoundedRectangle(cornerRadius: 1.5).fill(OMColors.hairline).frame(width: 3) // ui-lint:allow 引用条细线圆角
                 Text(inlineMarkdown(text))
                     .font(OMFonts.reading)
+                    .lineSpacing(OMFonts.readingLineSpacing)
                     .foregroundStyle(OMColors.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
