@@ -47,7 +47,7 @@ add() { STEPS+=("$1|$2|$3"); }
 
 # 1) 场景:自动跑完的(展开所有工具卡)
 for s in tools-files tools-shell tools-web-mcp canvas tools-browser tools-image tools-plan-todo subagents subagents-parallel subagents-background \
-         states-notices states-errors states-streaming roles markdown mermaid; do
+         states-notices states-errors states-streaming roles user-variants markdown markdown-edge mermaid showcase-tour; do
   add "scenario-$s" 12 "OMA_DEMO_SCENARIO=$s;OMA_EXPAND_ALL=1"
 done
 add "scenario-long-running" 14 "OMA_DEMO_SCENARIO=long-running;OMA_EXPAND_ALL=1"
