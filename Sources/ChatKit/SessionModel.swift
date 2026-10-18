@@ -913,7 +913,7 @@ public final class SessionModel {
         // 直连官方 API(无模型映射、~/.claude 也没配第三方网关)时,「自动」默认启用 MCP 工具按需加载:
         // Bridge 的十几个工具定义不再每轮随请求发送,用到时由模型搜索加载;第三方网关未必支持 tool_reference,保持 Claude Code 默认
         if options.mcpToolSearch == .auto, providerMeta == nil, defaultGatewayMeta == nil { options.mcpToolSearch = .on }
-        let extras = [extraSystemPrompt, additionalDirectoriesNote].compactMap { $0 }.filter { !$0.isEmpty }
+        let extras = [extraSystemPrompt, additionalDirectoriesNote, ChartPrompt.text].compactMap { $0 }.filter { !$0.isEmpty }
         if !extras.isEmpty {
             options.appendPrompt = ([options.appendPrompt.trimmingCharacters(in: .whitespacesAndNewlines)] + extras).filter { !$0.isEmpty }.joined(separator: "\n\n")
         }

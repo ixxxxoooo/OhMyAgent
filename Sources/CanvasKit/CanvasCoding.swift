@@ -225,6 +225,20 @@ public enum CanvasParser {
         return try validate(decoded)
     }
 
+    /// 把单个图表的 JSON 对象(会话里 ```chart 围栏的内容)解析为图表;`type` 缺省视为 chart。
+    /// - Parameter data: JSON 对象:`{kind, title?, labels, series:[{name, values}]}`
+    /// - Returns: 校验后的图表
+    /// - Throws: `CanvasError`(带路径的中文说明);非对象或非图表块同样报错
+    public static func parseChart(_ data: Data) throws -> CanvasChart {
+        guard var object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+            throw CanvasError("图表内容不是合法的 JSON 对象")
+        }
+        if object["type"] == nil { object["type"] = "chart" }
+        let wrapped = try JSONSerialization.data(withJSONObject: [object])
+        guard case .chart(let chart)? = try parseBlocks(wrapped).first else { throw CanvasError("内容不是图表") }
+        return chart
+    }
+
     /// 校验并规范化块列表(表格行补齐/截断,图表校验等长,规模上限)。
     /// - Parameter blocks: 待校验的块
     /// - Returns: 规范化后的块

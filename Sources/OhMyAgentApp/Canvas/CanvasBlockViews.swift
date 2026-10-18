@@ -200,7 +200,8 @@ private struct CanvasTableView: View {
 
 // MARK: - 图表
 
-private struct CanvasChartView: View {
+/// 图表视图(画布块与会话 ```chart 围栏共用)。
+struct CanvasChartView: View {
     let chart: CanvasChart
 
     private struct Point: Identifiable {

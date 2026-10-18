@@ -162,6 +162,9 @@ struct MarkdownBlockView: View, Equatable {
             // 围栏闭合后才渲染 Mermaid,避免流式输出中途反复解析失败
             if isClosed, language?.lowercased() == "mermaid" {
                 MermaidBlockView(source: code)
+            } else if isClosed, language?.lowercased() == "chart", let chart = ChartFence.parse(code) {
+                // 围栏闭合且 JSON 合法才画图;否则回退为普通代码块
+                ChartFenceView(chart: chart)
             } else {
                 CodeBlockView(language: language, code: code)
             }
