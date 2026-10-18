@@ -204,6 +204,10 @@ public enum ScenarioStep: Sendable {
     case delay(Int)
     /// 永不结束,直到被取消(冻结态)
     case hold
+    /// 表单提问(`elicitation/create` 的 form 模式):`schema` 为 `requestedSchema`,答案会被助手回显
+    case elicit(message: String, schema: JSONValue)
+    /// 链接提问(`elicitation/create` 的 url 模式):请用户在浏览器里完成某件事
+    case elicitURL(message: String, url: String)
     /// 内置步骤
     case builtin(ScenarioBuiltin)
 }

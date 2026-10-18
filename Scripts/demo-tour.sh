@@ -61,7 +61,7 @@ add "scenario-long-running" 14 "OMA_DEMO_SCENARIO=long-running;OMA_EXPAND_ALL=1"
 add "scenario-terminal" 12 "OMA_DEMO_SCENARIO=terminal;OMA_EXPAND_ALL=1"
 add "scenario-all" 60 "OMA_DEMO_SCENARIO=all;OMA_EXPAND_ALL=1"
 # 2) 场景:冻结与交互(只截停住的画面)
-for s in states-working states-frozen permissions permissions-variants plan-approval ask changes; do
+for s in states-working states-frozen permissions permissions-variants plan-approval ask ask-variants ask-forms changes; do
   add "scenario-$s" 10 "OMA_DEMO_SCENARIO=$s;OMA_EXPAND_ALL=1"
 done
 add "scenario-permissions-autoallow" 12 "OMA_DEMO_SCENARIO=permissions;OMA_AUTOALLOW=1;OMA_EXPAND_ALL=1"

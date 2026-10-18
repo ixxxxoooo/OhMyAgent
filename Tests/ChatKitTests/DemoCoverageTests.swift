@@ -136,4 +136,46 @@ struct DemoCoverageTests {
         #expect(await SessionModelTests.wait { !model.isRunning })
         model.shutdown()
     }
+
+    @Test("提问变体:多选项、三题向导、并发排队、通用表单与链接模式")
+    func askVariants() async throws {
+        let ws = try M3ScenarioTests.tempWorkspace()
+        defer { try? FileManager.default.removeItem(at: ws) }
+        let model = try await M3ScenarioTests.readyModel(workspace: ws)
+
+        /// 取消并移除当前最前面的提问。
+        func dropFirst() {
+            if let prompt = model.pendingElicitations.first { prompt.cancel(); model.dismiss(prompt) }
+        }
+
+        model.send("#demo-ask-variants")
+        #expect(await SessionModelTests.wait { !model.pendingElicitations.isEmpty })
+        let many = try #require(model.pendingElicitations.first?.fields.first { $0.id == "question_0" })
+        if case .single(let options) = many.kind { #expect(options.count == 8) } else { Issue.record("第一题应为单选") }
+        dropFirst()
+
+        #expect(await SessionModelTests.wait { model.pendingElicitations.first?.fields.contains { $0.id == "question_2" } == true })
+        let kinds = model.pendingElicitations.first?.fields.map(\.kind) ?? []
+        #expect(kinds.contains { if case .multi = $0 { return true } else { return false } })
+        dropFirst()
+
+        #expect(await SessionModelTests.wait { model.pendingElicitations.count == 2 }, "两个提问应同时排队")
+        dropFirst()
+        #expect(await SessionModelTests.wait { model.pendingElicitations.count == 1 })
+        dropFirst()
+        #expect(await SessionModelTests.wait { !model.isRunning })
+
+        model.send("#demo-ask-forms")
+        #expect(await SessionModelTests.wait { !model.pendingElicitations.isEmpty })
+        let fields = try #require(model.pendingElicitations.first?.fields)
+        #expect(fields.contains { $0.kind == .text } && fields.contains { $0.kind == .boolean })
+        #expect(fields.contains { if case .number(let isInteger) = $0.kind { return isInteger } else { return false } })
+        #expect(fields.contains { if case .number(let isInteger) = $0.kind { return !isInteger } else { return false } })
+        #expect(fields.contains { $0.isRequired })
+        dropFirst()
+        #expect(await SessionModelTests.wait { if case .url = model.pendingElicitations.first?.mode { return true } else { return false } })
+        dropFirst()
+        #expect(await SessionModelTests.wait { !model.isRunning })
+        model.shutdown()
+    }
 }

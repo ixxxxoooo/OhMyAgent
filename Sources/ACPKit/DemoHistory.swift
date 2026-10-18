@@ -93,7 +93,7 @@ public enum DemoHistory {
     public static func normalize(_ steps: [ScenarioStep]) -> [ScenarioStep] {
         steps.flatMap { step -> [ScenarioStep] in
             switch step {
-            case .delay, .hold, .builtin, .mode, .title, .stop, .fail, .rateLimit:
+            case .delay, .hold, .builtin, .mode, .title, .stop, .fail, .rateLimit, .elicit, .elicitURL:
                 return []
             case .tool(var tool):
                 tool.finish = settled(tool.finish)

@@ -113,6 +113,12 @@ extension ScriptedAgent {
             return .stopped(reason)
         case .fail(let code, let message):
             throw JSONRPCError(code: code, message: message)
+        case .elicit(let message, let schema):
+            let answer = try await connection.request("elicitation/create", params: ["mode": "form", "sessionId": .string(sessionId), "message": .string(message), "requestedSchema": schema])
+            await echoElicitation(answer, sessionId: sessionId, parent: parent)
+        case .elicitURL(let message, let url):
+            let answer = try await connection.request("elicitation/create", params: ["mode": "url", "sessionId": .string(sessionId), "message": .string(message), "url": .string(url)])
+            await echoElicitation(answer, sessionId: sessionId, parent: parent)
         case .delay(let millis):
             await scaledDelay(millis)
         case .hold:
@@ -133,6 +139,17 @@ extension ScriptedAgent {
             }
         }
         return cancelled.contains(sessionId) ? .cancelled : .finished
+    }
+
+    /// 回显用户对提问的答复(接受时给出答案内容,否则说明未作答)。
+    /// - Parameters:
+    ///   - answer: 客户端返回的 `{action, content}`
+    ///   - sessionId: 会话
+    ///   - parent: 父工具调用 ID
+    func echoElicitation(_ answer: JSONValue, sessionId: String, parent: String?) async {
+        let action = answer["action"]?.stringValue ?? "cancel"
+        let text = action == "accept" ? "收到答案:\(answer["content"]?.compactDescription ?? "{}")\n\n" : (action == "decline" ? "你跳过了这个问题。\n\n" : "提问已取消。\n\n")
+        await emit(sessionId, parent: parent, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": .string(text)]])
     }
 
     // MARK: 工具
