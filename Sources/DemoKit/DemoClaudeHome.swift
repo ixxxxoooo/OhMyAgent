@@ -25,7 +25,7 @@ public enum DemoClaudeHome {
     /// 演示用统计缓存(`stats-cache.json`):固定截止日期与确定性公式生成 30 天活动、每日按模型 token 与按模型累计,
     /// 让「用量与成本」页的图表在演示模式下稳定可见(不依赖真实使用记录)。
     static var statsCache: [String: Any] {
-        let models = ["claude-sonnet-4-5", "claude-opus-4-1", "claude-haiku-4-5"]
+        let models = ["claude-sonnet-5-5", "claude-opus-5-5", "claude-haiku-5-5"]
         var activity: [[String: Any]] = []
         var tokens: [[String: Any]] = []
         // 日期:2026-09-16 起连续 30 天
@@ -53,9 +53,9 @@ public enum DemoClaudeHome {
             "dailyActivity": activity,
             "dailyModelTokens": tokens,
             "modelUsage": [
-                "claude-sonnet-4-5": ["inputTokens": 1_820_000, "outputTokens": 640_000, "cacheReadInputTokens": 9_400_000, "cacheCreationInputTokens": 1_100_000, "costUSD": 18.42],
-                "claude-opus-4-1": ["inputTokens": 520_000, "outputTokens": 210_000, "cacheReadInputTokens": 2_900_000, "cacheCreationInputTokens": 480_000, "costUSD": 31.7],
-                "claude-haiku-4-5": ["inputTokens": 260_000, "outputTokens": 90_000, "cacheReadInputTokens": 700_000, "cacheCreationInputTokens": 90_000, "costUSD": 0.9],
+                "claude-sonnet-5-5": ["inputTokens": 1_820_000, "outputTokens": 640_000, "cacheReadInputTokens": 9_400_000, "cacheCreationInputTokens": 1_100_000, "costUSD": 18.42],
+                "claude-opus-5-5": ["inputTokens": 520_000, "outputTokens": 210_000, "cacheReadInputTokens": 2_900_000, "cacheCreationInputTokens": 480_000, "costUSD": 31.7],
+                "claude-haiku-5-5": ["inputTokens": 260_000, "outputTokens": 90_000, "cacheReadInputTokens": 700_000, "cacheCreationInputTokens": 90_000, "costUSD": 0.9],
             ],
         ]
     }
