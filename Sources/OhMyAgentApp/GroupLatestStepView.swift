@@ -18,6 +18,9 @@ struct GroupLatestStepView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var gapReady = false
 
+    /// 单行高度(容器与每一行一致,滚动位移恰为一整行)。
+    private static let rowHeight: CGFloat = 22
+
     /// 要展示的工具条目(并行时取仍在运行的最后一个)。
     private var latest: TimelineEntry? { group.tickerEntry }
 
@@ -42,14 +45,14 @@ struct GroupLatestStepView: View {
                     .transition(rowTransition)
             }
         }
-        .frame(height: 22, alignment: .leading)
+        .frame(height: Self.rowHeight, alignment: .leading)
         .clipped()
         .contentShape(Rectangle())
         .onTapGesture(perform: onTap)
         .accessibilityAddTraits(.isButton)
         .padding(.leading, 28)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: latest?.id)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: showsPlanning)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: latest?.id)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: showsPlanning)
         .task(id: GapKey(toolID: latest?.id, inGap: inGap)) {
             // 新工具开始、或最后一个工具刚结束(进入空窗)时重新计时:先收起「规划」行,空窗持续 0.3 秒后才出现
             gapReady = false
@@ -65,11 +68,10 @@ struct GroupLatestStepView: View {
         let inGap: Bool
     }
 
-    /// 行的滚入/滚出过渡。
+    /// 行的滚入/滚出过渡:纯位移、无淡入淡出(对齐 kuku),新行从底部滑入的同时旧行被整行顶出顶部;
+    /// 每行固定为容器高度,位移距离恰为一整行。
     private var rowTransition: AnyTransition {
-        reduceMotion ? .opacity : .asymmetric(
-            insertion: .move(edge: .bottom).combined(with: .opacity),
-            removal: .move(edge: .top).combined(with: .opacity))
+        reduceMotion ? .opacity : .asymmetric(insertion: .move(edge: .bottom), removal: .move(edge: .top))
     }
 
     /// 「规划下一步…」行:工具之间的短暂空窗。
@@ -83,6 +85,7 @@ struct GroupLatestStepView: View {
                 .foregroundStyle(OMColors.secondaryText)
                 .flowingText(true)
         }
+        .frame(height: Self.rowHeight, alignment: .leading)
     }
 
     /// 一行步骤:图标 + 动词 + 对象(命令取首行),运行中带流光;空窗等待期间保留旧行但停止流光。
@@ -101,5 +104,6 @@ struct GroupLatestStepView: View {
                 .foregroundStyle(OMColors.secondaryText)
                 .flowingText(!tool.status.isTerminal)
         }
+        .frame(height: Self.rowHeight, alignment: .leading)
     }
 }
