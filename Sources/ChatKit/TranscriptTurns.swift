@@ -16,8 +16,10 @@ public struct TranscriptTurn: Sendable, Equatable {
     public var model: String
     /// 回合内各次模型请求的 token 用量合计(记录里没有 usage 时为 nil)
     public var usage: TurnUsage?
+    /// 回合内最后一次模型请求的上下文占用(输入 + 缓存读写 + 输出);用于重新打开会话后还原「上下文窗口」
+    public var lastContextTokens: Int?
 
-    public init(start: Date, end: Date, model: String, usage: TurnUsage? = nil) {
+    public init(start: Date, end: Date, model: String, usage: TurnUsage? = nil, lastContextTokens: Int? = nil) {
         self.start = start
         self.end = end
         self.model = model
@@ -67,6 +69,7 @@ public enum TranscriptTurns {
                 if let model = message?["model"] as? String, !model.isEmpty, model != "<synthetic>" { turns[turns.count - 1].model = model }
                 if let id = message?["id"] as? String, let usage = usage(from: message?["usage"] as? [String: Any]) {
                     perMessage[turns.count - 1][id] = usage
+                    turns[turns.count - 1].lastContextTokens = usage.totalTokens
                 }
             }
         }

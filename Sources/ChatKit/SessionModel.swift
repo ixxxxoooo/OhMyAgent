@@ -1500,7 +1500,8 @@ public final class SessionModel {
     ///
     /// 轮次进行中、未连接、已在探测或 Agent 不支持时直接跳过;失败只记日志,不打扰用户。
     public func refreshContextUsage() async {
-        guard supportsContextBreakdown, phase == .ready, !isRunning, contextProbeChunks == nil, let client, let sessionId else { return }
+        // 纯文字会话禁用了斜杠命令,`/context` 不可用;用量改由记录还原/Agent 上报
+        guard supportsContextBreakdown, !isPlainChat, phase == .ready, !isRunning, contextProbeChunks == nil, let client, let sessionId else { return }
         let started = ContinuousClock.now
         contextProbeChunks = [:]
         defer { contextProbeChunks = nil }
@@ -2137,6 +2138,9 @@ extension SessionModel {
 }
 
 extension SessionModel {
+    /// 无法得知真实窗口时的默认上下文窗口(token)。
+    static let defaultContextWindow = 200_000
+
     /// 在后台开始解析会话记录(没有记录文件的引擎返回 nil)。
     /// - Returns: 解析任务;回放结束后交给 `attachReplayedSummaries(parsing:)`
     func startTranscriptParse() -> Task<[TranscriptTurn], Never>? {
@@ -2149,6 +2153,10 @@ extension SessionModel {
     func attachReplayedSummaries(parsing: Task<[TranscriptTurn], Never>?) async {
         guard let parsing else { return }
         let turns = await parsing.value
+        // 重新打开的会话还没有 Agent 上报的用量:用记录里最后一次请求的上下文占用顶上,窗口取默认 20 万(发送后以实际上报为准)
+        if usage?.used == nil, let tokens = turns.last(where: { $0.lastContextTokens != nil })?.lastContextTokens {
+            usage = UsageUpdate(used: tokens, size: Self.defaultContextWindow)
+        }
         timeline.attachReplayedSummaries(turns) { [weak self] raw in self?.resolveReplayModel(raw) ?? (raw, nil) }
     }
 

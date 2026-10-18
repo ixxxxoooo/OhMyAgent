@@ -58,5 +58,6 @@ struct TranscriptTurnsTests {
         #expect(usage?.outputTokens == 23)
         #expect(usage?.cachedReadTokens == 150)
         #expect(usage?.cachedWriteTokens == 5)
+        #expect(TranscriptTurns.parse(Data(lines.utf8)).first?.lastContextTokens == 55)
     }
 }
