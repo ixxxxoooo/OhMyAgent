@@ -8,6 +8,7 @@
 #   OMA_DEMO_ROOT 改变沙盒目录(默认 ~/Library/Caches/OhMyAgent/Demo)
 #   OMA_AUTOSEND="/demo-roles" OMA_ATTACH_IMAGE=图片路径 OMA_EXPAND_ALL=1 OMA_RIGHT_PANE=git ...
 set -euo pipefail
+source "${0:A:h}/lib-kill.sh"
 cd "$(dirname "$0")/.."
 RESET=""
 SCENARIO=""
@@ -21,8 +22,7 @@ while [[ $# -gt 0 ]]; do
   esac
   shift
 done
-pkill -x OhMyAgent 2>/dev/null || true
-pkill -x FakeAgent 2>/dev/null || true
+killDemoApp
 sleep 0.3
 Scripts/bundle.sh "$CONFIG"
 export OMA_DEMO=1

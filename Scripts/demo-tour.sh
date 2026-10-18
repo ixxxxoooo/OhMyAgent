@@ -16,6 +16,7 @@
 #   - 交互场景(permissions/plan-approval/ask/changes)与冻结场景只截「等待用户操作/冻结」时的画面。
 #   - 截图保留在输出目录,看完请自行删除。
 set -euo pipefail
+source "${0:A:h}/lib-kill.sh"
 cd "$(dirname "$0")/.."
 
 OUT="/tmp/oma-demo-tour"
@@ -151,8 +152,7 @@ PY
 }
 
 stop_app() {
-  pkill -x OhMyAgent 2>/dev/null || true
-  pkill -x FakeAgent 2>/dev/null || true
+  killDemoApp
   sleep 0.5
 }
 
