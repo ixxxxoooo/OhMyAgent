@@ -571,6 +571,11 @@ private struct SessionLine: View {
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture(perform: open)
+        // 可拖进编辑区:边缘分屏、中心并入标签组、标签栏插入位置
+        .onDrag {
+            DockDrag.shared.beginSession(item)
+            return NSItemProvider(object: (DockDrag.sessionPrefix + item.id) as NSString)
+        }
         .omTooltip(mode == .pinned ? "\(projectName) · \(item.title)" : item.title)
         .omContextMenu { menu }
         .accessibilityElement(children: .combine)

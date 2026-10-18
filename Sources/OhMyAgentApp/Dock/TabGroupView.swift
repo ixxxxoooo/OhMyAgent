@@ -33,6 +33,7 @@ final class DockDrag {
             guard !Task.isCancelled else { return }
             self?.tabID = nil
             self?.toolsPane = nil
+            self?.session = nil
         }
     }
     nonisolated static let prefix = "oma-tab:"
@@ -49,8 +50,20 @@ final class DockDrag {
         begin(UUID())
     }
 
-    /// 是否有可落下的拖拽(标签或右栏视图)。
-    var hasPayload: Bool { tabID != nil || toolsPane != nil }
+    /// 正在被拖拽的侧栏会话;落到编辑区时打开(或定位)该会话标签再放入落点
+    var session: SidebarSession?
+    /// 侧栏会话拖拽载荷前缀
+    nonisolated static let sessionPrefix = "oma-session:"
+
+    /// 开始拖拽侧栏会话;沿用标签拖拽的复位逻辑。
+    /// - Parameter item: 被拖拽的会话行
+    func beginSession(_ item: SidebarSession) {
+        session = item
+        begin(UUID())
+    }
+
+    /// 是否有可落下的拖拽(标签、右栏视图或侧栏会话)。
+    var hasPayload: Bool { tabID != nil || toolsPane != nil || session != nil }
 
     /// 把拖拽载荷解析成编辑区里的标签 ID:标签载荷直接解析,右栏视图载荷则打开对应的工具面板标签。
     /// - Parameters:
@@ -60,6 +73,16 @@ final class DockDrag {
     @MainActor
     static func resolveTab(_ text: String, in workbench: WorkbenchModel) -> UUID? {
         if let id = parse(text) { return id }
+        if text.hasPrefix(sessionPrefix) {
+            // 打开(已开则定位)会话标签,焦点标签即目标;随后由调用方移动到落点
+            guard let item = shared.session else { return nil }
+            if let id = item.sessionId {
+                workbench.openHistory(project: item.projectID, sessionId: id, title: item.title, agentID: item.foreignAgentID)
+            } else {
+                workbench.select(project: item.projectID)
+            }
+            return workbench.dock.focusedGroup?.activeID
+        }
         guard text.hasPrefix(toolsPrefix), let pane = RightPane(rawValue: String(text.dropFirst(toolsPrefix.count))),
               RightPane.available.contains(pane) else { return nil }
         return workbench.openToolsTab(pane, title: RightPaneView.title(pane))
@@ -316,6 +339,7 @@ struct GroupDropDelegate: DropDelegate {
                 model.syncSelectionFromDock()
                 DockDrag.shared.tabID = nil
                 DockDrag.shared.toolsPane = nil
+                DockDrag.shared.session = nil
             }
         }
         return true
@@ -360,6 +384,7 @@ struct TabStripDropDelegate: DropDelegate {
                 model.syncSelectionFromDock()
                 DockDrag.shared.tabID = nil
                 DockDrag.shared.toolsPane = nil
+                DockDrag.shared.session = nil
             }
         }
         return true
