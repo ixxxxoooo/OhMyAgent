@@ -1,5 +1,5 @@
 // @author ixxxxoooo
-// 子代理卡片(对标 Cursor 子代理):父对话里的主要观察窗口——实时状态(启动中 → 运行中 → 已完成)、
+// 子代理状态行(对标 Cursor 子代理,无框):父对话里的主要观察窗口——实时状态(启动中 → 运行中 → 已完成)、
 // 待办计数、当前在做什么;点击整张卡片在标签页里打开子代理的完整对话。
 
 import ACPKit
@@ -11,7 +11,6 @@ import SwiftUI
 struct SubagentCardView: View {
     let entry: TimelineEntry
     @Environment(SessionModel.self) private var model
-    @State private var hovering = false
 
     var body: some View {
         if let status = SubagentStatus.make(entry: entry), let tool = entry.tool {
@@ -25,20 +24,13 @@ struct SubagentCardView: View {
                             .labelStyle(.titleAndIcon)
                     }
                     trailingText(status)
-                    Spacer(minLength: 8)
-                    Image.om("square-arrow-out-up-right", size: 11)
-                        .foregroundStyle(OMColors.secondaryText)
-                        .opacity(hovering ? 1 : 0.55)
+                    // 无框:一行纯文字;标题行已有「打开」图标,这里不重复
                 }
-                .padding(.horizontal, 10)
-                .frame(height: 30)
+                .frame(height: 22)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(hovering ? OMColors.hoverFill : OMColors.subtleFill, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous).strokeBorder(OMColors.hairline))
-                .contentShape(RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .onHover { hovering = $0 }
             .omTooltip("在标签页中打开子代理的完整对话")
             .accessibilityLabel("子代理:\(tool.title)")
             .accessibilityHint("在标签页中打开子代理的完整对话")

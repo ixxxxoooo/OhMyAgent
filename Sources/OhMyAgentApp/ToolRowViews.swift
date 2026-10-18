@@ -87,7 +87,7 @@ struct ToolRowView: View {
                 if presentation.category == .subagent {
                     SubagentCardView(entry: entry)
                         .padding(.leading, 23)
-                        .padding(.vertical, 4)
+                        .padding(.bottom, 2)
                 }
                 // Canvas 工具完成后,在工具行下方给出可点击的画布卡片
                 if let ref = CanvasToolRef.of(tool) {
