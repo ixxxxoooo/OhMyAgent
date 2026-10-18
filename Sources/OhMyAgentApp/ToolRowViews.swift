@@ -257,7 +257,6 @@ struct ToolRowView: View {
     private func subject(_ p: ToolPresentation, failed: Bool) -> some View {
         if p.subjectIsPath {
             let name = (p.subject as NSString).lastPathComponent
-            let dir = ((p.subject as NSString).deletingLastPathComponent as NSString).lastPathComponent
             HStack(spacing: 5) {
                 if !name.isEmpty, Self.fileCategories.contains(p.category) {
                     OMFileIcon(name: name, size: OMMetrics.fileIconInline)
@@ -266,9 +265,6 @@ struct ToolRowView: View {
                 Text(name)
                     .font(OMFonts.small.weight(.medium))
                     .foregroundStyle(failed ? OMColors.danger : OMColors.primaryText)
-                if !dir.isEmpty, dir != "/" {
-                    Text(dir).font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
-                }
             }
             .lineLimit(1)
             .omTooltip(p.subject)
