@@ -42,6 +42,22 @@ struct PanelPlacementModelTests {
         #expect(layout.placement == PanelPlacement())
         #expect(layout.leftWidth == 300 && layout.rightPane == .git && layout.bottomPane == .terminal)
         #expect(layout.terminalWidth == PanelMetrics.terminalDefault)
+        #expect(layout.terminalListWidth == PanelMetrics.terminalListDefault && !layout.terminalListCollapsed)
+    }
+
+    @Test("终端列表宽度与折叠状态可往返,并被限制在范围内")
+    func terminalListLayout() throws {
+        var layout = WorkbenchLayout()
+        layout.terminalListWidth = 240
+        layout.terminalListCollapsed = true
+        let data = try JSONEncoder().encode(layout)
+        #expect(try JSONDecoder().decode(WorkbenchLayout.self, from: data) == layout)
+        layout.terminalListWidth = 9999
+        layout.clamp()
+        #expect(layout.terminalListWidth == PanelMetrics.terminalListRange.upperBound)
+        layout.terminalListWidth = 1
+        layout.clamp()
+        #expect(layout.terminalListWidth == PanelMetrics.terminalListRange.lowerBound)
     }
 
     @Test("未知的摆放取值回落到默认值,不会让整个状态文件失效")

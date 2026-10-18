@@ -1,6 +1,7 @@
 // @author ixxxxoooo
-// 终端面板(底部/左右栏共用):顶部终端标签条(新建、切换、关闭、重命名)+ 当前终端。
-// 参考 Cursor 的终端列表:每个标签对应一个常驻 shell,切换与隐藏面板都不会结束进程。
+// 终端面板(底部/左右栏共用):当前终端 + 终端切换入口。
+// 只有一个终端时是简洁的单终端;≥2 个时右侧出现终端列表(可收起,收起后回到顶部标签条)。
+// 参考 Cursor 的终端列表:每个条目对应一个常驻 shell,切换与隐藏面板都不会结束进程。
 
 import ChatKit
 import DesignSystem
@@ -17,12 +18,33 @@ struct TerminalPanelView: View {
 
     var body: some View {
         let state = store.state(for: root)
+        let showsList = state.instances.count >= 2 && !workbench.layout.terminalListCollapsed
         VStack(spacing: 0) {
-            tabStrip(state)
-            Divider()
-            TerminalTabView(id: state.active.id, fallbackDirectory: root)
-                .id(state.active.id)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if !showsList {
+                tabStrip(state)
+                Divider()
+            }
+            HStack(spacing: 0) {
+                TerminalTabView(id: state.active.id, fallbackDirectory: root)
+                    .id(state.active.id)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                if showsList {
+                    PanelResizer(width: $workbench.layout.terminalListWidth, side: .right,
+                                 range: PanelMetrics.terminalListRange, defaultWidth: PanelMetrics.terminalListDefault)
+                    TerminalListView(
+                        state: state,
+                        titleOf: { store.title(of: $0) },
+                        menu: { menu(for: $0, state: state) },
+                        onSelect: { id in omWithAnimation { store.activate(id, root: root) } },
+                        onClose: { close($0) },
+                        onRename: { id, name in store.rename(id, to: name, root: root) },
+                        onMove: { id, target in store.move(id, before: target, root: root) },
+                        onAdd: { AppActions.shared.newTerminal() },
+                        onCollapse: { omWithAnimation { workbench.layout.terminalListCollapsed = true } }
+                    )
+                    .frame(width: workbench.layout.terminalListWidth)
+                }
+            }
         }
     }
 
@@ -46,6 +68,12 @@ struct TerminalPanelView: View {
                 .padding(.horizontal, 6)
             }
             Spacer(minLength: 0)
+            if state.instances.count >= 2 {
+                Button { omWithAnimation { workbench.layout.terminalListCollapsed = false } } label: { Image.om("panel-right", size: 12) }
+                    .buttonStyle(.omIcon)
+                    .omTooltip("显示终端列表")
+                    .accessibilityLabel("显示终端列表")
+            }
             Button { AppActions.shared.newTerminal() } label: { Image.om("plus", size: 12) }
                 .buttonStyle(.omIcon)
                 .disabled(!state.canAdd)

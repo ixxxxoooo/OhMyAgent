@@ -17,6 +17,9 @@ public enum PanelMetrics {
     /// 终端侧栏宽度范围与默认值(终端放到左/右侧时使用)
     public static let terminalRange: ClosedRange<Double> = 240...900
     public static let terminalDefault: Double = 420
+    /// 终端面板内右侧「终端列表」的宽度范围与默认值
+    public static let terminalListRange: ClosedRange<Double> = 120...320
+    public static let terminalListDefault: Double = 180
 
     /// 某一侧栏允许的宽度范围。
     public static func range(for side: PanelSide) -> ClosedRange<Double> {

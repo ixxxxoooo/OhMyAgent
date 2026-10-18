@@ -81,3 +81,13 @@ struct TerminalPanelStoreTests {
         #expect(store.state(for: "/x").instances.count == 1)
     }
 }
+
+@Suite("终端拖动载荷")
+struct TerminalDragPayloadTests {
+    @Test("往返解析;非终端载荷或空 id 返回 nil")
+    func roundTrip() {
+        #expect(TerminalDragPayload.parse(TerminalDragPayload.make("bottom:/p#2")) == "bottom:/p#2")
+        #expect(TerminalDragPayload.parse("tab:123") == nil)
+        #expect(TerminalDragPayload.parse(TerminalDragPayload.make("")) == nil)
+    }
+}

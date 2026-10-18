@@ -57,12 +57,17 @@ public struct WorkbenchLayout: Codable, Equatable, Sendable {
     public var outputVisible = false
     /// 输出侧栏宽度
     public var outputWidth: Double = PanelMetrics.terminalDefault
+    /// 终端面板内右侧终端列表的宽度(≥2 个终端时出现)
+    public var terminalListWidth: Double = PanelMetrics.terminalListDefault
+    /// 终端列表是否被用户手动折叠
+    public var terminalListCollapsed = false
 
     public init() {}
 
     private enum CodingKeys: String, CodingKey {
         case leftVisible, rightVisible, bottomVisible, leftWidth, rightWidth, bottomHeight
         case leftPane, rightPane, bottomPane, placement, terminalVisible, terminalWidth, outputVisible, outputWidth
+        case terminalListWidth, terminalListCollapsed
     }
 
     /// 容错解码:新增字段缺失或取值未知时使用默认值,旧版本状态文件可继续读取。
@@ -82,6 +87,8 @@ public struct WorkbenchLayout: Codable, Equatable, Sendable {
         terminalWidth = try c.decodeIfPresent(Double.self, forKey: .terminalWidth) ?? PanelMetrics.terminalDefault
         outputVisible = try c.decodeIfPresent(Bool.self, forKey: .outputVisible) ?? false
         outputWidth = try c.decodeIfPresent(Double.self, forKey: .outputWidth) ?? PanelMetrics.terminalDefault
+        terminalListWidth = try c.decodeIfPresent(Double.self, forKey: .terminalListWidth) ?? PanelMetrics.terminalListDefault
+        terminalListCollapsed = try c.decodeIfPresent(Bool.self, forKey: .terminalListCollapsed) ?? false
     }
 
     /// 限制各尺寸在合理范围内(防止损坏的状态文件导致不可见的面板),并校正与摆放位置相关的状态。
@@ -90,6 +97,7 @@ public struct WorkbenchLayout: Codable, Equatable, Sendable {
         rightWidth = min(max(rightWidth, PanelMetrics.rightRange.lowerBound), PanelMetrics.rightRange.upperBound)
         terminalWidth = min(max(terminalWidth, PanelMetrics.terminalRange.lowerBound), PanelMetrics.terminalRange.upperBound)
         outputWidth = min(max(outputWidth, PanelMetrics.terminalRange.lowerBound), PanelMetrics.terminalRange.upperBound)
+        terminalListWidth = min(max(terminalListWidth, PanelMetrics.terminalListRange.lowerBound), PanelMetrics.terminalListRange.upperBound)
         bottomHeight = min(max(bottomHeight, 120), 600)
         if !LeftPane.available.contains(leftPane) { leftPane = .sessions }
         if !RightPane.available.contains(rightPane) { rightPane = .files }

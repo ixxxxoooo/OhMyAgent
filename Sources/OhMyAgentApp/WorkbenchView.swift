@@ -299,6 +299,13 @@ struct WorkbenchView: View {
         if let value = env["OMA_SIDEBAR_SIDE"].flatMap(PanelSide.init(rawValue:)) { workbench.setSidebarSide(value) }
         if let value = env["OMA_TOOLS_SIDE"].flatMap(PanelSide.init(rawValue:)) { workbench.setToolsSide(value) }
         if env["OMA_SHOW_TERMINAL"] != nil { workbench.showTerminal() }
+        // 调试:OMA_TERMINAL_NAMES=构建,服务,日志 —— 给当前项目预置多个命名终端(第一个重命名已有终端,其余新建)
+        if let names = env["OMA_TERMINAL_NAMES"]?.split(separator: ",").map(String.init), let first = names.first {
+            let root = workbench.selectedProjectID ?? NSHomeDirectory()
+            TerminalPanelStore.shared.rename(TerminalPanelState.baseID(root), to: first, root: root)
+            for name in names.dropFirst() { TerminalPanelStore.shared.addTerminal(root: root, name: name) }
+            TerminalPanelStore.shared.activate(TerminalPanelState.baseID(root), root: root)
+        }
         if env["OMA_SHOW_RIGHT"] != nil { workbench.layout.rightVisible = true }
         if env["OMA_SHOW_BOTTOM"] != nil { workbench.layout.bottomVisible = true }
         if let pane = env["OMA_BOTTOM_PANE"].flatMap(BottomPane.init(rawValue:)) { workbench.layout.bottomPane = pane }

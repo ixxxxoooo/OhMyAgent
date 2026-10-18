@@ -2511,3 +2511,7 @@
 "总计 %@" = "Total %@";
 "缓存命中率 %lld%%" = "Cache hit rate %lld%%";
 "规划下一步…" = "Planning next step…";
+"%lld 个终端" = "%lld Terminals";
+"终端列表" = "Terminal list";
+"收起终端列表" = "Hide terminal list";
+"显示终端列表" = "Show terminal list";
