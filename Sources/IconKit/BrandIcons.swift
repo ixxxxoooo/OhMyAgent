@@ -16,7 +16,7 @@ public enum BrandIcon: Equatable, Sendable {
 
     /// 模型 ID 子串 → 厂商图标键(顺序即优先级;更具体的写在前面)。
     private static let modelRules: [(needle: String, icon: String)] = [
-        ("claude", "claude"), ("anthropic", "anthropic"),
+        ("claude", "claude"), ("sonnet", "claude"), ("opus", "claude"), ("haiku", "claude"), ("fable", "claude"), ("anthropic", "anthropic"),
         ("gpt", "openai"), ("chatgpt", "openai"), ("codex", "codex"), ("davinci", "openai"),
         ("gemma", "gemma"), ("gemini", "gemini"),
         ("deepseek", "deepseek"),

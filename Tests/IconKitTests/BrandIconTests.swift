@@ -12,6 +12,9 @@ struct BrandIconTests {
     func matchByModel() {
         #expect(BrandIcon.resolve(modelId: "deepseek-chat", providerPreset: "opencode", providerName: "OpenCode Zen") == .vector("deepseek"))
         #expect(BrandIcon.resolve(modelId: "claude-sonnet-4-5", providerPreset: "opencode", providerName: "x") == .vector("claude"))
+        // 官方 Claude 的展示名只有「Sonnet 5.5」等,不含 claude 字样
+        #expect(BrandIcon.resolve(modelId: "Sonnet 5.5", providerPreset: nil, providerName: "Sonnet 5.5") == .vector("claude"))
+        #expect(BrandIcon.resolve(modelId: "Opus 5.5", providerPreset: nil, providerName: "Opus 5.5") == .vector("claude"))
         // Antigravity 官方 Agent 使用 Gemini 星形图标
         #expect(BrandIcon.resolve(providerPreset: nil, providerName: "Google Antigravity") == .vector("gemini"))
         #expect(BrandIcon.resolve(modelId: "gpt-5-codex", providerPreset: nil, providerName: "x") == .vector("openai"))
