@@ -2441,3 +2441,5 @@
 "%lld分%lld秒" = "%lldm %llds";
 "%lld小时%lld分" = "%lldh %lldm";
 "点击放大编辑" = "Click to edit in a larger editor";
+"开发版" = "Dev Build";
+"开发版:使用独立的数据目录与日志(OhMyAgent-Dev),不影响稳定版" = "Dev build: uses a separate data directory and logs (OhMyAgent-Dev); the stable build is unaffected";

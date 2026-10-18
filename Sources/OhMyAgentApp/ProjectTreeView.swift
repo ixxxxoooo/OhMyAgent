@@ -7,6 +7,7 @@ import ACPKit
 import ChatKit
 import DesignSystem
 import IconKit
+import OMLog
 import SwiftUI
 import UniformTypeIdentifiers
 import WorkbenchKit
@@ -229,7 +230,7 @@ struct ProjectTreeView: View {
             .foregroundStyle(OMColors.secondaryText)
             .omTooltip("设置 (⌘,)")
             .accessibilityLabel("设置")
-            if DemoLaunch.isActive { DemoBadgeView() }
+            if DemoLaunch.isActive { DemoBadgeView() } else if AppEnv.isDev() { DevBadgeView() }
             Spacer()
         }
         .padding(.horizontal, 10)

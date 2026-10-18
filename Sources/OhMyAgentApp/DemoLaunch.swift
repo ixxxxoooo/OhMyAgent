@@ -45,3 +45,18 @@ struct DemoBadgeView: View {
             .allowsHitTesting(true)
     }
 }
+
+/// 左侧栏底部的「开发版」徽章:提醒当前是开发版(独立数据目录与日志,不影响稳定版)。
+struct DevBadgeView: View {
+    var body: some View {
+        Text("开发版")
+            .font(OMFonts.caption.weight(.medium))
+            .foregroundStyle(OMColors.accentText)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 2)
+            .background(OMColors.accent.opacity(0.15), in: OMPillShape())
+            .overlay(OMPillShape().strokeBorder(OMColors.accent.opacity(0.4), lineWidth: 0.5))
+            .omTooltip("开发版:使用独立的数据目录与日志(OhMyAgent-Dev),不影响稳定版")
+            .accessibilityLabel("开发版")
+    }
+}
