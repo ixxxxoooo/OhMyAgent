@@ -9,7 +9,7 @@ import IconKit
 import SwiftUI
 
 /// 分组运行中的最新一步(单行,只显示最后一个工具)。
-/// 工具之间的空窗(上一步已结束、下一步未开始)延迟 0.7 秒后显示「规划下一步…」,避免闪烁;
+/// 工具之间的空窗(上一步已结束、下一步未开始)延迟 0.3 秒后显示「规划下一步…」,避免闪烁;
 /// 等待期间旧行原地保留(停止流光),画面始终有一行。点击行等同于点击分组标题(展开/收起)。
 struct GroupLatestStepView: View {
     let group: ExploreGroup
@@ -57,10 +57,10 @@ struct GroupLatestStepView: View {
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: latest?.id)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: showsPlanning)
         .task(id: GapKey(toolID: latest?.id, inGap: inGap)) {
-            // 新工具开始、或最后一个工具刚结束(进入空窗)时重新计时:先收起「规划」行,空窗持续 0.7 秒后才出现
+            // 新工具开始、或最后一个工具刚结束(进入空窗)时重新计时:先收起「规划」行,空窗持续 0.3 秒后才出现
             gapReady = false
             guard inGap else { return }
-            try? await Task.sleep(for: .milliseconds(700))
+            try? await Task.sleep(for: .milliseconds(300))
             if !Task.isCancelled { gapReady = true }
         }
     }
