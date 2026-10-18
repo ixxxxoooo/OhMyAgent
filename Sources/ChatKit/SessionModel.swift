@@ -315,6 +315,8 @@ public final class SessionModel {
     public private(set) var goal: GoalState?
     /// 客户端接管命令的执行回调(由应用层打开设置页、面板等)
     @ObservationIgnored public var onLocalCommand: (@MainActor (LocalCommand) -> Void)?
+    /// Agent 提交了计划且计划文件已就绪(参数是对应的计划卡):应用层据此在右侧分屏打开计划标签
+    @ObservationIgnored public var onPlanProposed: (@MainActor (TimelineEntry) -> Void)?
     /// 本机 Skills/自定义命令目录(用于标注来源与连接前兜底)
     @ObservationIgnored public var slashCatalog: (@MainActor () -> [SlashEntry])?
     /// 本机可 @ 提及的子 Agent(名称、说明、来源徽标)
@@ -1777,14 +1779,17 @@ public final class SessionModel {
         prompt.planEntry = entry
         if let path = prompt.planFilePath, FileManager.default.fileExists(atPath: path) {
             entry.planFileURL = URL(fileURLWithPath: path)
+            onPlanProposed?(entry)
         } else {
-            persistPlan(entry)
+            persistPlan(entry) { [weak self] in self?.onPlanProposed?(entry) }
         }
     }
 
     /// 把计划条目写成全局目录下的 `*.plan.md`(后台写入,完成后回填 `planFileURL`)。
-    /// - Parameter entry: 计划条目
-    public func persistPlan(_ entry: TimelineEntry) {
+    /// - Parameters:
+    ///   - entry: 计划条目
+    ///   - completion: 写入成功后的回调(主线程)
+    public func persistPlan(_ entry: TimelineEntry, completion: (@MainActor () -> Void)? = nil) {
         guard let document = entry.planDocument, entry.planFileURL == nil else { return }
         let directory = planDirectory
         let log = self.log
@@ -1792,6 +1797,7 @@ public final class SessionModel {
             do {
                 let url = try await Task.detached(priority: .utility) { try PlanStore.save(document, in: directory) }.value
                 entry?.planFileURL = url
+                completion?()
             } catch {
                 log.warning("保存计划文件失败", ["dir": directory.path, "error": error.localizedDescription])
             }

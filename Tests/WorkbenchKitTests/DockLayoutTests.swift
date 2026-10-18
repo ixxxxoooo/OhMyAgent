@@ -20,6 +20,35 @@ struct DockLayoutTests {
         #expect(dock.focusedGroup?.activeID == b)
     }
 
+    @Test("侧边打开:只有一个组时在右侧新建分屏,焦点与激活标签留在原组")
+    func openBesideCreatesRightSplit() {
+        var dock = DockLayout()
+        let chat = dock.open(file("chat"), title: "chat")
+        let chatGroup = dock.focusedGroupID
+        let plan = dock.openBeside(file("plan"), title: "plan", of: chatGroup, preview: true, keepFocus: true)
+        #expect(dock.groups.count == 2)
+        #expect(dock.groups[0].id == chatGroup && dock.groups[1].tabs.map(\.id) == [plan], "新组应在原组右侧")
+        #expect(dock.focusedGroupID == chatGroup, "不应抢走会话的焦点")
+        #expect(dock.group(chatGroup)?.activeID == chat)
+        #expect(dock.group(dock.groups[1].id)?.activeID == plan)
+    }
+
+    @Test("侧边打开:右侧已有组时放进去(预览替换预览),已打开的标签不移动")
+    func openBesideReusesNeighbor() {
+        var dock = DockLayout()
+        dock.open(file("chat"), title: "chat")
+        let chatGroup = dock.focusedGroupID
+        let first = dock.openBeside(file("plan1"), title: "plan1", of: chatGroup)
+        let second = dock.openBeside(file("plan2"), title: "plan2", of: chatGroup)
+        #expect(dock.groups.count == 2, "不应再新建分屏")
+        #expect(dock.groups[1].tabs.map(\.id) == [second], "新的预览标签替换旧的预览标签")
+        #expect(dock.tab(first) == nil)
+        let again = dock.openBeside(file("plan2"), title: "plan2 改名", of: chatGroup)
+        #expect(again == second && dock.groups[1].tabs.count == 1)
+        #expect(dock.tab(second)?.title == "plan2 改名")
+        #expect(dock.focusedGroupID == chatGroup)
+    }
+
     @Test("同内容去重:再次打开只聚焦并更新行号,预览被固化")
     func openDedupes() {
         var dock = DockLayout()

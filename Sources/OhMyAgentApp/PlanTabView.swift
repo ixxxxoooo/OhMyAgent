@@ -24,6 +24,14 @@ struct PlanTabView: View {
     @State private var mode = PlanViewMode.preview
 
     private var url: URL { URL(fileURLWithPath: path) }
+
+    /// 正在等待批准的计划(哪个会话的审批请求指向这个计划文件):有则 Build 直接批准它,而不是另开新会话。
+    private var pendingApproval: (model: SessionModel, prompt: PermissionPrompt)? {
+        for model in AppEnvironment.shared.workbench.sessions.values {
+            if let prompt = model.pendingPermissions.first(where: { $0.isPlanApproval && $0.planEntry?.planFileURL?.path == path }) { return (model, prompt) }
+        }
+        return nil
+    }
     private var document: PlanDocument { PlanDocument.parse(markdown: text) }
     /// 是否有未保存的修改
     private var isDirty: Bool { text != savedText }
@@ -32,6 +40,7 @@ struct PlanTabView: View {
         VStack(spacing: 0) {
             toolbar
             Divider().opacity(0.5)
+            approvalBar
             content
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -51,9 +60,11 @@ struct PlanTabView: View {
                 options: [(value: PlanViewMode.preview, title: String(localized: "预览")), (value: PlanViewMode.source, title: String(localized: "源码"))],
                 selection: mode, accessibilityName: String(localized: "计划视图模式")
             ) { mode = $0 }
-            Button("Build") { PlanActions.buildInNewSession(document, fileURL: url, projectID: nil) }
-                .buttonStyle(OMButtonStyle(.warm))
-                .disabled(loading || errorText != nil)
+            if pendingApproval == nil {
+                Button("Build") { PlanActions.buildInNewSession(document, fileURL: url, projectID: nil) }
+                    .buttonStyle(OMButtonStyle(.warm))
+                    .disabled(loading || errorText != nil)
+            }
             Button("保存") { Task { await save() } }
                 .buttonStyle(.omSecondary)
                 .keyboardShortcut("s", modifiers: .command)
@@ -74,6 +85,40 @@ struct PlanTabView: View {
             .omTooltip(help)
             .accessibilityLabel(help)
             .disabled(loading || errorText != nil)
+    }
+
+    /// 待批准横条(工具栏下方整行,右栏再窄也不会把按钮挤成省略号):在这里直接决定,等同于会话里的审批条。
+    /// 有未保存的修改先保存,因为 Claude 读的是磁盘上的计划文件。
+    @ViewBuilder
+    private var approvalBar: some View {
+        if let (model, prompt) = pendingApproval {
+            HStack(spacing: 8) {
+                Image.om("circle-alert", size: 13).foregroundStyle(OMColors.warning)
+                Text("计划待批准").font(OMFonts.small.weight(.medium))
+                Text(isDirty ? "有未保存的修改,Build 时会先保存" : "确认后再 Build").font(OMFonts.caption).foregroundStyle(OMColors.secondaryText).lineLimit(1)
+                Spacer(minLength: 8)
+                Button("继续规划") {
+                    if let reject = prompt.request.options.first(where: { $0.kind == .rejectOnce || $0.kind == .rejectAlways }) { model.resolve(prompt, optionId: reject.optionId) }
+                }
+                .buttonStyle(.omSecondary)
+                .fixedSize()
+                if let build = prompt.request.options.first(where: { $0.optionId == "exit-plan-default" }) ?? prompt.request.options.first(where: { $0.kind == .allowOnce }) ?? prompt.request.options.first(where: { $0.kind == .allowAlways }) {
+                    Button(PlanApprovalCard.label(for: build)) {
+                        Task {
+                            if isDirty { await save() }
+                            model.resolve(prompt, optionId: build.optionId)
+                        }
+                    }
+                    .buttonStyle(OMButtonStyle(.warm))
+                    .fixedSize()
+                    .disabled(loading || errorText != nil || saveError != nil)
+                }
+            }
+            .padding(.horizontal, 16)
+            .frame(height: 38)
+            .background(OMColors.warning.opacity(0.08))
+            Divider().opacity(0.5)
+        }
     }
 
     // MARK: 内容

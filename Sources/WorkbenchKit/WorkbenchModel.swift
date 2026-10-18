@@ -1269,6 +1269,18 @@ public final class WorkbenchModel {
         return tab
     }
 
+    /// 在会话右侧分屏打开计划标签(Agent 提交计划时用):焦点留在会话,方便边看计划边决定是否 Build。
+    /// - Parameters:
+    ///   - path: 计划文件绝对路径
+    ///   - title: 标签标题
+    @discardableResult
+    public func openPlanBeside(path: String, title: String) -> UUID {
+        mode = .workspace
+        let tab = dock.openBeside(.preview(id: Self.planTabPrefix + path), title: title, of: dock.focusedGroupID, preview: true, keepFocus: true)
+        scheduleSave()
+        return tab
+    }
+
     // MARK: 浏览器标签
 
     /// 浏览器标签的标识前缀(预览类标签,后缀为浏览器标签 id)。

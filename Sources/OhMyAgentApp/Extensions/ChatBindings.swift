@@ -40,6 +40,13 @@ enum ChatBindings {
             guard let model else { return [] }
             return ProjectConfigHub.shared.agentMentions(for: model.workspace)
         }
+        // Agent 提交计划:像 Cursor 那样在会话右侧分屏打开计划标签(焦点留在会话,方便边看计划边决定是否 Build)
+        model.onPlanProposed = { [weak model] entry in
+            guard let model, let file = entry.planFileURL else { return }
+            let workbench = AppEnvironment.shared.workbench
+            guard workbench.projectID(of: model) == workbench.selectedProjectID else { return }
+            workbench.openPlanBeside(path: file.path, title: entry.planDocument?.name ?? String(localized: "计划"))
+        }
         model.onLocalCommand = { [weak model] command in
             guard let model else { return }
             handle(command, in: model)

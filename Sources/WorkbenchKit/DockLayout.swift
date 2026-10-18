@@ -219,6 +219,38 @@ public struct DockLayout: Codable, Equatable, Sendable {
         return new.id
     }
 
+    /// 在某个组的旁边(右侧)打开标签,像 Cursor 那样「侧边打开」:已有别的组就放进去(预览标签会替换其预览),
+    /// 否则在该组右侧新建分屏。已经打开的标签不移动,只在其所在组里切到它。
+    /// - Parameters:
+    ///   - kind: 标签类型
+    ///   - title: 标题
+    ///   - groupID: 作为参照的组(通常是会话所在的组)
+    ///   - preview: 是否预览方式
+    ///   - keepFocus: 是否把焦点留在参照组(为 true 时不抢走会话的焦点)
+    /// - Returns: 标签 ID
+    @discardableResult
+    public mutating func openBeside(_ kind: TabKind, title: String, of groupID: UUID, preview: Bool = true, keepFocus: Bool = true) -> UUID {
+        let originalFocus = focusedGroupID
+        defer { if keepFocus, group(originalFocus) != nil { focusedGroupID = originalFocus } }
+        if let existing = tab(for: kind), let loc = location(of: existing.id) {
+            update(existing.id) { $0.title = title }
+            mutateGroup(loc.group) { $0.activeID = existing.id }
+            return existing.id
+        }
+        guard group(groupID) != nil else { return open(kind, title: title, preview: preview) }
+        let ordered = groups
+        let others = ordered.filter { $0.id != groupID }
+        let after = ordered.firstIndex { $0.id == groupID }.flatMap { index in ordered.dropFirst(index + 1).first }
+        if let target = after ?? others.last {
+            return open(kind, title: title, preview: preview, in: target.id)
+        }
+        let tab = WorkbenchTab(kind: kind, title: title, isPreview: preview)
+        let fresh = TabGroup(tabs: [tab])
+        root = Self.insert(newGroup: fresh, beside: groupID, axis: .horizontal, before: false, in: root)
+        focusedGroupID = fresh.id
+        return tab.id
+    }
+
     /// 激活标签并聚焦其所在组。
     public mutating func activate(_ tabID: UUID) {
         guard let loc = location(of: tabID) else { return }
