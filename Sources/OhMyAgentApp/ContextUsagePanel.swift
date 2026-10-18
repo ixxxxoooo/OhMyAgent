@@ -70,7 +70,8 @@ struct ContextUsagePanel: View {
                     .foregroundStyle(OMColors.tertiaryText)
                     .lineLimit(1)
             }
-            if model.isProbingContext { OMSpinner(.mini) }
+            // 已有数据时静默刷新,不再出现转圈(业界做法:先显示上次的值,后台更新)
+            if model.isProbingContext && display == nil { OMSpinner(.mini) }
             Spacer(minLength: 8)
             Button(action: onClose) {
                 Image.om("x", size: 12).foregroundStyle(OMColors.secondaryText).frame(width: 20, height: 20).contentShape(Rectangle())
@@ -262,7 +263,6 @@ private struct PlanUsageSection: View {
             Rectangle().fill(OMColors.hairline).frame(height: 1).padding(.vertical, 2)
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text("套餐用量").font(OMFonts.sectionTitle)
-                if center.state == .checking && !center.windows.isEmpty { OMSpinner(.mini) }
                 Spacer(minLength: 8)
                 if let cost { costLabel(cost) }
             }

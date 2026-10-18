@@ -1339,8 +1339,11 @@ public final class SessionModel {
             }
             await self?.settleEvents()
             self?.timeline.finishStreaming()
+            // 先等记录解析完,再同一步里结束回放并补齐结束行:中间不让出主线程,界面不会先出一版没有结束行的时间线再跳一下
+            let parsed = await transcriptTurns?.value
+            if let parsed { self?.timeline.replayTurns = parsed }
             self?.timeline.endReplay()
-            await self?.attachReplayedSummaries(parsing: transcriptTurns)
+            self?.attachReplayedSummaries(turns: parsed)
             self?.isReplaying = false
             replaySpan.end(["entries": "\(self?.timeline.entries.count ?? 0)"])
             self?.flushQueuedPrompt()
@@ -2149,10 +2152,9 @@ extension SessionModel {
     }
 
     /// 回放结束后从会话记录补出各回合的耗时与完成时间(没有记录文件的引擎直接跳过)。
-    /// - Parameter parsing: `startTranscriptParse()` 启动的解析任务
-    func attachReplayedSummaries(parsing: Task<[TranscriptTurn], Never>?) async {
-        guard let parsing else { return }
-        let turns = await parsing.value
+    /// - Parameter turns: `startTranscriptParse()` 解析出的回合(nil 表示没有记录文件)
+    func attachReplayedSummaries(turns: [TranscriptTurn]?) {
+        guard let turns else { return }
         // 重新打开的会话还没有 Agent 上报的用量:用记录里最后一次请求的上下文占用顶上,窗口取默认 20 万(发送后以实际上报为准)
         if usage?.used == nil, let tokens = turns.last(where: { $0.lastContextTokens != nil })?.lastContextTokens {
             usage = UsageUpdate(used: tokens, size: Self.defaultContextWindow)
