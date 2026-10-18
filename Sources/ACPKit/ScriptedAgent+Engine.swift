@@ -240,10 +240,13 @@ extension ScriptedAgent {
                 ["optionId": "reject", "name": "拒绝", "kind": "reject_once"],
             ]
         case .plan:
+            // 与真实 claude-agent-acp 的 ExitPlanMode 选项一致(ID、类别、顺序)
             return [
-                ["optionId": "acceptEdits", "name": "批准并自动接受编辑", "kind": "allow_always"],
-                ["optionId": "default", "name": "批准并逐项确认", "kind": "allow_once"],
-                ["optionId": "plan", "name": "继续规划", "kind": "reject_once"],
+                ["optionId": "exit-plan-default", "name": "Yes, manually approve edits", "kind": "allow_once"],
+                ["optionId": "exit-plan-clear-auto", "name": "Yes, clear context (13% used) and use auto mode", "kind": "allow_always"],
+                ["optionId": "exit-plan-auto", "name": "Yes, and use auto mode", "kind": "allow_always"],
+                ["optionId": "exit-plan-bypass", "name": "Yes, and bypass permissions", "kind": "allow_always"],
+                ["optionId": "reject", "name": "No, keep planning", "kind": "reject_once"],
             ]
         }
     }

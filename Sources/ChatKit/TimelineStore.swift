@@ -75,6 +75,8 @@ public final class TimelineEntry: Identifiable {
     public var planFileURL: URL?
     /// 计划是否已点「Build」(只有批准时才追踪,在别处实现不会回写)
     public var planBuilt = false
+    /// 计划正等待批准(Agent 提交了计划、用户还没选择):时间线里的计划卡显示「待批准」并默认展开
+    public var planPending = false
     /// 计划已保存到工作区的文件(`<项目>/.oma/plans/*.plan.md`)
     public var planWorkspaceURL: URL?
 

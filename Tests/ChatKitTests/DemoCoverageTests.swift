@@ -189,11 +189,18 @@ struct DemoCoverageTests {
 
         model.send("#demo-plan-approval")
         #expect(await SessionModelTests.wait { model.pendingPermissions.first?.isPlanApproval == true })
-        if let prompt = model.pendingPermissions.first { model.resolve(prompt, optionId: "default") }
+        // 批准之前,计划就已经作为计划卡出现在时间线里(待批准),用户能先看到计划文档
+        let pendingEntry = try #require(model.timeline.entries.last { $0.kind == .planDoc })
+        #expect(pendingEntry.planPending && !pendingEntry.planBuilt)
+        #expect(model.pendingPermissions.first?.planEntry === pendingEntry)
+        // 选项与真实适配器一致:5 个,其中 3 个「始终允许」类含义各不相同,必须靠 ID 区分
+        #expect(model.pendingPermissions.first?.request.options.map(\.optionId) == ["exit-plan-default", "exit-plan-clear-auto", "exit-plan-auto", "exit-plan-bypass", "reject"])
+        if let prompt = model.pendingPermissions.first { model.resolve(prompt, optionId: "exit-plan-default") }
         #expect(await SessionModelTests.wait { !model.isRunning })
 
         let entry = try #require(model.timeline.entries.last { $0.kind == .planDoc })
-        #expect(entry.planBuilt)
+        #expect(entry === pendingEntry, "批准不应再追加第二张计划卡")
+        #expect(entry.planBuilt && !entry.planPending)
         #expect(entry.planDocument?.todos.isEmpty == false)
         // 批准后 Agent 按计划逐项推进:计划卡的 TODO 随最新待办同步
         let latest = try #require(model.timeline.entries.last { $0.kind == .plan })
@@ -208,6 +215,23 @@ struct DemoCoverageTests {
         let saved = try #require(model.savePlanToWorkspace(entry))
         #expect(saved.path.contains("/.oma/plans/") && FileManager.default.fileExists(atPath: saved.path))
         #expect(entry.planWorkspaceURL == saved)
+        model.shutdown()
+    }
+
+    @Test("拒绝计划(继续规划):计划卡保留但不标已 Build,也不再是待批准")
+    func planRejectedKeepsCard() async throws {
+        let ws = try M3ScenarioTests.tempWorkspace()
+        let plans = FileManager.default.temporaryDirectory.appendingPathComponent("oma-plans-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: ws); try? FileManager.default.removeItem(at: plans) }
+        let model = try await M3ScenarioTests.readyModel(workspace: ws)
+        model.planDirectory = plans
+        model.send("#demo-plan-approval")
+        #expect(await SessionModelTests.wait { model.pendingPermissions.first?.isPlanApproval == true })
+        if let prompt = model.pendingPermissions.first { model.resolve(prompt, optionId: "reject") }
+        #expect(await SessionModelTests.wait { !model.isRunning })
+        let entry = try #require(model.timeline.entries.last { $0.kind == .planDoc })
+        #expect(!entry.planBuilt && !entry.planPending)
+        #expect(model.timeline.entries.filter { $0.kind == .planDoc }.count == 1)
         model.shutdown()
     }
 

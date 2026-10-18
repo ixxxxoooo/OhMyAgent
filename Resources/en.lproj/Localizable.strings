@@ -2553,3 +2553,13 @@
 "数据来自 ~/.claude/projects 里的 %lld 个会话记录,统计到 %@。费用取自 Claude Code 为每个会话记录的费用(%lld 个会话有记录,较早的会话没有),不含订阅套餐的固定费用。" = "Based on %lld session transcripts in ~/.claude/projects, up to %@. Cost is what Claude Code recorded per session (%lld sessions have a record; older ones do not) and excludes any fixed subscription fee.";
 "数据来自 ~/.claude/stats-cache.json,统计截止 %@;没有找到会话记录。" = "Based on ~/.claude/stats-cache.json, up to %@; no session transcripts were found.";
 "使用 Claude Code 一段时间后,会话记录(~/.claude/projects)会汇总成图表显示在这里。" = "After you have used Claude Code for a while, session transcripts (~/.claude/projects) are summarized into charts here.";
+"上面的计划卡里可以查看完整计划;确认没问题再选择 Build。" = "The plan card above shows the full plan; choose a Build option once you're happy with it.";
+"在标签页中查看/编辑计划" = "View / edit the plan in a tab";
+"在标签页中查看或编辑计划" = "View or edit the plan in a tab";
+"Build · 自动模式" = "Build · auto mode";
+"清空上下文后 Build" = "Clear context, then Build";
+"Build · 跳过权限确认" = "Build · skip permission prompts";
+"按计划实施,每次修改文件或运行命令前都问你" = "Implement the plan, asking before every file change or command";
+"按计划实施,自动模式下由分类器判断哪些操作无需确认" = "Implement the plan in auto mode, where a classifier decides which actions need no confirmation";
+"先清空当前对话上下文(计划保留),再用自动模式实施,适合上下文已经很长时" = "Clear the current context (the plan is kept), then implement in auto mode; useful when the context is already long";
+"按计划实施,并跳过所有权限确认——只在完全信任这个计划时使用" = "Implement the plan and skip all permission prompts; only use this if you fully trust the plan";

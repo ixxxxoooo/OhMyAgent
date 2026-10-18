@@ -36,6 +36,12 @@ public final class PermissionPrompt: Identifiable {
     /// 是否为「退出计划模式」请求(`ExitPlanMode`)。
     public var isPlanApproval: Bool { tool.name == "ExitPlanMode" }
 
+    /// 计划在时间线里对应的计划卡(请求到达时就加入,批准/拒绝后回写状态)。
+    public weak var planEntry: TimelineEntry?
+
+    /// Claude Code 把计划写入的文件(`~/.claude/plans/*.md`);请求入参里的 `planFilePath`,没有则为 nil。
+    public var planFilePath: String? { tool.rawInput?["planFilePath"]?.stringValue }
+
     /// 计划文本(Markdown):优先取请求输入中的 `plan`,其次取内容块里的文本。
     public var planText: String? {
         if let plan = tool.rawInput?["plan"]?.stringValue, !plan.isEmpty { return plan }
@@ -1738,6 +1744,7 @@ public final class SessionModel {
         log.info("请求权限", ["tool": call.title, "kind": "\(call.kind)", "toolCallId": call.toolCallId, "options": request.options.map(\.optionId).joined(separator: ",")])
         return await withCheckedContinuation { continuation in
             let prompt = PermissionPrompt(request: request, continuation: continuation)
+            proposePlanIfNeeded(for: prompt)
             pendingPermissions.append(prompt)
         }
     }
@@ -1748,16 +1755,31 @@ public final class SessionModel {
     ///   - optionId: 选项
     public func resolve(_ prompt: PermissionPrompt, optionId: String) {
         log.info("权限已回复", ["tool": prompt.title, "option": optionId])
-        // 计划被批准后,把计划文档留在时间线里,方便回看
-        if prompt.isPlanApproval, let plan = prompt.planText,
-           let option = prompt.request.options.first(where: { $0.optionId == optionId }),
-           option.kind == .allowOnce || option.kind == .allowAlways {
-            let entry = timeline.appendPlanDoc(plan)
-            entry.planBuilt = true
-            persistPlan(entry)
+        // 计划卡在请求到达时就已进入时间线(待批准);这里按选择结果回写状态
+        if prompt.isPlanApproval, let entry = prompt.planEntry {
+            entry.planPending = false
+            if let option = prompt.request.options.first(where: { $0.optionId == optionId }),
+               option.kind == .allowOnce || option.kind == .allowAlways {
+                entry.planBuilt = true
+            }
         }
         prompt.choose(optionId)
         pendingPermissions.removeAll { $0.id == prompt.id }
+    }
+
+    /// 计划批准请求到达时:把计划作为计划卡立即放进时间线(待批准),让用户先看到计划文档再决定;
+    /// 计划文件优先用 Claude Code 自己写的那份(编辑它就是编辑真正的计划),没有才另存一份。
+    /// - Parameter prompt: 计划批准请求
+    private func proposePlanIfNeeded(for prompt: PermissionPrompt) {
+        guard prompt.isPlanApproval, prompt.planEntry == nil, let plan = prompt.planText else { return }
+        let entry = timeline.appendPlanDoc(plan)
+        entry.planPending = true
+        prompt.planEntry = entry
+        if let path = prompt.planFilePath, FileManager.default.fileExists(atPath: path) {
+            entry.planFileURL = URL(fileURLWithPath: path)
+        } else {
+            persistPlan(entry)
+        }
     }
 
     /// 把计划条目写成全局目录下的 `*.plan.md`(后台写入,完成后回填 `planFileURL`)。

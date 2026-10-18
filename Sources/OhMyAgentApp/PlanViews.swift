@@ -96,95 +96,20 @@ struct PlanTodoList: View {
     }
 }
 
-// MARK: - 待批准的计划卡
-
-/// 计划待批准:标题、概述、TODO 列表、可展开的完整计划,以及 Build / 继续规划。
-struct PlanApprovalCard: View {
-    let prompt: PermissionPrompt
-    let onChoose: (String) -> Void
-    @Environment(SessionModel.self) private var model
-    @State private var showFull = false
-
-    private var document: PlanDocument { PlanDocument.parse(markdown: prompt.planText ?? "") }
-
-    var body: some View {
-        let plan = document
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Image.om("list-todo").foregroundStyle(OMColors.warning)
-                Text("计划待批准").font(OMFonts.small.weight(.medium))
-                Spacer()
-                OMCopyButton(help: String(localized: "复制计划"), size: 12) { plan.body }
-                Button {
-                    // 当前会话保持规划状态(选「继续规划」),计划交给新会话实施
-                    if PlanActions.buildInNewSession(plan, fileURL: nil, from: model),
-                       let reject = prompt.request.options.first(where: { $0.kind == .rejectOnce || $0.kind == .rejectAlways }) {
-                        onChoose(reject.optionId)
-                    }
-                } label: {
-                    Image.om("git-fork", size: 12)
-                }
-                .buttonStyle(.omIcon)
-                .omTooltip("在新会话中 Build(当前会话保持规划)")
-                .accessibilityLabel("在新会话中 Build")
-            }
-            Text(plan.name).font(OMFonts.body.weight(.medium)).textSelection(.enabled)
-            if !plan.overview.isEmpty {
-                Text(plan.overview).font(OMFonts.small).foregroundStyle(OMColors.secondaryText).textSelection(.enabled)
-            }
-            if !plan.todos.isEmpty { PlanTodoList(todos: plan.todos) }
-            Button {
-                omWithAnimation { showFull.toggle() }
-            } label: {
-                HStack(spacing: 4) {
-                    Image.om(showFull ? "chevron.down" : "chevron.right", size: 10)
-                    Text(showFull ? "收起完整计划" : "查看完整计划").font(OMFonts.small)
-                }
-                .foregroundStyle(OMColors.secondaryText)
-            }
-            .buttonStyle(.plain)
-            if showFull {
-                AutoHeightScroll(maxHeight: 320) {
-                    MarkdownView(text: plan.body).frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-            HStack(spacing: 8) {
-                ForEach(prompt.request.options) { option in
-                    Button(label(for: option)) { onChoose(option.optionId) }
-                        .buttonStyle(style(for: option))
-                }
-            }
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .omGlassCard()
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("计划待批准:\(plan.name)")
-    }
-
-    /// 选项文案:批准类统一以 Build 开头,更贴近「开始实施」的语义。
-    private func label(for option: PermissionOption) -> String {
-        switch option.kind {
-        case .allowAlways: return String(localized: "Build · 自动接受编辑")
-        case .allowOnce: return String(localized: "Build · 逐项确认")
-        default: return option.name
-        }
-    }
-
-    /// 样式:「自动接受编辑」是唯一的实心主操作(暖色),其余为次按钮。
-    private func style(for option: PermissionOption) -> OMButtonStyle {
-        option.kind == .allowAlways ? OMButtonStyle(.warm) : OMButtonStyle(.secondary)
-    }
-}
-
 // MARK: - 时间线里的计划卡
 
-/// 批准后留在时间线里的计划卡。
+/// 时间线里的计划卡:计划一提交就出现(待批准),批准后标「已 Build」。
 struct PlanDocView: View {
     let entry: TimelineEntry
     @Environment(SessionModel.self) private var model
-    @State private var expanded = false
+    @State private var expanded: Bool
     @State private var savedNote: String?
+
+    init(entry: TimelineEntry) {
+        self.entry = entry
+        // 待批准的计划默认展开:用户要先看到计划文档再决定是否 Build
+        _expanded = State(initialValue: entry.planPending)
+    }
 
     private var document: PlanDocument { entry.planDocument ?? PlanDocument.parse(markdown: entry.text) }
 
@@ -204,6 +129,7 @@ struct PlanDocView: View {
                 Label("计划", om: "list-todo")
                     .font(OMFonts.small.weight(.medium))
                     .foregroundStyle(OMColors.secondaryText)
+                if entry.planPending { OMTag(String(localized: "待批准"), tint: OMColors.warning) }
                 if entry.planBuilt { OMTag(String(localized: "已 Build"), tint: OMColors.success) }
                 if !items.isEmpty {
                     Text("\(items.filter { $0.status == "completed" }.count)/\(items.count)")
