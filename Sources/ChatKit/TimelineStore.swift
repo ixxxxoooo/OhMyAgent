@@ -220,7 +220,7 @@ public final class TimelineStore {
         let turn = turns[replayPrompts - 1]
         let texts = entries[(start + 1)...].filter { $0.kind == .assistant }.map(\.text).filter { !$0.isEmpty }
         let resolved = replayResolveModel(turn.model)
-        let summary = TurnSummary(model: resolved.name, durationSeconds: turn.end.timeIntervalSince(turn.start), brand: resolved.brand,
+        let summary = TurnSummary(model: resolved.name, durationSeconds: turn.end.timeIntervalSince(turn.start), usage: turn.usage, brand: resolved.brand,
                                   outputText: texts.joined(separator: "\n\n"), finishedAt: turn.end)
         let entry = TimelineEntry(kind: .turnSummary, text: summary.copyText)
         entry.summary = summary
@@ -523,7 +523,7 @@ public final class TimelineStore {
             guard end > users[userPosition] + 1, entries[end - 1].kind != .turnSummary else { continue }
             let texts = entries[(users[userPosition] + 1)..<end].filter { $0.kind == .assistant }.map(\.text).filter { !$0.isEmpty }
             let resolved = resolveModel(turn.model)
-            let summary = TurnSummary(model: resolved.name, durationSeconds: turn.end.timeIntervalSince(turn.start), brand: resolved.brand,
+            let summary = TurnSummary(model: resolved.name, durationSeconds: turn.end.timeIntervalSince(turn.start), usage: turn.usage, brand: resolved.brand,
                                       outputText: texts.joined(separator: "\n\n"), finishedAt: turn.end)
             let entry = TimelineEntry(kind: .turnSummary, text: summary.copyText)
             entry.summary = summary

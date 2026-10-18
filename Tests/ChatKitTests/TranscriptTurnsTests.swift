@@ -44,4 +44,19 @@ struct TranscriptTurnsTests {
         store.attachReplayedSummaries(turns)
         #expect(store.entries.filter { $0.kind == .turnSummary }.count == 2)
     }
+
+    @Test("回合 token 用量:同一消息 ID 的多行只算一次,多次请求累加")
+    func sumsUsagePerMessage() {
+        let lines = [
+            #"{"type":"user","timestamp":"2026-10-18T05:00:00.000Z","message":{"content":"q"}}"#,
+            #"{"type":"assistant","timestamp":"2026-10-18T05:00:01.000Z","message":{"id":"a","model":"m","usage":{"input_tokens":10,"output_tokens":1,"cache_read_input_tokens":100,"cache_creation_input_tokens":5}}}"#,
+            #"{"type":"assistant","timestamp":"2026-10-18T05:00:02.000Z","message":{"id":"a","model":"m","usage":{"input_tokens":10,"output_tokens":20,"cache_read_input_tokens":100,"cache_creation_input_tokens":5}}}"#,
+            #"{"type":"assistant","timestamp":"2026-10-18T05:00:03.000Z","message":{"id":"b","model":"m","usage":{"input_tokens":2,"output_tokens":3,"cache_read_input_tokens":50,"cache_creation_input_tokens":0}}}"#,
+        ].joined(separator: "\n")
+        let usage = TranscriptTurns.parse(Data(lines.utf8)).first?.usage
+        #expect(usage?.inputTokens == 12)
+        #expect(usage?.outputTokens == 23)
+        #expect(usage?.cachedReadTokens == 150)
+        #expect(usage?.cachedWriteTokens == 5)
+    }
 }

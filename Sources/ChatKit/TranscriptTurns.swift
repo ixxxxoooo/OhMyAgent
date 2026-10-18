@@ -2,6 +2,7 @@
 // 从 Claude Code 会话记录(`.jsonl`)里还原每个回合的起止时间与模型,
 // 让回放出来的历史回合(含终端里跑的)也能显示「耗时 · 完成于」结束行。
 
+import ACPKit
 import Foundation
 import OMLog
 
@@ -13,11 +14,14 @@ public struct TranscriptTurn: Sendable, Equatable {
     public var end: Date
     /// 回合内最后一条助手消息的模型(可能为空)
     public var model: String
+    /// 回合内各次模型请求的 token 用量合计(记录里没有 usage 时为 nil)
+    public var usage: TurnUsage?
 
-    public init(start: Date, end: Date, model: String) {
+    public init(start: Date, end: Date, model: String, usage: TurnUsage? = nil) {
         self.start = start
         self.end = end
         self.model = model
+        self.usage = usage
     }
 }
 
@@ -41,6 +45,8 @@ public enum TranscriptTurns {
         let parser = ISO8601DateFormatter()
         parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         var turns: [TranscriptTurn] = []
+        // 同一条助手消息会按内容块拆成多行并重复携带 usage:按消息 ID 去重,取最后一行(流式累计值)
+        var perMessage: [[String: TurnUsage]] = []
         for line in data.split(separator: UInt8(ascii: "\n")) {
             // 只解码用户/助手行,跳过体量最大的附件与请求快照行
             guard line.range(of: Data(#""type":"user""#.utf8)) != nil || line.range(of: Data(#""type":"assistant""#.utf8)) != nil,
@@ -51,6 +57,7 @@ public enum TranscriptTurns {
             if type == "user" {
                 if isPrompt(object, message: message) {
                     turns.append(TranscriptTurn(start: time, end: time, model: ""))
+                    perMessage.append([:])
                 } else if !turns.isEmpty, object["isMeta"] as? Bool != true {
                     // 元信息行(系统提醒等)不代表回合还在进行,不延长完成时间
                     turns[turns.count - 1].end = max(turns[turns.count - 1].end, time)
@@ -58,9 +65,26 @@ public enum TranscriptTurns {
             } else if !turns.isEmpty {
                 turns[turns.count - 1].end = max(turns[turns.count - 1].end, time)
                 if let model = message?["model"] as? String, !model.isEmpty, model != "<synthetic>" { turns[turns.count - 1].model = model }
+                if let id = message?["id"] as? String, let usage = usage(from: message?["usage"] as? [String: Any]) {
+                    perMessage[turns.count - 1][id] = usage
+                }
             }
         }
+        for index in turns.indices where !perMessage[index].isEmpty {
+            let all = perMessage[index].values
+            turns[index].usage = TurnUsage(inputTokens: all.reduce(0) { $0 + $1.inputTokens }, outputTokens: all.reduce(0) { $0 + $1.outputTokens },
+                                           cachedReadTokens: all.reduce(0) { $0 + $1.cachedReadTokens }, cachedWriteTokens: all.reduce(0) { $0 + $1.cachedWriteTokens })
+        }
         return turns
+    }
+
+    /// 把记录里的 `usage` 字典转成 `TurnUsage`;全为 0 或缺失时返回 nil。
+    private static func usage(from node: [String: Any]?) -> TurnUsage? {
+        guard let node else { return nil }
+        func count(_ key: String) -> Int { (node[key] as? NSNumber)?.intValue ?? 0 }
+        let value = TurnUsage(inputTokens: count("input_tokens"), outputTokens: count("output_tokens"),
+                              cachedReadTokens: count("cache_read_input_tokens"), cachedWriteTokens: count("cache_creation_input_tokens"))
+        return value.totalTokens > 0 ? value : nil
     }
 
     /// 是否是用户真正输入的提问(排除工具结果、元信息与本地命令输出)。
