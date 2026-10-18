@@ -18,6 +18,7 @@ struct WorkbenchView: View {
     private let appearance = AppearanceModel.shared
     private let actions = AppActions.shared
     @State private var windowIsKey = false
+    @State private var compact = CompactLayout()
 
     var body: some View {
         Group {
@@ -32,7 +33,9 @@ struct WorkbenchView: View {
         .overlay { MermaidFloatingOverlay() }
         .overlay { ImagePreviewOverlay() }
         .tint(appearance.tint)
-        .frame(minWidth: 860, minHeight: 560)
+        .frame(minWidth: 480, minHeight: 480)
+        // 最小模式:窗口足够窄时自动收起左/右栏,拉宽后恢复(对照 Cursor)
+        .onGeometryChange(for: Double.self) { Double($0.size.width) } action: { compact.update(width: $0, layout: &workbench.layout) }
         .background(WindowFocusReader(onWindow: { window in actions.mainWindow = window; WindowChrome.apply(to: window) }, onChange: { key in
             windowIsKey = key
             if let window = actions.mainWindow { WindowChrome.apply(to: window) }
@@ -62,7 +65,7 @@ struct WorkbenchView: View {
         HStack(spacing: 0) {
             ForEach(workbench.layout.visibleColumns(on: .left)) { panelColumn($0, side: .left) }
             CenterColumn(workbench: workbench)
-                .frame(minWidth: 320, maxWidth: .infinity)
+                .frame(minWidth: 280, maxWidth: .infinity)
             // 右侧由内向外排列
             ForEach(workbench.layout.visibleColumns(on: .right).reversed()) { panelColumn($0, side: .right) }
         }
