@@ -171,6 +171,12 @@ struct WorkbenchView: View {
         var env = ProcessInfo.processInfo.environment
         // 调试:OMA_TOGGLE_LEFT=秒 延迟后切换左栏显隐(不依赖鼠标点击,用于脚本化验证左栏收起/展开)
         // OMA_TOGGLE_RIGHT=秒 同理切换右栏;OMA_TOGGLE_COUNT=N 重复切换 N 次(间隔 1.5 秒,配合侧栏切换性能日志)
+        // OMA_SWITCH_SESSIONS=N 先冷打开 N 个历史会话并在标签间切换(见 PerfBenchmarkHooks),随后才执行侧栏切换,
+        // 这样侧栏开关是在「多个会话标签常驻」的真实状态下测量
+        if let raw = env["OMA_SWITCH_SESSIONS"], let count = Int(raw), count > 0 {
+            try? await Task.sleep(for: .seconds(env["OMA_SWITCH_DELAY"].flatMap(Double.init) ?? 3))
+            await PerfBenchmarkHooks.switchSessions(workbench: workbench, count: count)
+        }
         let toggleCount = env["OMA_TOGGLE_COUNT"].flatMap(Int.init) ?? 1
         for (key, toggle) in [("OMA_TOGGLE_LEFT", { workbench.toggleLeft() }), ("OMA_TOGGLE_RIGHT", { workbench.toggleRight() })] {
             guard let delay = env[key], let seconds = Double(delay) else { continue }

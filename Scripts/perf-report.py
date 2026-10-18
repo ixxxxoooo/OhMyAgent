@@ -11,6 +11,17 @@
       --max-hitch-ms N    单次主线程卡顿上限(默认 1500)
       --min-samples N     至少需要的资源采样次数(默认 3)
   perf-report.py turn <标识>      按会话前缀(session=/sid=)或回合串起相关日志
+  perf-report.py ui [阈值]        侧栏开关/会话切换的交互性能画像并按门槛检查(配合 Scripts/perf-ui.sh)
+      --panel-avg-ms N      侧栏切换平均帧间隔上限(默认 17.5)
+      --panel-hitches N     每次切换平均掉帧(>33ms)上限(默认 1)
+      --panel-max-ms N      侧栏切换单帧最长上限(默认 33)
+      --first-frame-ms N    点击到首帧 P95 上限(默认 80)
+      --cold-open-ms N      冷打开会话「时间线挂载」上限(默认 150)
+      --warm-switch-ms N    已挂载标签切换上限(默认 50)
+      --hitch-ms N          基准期间单次主线程卡顿上限(默认 250)
+      --idle-cpu N          无会话运行时本进程 CPU 平均上限(默认 5,仅 --cpu-check 时判)
+      --cpu-check           同时检查 CPU(运行中冻结场景下用 --run-cpu 上限)
+      --run-cpu N           会话运行中本进程 CPU 平均上限(默认 15)
 默认只看最近一次启动的那个进程(按 pid 过滤,避免开发版与安装版混在一起);
 --all 看全部保留的日志;--pid N 指定进程。
 @author ixxxxoooo
@@ -21,7 +32,7 @@ import re
 import statistics
 import sys
 
-DIR = os.path.expanduser("~/Library/Logs/OhMyAgent")
+DIR = os.environ.get("OMA_LOG_DIR") or os.path.expanduser("~/Library/Logs/OhMyAgent")
 LINE = re.compile(r"^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d{3}) (DEBUG|INFO |WARN |ERROR) \[(\w+)\] (.*)$")
 KV = re.compile(r'(\w[\w.]*)=("(?:[^"\\]|\\.)*"|\S*)')
 
@@ -208,6 +219,80 @@ def check(entries, opts):
     return problems
 
 
+def ui_metrics(entries):
+    """从日志抽取交互性能指标;只统计 `基准阶段` 标记之后的记录(没有标记时统计全部)。"""
+    marks = [i for i, e in enumerate(entries) if e[3] == "基准阶段"]
+    scope = entries[marks[0]:] if marks else entries
+    panel = [e[4] for e in scope if e[3] == "侧栏切换" and num(e[4].get("frames")) > 2]
+    avg = [num(f.get("avgMs")) for f in panel]
+    hitches = [num(f.get("hitches")) for f in panel]
+    maxes = [num(f.get("maxMs")) for f in panel]
+    first = [num(f.get("firstFrameMs")) for f in panel]
+    # 冷打开:时间线挂载且 entries=0(新标签);热切换:标签切换且不是冷打开
+    mounts = [e[4] for e in scope if e[3] in ("时间线挂载", "时间线挂载 耗时较长")]
+    cold = [num(f.get("ms")) for f in mounts if f.get("entries") == "0"]
+    switches = [e[4] for e in scope if e[3] in ("标签切换", "标签切换 耗时较长")]
+    warm = [num(f.get("ms")) for f in switches]
+    # 卡顿归属阶段
+    phase = None
+    by_phase = {}
+    for e in scope:
+        if e[3] == "基准阶段":
+            phase = e[4].get("phase")
+        elif e[3] == "主线程卡顿":
+            by_phase.setdefault(phase or "启动前", []).append(num(e[4].get("ms")))
+    return {"avg": avg, "hitches": hitches, "maxes": maxes, "first": first, "cold": cold, "warm": warm, "by_phase": by_phase,
+            "stacks": [e for e in scope if e[3] == "卡顿栈"]}
+
+
+def ui(entries, opts, check_cpu):
+    """打印交互性能画像并返回失败原因列表。"""
+    m = ui_metrics(entries)
+    problems = []
+    print("== 侧栏开关 ==")
+    if m["avg"]:
+        print(f"  次数 {len(m['avg'])}  平均帧间隔均值 {statistics.mean(m['avg']):.1f}ms  P95 {pct(m['avg'], 0.95):.1f}ms")
+        print(f"  每次掉帧(>33ms)均值 {statistics.mean(m['hitches']):.2f}  最大 {max(m['hitches']):.0f}")
+        print(f"  单帧最长 P95 {pct(m['maxes'], 0.95):.0f}ms  最大 {max(m['maxes']):.0f}ms")
+        print(f"  点击→首帧 P95 {pct(m['first'], 0.95):.0f}ms  最大 {max(m['first']):.0f}ms")
+        if statistics.mean(m["avg"]) > opts["panel_avg_ms"]:
+            problems.append(f"侧栏切换平均帧间隔 {statistics.mean(m['avg']):.1f}ms > {opts['panel_avg_ms']}ms")
+        if statistics.mean(m["hitches"]) > opts["panel_hitches"]:
+            problems.append(f"侧栏切换平均掉帧 {statistics.mean(m['hitches']):.2f} > {opts['panel_hitches']}")
+        if pct(m["maxes"], 0.95) > opts["panel_max_ms"]:
+            problems.append(f"侧栏切换单帧最长 P95 {pct(m['maxes'], 0.95):.0f}ms > {opts['panel_max_ms']}ms")
+        if pct(m["first"], 0.95) > opts["first_frame_ms"]:
+            problems.append(f"点击→首帧 P95 {pct(m['first'], 0.95):.0f}ms > {opts['first_frame_ms']}ms")
+    else:
+        print("  无数据(没有「侧栏切换」记录)")
+    print("\n== 会话切换 ==")
+    print(dist("冷打开 时间线挂载", m["cold"]))
+    print(dist("标签切换", m["warm"]))
+    if m["cold"] and max(m["cold"]) > opts["cold_open_ms"]:
+        problems.append(f"冷打开时间线挂载最长 {max(m['cold']):.0f}ms > {opts['cold_open_ms']}ms")
+    if m["warm"]:
+        ordered = sorted(m["warm"])
+        # 冷打开时的标签切换会包含挂载,热切换以中位数衡量
+        if statistics.median(ordered) > opts["warm_switch_ms"]:
+            problems.append(f"标签切换中位 {statistics.median(ordered):.0f}ms > {opts['warm_switch_ms']}ms")
+    print("\n== 主线程卡顿(按基准阶段)==")
+    for phase, values in m["by_phase"].items():
+        print(f"  {phase}: {len(values)} 次  最长 {max(values):.0f}ms")
+        if phase != "启动前" and max(values) > opts["hitch_ms"]:
+            problems.append(f"阶段「{phase}」主线程卡顿最长 {max(values):.0f}ms > {opts['hitch_ms']}ms")
+    for e in m["stacks"][-5:]:
+        print(f"  卡顿栈 stalled={e[4].get('stalledMs')}ms: {e[4].get('top', '')[-300:]}")
+    if check_cpu:
+        cpu = [num(e[4].get("cpuPct")) for e in entries if e[3] == "资源采样" and "cpuPct" in e[4]]
+        # 丢弃前两个采样(启动期)
+        cpu = cpu[2:] if len(cpu) > 4 else cpu
+        if cpu:
+            print(f"\n== CPU ==\n  平均 {statistics.mean(cpu):.1f}%  最大 {max(cpu):.0f}%  (n={len(cpu)})")
+            if statistics.mean(cpu) > opts["run_cpu"]:
+                problems.append(f"本进程 CPU 平均 {statistics.mean(cpu):.1f}% > {opts['run_cpu']}%")
+    return problems
+
+
 def option(args, flag, default):
     """取 `--flag 值`,返回 (值, 剩余参数)。"""
     if flag in args:
@@ -249,6 +334,23 @@ def main():
                 print("  ✗ " + item)
             return 1
         print("性能门槛通过")
+    elif cmd == "ui":
+        rest = args[1:]
+        check_cpu = "--cpu-check" in rest
+        rest = [a for a in rest if a != "--cpu-check"]
+        opts = {}
+        for flag, key, default in (("--panel-avg-ms", "panel_avg_ms", 17.5), ("--panel-hitches", "panel_hitches", 1.0), ("--panel-max-ms", "panel_max_ms", 33.0),
+                                   ("--first-frame-ms", "first_frame_ms", 80.0), ("--cold-open-ms", "cold_open_ms", 150.0), ("--warm-switch-ms", "warm_switch_ms", 50.0),
+                                   ("--hitch-ms", "hitch_ms", 250.0), ("--run-cpu", "run_cpu", 15.0)):
+            opts[key], rest = option(rest, flag, default)
+        problems = ui(entries, opts, check_cpu)
+        print()
+        if problems:
+            print("交互性能门槛未通过:")
+            for item in problems:
+                print("  ✗ " + item)
+            return 1
+        print("交互性能门槛通过")
     elif cmd == "turn" and len(args) > 1:
         turn(entries, args[1])
     else:
