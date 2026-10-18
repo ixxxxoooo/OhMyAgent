@@ -87,6 +87,7 @@ extension ElicitationOutcome {
     public static func isAskQuestion(_ tool: ToolCall) -> Bool {
         if tool.name == "AskUserQuestion" { return true }
         if tool.title == "Asking for your input" { return true }
+        if tool.callsMcpTool(withPrefix: "ask_user_question") { return true }
         return tool.rawInput?["questions"]?.arrayValue?.contains { $0["question"]?.stringValue != nil } == true
     }
 
@@ -95,7 +96,7 @@ extension ElicitationOutcome {
     /// Claude Code 的结果文本形如:`User has answered your questions: "问题"="答案", "问题2"="答案2". You can now continue…`
     /// - Parameter tool: 工具调用
     public static func replayed(from tool: ToolCall) -> ElicitationOutcome? {
-        guard isAskQuestion(tool), let raw = tool.rawInput?["questions"]?.arrayValue, !raw.isEmpty else { return nil }
+        guard isAskQuestion(tool), let raw = tool.mcpInput?["questions"]?.arrayValue, !raw.isEmpty else { return nil }
         let pairs = parseAnswers(tool.resultText ?? "")
         let items = raw.enumerated().compactMap { index, item -> AnsweredQuestion? in
             guard let prompt = item["question"]?.stringValue else { return nil }

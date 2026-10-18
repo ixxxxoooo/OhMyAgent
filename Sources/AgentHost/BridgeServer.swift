@@ -57,6 +57,7 @@ public enum BridgeTool: String, CaseIterable, Sendable, Codable {
     case browserConsole = "browser_console"
     case browserNetwork = "browser_network"
     case browserTabs = "browser_tabs"
+    case askUserQuestion = "ask_user_question"
 
     /// 是否为浏览器类工具(受「浏览器」审批策略管理)。
     public var isBrowser: Bool { rawValue.hasPrefix("browser_") }
@@ -94,6 +95,10 @@ public enum BridgeTool: String, CaseIterable, Sendable, Codable {
         case .browserConsole: return "Read recent console messages and uncaught errors of the current page (written since it was opened)."
         case .browserNetwork: return "Read recent network requests (method, URL, status, duration) of the current page, newest last."
         case .browserTabs: return "List the open browser tabs of this workspace (id, title, URL)."
+        case .askUserQuestion:
+            return "Ask the user one or more multiple-choice questions in the OhMyAgent UI and wait for the answers. Use this INSTEAD of any built-in question/ask tool "
+                + "(those do not work in this client). Each question has a short `header`, the `question`, 2-6 `options` ({label, description?}) and optional `multiSelect`. "
+                + "The user can always type a custom answer. Returns the chosen answers."
         }
     }
 
@@ -124,6 +129,13 @@ public enum BridgeTool: String, CaseIterable, Sendable, Codable {
         case .browserClick: return object(["ref": ["type": "string", "description": "Element ref from the latest browser_snapshot, e.g. e12"]], required: ["ref"])
         case .browserType:
             return object(["ref": ["type": "string"], "text": ["type": "string"], "submit": ["type": "boolean", "description": "Press Enter after typing (default false)"]], required: ["ref", "text"])
+        case .askUserQuestion:
+            return object(["questions": ["type": "array", "description": "1-4 questions",
+                                         "items": ["type": "object", "properties": [
+                                             "question": ["type": "string"], "header": ["type": "string", "description": "Very short label"],
+                                             "multiSelect": ["type": "boolean"],
+                                             "options": ["type": "array", "items": ["type": "object", "properties": ["label": ["type": "string"], "description": ["type": "string"]], "required": ["label"]]]],
+                                             "required": ["question", "options"]]]], required: ["questions"])
         case .browserScroll:
             return object(["direction": ["type": "string", "description": "up, down (default), top or bottom"], "ref": ["type": "string", "description": "Scroll this element into view instead"]], required: [])
         }
@@ -243,7 +255,7 @@ public final class BridgeServer: Sendable {
         case .notify:
             guard let message = arguments["message"]?.stringValue, !message.isEmpty else { return BridgeResult("缺少 message 参数", isError: true) }
             return await handler.notify(title: arguments["title"]?.stringValue ?? "OhMyAgent", message: message)
-        case .canvasCreate, .canvasUpdate, .canvasList, .searchCode, .browserNavigate, .browserSnapshot, .browserClick, .browserType, .browserScroll, .browserScreenshot, .browserConsole, .browserNetwork, .browserTabs:
+        case .canvasCreate, .canvasUpdate, .canvasList, .searchCode, .browserNavigate, .browserSnapshot, .browserClick, .browserType, .browserScroll, .browserScreenshot, .browserConsole, .browserNetwork, .browserTabs, .askUserQuestion:
             return await handler.callExtended(tool, arguments: arguments)
         }
     }

@@ -49,6 +49,15 @@ public struct ToolPresentation: Sendable, Equatable {
         self.detail = nil
         self.subjectIsPath = false
 
+        if ElicitationOutcome.isAskQuestion(tool) {
+            // AskUserQuestion:标题固定为「向你提问」,摘要显示题数;适配器给的英文标题不展示
+            category = .other
+            verb = String(localized: "向你提问")
+            let count = tool.mcpInput?["questions"]?.arrayValue?.count ?? 0
+            subject = count > 0 ? String(localized: "\(count) 个问题") : ""
+            return
+        }
+
         // MCP 工具:Claude Code 是 mcp__服务器__工具,OpenCode 是包在 execute 里的 tools.服务器.工具(...)
         if let ref = tool.mcpRef {
             category = .mcp
@@ -83,15 +92,6 @@ public struct ToolPresentation: Sendable, Equatable {
             if let pattern = input?["pattern"]?.stringValue, !pattern.isEmpty { parts.append(String(localized: "输出匹配 \(pattern)")) }
             subject = parts.isEmpty ? Self.stripVerb(tool.title) : parts.joined(separator: " · ")
             if let timeout = input?["timeout_ms"]?.intValue, timeout > 0 { detail = String(localized: "超时 \(WorkingStatus.elapsed(timeout / 1000))") }
-            return
-        }
-
-        if ElicitationOutcome.isAskQuestion(tool) {
-            // AskUserQuestion:标题固定为「向你提问」,摘要显示题数;适配器给的英文标题不展示
-            category = .other
-            verb = String(localized: "向你提问")
-            let count = input?["questions"]?.arrayValue?.count ?? 0
-            subject = count > 0 ? String(localized: "\(count) 个问题") : ""
             return
         }
 

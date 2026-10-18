@@ -35,6 +35,7 @@ final class SessionBridge: BridgeHandler, @unchecked Sendable {
         case .searchCode: return await callSearch(arguments: arguments)
         case .browserNavigate, .browserSnapshot, .browserClick, .browserType, .browserScroll, .browserScreenshot, .browserConsole, .browserNetwork, .browserTabs:
             return await callBrowser(tool, arguments: arguments)
+        case .askUserQuestion: return await callAskUserQuestion(arguments: arguments)
         default: return BridgeResult("当前客户端不支持工具 \(tool.rawValue)", isError: true)
         }
     }

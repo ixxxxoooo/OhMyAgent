@@ -143,7 +143,20 @@ public struct GenericACPProvider: AgentProvider {
         }
         // 允许写命令名(如 `codex`),在 PATH 中解析
         let resolved = Self.resolve(command, path: env["PATH"] ?? "")
+        Self.applyOpenCodeOverrides(&env, executable: resolved ?? command, arguments: descriptor.args)
         return ProcessLaunch(executable: resolved ?? command, arguments: descriptor.args, environment: env, workingDirectory: cwd)
+    }
+
+    /// OpenCode 的 ACP 模式不会把 `question` 工具的提问转给客户端(直接返回「用户已忽略」),
+    /// 禁用它,让模型改用 Bridge 的 `ask_user_question`;用户已自行设置 `OPENCODE_CONFIG_CONTENT` 时不覆盖。
+    /// - Parameters:
+    ///   - env: 启动环境(就地修改)
+    ///   - executable: 可执行文件路径或命令名
+    ///   - arguments: 启动参数
+    static func applyOpenCodeOverrides(_ env: inout [String: String], executable: String, arguments: [String]) {
+        guard (executable as NSString).lastPathComponent == "opencode", arguments.contains("acp"),
+              env["OPENCODE_CONFIG_CONTENT"] == nil else { return }
+        env["OPENCODE_CONFIG_CONTENT"] = #"{"permission":{"question":"deny"}}"#
     }
 
     /// 在 PATH 中解析可执行文件。

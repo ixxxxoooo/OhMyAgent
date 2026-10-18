@@ -1802,7 +1802,7 @@ public final class SessionModel {
 
     // MARK: - 提问(Elicitation)
 
-    private func awaitElicitation(method: String, params: JSONValue?) async -> JSONValue {
+    func awaitElicitation(method: String, params: JSONValue?) async -> JSONValue {
         guard method == "elicitation/create", let params else { return ["action": "cancel"] }
         let message = params["message"]?.stringValue ?? ""
         return await withCheckedContinuation { continuation in
