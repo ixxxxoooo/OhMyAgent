@@ -47,6 +47,12 @@ final class BrowserTabModel: NSObject {
     @ObservationIgnored private var waiters: [CheckedContinuation<Void, Never>] = []
     @ObservationIgnored private var observers: [NSKeyValueObservation] = []
     @ObservationIgnored var onTitleChange: ((String) -> Void)?
+    /// 是否处于「选择元素」模式(页面里正显示高亮层)
+    var isPicking = false
+    /// 选择结果的提示(如「已把 <button> 加入输入框」),几秒后自动清除
+    var pickNote: String?
+    /// 用户选中元素后回调(元素信息 + 元素截图)
+    @ObservationIgnored var onElementPicked: ((PickedElement, Data?) -> Void)?
     private static let logLimit = 300
 
     /// - Parameters:
@@ -152,6 +158,8 @@ final class BrowserTabModel: NSObject {
         case "console":
             console.append(BrowserConsoleLine(level: body["level"] as? String ?? "log", text: String((body["text"] as? String ?? "").prefix(2000))))
             if console.count > Self.logLimit { console.removeFirst(console.count - Self.logLimit) }
+        case "pick": handlePick(body)
+        case "pickCancel": isPicking = false
         case "net":
             network.append(BrowserNetworkLine(method: body["method"] as? String ?? "GET", url: String((body["url"] as? String ?? "").prefix(300)),
                                               status: body["status"] as? Int ?? 0, milliseconds: body["ms"] as? Int ?? 0, error: body["error"] as? String,
@@ -163,6 +171,10 @@ final class BrowserTabModel: NSObject {
 }
 
 extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        isPicking = false // 页面跳转后高亮层已不在
+    }
+
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         network.append(BrowserNetworkLine(method: "GET", url: String((webView.url?.absoluteString ?? "").prefix(300)), status: 200, milliseconds: 0, error: nil))
         resumeWaiters()
@@ -241,6 +253,10 @@ final class BrowserController {
         let id = String(UUID().uuidString.prefix(8)).lowercased()
         let model = BrowserTabModel(id: id, workspace: workspace, dataStore: dataStore(for: workspace))
         model.onTitleChange = { title in AppEnvironment.shared.workbench.setBrowserTitle(id: id, title: title) }
+        model.onElementPicked = { [weak model] element, png in
+            guard let model else { return }
+            BrowserController.shared.deliver(element, png: png, workspace: workspace, to: model)
+        }
         tabs[id] = model
         order.append(id)
         if makeActive { active[workspace] = id }
@@ -256,6 +272,10 @@ final class BrowserController {
         if let existing = tabs[id] { return existing }
         let model = BrowserTabModel(id: id, workspace: workspace, dataStore: dataStore(for: workspace))
         model.onTitleChange = { title in AppEnvironment.shared.workbench.setBrowserTitle(id: id, title: title) }
+        model.onElementPicked = { [weak model] element, png in
+            guard let model else { return }
+            BrowserController.shared.deliver(element, png: png, workspace: workspace, to: model)
+        }
         tabs[id] = model
         order.append(id)
         return model
@@ -376,6 +396,9 @@ final class BrowserController {
         if let message = nsError.userInfo["WKJavaScriptExceptionMessage"] as? String { return message }
         return error.localizedDescription
     }
+
+    /// 工作区当前浏览器标签的 id(调试探针用)。
+    func activeID(workspace: String) -> String? { active[workspace] }
 
     /// 工作区当前浏览器标签的地址;没有已打开且有页面的标签时为 nil。
     /// - Parameter workspace: 工作区路径

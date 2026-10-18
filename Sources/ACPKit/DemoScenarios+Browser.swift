@@ -31,6 +31,8 @@ extension DemoScenarios {
                  output: "Typed into textbox \"搜索路由\". Now at http://localhost:5173/metrics?q=%2Fapi%2Fusers"),
             tool("b_click", "browser_click", ["ref": "e9"],
                  output: "Clicked button \"刷新\". Now at http://localhost:5173/metrics?q=%2Fapi%2Fusers — Atlas · 指标看板"),
+            tool("b_hover", "browser_hover", ["ref": "e4"], output: "Hovered link \"指标\""),
+            tool("b_dbl", "browser_click", ["ref": "e7", "double": true], output: "Double-clicked heading \"请求指标\". Now at http://localhost:5173/metrics?q=%2Fapi%2Fusers — Atlas · 指标看板"),
             tool("b_scroll", "browser_scroll", ["direction": "bottom"], output: "Scrolled to the bottom (y=1184 of 1184)."),
             tool("b_shot", "browser_screenshot", output: "Screenshot of http://localhost:5173/metrics?q=%2Fapi%2Fusers",
                  extra: [["type": "content", "content": ScenarioImages.contentBlock(.dashboard)]]),
@@ -38,6 +40,9 @@ extension DemoScenarios {
                  output: "[log] [vite] connected.\n[warning] Each child in a list should have a unique \"key\" prop.\n[error] Uncaught TypeError: Cannot read properties of undefined (reading 'p95')\n    at MetricsTable (MetricsTable.tsx:42:18)"),
             tool("b_net", "browser_network",
                  output: "GET http://localhost:5173/metrics → 200 (38 ms)\nGET http://localhost:5173/api/metrics?route=%2Fapi%2Fusers → 200 (212 ms)\nGET http://localhost:5173/api/metrics/latency?route=%2Fapi%2Fusers → 500 (96 ms)\nGET https://fonts.gstatic.com/s/inter/v13/inter.woff2 → 200 (141 ms)"),
+            tool("b_net2", "browser_network", ["request": 3],
+                 output: "#3 GET http://localhost:5173/api/metrics/latency?route=%2Fapi%2Fusers\nStatus: 500 (96 ms)\nContent-Type: application/json\nRequest body: (none)\nResponse body: {\"error\":\"latency window is empty\",\"route\":\"/api/users\"}"),
+            tool("b_back", "browser_back", output: "Went back to http://localhost:5173/metrics — title: Atlas · 指标看板"),
             tool("b_tabs", "browser_tabs", output: "browser-1 (current): Atlas · 指标看板 — http://localhost:5173/metrics?q=%2Fapi%2Fusers\nbrowser-2: Vite — http://localhost:5173/"),
             DemoSteps.say("""
             页面能打开,但**延迟表格渲染报错**:`/api/metrics/latency` 返回 500,前端又没有处理空数据,于是在 `MetricsTable.tsx:42` 读取 `p95` 时崩溃。

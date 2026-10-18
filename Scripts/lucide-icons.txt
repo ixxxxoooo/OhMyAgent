@@ -185,3 +185,4 @@ message-circle-plus
 folder-clock
 folder-symlink
 square-slash
+mouse-pointer-click

@@ -559,7 +559,10 @@ public final class TimelineStore {
         // 用户消息里的图片(历史重放)还原为图片附件,而不是退化成「[图片]」文字
         var attachment: ImageAttachment?
         switch content {
-        case .text(let value): text = value
+        case .text(let value):
+            // `@browser` 附加的提示块不是用户写的,历史重放时不显示
+            if kind == .user, BrowserMention.isHint(value) { return }
+            text = value
         case .resourceLink(_, let name, _, let title): text = "[\(title ?? name)]"
         case .image(let base64, let mimeType, _):
             if kind == .user, let data = Data(base64Encoded: base64), !data.isEmpty {

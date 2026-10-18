@@ -885,8 +885,13 @@ public final class SessionModel {
         for url in CompletionEngine.mentionedFiles(in: prompt, workspace: workspace, includeDirectories: true) {
             blocks.append(.resourceLink(uri: url.absoluteString, name: url.lastPathComponent, mimeType: nil, title: nil))
         }
+        // `@browser`:附一个隐藏的提示块(用户看到的消息不变;历史重放时由时间线隐藏)
+        if BrowserMention.isMentioned(in: prompt) { blocks.append(.text(BrowserMention.hint(servers: browserHintServers))) }
         return blocks
     }
+
+    /// `@browser` 提示块里给出的开发服务器(发送前异步检测)
+    @ObservationIgnored private var browserHintServers: [DevServer] = []
 
     /// 当前会话生效的模型映射(槽位 → 提供商模型);为空表示使用 ~/.claude 的系统默认配置
     public private(set) var mappedModels: [ModelSlot: MappedModel] = [:]
@@ -1034,6 +1039,7 @@ public final class SessionModel {
             // 先探测网关:代理没启动时,SDK 会静默重试 10 余次,界面看起来像卡死
             let status = await self?.probeGateway() ?? .notConfigured
             guard let self, self.isRunning else { return }
+            if BrowserMention.isMentioned(in: prompt) { self.browserHintServers = await DevServerDetector.detect(workspace: self.workspace.path) }
             if case .unreachable(let url, let reason) = status {
                 self.log.error("模型网关不可达,未发送", ["gateway": ModelGateway.origin(of: url), "reason": reason])
                 self.abortSend(prompt: prompt, images: images, message: ModelGateway.unreachableMessage(url: url, reason: reason))
@@ -1505,7 +1511,7 @@ public final class SessionModel {
                                insertText: CompletionEngine.mentionInsertText(path: path, isDirectory: true))
             }
             let agents = CompletionEngine.agentMentionItems(query: context.query, agents: agentCatalog?() ?? [])
-            return agents + files + folders
+            return CompletionEngine.browserMentionItems(query: context.query) + agents + files + folders
         }
     }
 

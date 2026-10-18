@@ -2565,3 +2565,12 @@
 "按计划实施,并跳过所有权限确认——只在完全信任这个计划时使用" = "Implement the plan and skip all permission prompts; only use this if you fully trust the plan";
 "有未保存的修改,Build 时会先保存" = "Unsaved changes will be saved before Build";
 "确认后再 Build" = "Confirm, then Build";
+"让 Agent 用内置浏览器完成(测试页面、截图、看控制台与网络)" = "Have the agent do this with the built-in browser (test pages, screenshots, console and network)";
+"用内置浏览器测试页面、截图、看日志" = "Test pages, take screenshots and read logs with the built-in browser";
+"退出选择元素" = "Exit element picker";
+"选择页面元素,发给 Agent" = "Pick a page element and send it to the agent";
+"选择页面元素" = "Pick page element";
+"点击页面上的元素,把它发给 Agent · Esc 取消" = "Click an element on the page to send it to the agent · Esc to cancel";
+"没有可用的会话,元素未加入输入框" = "No session available; the element was not added to the composer";
+"已把 %@ 加入输入框" = "Added %@ to the composer";
+"元素截图 %@" = "Element screenshot %@";

@@ -32,6 +32,7 @@ public struct CompletionItem: Identifiable, Sendable, Hashable {
             case .skill: return "Skills"
             case .mcpPrompt: return "MCP"
             case .subagent: return ChatL10n.t("子 Agent")
+            case .browser: return ChatL10n.t("工具")
             case .file: return ChatL10n.t("文件")
             case .folder: return ChatL10n.t("文件夹")
             }
@@ -52,6 +53,8 @@ public struct CompletionItem: Identifiable, Sendable, Hashable {
         case mcpPrompt
         /// `@agent-名称` 子 Agent 提及
         case subagent
+        /// `@browser`:让 Agent 用内置浏览器做这件事
+        case browser
     }
     public var id: String { "\(kind)-\(insertText)" }
     /// 菜单分组标题。
@@ -233,6 +236,14 @@ public enum CompletionEngine {
             return (CompletionItem(kind: .subagent, title: "@\(handle)", subtitle: agent.summary, insertText: "@\(handle) ", badge: agent.badge), score)
         }
         return scored.sorted { $0.1 > $1.1 }.prefix(limit).map(\.0)
+    }
+
+    /// `@browser` 候选:查询词为空或与 browser 模糊匹配时出现。
+    /// - Parameter query: `@` 后的查询词
+    public static func browserMentionItems(query: String) -> [CompletionItem] {
+        guard query.isEmpty || FuzzyMatcher.score(query: query.lowercased(), candidate: BrowserMention.handle) != nil else { return [] }
+        return [CompletionItem(kind: .browser, title: "@\(BrowserMention.handle)", subtitle: ChatL10n.t("用内置浏览器测试页面、截图、看日志"),
+                               insertText: "@\(BrowserMention.handle) ", badge: ChatL10n.t("浏览器"))]
     }
 
     /// 去掉编辑器引用产生的行号后缀:`a/b.swift:12` 或 `a/b.swift:12-20`;

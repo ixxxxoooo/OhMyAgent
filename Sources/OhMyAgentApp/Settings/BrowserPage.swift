@@ -23,7 +23,7 @@ struct BrowserPage: View {
                     .buttonStyle(.omSecondary)
                     .disabled(AppEnvironment.shared.workbench.selectedProjectID == nil)
                 }
-                Note("浏览器只允许 http/https 页面;file、javascript 等协议会被拦截。Agent 通过 browser_navigate / browser_snapshot / browser_click / browser_type 等工具操作它。").footnote()
+                Note("浏览器只允许 http/https 页面;file、javascript 等协议会被拦截。Agent 通过 browser_navigate / snapshot / click(含双击、右键)/ hover / type / scroll / back / forward / reload / screenshot / console / network 等工具操作它。在消息里写 @browser 可以明确要求 Agent 用它,并复用本机已在运行的开发服务器。在浏览器标签页工具栏点「选择页面元素」,可以把页面上的某个元素连同截图发进输入框。").footnote()
             }
         }
     }

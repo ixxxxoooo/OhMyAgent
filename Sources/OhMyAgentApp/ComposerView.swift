@@ -169,7 +169,7 @@ struct ComposerView: View {
     private func accept(_ item: CompletionItem) {
         guard let context = completion else { return }
         var text = item.insertText
-        if context.trigger == .slash || item.kind == .subagent { text += item.insertText.hasSuffix(" ") ? "" : " " }
+        if context.trigger == .slash || item.kind == .subagent || item.kind == .browser { text += item.insertText.hasSuffix(" ") ? "" : " " }
         completion = nil
         items = []
         controller.replace(range: context.range, with: text)
@@ -617,6 +617,7 @@ struct CompletionPopup: View {
         case .customCommand: return "command"
         case .mcpPrompt: return "brand.mcp"
         case .subagent: return "bot"
+        case .browser: return "globe"
         }
     }
 }

@@ -102,14 +102,16 @@ enum BrowserScripts {
     if (!el) throw new Error('Element ' + ref + ' not found. Take a new browser_snapshot.');
     el.scrollIntoView({block: 'center', inline: 'center'});
     if (typeof el.focus === 'function') el.focus({preventScroll: true});
+    const mouseButton = (typeof button === 'undefined') ? 'left' : button;
+    const isDouble = (typeof double === 'undefined') ? false : double;
     const r = el.getBoundingClientRect();
     const opts = function(b, detail){ return {bubbles: true, cancelable: true, view: window, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, button: b, buttons: b === 2 ? 2 : 1, detail: detail}; };
     const label = (el.getAttribute('aria-label') || el.innerText || el.value || '').replace(/\\s+/g, ' ').trim().slice(0, 60);
-    if (button === 'right') {
+    if (mouseButton === 'right') {
       ['mousedown', 'mouseup', 'contextmenu'].forEach(function(t){ el.dispatchEvent(new MouseEvent(t, opts(2, 1))); });
       return 'Right-clicked ' + el.tagName.toLowerCase() + ' "' + label + '"';
     }
-    if (double) {
+    if (isDouble) {
       el.click(); el.click();
       el.dispatchEvent(new MouseEvent('dblclick', opts(0, 2)));
       return 'Double-clicked ' + el.tagName.toLowerCase() + ' "' + label + '"';
@@ -164,5 +166,80 @@ enum BrowserScripts {
     else if (direction === 'up') { window.scrollBy(0, -window.innerHeight * 0.8); }
     else { window.scrollBy(0, window.innerHeight * 0.8); }
     return 'Scroll position ' + Math.round(window.scrollY) + '/' + Math.max(0, Math.round(document.documentElement.scrollHeight - window.innerHeight)) + ' px';
+    """
+
+    /// 选择元素:鼠标悬停高亮、点击选中并把元素信息回传原生(消息 `pick`);Esc 取消(消息 `pickCancel`)。
+    /// 选中后自动退出选择模式并移除高亮层,不会残留在页面里影响 Agent 的快照与截图。
+    static let pickStart = """
+    if (window.__omaPick) { window.__omaPick.stop(false); }
+    const post = function(p){ try { window.webkit.messageHandlers.oma.postMessage(p); } catch (e) {} };
+    const box = document.createElement('div');
+    box.setAttribute('data-oma-pick-overlay', '1');
+    box.style.cssText = 'position:fixed;z-index:2147483647;pointer-events:none;border:2px solid #d9480f;background:rgba(217,72,15,0.12);border-radius:2px;display:none;';
+    const tip = document.createElement('div');
+    tip.style.cssText = 'position:fixed;z-index:2147483647;pointer-events:none;background:#1f1f1f;color:#fff;font:11px -apple-system,sans-serif;padding:2px 6px;border-radius:3px;display:none;max-width:60vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+    document.documentElement.appendChild(box); document.documentElement.appendChild(tip);
+    let current = null;
+    const esc = function(s){ return (window.CSS && CSS.escape) ? CSS.escape(s) : String(s).replace(/[^a-zA-Z0-9_-]/g, '\\\\$&'); };
+    const selectorOf = function(el){
+      const parts = [];
+      let node = el, depth = 0;
+      while (node && node.nodeType === 1 && node !== document.documentElement && depth < 7) {
+        let part = node.tagName.toLowerCase();
+        if (node.id) { parts.unshift(part + '#' + esc(node.id)); break; }
+        const cls = Array.prototype.slice.call(node.classList || []).filter(function(c){ return c.length < 40; }).slice(0, 2);
+        if (cls.length) part += '.' + cls.map(esc).join('.');
+        const parent = node.parentElement;
+        if (parent) {
+          const same = Array.prototype.filter.call(parent.children, function(c){ return c.tagName === node.tagName; });
+          if (same.length > 1) part += ':nth-of-type(' + (same.indexOf(node) + 1) + ')';
+        }
+        parts.unshift(part); node = parent; depth += 1;
+      }
+      return parts.join(' > ');
+    };
+    const show = function(el){
+      const r = el.getBoundingClientRect();
+      box.style.display = 'block'; box.style.left = r.left + 'px'; box.style.top = r.top + 'px'; box.style.width = r.width + 'px'; box.style.height = r.height + 'px';
+      tip.textContent = '<' + el.tagName.toLowerCase() + '> ' + Math.round(r.width) + '×' + Math.round(r.height);
+      tip.style.display = 'block'; tip.style.left = Math.max(0, r.left) + 'px'; tip.style.top = Math.max(0, r.top - 22) + 'px';
+    };
+    const pointed = function(e){ box.style.display = 'none'; tip.style.display = 'none'; const el = document.elementFromPoint(e.clientX, e.clientY); return el; };
+    const onMove = function(e){ const el = pointed(e); if (el && el !== document.documentElement && el !== document.body) { current = el; show(el); } else { box.style.display = 'none'; tip.style.display = 'none'; } };
+    const swallow = function(e){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); };
+    const onClick = function(e){
+      swallow(e);
+      const el = current || pointed(e);
+      if (!el) { api.stop(true); return; }
+      const r = el.getBoundingClientRect(); const cs = getComputedStyle(el);
+      const keys = ['color','background-color','font-size','font-weight','font-family','display','position','padding','margin','border','border-radius'];
+      const styles = {}; keys.forEach(function(k){ styles[k] = cs.getPropertyValue(k); });
+      const info = {url: location.href, title: document.title, tag: el.tagName.toLowerCase(), selector: selectorOf(el),
+        text: (el.innerText || el.value || '').replace(/\\s+/g, ' ').trim().slice(0, 200), html: el.outerHTML.replace(/ data-oma-ref="[^"]*"/g, '').slice(0, 1600), styles: styles,
+        w: Math.round(r.width), h: Math.round(r.height), x: Math.round(r.left), y: Math.round(r.top)};
+      api.stop(false);
+      post({k: 'pick', info: info});
+    };
+    const onKey = function(e){ if (e.key === 'Escape') { swallow(e); api.stop(true); } };
+    const blockers = ['mousedown', 'mouseup', 'pointerdown', 'pointerup', 'dblclick', 'contextmenu', 'submit'];
+    const api = {
+      stop: function(cancelled){
+        document.removeEventListener('mousemove', onMove, true); document.removeEventListener('click', onClick, true); document.removeEventListener('keydown', onKey, true);
+        blockers.forEach(function(t){ document.removeEventListener(t, swallow, true); });
+        box.remove(); tip.remove(); document.documentElement.style.cursor = ''; window.__omaPick = null;
+        if (cancelled) post({k: 'pickCancel'});
+      }
+    };
+    document.addEventListener('mousemove', onMove, true); document.addEventListener('click', onClick, true); document.addEventListener('keydown', onKey, true);
+    blockers.forEach(function(t){ document.addEventListener(t, swallow, true); });
+    document.documentElement.style.cursor = 'crosshair';
+    window.__omaPick = api;
+    return 'picking';
+    """
+
+    /// 退出选择模式(不回传)。
+    static let pickStop = """
+    if (window.__omaPick) { window.__omaPick.stop(false); }
+    return 'stopped';
     """
 }

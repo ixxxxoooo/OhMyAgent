@@ -46,6 +46,30 @@ enum BrowserProbe {
             }
         }
         for item in actions.split(separator: ";").map(String.init) {
+            // pick:<ref>:用合成鼠标事件在页面里「选择元素」并检查结果(输入框草稿与图片附件)
+            if item == "pickon" {
+                try? await Task.sleep(for: .milliseconds(900))
+                let model = BrowserController.shared.tab(id: BrowserController.shared.activeID(workspace: workspace) ?? "", workspace: workspace)
+                await model.setPicking(true)
+                log += "### pickon  选择模式:\(model.isPicking)\n\n"
+                continue
+            }
+            if item.hasPrefix("pick:") {
+                let ref = String(item.dropFirst(5))
+                try? await Task.sleep(for: .milliseconds(900))
+                let model = BrowserController.shared.tab(id: BrowserController.shared.activeID(workspace: workspace) ?? "", workspace: workspace)
+                await model.setPicking(true)
+                _ = try? await model.evaluate("""
+                const el = document.querySelector('[data-oma-ref="' + ref + '"]'); const r = el.getBoundingClientRect();
+                const o = {bubbles: true, cancelable: true, view: window, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2};
+                document.dispatchEvent(new MouseEvent('mousemove', o)); document.dispatchEvent(new MouseEvent('click', o));
+                return 'ok';
+                """, arguments: ["ref": ref])
+                try? await Task.sleep(for: .milliseconds(1500))
+                let session = AppEnvironment.shared.workbench.sessions[workspace]
+                log += "### \(item)  [已选择]\n提示条:\(model.pickNote ?? "(无)")  选择模式:\(model.isPicking)\n附件:\(session?.attachments.map { "\($0.name) \($0.data.count) 字节" } ?? [])\n草稿:\n\(session?.draft ?? "(无会话)")\n\n"
+                continue
+            }
             guard let command = parse(item) else { log += "### \(item)\n(无法解析)\n\n"; continue }
             try? await Task.sleep(for: .milliseconds(900))
             let result = await BrowserController.shared.run(command, workspace: workspace, activate: true)

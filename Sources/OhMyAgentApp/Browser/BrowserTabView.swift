@@ -48,9 +48,10 @@ struct BrowserTabView: View {
             if let model {
                 toolbar(model)
                 Divider().opacity(0.5)
-                ZStack {
+                ZStack(alignment: .top) {
                     WebViewHost(webView: model.webView)
                     if model.urlString.isEmpty { emptyState }
+                    pickBanner(model)
                 }
             }
         }
@@ -81,6 +82,7 @@ struct BrowserTabView: View {
             .padding(.horizontal, 8)
             .frame(height: 24)
             .background(OMPillShape().fill(OMColors.subtleFill))
+            pickButton(model)
             navButton("external-link", help: "用系统浏览器打开", enabled: !model.urlString.isEmpty) {
                 if let url = URL(string: model.urlString) { NSWorkspace.shared.open(url) }
             }
@@ -88,6 +90,45 @@ struct BrowserTabView: View {
         .padding(.horizontal, 12)
         .frame(height: 40)
         .onChange(of: model.urlString) { _, value in if !value.isEmpty { address = value } }
+    }
+
+    /// 「选择元素」开关:开启后在页面里点选元素,元素信息与截图进入当前会话的输入框。
+    private func pickButton(_ model: BrowserTabModel) -> some View {
+        Button {
+            Task { await model.setPicking(!model.isPicking) }
+        } label: {
+            Image.om("mouse-pointer-click", size: 13)
+                .foregroundStyle(model.isPicking ? OMColors.accent : OMColors.secondaryText)
+        }
+        .buttonStyle(.omIcon)
+        .disabled(model.urlString.isEmpty)
+        .omTooltip(model.isPicking ? "退出选择元素" : "选择页面元素,发给 Agent")
+        .accessibilityLabel("选择页面元素")
+        .accessibilityAddTraits(model.isPicking ? .isSelected : [])
+    }
+
+    /// 页面上方的提示条:选择中提示操作方式;选中后短暂显示结果。
+    @ViewBuilder
+    private func pickBanner(_ model: BrowserTabModel) -> some View {
+        if model.isPicking || model.pickNote != nil {
+            HStack(spacing: 8) {
+                Image.om(model.isPicking ? "mouse-pointer-click" : "circle-check", size: 12)
+                    .foregroundStyle(model.isPicking ? OMColors.accent : OMColors.success)
+                Text(verbatim: model.isPicking ? String(localized: "点击页面上的元素,把它发给 Agent · Esc 取消") : (model.pickNote ?? ""))
+                    .font(OMFonts.small)
+                    .foregroundStyle(OMColors.primaryText)
+                    .lineLimit(1)
+                if model.isPicking {
+                    Button("取消") { Task { await model.setPicking(false) } }.buttonStyle(.omPlain)
+                }
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 30)
+            .omGlassCapsule()
+            .padding(.top, 10)
+            .transition(.opacity)
+            .accessibilityElement(children: .combine)
+        }
     }
 
     private func navButton(_ icon: String, help: String, enabled: Bool, action: @escaping () -> Void) -> some View {
