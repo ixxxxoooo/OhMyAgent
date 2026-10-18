@@ -125,6 +125,10 @@ struct TabItemView: View {
     var body: some View {
         HStack(spacing: 4) {
             icon
+            // 会话状态点(运行中为呼吸灯)放在标题前,不占用尾部关闭按钮的位置
+            if case .chat = tab.kind, let uid = workbench.session(forTab: tab)?.uid {
+                AttentionDot(uid: uid)
+            }
             Text(workbench.displayTitle(tab))
                 .font(OMFonts.small)
                 .italic(tab.isPreview)
@@ -188,18 +192,12 @@ struct TabItemView: View {
         }
     }
 
-    /// 会话标签的注意力状态(运行中/等待/未读);非会话标签为 idle。
-    private var attentionState: AttentionState {
-        guard case .chat = tab.kind, let uid = workbench.session(forTab: tab)?.uid else { return .idle }
-        return AttentionCenter.shared.items[uid]?.state ?? .idle
-    }
-
-    /// 尾部是否有内容(悬停的关闭按钮、图钉、未保存点或会话状态点)。
+    /// 尾部是否有内容(悬停的关闭按钮、图钉或未保存点)。
     private var showsTrailing: Bool {
-        hovering || tab.isPinned || tab.isDirty || attentionState != .idle
+        hovering || tab.isPinned || tab.isDirty
     }
 
-    /// 尾部叠加区:悬停显示关闭按钮;否则显示图钉 / 未保存点 / 会话状态点(运行中为呼吸灯)。
+    /// 尾部叠加区:悬停显示关闭按钮;否则显示图钉 / 未保存点。
     @ViewBuilder
     private var trailing: some View {
         ZStack {
@@ -216,8 +214,6 @@ struct TabItemView: View {
                     if tab.isDirty {
                         Circle().fill(OMColors.secondaryText).frame(width: 7, height: 7)
                             .omTooltip("有未保存修改")
-                    } else if case .chat = tab.kind, let uid = workbench.session(forTab: tab)?.uid {
-                        AttentionDot(uid: uid)
                     }
                 }
                 if hovering {
