@@ -181,6 +181,8 @@ struct ExtensionRow<Badges: View, Trailing: View, Detail: View>: View {
     let title: String
     var subtitle: String?
     var monoSubtitle = false
+    /// 说明最多显示的行数(默认 2;命令类长文本用 1 加尾部省略)
+    var subtitleLines = 2
     var dimmed = false
     var expanded = false
     var onTap: (() -> Void)?
@@ -205,8 +207,8 @@ struct ExtensionRow<Badges: View, Trailing: View, Detail: View>: View {
                         Text(verbatim: subtitle)
                             .font(monoSubtitle ? OMFonts.monoSmall : OMFonts.small)
                             .foregroundStyle(OMColors.secondaryText)
-                            .lineLimit(2)
-                            .truncationMode(.middle)
+                            .lineLimit(subtitleLines)
+                            .truncationMode(subtitleLines == 1 ? .tail : .middle)
                     }
                 }
                 Spacer(minLength: 8)
@@ -230,9 +232,9 @@ struct ExtensionRow<Badges: View, Trailing: View, Detail: View>: View {
 
 extension ExtensionRow where Detail == EmptyView {
     /// 没有展开详情的行。
-    init(icon: String, tint: Color = OMColors.accent, title: String, subtitle: String? = nil, monoSubtitle: Bool = false, dimmed: Bool = false,
+    init(icon: String, tint: Color = OMColors.accent, title: String, subtitle: String? = nil, monoSubtitle: Bool = false, subtitleLines: Int = 2, dimmed: Bool = false,
          onTap: (() -> Void)? = nil, @ViewBuilder badges: () -> Badges, @ViewBuilder trailing: () -> Trailing) {
-        self.init(icon: icon, tint: tint, title: title, subtitle: subtitle, monoSubtitle: monoSubtitle, dimmed: dimmed, expanded: false,
+        self.init(icon: icon, tint: tint, title: title, subtitle: subtitle, monoSubtitle: monoSubtitle, subtitleLines: subtitleLines, dimmed: dimmed, expanded: false,
                   onTap: onTap, badges: badges, trailing: trailing, detail: { EmptyView() })
     }
 }

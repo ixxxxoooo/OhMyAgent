@@ -13,14 +13,25 @@ struct HooksSettingsPage: View {
     var query = ""
     @State private var editor: HookEditorTarget?
     @State private var pendingDelete: HookEntry?
+    @State private var expandedGroups: Set<String> = []
 
+    /// 每组默认显示的条数,其余折叠到「显示更多」。
+    private static let collapsedCount = 5
+
+    /// 按来源(用户 / 项目 / 本地设置 / 插件)分组,保持首次出现的顺序。
     private var grouped: [(String, [HookEntry])] {
         let hooks = query.isEmpty ? center.snapshot.hooks : center.snapshot.hooks.filter {
             $0.event.localizedCaseInsensitiveContains(query) || $0.matcher.localizedCaseInsensitiveContains(query)
-                || $0.handler.summary.localizedCaseInsensitiveContains(query)
+                || $0.handler.summary.localizedCaseInsensitiveContains(query) || $0.origin.displayName.localizedCaseInsensitiveContains(query)
         }
-        let groups = Dictionary(grouping: hooks, by: \.event)
-        return groups.keys.sorted().map { ($0, groups[$0] ?? []) }
+        var order: [String] = []
+        var groups: [String: [HookEntry]] = [:]
+        for hook in hooks {
+            let key = hook.origin.displayName
+            if groups[key] == nil { order.append(key) }
+            groups[key, default: []].append(hook)
+        }
+        return order.map { ($0, groups[$0] ?? []) }
     }
 
     var body: some View {
@@ -39,13 +50,21 @@ struct HooksSettingsPage: View {
             if grouped.isEmpty {
                 ExtensionEmptyCard(icon: "bolt.horizontal", title: String(localized: "没有配置 Hook"), message: String(localized: "Hook 可在工具调用前后、会话开始/结束等事件上运行命令。"))
             } else {
-                ForEach(grouped, id: \.0) { event, entries in
-                    ExtensionSectionLabel(title: event, count: entries.count)
+                ForEach(grouped, id: \.0) { origin, entries in
+                    let showAll = expandedGroups.contains(origin) || entries.count <= Self.collapsedCount + 1
+                    let visible = showAll ? entries : Array(entries.prefix(Self.collapsedCount))
+                    ExtensionSectionLabel(title: origin, count: entries.count)
                     ExtensionCardList {
-                        ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                        ForEach(Array(visible.enumerated()), id: \.element.id) { index, entry in
                             if index > 0 { ExtensionRowDivider() }
                             row(entry)
                         }
+                    }
+                    if !showAll {
+                        Button { expandedGroups.insert(origin) } label: {
+                            Label(String(localized: "显示更多 \(entries.count - Self.collapsedCount) 条"), om: "chevron-down")
+                        }
+                        .buttonStyle(.omPlain)
                     }
                 }
             }
@@ -58,27 +77,26 @@ struct HooksSettingsPage: View {
         }
     }
 
+    /// 一行 Hook:事件名为标题,命令单行(尾部省略)作说明;有匹配器时在标题旁加标签。
     private func row(_ entry: HookEntry) -> some View {
         let editable: Bool = { if case .settings = entry.origin { return true } else { return false } }()
         return ExtensionRow(
-            icon: "bolt.horizontal", title: entry.handler.summary, subtitle: nil, monoSubtitle: true,
+            icon: "bolt.horizontal", title: entry.event, subtitle: entry.handler.summary, monoSubtitle: true, subtitleLines: 1,
             onTap: editable ? { editor = HookEditorTarget(entry: entry) } : nil,
             badges: {
-                Tag(entry.handler.type, color: OMColors.accent2)
                 if !entry.matcher.isEmpty { Tag(String(localized: "匹配 \(entry.matcher)")) }
-                Tag(entry.origin.displayName)
                 if let timeout = entry.handler.timeout { Tag("\(timeout)s") }
             },
             trailing: {
                 if editable {
-                    HStack(spacing: 6) {
-                        Button { editor = HookEditorTarget(entry: entry) } label: { Image.om("pencil", size: 13).frame(width: 24, height: 24).contentShape(Rectangle()) }
-                            .buttonStyle(.plain).foregroundStyle(OMColors.secondaryText).omTooltip("编辑").accessibilityLabel("编辑")
-                        Button { pendingDelete = entry } label: { Image.om("trash", size: 13).frame(width: 24, height: 24).contentShape(Rectangle()) }
-                            .buttonStyle(.plain).foregroundStyle(OMColors.secondaryText).omTooltip("删除").accessibilityLabel("删除")
+                    HStack(spacing: 4) {
+                        Button { editor = HookEditorTarget(entry: entry) } label: { Image.om("pencil", size: 12) }
+                            .buttonStyle(.omIcon).omTooltip("编辑").accessibilityLabel("编辑")
+                        Button { pendingDelete = entry } label: { Image.om("trash", size: 12) }
+                            .buttonStyle(.omIcon).omTooltip("删除").accessibilityLabel("删除")
                     }
                 } else {
-                    Image.om("lock", size: 13).foregroundStyle(OMColors.tertiaryText).omTooltip("来自插件,只读")
+                    Image.om("lock", size: 12).foregroundStyle(OMColors.tertiaryText).omTooltip("来自插件,只读")
                 }
             }
         )

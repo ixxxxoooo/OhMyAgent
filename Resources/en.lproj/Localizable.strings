@@ -2481,3 +2481,4 @@
 "切换模型来源失败:%@" = "Failed to switch model source: %@";
 "切换到源码" = "Switch to source";
 "切换到预览" = "Switch to preview";
+"显示更多 %lld 条" = "Show %lld more";
