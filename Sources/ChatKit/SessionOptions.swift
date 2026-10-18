@@ -116,6 +116,7 @@ public enum ChatWidth: String, Sendable, CaseIterable, Identifiable {
 ///
 /// 开启后 MCP 工具定义不再一次性塞进上下文,而是由模型按需搜索加载,可显著降低启动占用。
 /// Claude Code 默认只在直连官方 API 且 MCP 工具超过窗口 10% 时才自动启用;经第三方网关(自定义 `ANTHROPIC_BASE_URL`)时默认关闭。
+/// OhMyAgent 的「自动」更积极:直连官方 API 的会话直接启用(见 `SessionModel.effectiveMeta`),让 Bridge 工具默认按需加载。
 public enum McpToolSearch: String, Sendable, CaseIterable, Identifiable {
     /// 保持 Claude Code 默认行为(不注入变量)
     case auto

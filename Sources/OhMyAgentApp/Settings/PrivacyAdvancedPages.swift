@@ -72,7 +72,7 @@ struct AdvancedPage: View {
                 Picker("MCP 工具按需加载", selection: $mcpToolSearch) {
                     ForEach(McpToolSearch.allCases) { mode in Text(mode.displayName).tag(mode.rawValue) }
                 }
-                Note("开启后 MCP 工具定义不再启动即全部载入上下文,而是由模型按需搜索加载,MCP 较多时能明显降低初始占用。「自动」沿用 Claude Code 默认:直连官方 API 且 MCP 工具超过窗口 10% 时才启用。")
+                Note("开启后 MCP 工具定义不再启动即全部载入上下文,而是由模型按需搜索加载,MCP 较多时能明显降低初始占用。「自动」:直连官方 API 的会话启用(OhMyAgent Bridge 的工具因此默认按需加载);经第三方网关或模型映射时沿用 Claude Code 默认(关闭),这类会话可在「Agent 扩展 → OhMyAgent Bridge」里关掉用不到的工具来减小体积。")
                 if mcpToolSearch == McpToolSearch.on.rawValue {
                     Label("经第三方网关或模型映射使用时,网关必须支持 tool_reference 内容块,否则请求可能报错;遇到问题请改回「自动」。", om: "triangle-alert")
                         .font(OMFonts.caption).foregroundStyle(OMColors.warning)

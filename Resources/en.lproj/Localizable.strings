@@ -1574,7 +1574,6 @@
 "显示项目栏" = "Show Project Sidebar";
 "隐藏工具栏" = "Hide Tools Sidebar";
 "显示工具栏" = "Show Tools Sidebar";
-"每个会话在应用内置的本机回环端点上注册一个不可猜测的 HTTP MCP 地址(服务器名 `ohmyagent`,无需额外进程),暴露:打开文件、显示改动、读取你在输入框中选中的文字、发送系统通知、创建/更新画布(Canvas)。会话结束即注销。" = "Each session registers an unguessable HTTP MCP address on the app's built-in loopback endpoint (server name `ohmyagent`, no extra process), exposing: open files, show changes, read the text you selected in the composer, send system notifications, and create/update Canvases. It is unregistered when the session ends.";
 "新会话的默认模型;未单独设置的槽位也使用它" = "Default model for new sessions; slots without their own model use it too";
 "选择 Opus 时使用(复杂任务)" = "Used when Opus is selected (complex tasks)";
 "选择 Sonnet 时使用(日常编码)" = "Used when Sonnet is selected (everyday coding)";
@@ -1744,7 +1743,6 @@
 "去设置" = "Open settings";
 "打开高级设置" = "Open advanced settings";
 "上下文已用 %lld%%,建议输入 /compact 压缩,或开启新会话。" = "Context is %lld%% used. Run /compact or start a new session.";
-"开启后 MCP 工具定义不再启动即全部载入上下文,而是由模型按需搜索加载,MCP 较多时能明显降低初始占用。「自动」沿用 Claude Code 默认:直连官方 API 且 MCP 工具超过窗口 10% 时才启用。" = "When on, MCP tool definitions are no longer all loaded into the context at startup; the model searches and loads them on demand, which sharply cuts the initial footprint when you have many MCP servers. \"Automatic\" keeps Claude Code's default: enabled only on the official API when MCP tools exceed 10% of the window.";
 "经第三方网关或模型映射使用时,网关必须支持 tool_reference 内容块,否则请求可能报错;遇到问题请改回「自动」。" = "When used through a third-party gateway or model mapping, the gateway must support tool_reference content blocks or requests may fail; switch back to \"Automatic\" if you hit problems.";
 "对新建或恢复的会话生效。对应环境变量 ENABLE_TOOL_SEARCH。" = "Applies to new or resumed sessions. Maps to the ENABLE_TOOL_SEARCH environment variable.";
 "界面字号" = "UI font size";
@@ -2494,3 +2492,5 @@
 "上下文上限(自动压缩窗口)" = "Context limit (auto-compact window)";
 "0 表示默认" = "0 means default";
 "给对话上下文设上限:占用接近该值时 Claude Code 自动压缩,避免长会话越滚越大、每轮都重复读取巨量历史。范围 5 万 ~ 100 万(超出会被夹到范围内),0 使用默认值(大窗口模型可能到 100 万)。模型映射里为模型单独设置了窗口时取两者较小值。对新建或恢复的会话生效。对应环境变量 CLAUDE_CODE_AUTO_COMPACT_WINDOW。" = "Caps the conversation context: Claude Code auto-compacts when usage approaches this value, so long sessions do not keep re-reading a huge history every turn. Range 50K to 1M tokens (values outside are clamped); 0 uses the default (large-window models may reach 1M). If a model mapping sets its own window, the smaller of the two applies. Takes effect for new or resumed sessions. Maps to the environment variable CLAUDE_CODE_AUTO_COMPACT_WINDOW.";
+"开启后 MCP 工具定义不再启动即全部载入上下文,而是由模型按需搜索加载,MCP 较多时能明显降低初始占用。「自动」:直连官方 API 的会话启用(OhMyAgent Bridge 的工具因此默认按需加载);经第三方网关或模型映射时沿用 Claude Code 默认(关闭),这类会话可在「Agent 扩展 → OhMyAgent Bridge」里关掉用不到的工具来减小体积。" = "When on, MCP tool definitions are no longer all loaded into the context at startup; the model searches and loads them on demand, which sharply cuts the initial footprint when you have many MCP servers. \"Automatic\": enabled for sessions on the official API (so OhMyAgent Bridge tools load on demand by default); with a third-party gateway or model mapping it keeps Claude Code's default (off) — in those sessions, turn off unused tools under Agent Extensions → OhMyAgent Bridge to shrink the footprint.";
+"每个会话在应用内置的本机回环端点上注册一个不可猜测的 HTTP MCP 地址(服务器名 `ohmyagent`,无需额外进程),暴露:打开文件、显示改动、读取你在输入框中选中的文字、发送系统通知、画布(Canvas)、代码搜索与内置浏览器。会话结束即注销。每个启用的工具定义都会随每次模型请求发送(命中提示缓存时按 0.1 倍计费),用不到的(如浏览器)建议关掉;直连官方 API 时会自动按需加载,无需手动关。" = "Each session registers an unguessable HTTP MCP address on the app's built-in loopback endpoint (server name `ohmyagent`, no extra process), exposing: open file, show diff, read your selection in the composer, system notifications, Canvas, code search and the built-in browser. It is unregistered when the session ends. Every enabled tool definition is sent with each model request (billed at 0.1x when the prompt cache hits), so turn off ones you do not use (e.g. the browser); on the official API tools load on demand automatically.";
