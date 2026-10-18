@@ -244,6 +244,22 @@ extension DemoScenarios {
         [DemoSteps.say("下面是各种图的渲染效果:\n\n"), .text(mermaidBlocks), DemoSteps.say("最后一个类型暂不支持,会回退为代码块。\n")]
     }
 
+    /// 会话内联图表:折线图与带均线、成交量的 K 线图(```chart 围栏)。
+    static func chart(_ c: ScenarioContext) -> [ScenarioStep] {
+        let candles = (0..<30).map { i -> String in
+            let base = 1500.0 + Double(i) * 3 + (i % 5 == 0 ? -25 : Double(i % 3) * 8)
+            let close = base + (i % 2 == 0 ? 14 : -9)
+            return "[\(Int(base)),\(Int(max(base, close)) + 12),\(Int(min(base, close)) - 10),\(Int(close)),\(20_000 + i * 900)]"
+        }.joined(separator: ",")
+        let labels = (0..<30).map { "\"10-\(String(format: "%02d", $0 + 1))\"" }.joined(separator: ",")
+        let line = "{\"kind\":\"line\",\"title\":\"月度销量\",\"labels\":[\"1月\",\"2月\",\"3月\",\"4月\"],\"series\":[{\"name\":\"2025\",\"values\":[10,20,15,30]},{\"name\":\"2026\",\"values\":[12,18,25,28]}]}"
+        let candle = "{\"kind\":\"candle\",\"title\":\"示意 K 线(演示数据)\",\"labels\":[\(labels)],\"candles\":[\(candles)],\"ma\":[5,10],\"up\":\"red\"}"
+        return [
+            DemoSteps.say("折线图:\n\n```chart\n\(line)\n```\n\n"),
+            DemoSteps.say("K 线图(红涨绿跌,带 MA5/MA10 与成交量,悬停查看开高低收):\n\n```chart\n\(candle)\n```\n"),
+        ]
+    }
+
     /// Markdown 全元素与多语言代码高亮。
     static func markdown(_ c: ScenarioContext) -> [ScenarioStep] {
         let doc = """

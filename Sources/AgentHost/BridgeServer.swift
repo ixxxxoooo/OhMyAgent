@@ -62,6 +62,7 @@ public enum BridgeTool: String, CaseIterable, Sendable, Codable {
     case browserNetwork = "browser_network"
     case browserTabs = "browser_tabs"
     case askUserQuestion = "ask_user_question"
+    case chartGuide = "chart_guide"
 
     /// 是否为浏览器类工具(受「浏览器」审批策略管理)。
     public var isBrowser: Bool { rawValue.hasPrefix("browser_") }
@@ -77,7 +78,7 @@ public enum BridgeTool: String, CaseIterable, Sendable, Codable {
             return "Create a Canvas: a live, reopenable visual artifact shown beside the chat. Prefer it over long markdown when the answer is data-dense "
                 + "(tables, metrics, charts), needs images or diagrams, or the user will iterate on it (reports, dashboards, comparisons, audits, timelines). "
                 + "Content is a list of blocks. Block types (field `type`): heading{text,level 1-3}, markdown{text}, stats{items:[{label,value,delta?,tone?}]}, "
-                + "table{columns:[..],rows:[[..]],title?}, chart{kind: bar|line|area|pie, labels:[..], series:[{name,values:[numbers matching labels]}], title?}, "
+                + "table{columns:[..],rows:[[..]],title?}, chart{kind: bar|line|area|pie, labels:[..], series:[{name,values:[numbers matching labels]}], title?; or kind: candle with labels:[dates], candles:[[open,high,low,close,volume?]..], ma?:[5,10], up?: red|green}, "
                 + "callout{tone: info|success|warning|danger, title?, text}, code{language?,text}, image{source: absolute path or https URL, caption?}, "
                 + "mermaid{text}, section{title,collapsed?,blocks:[..]}, divider. Returns the canvas id."
         case .canvasUpdate:
@@ -105,6 +106,8 @@ public enum BridgeTool: String, CaseIterable, Sendable, Codable {
             return "Read the network requests (fetch/XHR and the page load) of the current page: numbered, with method, URL, status, content type and duration. "
                 + "Pass `request` (a number from the list) to get that request's request/response payload preview. Long lists are saved to a file; the result then gives a preview and the path."
         case .browserTabs: return "List the open browser tabs of this workspace (id, title, URL)."
+        case .chartGuide:
+            return "Returns the format for drawing charts inline in the chat (line, bar, area, pie, and candlestick/K-line for stock data). Call it BEFORE you draw a chart, then emit a ```chart fenced block as described."
         case .askUserQuestion:
             return "Ask the user one or more multiple-choice questions in the OhMyAgent UI and wait for the answers. Use this INSTEAD of any built-in question/ask tool "
                 + "(those do not work in this client). Each question has a short `header`, the `question`, 2-6 `options` ({label, description?}) and optional `multiSelect`. "
@@ -127,7 +130,7 @@ public enum BridgeTool: String, CaseIterable, Sendable, Codable {
             return object(["id": ["type": "string"], "title": ["type": "string"],
                            "blocks": ["type": "array", "items": ["type": "object"]],
                            "append_blocks": ["type": "array", "items": ["type": "object"]]], required: ["id"])
-        case .canvasList: return object([:], required: [])
+        case .canvasList, .chartGuide: return object([:], required: [])
         case .searchCode:
             return object(["query": ["type": "string", "description": "Text or regular expression to find"],
                            "regex": ["type": "boolean", "description": "Treat query as a regular expression (default false)"],
@@ -270,6 +273,8 @@ public final class BridgeServer: Sendable {
         case .notify:
             guard let message = arguments["message"]?.stringValue, !message.isEmpty else { return BridgeResult("缺少 message 参数", isError: true) }
             return await handler.notify(title: arguments["title"]?.stringValue ?? "OhMyAgent", message: message)
+        case .chartGuide:
+            return BridgeResult(ChartGuide.text)
         case .canvasCreate, .canvasUpdate, .canvasList, .searchCode, .browserNavigate, .browserSnapshot, .browserClick, .browserHover, .browserBack, .browserForward, .browserReload, .browserType, .browserScroll, .browserScreenshot, .browserConsole, .browserNetwork, .browserTabs, .askUserQuestion:
             return await handler.callExtended(tool, arguments: arguments)
         }

@@ -123,7 +123,7 @@ extension CanvasBlock: Codable {
         case "chart":
             let kindText = try c.string("kind", "chart", "variant") ?? "bar"
             guard let kind = CanvasChartKind(rawValue: kindText.lowercased()) else {
-                throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath + [c.key("kind")], debugDescription: "图表类型必须是 bar/line/area/pie,收到 \(kindText)"))
+                throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath + [c.key("kind")], debugDescription: "图表类型必须是 bar/line/area/pie/candle,收到 \(kindText)"))
             }
             let labels = try c.strings("labels")
             var series: [CanvasSeries] = []
@@ -136,7 +136,13 @@ extension CanvasBlock: Codable {
                     series.append(CanvasSeries(name: name, values: values))
                 }
             }
-            self = .chart(CanvasChart(kind: kind, title: try c.string("title"), labels: labels, series: series))
+            var candles: [CanvasCandle] = []
+            if c.contains(c.key("candles")) { candles = try c.decode([CanvasCandle].self, forKey: c.key("candles")) }
+            var periods: [Int] = []
+            if c.contains(c.key("ma")) { periods = try c.decode([LooseNumber].self, forKey: c.key("ma")).map { Int($0.value) } }
+            let up = try c.string("up", "up_color")?.lowercased()
+            self = .chart(CanvasChart(kind: kind, title: try c.string("title"), labels: labels, series: series,
+                                      candles: candles, movingAverages: periods, upIsRed: up != "green"))
         case "callout", "note", "alert":
             let tone = (try c.string("tone", "kind")).flatMap(CanvasTone.init(rawValue:)) ?? .info
             self = .callout(tone: tone, title: try c.string("title"), text: try c.string("text", "content") ?? "")
@@ -176,6 +182,9 @@ extension CanvasBlock: Codable {
             try put("kind", chart.kind.rawValue); try put("labels", chart.labels)
             try put("series", chart.series.map { SeriesDTO(name: $0.name, values: $0.values) })
             if let title = chart.title { try put("title", title) }
+            if chart.kind == .candle {
+                try put("candles", chart.candles); try put("ma", chart.movingAverages); try put("up", chart.upIsRed ? "red" : "green")
+            }
         case .callout(let tone, let title, let text):
             try put("tone", tone.rawValue); try put("text", text)
             if let title { try put("title", title) }
@@ -273,6 +282,7 @@ public enum CanvasParser {
             }
             return .table(table)
         case .chart(let chart):
+            if chart.kind == .candle { try CanvasCandle.validate(chart, path: path); return block }
             guard !chart.labels.isEmpty, !chart.series.isEmpty else { throw CanvasError("\(path) 图表需要非空的 labels 与 series") }
             guard chart.pointCount <= CanvasLimits.maxChartPoints else { throw CanvasError("\(path) 数据点过多(上限 \(CanvasLimits.maxChartPoints))") }
             for (index, series) in chart.series.enumerated() where series.values.count != chart.labels.count {

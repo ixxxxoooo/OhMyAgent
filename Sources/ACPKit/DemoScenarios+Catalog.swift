@@ -21,6 +21,7 @@ extension DemoScenarios {
             DemoScenario(id: "changes", group: "交互", title: "本轮改动:检查点与一键回退", summary: "真实修改 oma-demo.txt,生成「改动」汇总并可回退(交互)", behavior: .interactive, build: changes),
             DemoScenario(id: "markdown", group: "会话流样式", title: "Markdown 与代码高亮:发布说明", summary: "标题/列表/任务列表/表格/引用/多语言代码块", build: markdown),
             DemoScenario(id: "mermaid", group: "会话流样式", title: "Mermaid 图表:架构文档", summary: "流程/时序/状态/类/饼图/甘特与不支持类型的回退", build: mermaid),
+            DemoScenario(id: "chart", group: "会话流样式", title: "内联图表:折线与 K 线", summary: "```chart 围栏渲染折线图与带均线/成交量的蜡烛图", build: chart),
             DemoScenario(id: "user-variants", group: "会话流样式", title: "用户消息:图片、@文件与长文折叠", summary: "带图片、@文件文本、超过 6 行自动折叠、纯图片、多图、原样 Markdown、中英混排", build: userVariants),
             DemoScenario(id: "markdown-edge", group: "会话流样式", title: "Markdown 边界:嵌套、宽表格与回退", summary: "多级嵌套列表、引用含列表、宽表格、更多围栏语言、公式/图片/HTML 的回退、超长单词、未闭合围栏", build: markdownEdge),
         ]

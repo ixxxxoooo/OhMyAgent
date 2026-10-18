@@ -41,7 +41,7 @@ struct CanvasBlockView: View {
         case .table(let table):
             CanvasTableView(table: table)
         case .chart(let chart):
-            CanvasChartView(chart: chart)
+            if chart.kind == .candle { CandleChartView(chart: chart) } else { CanvasChartView(chart: chart) }
         case .callout(let tone, let title, let text):
             CanvasCalloutView(tone: tone, title: title, text: text)
         case .code(let language, let text):

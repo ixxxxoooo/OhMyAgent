@@ -58,6 +58,8 @@ public struct CanvasTable: Codable, Sendable, Equatable {
 /// 图表种类。
 public enum CanvasChartKind: String, Codable, Sendable, Equatable, CaseIterable {
     case bar, line, area, pie
+    /// 蜡烛图(K 线):数据在 `CanvasChart.candles`
+    case candle
 }
 
 /// 图表中的一个系列。
@@ -71,22 +73,33 @@ public struct CanvasSeries: Codable, Sendable, Equatable {
     }
 }
 
-/// 图表:`labels` 为横轴(饼图为扇区名),每个系列的 `values` 与之等长。
+/// 图表:`labels` 为横轴(饼图为扇区名、蜡烛图为日期/时间),每个系列的 `values` 与之等长;
+/// 蜡烛图用 `candles`(与 `labels` 等长)而不是 `series`。
 public struct CanvasChart: Codable, Sendable, Equatable {
     public var kind: CanvasChartKind
     public var title: String?
     public var labels: [String]
     public var series: [CanvasSeries]
+    /// 蜡烛数据(仅 `kind == .candle`)
+    public var candles: [CanvasCandle]
+    /// 均线周期(仅蜡烛图,如 [5, 10, 20]),由客户端按收盘价计算
+    public var movingAverages: [Int]
+    /// 红涨绿跌(默认 true,A 股习惯);false 为绿涨红跌
+    public var upIsRed: Bool
 
-    public init(kind: CanvasChartKind, title: String? = nil, labels: [String], series: [CanvasSeries]) {
+    public init(kind: CanvasChartKind, title: String? = nil, labels: [String], series: [CanvasSeries],
+                candles: [CanvasCandle] = [], movingAverages: [Int] = [], upIsRed: Bool = true) {
         self.kind = kind
         self.title = title
         self.labels = labels
         self.series = series
+        self.candles = candles
+        self.movingAverages = movingAverages
+        self.upIsRed = upIsRed
     }
 
     /// 数据点总数。
-    public var pointCount: Int { series.reduce(0) { $0 + $1.values.count } }
+    public var pointCount: Int { series.reduce(0) { $0 + $1.values.count } + candles.count }
 }
 
 /// 画布块。

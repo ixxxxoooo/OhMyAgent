@@ -7,6 +7,6 @@ import Foundation
 public enum ChartPrompt {
     /// 追加提示文本。
     public static let text = """
-    需要画趋势/对比/占比图时,输出 ```chart 围栏,内容为 JSON:{"kind":"line|bar|area|pie","title":"…","labels":["a","b"],"series":[{"name":"…","values":[1,2]}]}(values 数量须与 labels 一致,JSON 必须合法)。流程图/时序图用 mermaid;不要用 mermaid 的 xychart-beta 画数据图。
+    需要在回复里画图(折线/柱状/饼图,或股票 K 线)时,先调用 chart_guide 工具获取格式,再输出 ```chart 围栏;流程图/时序图用 mermaid。图中数据必须来自真实检索,估算或示意的数据要在标题里注明。
     """
 }

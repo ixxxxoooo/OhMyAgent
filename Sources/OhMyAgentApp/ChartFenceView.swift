@@ -35,6 +35,6 @@ struct ChartFenceView: View {
     let chart: CanvasChart
 
     var body: some View {
-        CanvasChartView(chart: chart)
+        if chart.kind == .candle { CandleChartView(chart: chart) } else { CanvasChartView(chart: chart) }
     }
 }

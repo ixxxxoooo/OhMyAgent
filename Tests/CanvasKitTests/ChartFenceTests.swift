@@ -47,3 +47,36 @@ struct XYChartParserTests {
         #expect(XYChartParser.parse("flowchart TD\n A-->B") == nil)
     }
 }
+
+struct CandleChartTests {
+    private let json = #"{"kind":"candle","labels":["a","b","c"],"candles":[[10,12,9,11,100],{"o":11,"h":13,"l":10,"c":10.5},[10.5,14,10,13,300]],"ma":[2],"up":"green"}"#
+
+    /// 数组与对象两种蜡烛写法都能解析,均线与涨跌色选项生效。
+    @Test func parsesCandles() throws {
+        let chart = try CanvasParser.parseChart(Data(json.utf8))
+        #expect(chart.kind == .candle)
+        #expect(chart.candles.count == 3)
+        #expect(chart.candles[0].volume == 100)
+        #expect(chart.candles[1].volume == nil)
+        #expect(chart.candles[1].isUp == false)
+        #expect(chart.upIsRed == false)
+        #expect(chart.movingAverages == [2])
+    }
+
+    /// 均线按收盘价简单平均,前 period-1 根为 nil。
+    @Test func movingAverage() throws {
+        let chart = try CanvasParser.parseChart(Data(json.utf8))
+        let ma = chart.movingAverage(period: 2)
+        #expect(ma[0] == nil)
+        #expect(ma[1] == 10.75)
+        #expect(ma[2] == 11.75)
+    }
+
+    /// 高低价不自洽、数量与 labels 不一致时报错。
+    @Test func rejectsBadCandles() {
+        let badHigh = #"{"kind":"candle","labels":["a"],"candles":[[10,9,8,10]]}"#
+        let badCount = #"{"kind":"candle","labels":["a","b"],"candles":[[10,12,9,11]]}"#
+        #expect(throws: CanvasError.self) { try CanvasParser.parseChart(Data(badHigh.utf8)) }
+        #expect(throws: CanvasError.self) { try CanvasParser.parseChart(Data(badCount.utf8)) }
+    }
+}
