@@ -135,7 +135,8 @@ struct WorkbenchView: View {
                 OutputSidePanel(workbench: workbench)
             }
         }
-        .frame(width: CGFloat(width.wrappedValue))
+        // 窗口放不下「面板 + 中栏最小宽度」时面板让出宽度(而不是把整个工作区撑出窗口、右上角开关被挤出可视区)
+        .frame(minWidth: 0, idealWidth: CGFloat(width.wrappedValue), maxWidth: CGFloat(width.wrappedValue))
         .clipped()
         // 滑出时面板仍盖在(已一次性扩宽的)中栏之上,否则会被后绘制的中栏遮住而「瞬间消失」
         .zIndex(1)
