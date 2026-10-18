@@ -72,6 +72,9 @@ public enum ClientPrefs {
         public static let proxyAddress = "network.proxyAddress"
         public static let requestTimeout = "network.timeoutSeconds"
         public static let appendPrompt = "prompt.append"
+        /// 辅助任务模型(`UtilityModelChoice.raw`):会话标题生成 / 提示词优化;空 = 自动,标题另有 off
+        public static let titleModel = "prompt.titleModel"
+        public static let optimizeModel = "prompt.optimizeModel"
         public static let loadClaudeMemory = "prompt.loadClaudeMemory"
         /// 是否显示第三方 Agent 的扩展通知行(如 pi-tps 的「TPS …」),默认显示为淡色小字
         public static let showAgentNotify = "agent.showNotify"

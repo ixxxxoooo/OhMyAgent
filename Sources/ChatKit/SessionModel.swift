@@ -1046,16 +1046,19 @@ public final class SessionModel {
     }
 
     /// 首条消息后的自动标题:先用首句截取立刻给出临时标题,再异步经本机网关用小模型生成短标题覆盖。
+    /// 模型可在设置里单独指定(`UtilityTask.title`),也可关闭只保留截取标题;
     /// 仅在没有更高优先级来源(手动、适配器)时生效;失败只记日志并保留截取标题。
     private func startAutoTitle(for prompt: String, sessionId: String) {
         if let fallback = TitleGenerator.fallbackTitle(from: prompt) {
             applyAutoTitle(fallback, source: .truncated, sessionId: sessionId)
         }
-        guard let gateway = providerURL, mappedModels[.haiku] != nil || mappedModels[.main] != nil else { return }
-        let alias = (mappedModels[.haiku] != nil ? ModelSlot.haiku : ModelSlot.main).alias
+        let choice = UtilityModels.choice(for: .title)
+        guard choice != .off else { return }
+        let sessionGateway = utilityGateway
         titleTask?.cancel()
         titleTask = Task { [weak self] in
-            guard let title = await TitleGenerator.generate(gateway: gateway, model: alias, userText: prompt), !Task.isCancelled else { return }
+            guard let endpoint = await UtilityModels.endpoint(for: choice, fallback: sessionGateway), !Task.isCancelled else { return }
+            guard let title = await TitleGenerator.generate(gateway: endpoint.url, model: endpoint.alias, userText: prompt), !Task.isCancelled else { return }
             self?.applyAutoTitle(title, source: .generated, sessionId: sessionId)
         }
     }

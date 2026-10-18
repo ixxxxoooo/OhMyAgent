@@ -11,6 +11,8 @@ import SwiftUI
 /// Claude Code 模型映射页。
 struct ModelMappingPage: View {
     @State private var model = ProviderSettingsModel()
+    @AppStorage(ClientPrefs.Key.titleModel) private var titleChoice = ""
+    @AppStorage(ClientPrefs.Key.optimizeModel) private var optimizeChoice = ""
 
     var body: some View {
         Form {
@@ -35,6 +37,11 @@ struct ModelMappingPage: View {
             }
             Section("槽位") {
                 ForEach(ModelSlot.allCases) { slot in slotRow(slot) }
+            }
+            Section("辅助任务模型") {
+                utilityRow(.title)
+                utilityRow(.optimize)
+                Note("会话标题生成、提示词优化这类轻量请求可单独指定模型,与会话本身使用的模型互不影响,也不要求启用上面的映射。建议选便宜、快的非推理模型;「自动」使用 Haiku 槽位(未映射时,提示词优化改用本机 claude)。对之后的请求立即生效。")
             }
             Section {
                 statusRow
@@ -83,6 +90,7 @@ struct ModelMappingPage: View {
     }
 
     private static let followID = "__follow__"
+    private static let autoID = "__auto__"
 
     /// 行 ID 编码:`提供商ID\u{1F}模型ID`(避开模型名里常见的分隔符)。
     private static func encode(_ target: ModelTarget) -> String { "\(target.providerId)\u{1F}\(target.model)" }
@@ -123,6 +131,67 @@ struct ModelMappingPage: View {
             Text("提供商已删除").foregroundStyle(OMColors.warning)
         } else {
             Text(slot == .main ? String(localized: "未设置(沿用 ~/.claude)") : String(localized: "跟随默认")).foregroundStyle(OMColors.secondaryText)
+        }
+    }
+
+    // MARK: - 辅助任务
+
+    private func utilityRow(_ task: UtilityTask) -> some View {
+        let raw = task == .title ? titleChoice : optimizeChoice
+        let current = UtilityModelChoice(raw: raw)
+        return LabeledContent {
+            SlotPickerButton(
+                sections: utilitySections(task: task, current: current),
+                label: { utilityLabel(current) },
+                onPick: { id in
+                    let value = id == Self.autoID ? "" : id
+                    if task == .title { titleChoice = value } else { optimizeChoice = value }
+                }
+            )
+            .accessibilityLabel(String(localized: "\(task.title) 使用的模型"))
+        } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: task.title)
+                Text(verbatim: task.detail).font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
+            }
+        }
+    }
+
+    /// 辅助任务的选择列表:自动(标题另有关闭)+ 按提供商分组的全部可用模型;行 ID 即偏好原始值。
+    private func utilitySections(task: UtilityTask, current: UtilityModelChoice) -> [ModelPickerSection] {
+        var head = [ModelPickerRow(id: Self.autoID, name: String(localized: "自动(Haiku 槽位)"), isSelected: current == .automatic)]
+        if task == .title { head.append(ModelPickerRow(id: UtilityModelChoice.off.raw, name: String(localized: "关闭(仅截取首句)"), isSelected: current == .off)) }
+        var result = [ModelPickerSection(id: "auto", title: nil, rows: head)]
+        for section in ProviderMenuBuilder.sections(snapshot: model.snapshot, hasKey: { model.hasKey(id: $0) }) {
+            let owner = provider(section.providerId)
+            result.append(ModelPickerSection(id: section.providerId, title: section.providerName, rows: section.models.map { item in
+                let choice = UtilityModelChoice.model(providerId: section.providerId, model: item.id)
+                return ModelPickerRow(id: choice.raw, name: item.name,
+                                      brand: BrandIcon.resolve(modelId: item.id, providerPreset: owner?.presetId, providerName: section.providerName),
+                                      copyText: item.id, isSelected: current == choice)
+            }))
+        }
+        return result
+    }
+
+    @ViewBuilder
+    private func utilityLabel(_ current: UtilityModelChoice) -> some View {
+        switch current {
+        case .automatic:
+            Text("自动(Haiku 槽位)").foregroundStyle(OMColors.secondaryText)
+        case .off:
+            Text("关闭(仅截取首句)").foregroundStyle(OMColors.secondaryText)
+        case .model(let providerId, let modelId):
+            if let provider = provider(providerId) {
+                HStack(spacing: 6) {
+                    BrandIconView(BrandIcon.resolve(modelId: modelId, providerPreset: provider.presetId, providerName: provider.name), size: 14)
+                    Text(verbatim: provider.displayName(forModel: modelId))
+                    Text(verbatim: provider.name).foregroundStyle(OMColors.tertiaryText)
+                    if let problem = problem(provider) { Text(verbatim: "· \(problem)").foregroundStyle(OMColors.warning) }
+                }
+            } else {
+                Text("提供商已删除").foregroundStyle(OMColors.warning)
+            }
         }
     }
 
@@ -176,5 +245,23 @@ private struct SlotPickerButton<Label: View>: View {
         .buttonStyle(.plain)
         .omPicker(isPresented: $shown, items: flattened, selectedID: flattened.first(where: \.isSelected)?.id, placeholder: String(localized: "搜索模型"),
                   placement: .below, width: 300, row: { ModelPickRowContent(row: $0) }, onSelect: { row in onPick(row.id) })
+    }
+}
+
+private extension UtilityTask {
+    /// 设置页显示名。
+    var title: String {
+        switch self {
+        case .title: String(localized: "会话标题生成")
+        case .optimize: String(localized: "提示词优化")
+        }
+    }
+
+    /// 设置页说明。
+    var detail: String {
+        switch self {
+        case .title: String(localized: "首条消息后给会话起短标题")
+        case .optimize: String(localized: "输入框里的「优化提示词」按钮")
+        }
     }
 }

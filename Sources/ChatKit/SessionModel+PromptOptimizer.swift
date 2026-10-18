@@ -5,7 +5,7 @@ import AgentHost
 import Foundation
 
 extension SessionModel {
-    /// 优化一段提示词。通道优先级:演示模式 → 已映射提供商的本机网关 → 本机 `claude -p`。
+    /// 优化一段提示词。通道优先级:演示模式 → 设置里指定的模型 / 已映射提供商的本机网关 → 本机 `claude -p`。
     /// - Parameter draft: 输入框草稿
     /// - Returns: 改写后的提示词
     /// - Throws: `PromptOptimizeError`(不可优化、无可用通道、请求失败)
@@ -13,7 +13,7 @@ extension SessionModel {
         guard PromptOptimizer.isOptimizable(draft) else { throw PromptOptimizeError.notOptimizable }
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         if Toolchain.isDemoMode { return PromptOptimizer.demoRewrite(text) }
-        if let gateway = utilityGateway {
+        if let gateway = await UtilityModels.endpoint(for: UtilityModels.choice(for: .optimize), fallback: utilityGateway) {
             guard let result = await PromptOptimizer.viaGateway(gateway: gateway.url, model: gateway.alias, text: text) else { throw PromptOptimizeError.failed }
             return result
         }
