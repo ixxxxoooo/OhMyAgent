@@ -159,8 +159,8 @@ public enum CompletionEngine {
     ///   - query: 查询词(不含 `/`)
     ///   - agentCommands: Agent 通告的命令
     ///   - entries: 本机 Skills/自定义命令;用于标注来源,Agent 尚未通告任何命令时也直接作为候选
-    ///   - limit: 最大数量
-    public static func slashItems(query: String, agentCommands: [AvailableCommand], entries: [SlashEntry] = [], limit: Int = 40) -> [CompletionItem] {
+    ///   - limit: 最大数量(默认足够容纳全部命令:弹层可滚动,不能在空查询时截掉内置命令)
+    public static func slashItems(query: String, agentCommands: [AvailableCommand], entries: [SlashEntry] = [], limit: Int = 300) -> [CompletionItem] {
         var items = localCommands
         let known = Dictionary(entries.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
         var seen = Set(items.map(\.insertText))
@@ -194,7 +194,8 @@ public enum CompletionEngine {
                                             subtitle: entry.summary, insertText: "/\(entry.name)", badge: entry.badge))
             }
         }
-        let order: [CompletionItem.Kind: Int] = [.localCommand: 0, .customCommand: 1, .skill: 2, .mcpPrompt: 3, .agentCommand: 4]
+        // 同分时:客户端命令 → 自定义命令 → Claude 内置命令 → Skill → MCP 提示(内置命令比技能更常用,不能被排到后面)
+        let order: [CompletionItem.Kind: Int] = [.localCommand: 0, .customCommand: 1, .agentCommand: 2, .skill: 3, .mcpPrompt: 4]
         let scored = items.enumerated().compactMap { index, item -> (CompletionItem, Int, Int)? in
             let name = String(item.insertText.dropFirst())
             guard let score = FuzzyMatcher.score(query: query, candidate: name) else { return nil }

@@ -11,6 +11,7 @@ import ChatKit
 import ClaudeConfigKit
 import DesignSystem
 import IconKit
+import OMLog
 import SwiftUI
 
 /// 活动图的指标。
@@ -56,11 +57,12 @@ struct UsagePage: View {
             }
             if !stats.models.isEmpty { modelsSection }
             if loaded, stats.daily.isEmpty, stats.models.isEmpty {
-                Section { EmptyHint(icon: "chart-column", title: String(localized: "没有找到统计数据"), message: String(localized: "claude 会定期把使用统计写入 ~/.claude/stats-cache.json,使用一段时间后这里会出现图表。")).frame(height: 160) }
+                Section { EmptyHint(icon: "chart-column", title: String(localized: "没有找到统计数据"), message: String(localized: "使用 Claude Code 一段时间后,会话记录(~/.claude/projects)会汇总成图表显示在这里。")).frame(height: 160) }
             }
         }
         .task {
-            stats = await Task.detached { UsageStats.load(paths: paths) }.value
+            let cache = AppEnv.supportDirectory.appendingPathComponent("usage-index.json")
+            stats = await Task.detached(priority: .utility) { UsageStats.load(paths: paths, cacheURL: cache) }.value
             loaded = true
         }
     }
@@ -79,9 +81,24 @@ struct UsagePage: View {
                 UsageTile(icon: "gauge", title: String(localized: "缓存命中率"), value: stats.cacheHitRatio.map { "\(Int(($0 * 100).rounded()))%" } ?? "—")
             }
             .padding(.vertical, 2)
-            if let last = stats.lastComputedDate { Note("统计截止 \(last)(由 claude 定期更新)") }
+            if !loaded {
+                HStack(spacing: 6) { OMSpinner(.mini); Text("正在统计会话记录…").font(OMFonts.small).foregroundStyle(OMColors.secondaryText) }
+            } else {
+                sourceNote
+            }
         } header: {
             Label("概览", om: "chart-column")
+        }
+    }
+
+    /// 数据来源说明:会话记录(真实、实时)或旧的统计文件(已停止更新)。
+    @ViewBuilder
+    private var sourceNote: some View {
+        switch stats.source {
+        case .transcripts(let sessions, let costSessions):
+            Note("数据来自 ~/.claude/projects 里的 \(sessions) 个会话记录,统计到 \(stats.lastComputedDate ?? "—")。费用取自 Claude Code 为每个会话记录的费用(\(costSessions) 个会话有记录,较早的会话没有),不含订阅套餐的固定费用。")
+        case .statsCache:
+            if let last = stats.lastComputedDate { Note("数据来自 ~/.claude/stats-cache.json,统计截止 \(last);没有找到会话记录。") }
         }
     }
 
@@ -89,10 +106,10 @@ struct UsagePage: View {
 
     private var currentSessionSection: some View {
         Section {
-            if let model = AppEnvironment.shared.sessionModels.first, let usage = model.usage {
+            if let model = AppEnvironment.shared.workbench.activeSession ?? AppEnvironment.shared.sessionModels.first, let usage = model.usage {
                 let detail = model.contextUsage ?? ContextUsage(reported: usage)
                 if let detail { ContextUsageBody(usage: detail).padding(.vertical, 4) }
-                if let cost = usage.costAmount {
+                if let cost = usage.costAmount, cost > 0 {
                     LabeledContent("累计费用", value: "\(cost.formatted(.number.precision(.fractionLength(2...4)))) \(usage.costCurrency ?? "USD")")
                     if budget > 0, cost >= budget { Label(String(localized: "已超过预算提醒阈值 \(budget.formatted()) USD"), om: "triangle-alert").foregroundStyle(OMColors.warning) }
                 }

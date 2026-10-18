@@ -41,6 +41,15 @@ public struct UsageStatsSnapshot: Sendable, Equatable {
     public var models: [ModelUsageTotal]
     /// 每日按模型 token(可能为空:旧版缓存没有该字段)
     public var dailyTokens: [DailyModelTokens] = []
+    /// 数据来源
+    public var source: Source = .statsCache
+
+    /// 数据来源:会话记录(真实、实时)或旧的 stats-cache.json(新版 Claude Code 已不再更新)。
+    public enum Source: Sendable, Equatable {
+        case statsCache
+        /// - sessions: 参与统计的会话数;costSessions: 其中带有费用记录的会话数
+        case transcripts(sessions: Int, costSessions: Int)
+    }
 
     public static let empty = UsageStatsSnapshot(lastComputedDate: nil, daily: [], models: [])
 
@@ -111,8 +120,18 @@ public struct UsageStatsSnapshot: Sendable, Equatable {
 
 /// 统计读取器。
 public enum UsageStats {
-    /// 读取统计文件;不存在或解析失败返回空快照。
-    public static func load(paths: ClaudePaths) -> UsageStatsSnapshot {
+    /// 读取用量:优先从会话记录汇总(真实且实时),没有任何会话记录时退回 `stats-cache.json`。
+    /// - Parameters:
+    ///   - paths: Claude 配置路径
+    ///   - cacheURL: 会话记录汇总缓存位置(可空)
+    public static func load(paths: ClaudePaths, cacheURL: URL? = nil) -> UsageStatsSnapshot {
+        let projects = paths.claudeDirectory.appendingPathComponent("projects")
+        if let scanned = UsageScanner(projectsDirectory: projects, cacheURL: cacheURL).scan() { return scanned }
+        return loadStatsCache(paths: paths)
+    }
+
+    /// 读取旧统计文件;不存在或解析失败返回空快照。
+    static func loadStatsCache(paths: ClaudePaths) -> UsageStatsSnapshot {
         guard let object = try? JSONFile(paths.claudeDirectory.appendingPathComponent("stats-cache.json")).read() else { return .empty }
         let daily = ((object["dailyActivity"] as? [[String: Any]]) ?? []).compactMap { item -> DailyActivity? in
             guard let date = item["date"] as? String else { return nil }

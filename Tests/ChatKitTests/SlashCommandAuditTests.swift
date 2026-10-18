@@ -42,3 +42,18 @@ struct SlashCommandAuditTests {
         #expect(!titles.contains("/__remote-workflow") && !titles.contains("/workflow-launch-exec") && !titles.contains("/fast"))
     }
 }
+
+@Suite("斜杠命令列表完整性")
+struct SlashCommandListTests {
+    @Test("空查询时 100+ 个候选一个不少,内置命令排在技能前面")
+    func emptyQueryKeepsEverything() {
+        let builtins = ["compact", "context", "init", "goal", "effort"].map { AvailableCommand(name: $0, description: "", inputHint: nil) }
+        let skills = (1...90).map { AvailableCommand(name: "skill-\($0)", description: "", inputHint: nil) }
+        let entries = (1...90).map { SlashEntry(name: "skill-\($0)", summary: "", badge: "Skill", kind: .skill) }
+        let items = CompletionEngine.slashItems(query: "", agentCommands: skills + builtins, entries: entries)
+        let names = items.map(\.insertText)
+        for name in ["/compact", "/context", "/init", "/goal", "/effort", "/skill-90"] { #expect(names.contains(name), "\(name) 被截掉了") }
+        let firstSkill = names.firstIndex(of: "/skill-1") ?? .max
+        #expect((names.firstIndex(of: "/compact") ?? .max) < firstSkill, "内置命令应排在技能前面")
+    }
+}

@@ -2549,3 +2549,7 @@
 "`/ide` 是终端里的 IDE 集成,在 OhMyAgent 里不可用。" = "`/ide` is the terminal IDE integration and is not available in OhMyAgent.";
 "`/install-github-app` 依赖终端界面,请在终端里运行 `claude` 后执行。" = "`/install-github-app` needs the terminal UI. Run `claude` in a terminal and execute it there.";
 "`/bug` 依赖终端界面,请在终端里运行 `claude` 后执行。" = "`/bug` needs the terminal UI. Run `claude` in a terminal and execute it there.";
+"正在统计会话记录…" = "Scanning session transcripts…";
+"数据来自 ~/.claude/projects 里的 %lld 个会话记录,统计到 %@。费用取自 Claude Code 为每个会话记录的费用(%lld 个会话有记录,较早的会话没有),不含订阅套餐的固定费用。" = "Based on %lld session transcripts in ~/.claude/projects, up to %@. Cost is what Claude Code recorded per session (%lld sessions have a record; older ones do not) and excludes any fixed subscription fee.";
+"数据来自 ~/.claude/stats-cache.json,统计截止 %@;没有找到会话记录。" = "Based on ~/.claude/stats-cache.json, up to %@; no session transcripts were found.";
+"使用 Claude Code 一段时间后,会话记录(~/.claude/projects)会汇总成图表显示在这里。" = "After you have used Claude Code for a while, session transcripts (~/.claude/projects) are summarized into charts here.";
