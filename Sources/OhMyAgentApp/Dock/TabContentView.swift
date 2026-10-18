@@ -65,7 +65,7 @@ struct TabContentView: View {
 }
 
 /// 会话内容:项目会话尚未创建时按需创建。
-private struct ChatPane: View {
+struct ChatPane: View {
     let workbench: WorkbenchModel
     let projectID: String
     let slot: String?

@@ -18,10 +18,14 @@ struct RightPaneView: View {
         let _ = PanelToggleProbe.count("rightPane")
         VStack(spacing: 0) {
             paneBar
+            if let chat = workbench.activeChat(in: .tools) {
+                ChatPane(workbench: workbench, projectID: chat.projectID, slot: chat.slot)
+            } else {
             switch workbench.layout.rightPane {
             case .git: SCMView(workbench: workbench)
             case .search: SearchPaneView(workbench: workbench)
             default: ExplorerView(workbench: workbench)
+            }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -34,8 +38,8 @@ struct RightPaneView: View {
     private var paneBar: some View {
         HStack(spacing: 2) {
             ForEach(workbench.layout.rightPaneOrder, id: \.self) { pane in
-                let selected = workbench.layout.rightPane == pane
-                Button { workbench.layout.rightPane = pane } label: {
+                let selected = workbench.layout.rightPane == pane && workbench.activeChat(in: .tools) == nil
+                Button { workbench.layout.rightPane = pane; workbench.layout.activeToolsChat = nil } label: {
                     Image.om(Self.icon(pane), size: 14)
                         .frame(width: 28, height: 24)
                         .background(selected ? OMColors.selectedFill : .clear, in: RoundedRectangle(cornerRadius: OMRadius.tag))
@@ -60,6 +64,9 @@ struct RightPaneView: View {
                 .accessibilityLabel(Self.title(pane))
                 .accessibilityAddTraits(selected ? .isSelected : [])
             }
+            ForEach(workbench.dockedChats(in: .tools)) { chat in
+                DockedChatTab(workbench: workbench, chat: chat, iconOnly: true)
+            }
             Spacer(minLength: 4)
             // 标题区同时是拖动手柄:按住拖到窗口左/右半边即可把工具栏换到那一侧
             Text(Self.title(workbench.layout.rightPane))
@@ -74,6 +81,9 @@ struct RightPaneView: View {
         .padding(.trailing, workbench.layout.titlebarInsets(for: .tools).trailing)
         .frame(height: TitlebarMetrics.height)
         .background(WindowDragArea())
+        .dropDestination(for: String.self) { payloads, _ in
+            return dropChat(payloads, host: .tools, in: workbench)
+        }
     }
 
     /// 非 Git 视图时的轻量轮询(应用在前台才刷新,状态不变时退避):保证圆点及时出现。

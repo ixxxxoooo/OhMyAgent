@@ -32,12 +32,12 @@ struct BottomPanelView: View {
             resizeHandle
             HStack(spacing: 4) {
                 ForEach(panes, id: \.self) { pane in
-                    Button(Self.title(pane)) { workbench.layout.bottomPane = pane }
+                    Button(Self.title(pane)) { workbench.layout.bottomPane = pane; workbench.layout.activeBottomChat = nil }
                         .buttonStyle(.plain)
-                        .font(OMFonts.small.weight(currentPane == pane ? .medium : .regular))
-                        .foregroundStyle(currentPane == pane ? OMColors.primaryText : OMColors.secondaryText)
+                        .font(OMFonts.small.weight(isPaneActive(pane) ? .medium : .regular))
+                        .foregroundStyle(isPaneActive(pane) ? OMColors.primaryText : OMColors.secondaryText)
                         .padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(currentPane == pane ? OMColors.selectedFill : .clear, in: OMPillShape())
+                        .background(isPaneActive(pane) ? OMColors.selectedFill : .clear, in: OMPillShape())
                         // 标签可拖动换顺序
                         .draggable(Self.dragPrefix + pane.rawValue)
                         .dropDestination(for: String.self) { payloads, _ in
@@ -47,6 +47,9 @@ struct BottomPanelView: View {
                             return true
                         }
                 }
+                ForEach(workbench.dockedChats(in: .bottom)) { chat in
+                    DockedChatTab(workbench: workbench, chat: chat)
+                }
                 Spacer()
                 Button { workbench.layout.bottomVisible = false } label: { Image.om("xmark") }
                     .buttonStyle(.omPlain)
@@ -54,15 +57,22 @@ struct BottomPanelView: View {
                     .accessibilityLabel("关闭底部面板")
             }
             .padding(.horizontal, 10).padding(.vertical, 4)
+            .dropDestination(for: String.self) { payloads, _ in
+                return dropChat(payloads, host: .bottom, in: workbench)
+            }
             .background { Color.clear.terminalDragHandle(workbench, panel: currentPane == .terminal ? .terminal : .output) }
             Divider()
             Group {
+                if let chat = workbench.activeChat(in: .bottom) {
+                    ChatPane(workbench: workbench, projectID: chat.projectID, slot: chat.slot)
+                } else {
                 switch currentPane {
                 case .output: LogViewerView()
                 case .terminal:
                     // 底部面板使用项目级常驻终端(可有多个);面板隐藏/切换标签都不会结束其中的进程
                     TerminalPanelView(workbench: workbench, root: workbench.selectedProjectID ?? NSHomeDirectory())
                 case .problems: EmptyView()
+                }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -89,6 +99,11 @@ struct BottomPanelView: View {
                         }
                         .onEnded { _ in dragStartHeight = nil })
             }
+    }
+
+    /// 内置面板标签是否高亮(选中了停靠会话时都不高亮)。
+    private func isPaneActive(_ pane: BottomPane) -> Bool {
+        workbench.activeChat(in: .bottom) == nil && currentPane == pane
     }
 
     /// 标签拖拽载荷前缀。

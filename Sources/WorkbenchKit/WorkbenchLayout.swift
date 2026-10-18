@@ -51,6 +51,12 @@ public struct WorkbenchLayout: Codable, Equatable, Sendable {
     public var rightPaneOrder: [RightPane] = RightPane.available
     /// 底部面板标签(终端/输出)的显示顺序,可拖拽调整
     public var bottomPaneOrder: [BottomPane] = BottomPane.available
+    /// 停靠到底部面板/工具栏里的会话(不持久化:会话本身随应用重启重建)
+    public var dockedChats: [PanelChat] = []
+    /// 底部面板当前选中的会话(nil 表示显示终端/输出)
+    public var activeBottomChat: String?
+    /// 工具栏当前选中的会话(nil 表示显示文件/搜索/Git)
+    public var activeToolsChat: String?
     /// 各面板的摆放位置(终端位置、项目栏与工具栏所在侧)
     public var placement = PanelPlacement()
     /// 终端侧栏是否可见(终端放到左/右侧时有效)
@@ -113,7 +119,7 @@ public struct WorkbenchLayout: Codable, Equatable, Sendable {
         // 底部面板只显示摆放在底部的面板;没有任何面板在底部时,底部面板不可见
         if placement.terminal != .bottom && bottomPane == .terminal { bottomPane = .output }
         if placement.output != .bottom && bottomPane == .output && placement.terminal == .bottom { bottomPane = .terminal }
-        if placement.terminal != .bottom && placement.output != .bottom { bottomVisible = false }
+        if placement.terminal != .bottom && placement.output != .bottom && !dockedChats.contains(where: { $0.host == .bottom }) { bottomVisible = false }
         if !placement.terminal.isSide { terminalVisible = false }
         if !placement.output.isSide { outputVisible = false }
     }

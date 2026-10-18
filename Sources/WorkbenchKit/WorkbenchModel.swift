@@ -122,12 +122,12 @@ public final class WorkbenchModel {
     }
 
     /// 回收没有标签承载的会话(标签被关闭、项目被移除后调用);运行中的轮次随进程一起结束。
-    private func reapConversations() {
+    func reapConversations() {
         guard !conversations.isEmpty else { return }
         let alive = Set(dock.allTabs.compactMap { tab -> ConversationKey? in
             if case .chat(let projectID, let slot) = tab.kind { return ConversationKey(projectID: projectID, slot: slot) }
             return nil
-        })
+        } + layout.dockedChats.map { ConversationKey(projectID: $0.projectID, slot: $0.slot) })
         for key in conversations.keys where !alive.contains(key) {
             conversations[key]?.shutdown()
             conversations[key] = nil
