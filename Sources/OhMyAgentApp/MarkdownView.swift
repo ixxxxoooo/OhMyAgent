@@ -105,8 +105,8 @@ struct InlineCodeTextRenderer: TextRenderer {
     }
 }
 
-/// 行内代码两侧的内边距字符:四分之一个全角空格(U+2005,宽 0.25em),与排版框上下的留白视觉相当。
-private let inlineCodePadding = "\u{2005}"
+/// 行内代码两侧的内边距字符:细空格(U+2009,约 0.2em),与排版框上下的留白视觉相当。
+private let inlineCodePadding = "\u{2009}"
 
 /// 把行内 Markdown 构造成 `Text`:普通片段沿用系统渲染(链接、粗体、斜体),行内代码片段换成等宽字体 + 强调色,并打上 `InlineCodeAttribute`。
 /// - Parameter source: 行内 Markdown 原文
