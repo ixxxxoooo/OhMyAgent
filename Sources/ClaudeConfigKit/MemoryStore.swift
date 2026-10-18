@@ -17,6 +17,38 @@ public struct MemoryFile: Sendable, Identifiable, Hashable {
     public var isLoadedByDefault: Bool
 }
 
+/// 规则加载顺序中的一步:同一位置的一个或多个文件(规则目录会合并成一步)。
+public struct MemoryLoadStep: Sendable, Identifiable, Equatable {
+    public var id: String
+    /// 步骤标题(位置说明)
+    public var title: String
+    /// 该位置下的文件(可能为空:尚未创建)
+    public var files: [MemoryFile]
+
+    /// 该位置是否至少有一个已存在的文件。
+    public var exists: Bool { files.contains { $0.exists } }
+}
+
+extension MemoryStore {
+    /// 按 Claude Code 的加载先后排列指令文件:用户指令 → 用户规则 → 项目指令 → 项目规则 → 本地指令(后加载的优先级更高)。
+    /// `AGENTS.md` 不会被自动加载,不在其中。
+    /// - Parameter files: `list()` 的结果
+    /// - Returns: 带先后顺序的步骤(规则目录合并为一步)
+    public static func loadOrder(of files: [MemoryFile]) -> [MemoryLoadStep] {
+        func step(_ id: String, _ title: String, _ kinds: [MemoryFile.Kind]) -> MemoryLoadStep? {
+            let matched = files.filter { kinds.contains($0.kind) }
+            return matched.isEmpty ? nil : MemoryLoadStep(id: id, title: title, files: matched)
+        }
+        return [
+            step("user", String(localized: "用户指令 ~/.claude/CLAUDE.md"), [.user]),
+            step("userRule", String(localized: "用户规则 ~/.claude/rules/"), [.userRule]),
+            step("project", String(localized: "项目指令 CLAUDE.md"), [.project, .projectInClaudeDir]),
+            step("projectRule", String(localized: "项目规则 .claude/rules/"), [.projectRule]),
+            step("local", String(localized: "本地指令 CLAUDE.local.md"), [.local]),
+        ].compactMap { $0 }
+    }
+}
+
 /// 记忆存储。
 public struct MemoryStore: Sendable {
     public var paths: ClaudePaths

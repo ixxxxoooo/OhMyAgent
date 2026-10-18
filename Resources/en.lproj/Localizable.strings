@@ -2482,3 +2482,12 @@
 "切换到源码" = "Switch to source";
 "切换到预览" = "Switch to preview";
 "显示更多 %lld 条" = "Show %lld more";
+"规则加载顺序" = "Rule load order";
+"后加载的优先级更高" = "Later items take precedence";
+"%lld 个文件" = "%lld files";
+"第 %lld 步:%@" = "Step %lld: %@";
+"用户指令 ~/.claude/CLAUDE.md" = "User instructions ~/.claude/CLAUDE.md";
+"用户规则 ~/.claude/rules/" = "User rules ~/.claude/rules/";
+"项目指令 CLAUDE.md" = "Project instructions CLAUDE.md";
+"项目规则 .claude/rules/" = "Project rules .claude/rules/";
+"本地指令 CLAUDE.local.md" = "Local instructions CLAUDE.local.md";

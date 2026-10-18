@@ -13,6 +13,7 @@ struct MemoryManagerView: View {
     var query = ""
     @State private var selectedID: String?
     @State private var showCreateRule = false
+    @State private var showLoadOrder = true
 
     private var allFiles: [MemoryFile] { center.snapshot.memory }
     private var files: [MemoryFile] {
@@ -21,6 +22,63 @@ struct MemoryManagerView: View {
     private var selected: MemoryFile? { allFiles.first { $0.id == selectedID } }
 
     var body: some View {
+        VStack(spacing: 0) {
+            loadOrderSection
+            Divider()
+            listDetail
+        }
+        .sheet(isPresented: $showCreateRule) { RuleCreateSheet(center: center) { showCreateRule = false } }
+    }
+
+    /// 「规则加载顺序」:按 Claude Code 的加载先后列出带序号的步骤,后加载的优先级更高;点击步骤跳到对应文件。
+    private var loadOrderSection: some View {
+        let steps = MemoryStore.loadOrder(of: allFiles)
+        return VStack(alignment: .leading, spacing: 6) {
+            Button { omWithAnimation(.snappy(duration: 0.15)) { showLoadOrder.toggle() } } label: {
+                HStack(spacing: 6) {
+                    Image.om(showLoadOrder ? "chevron-down" : "chevron-right", size: 12).foregroundStyle(OMColors.tertiaryText)
+                    Text("规则加载顺序").font(OMFonts.small.weight(.medium)).foregroundStyle(OMColors.secondaryText)
+                    Text("后加载的优先级更高").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("规则加载顺序")
+            if showLoadOrder {
+                VStack(spacing: 2) {
+                    ForEach(Array(steps.enumerated()), id: \.element.id) { index, step in loadStepRow(index + 1, step) }
+                }
+            }
+        }
+        .padding(.horizontal, OMSpacing.md)
+        .padding(.vertical, OMSpacing.sm)
+    }
+
+    /// 一步:序号 + 位置 + 状态;点击选中该位置的第一个文件。
+    private func loadStepRow(_ number: Int, _ step: MemoryLoadStep) -> some View {
+        let target = step.files.first { $0.exists } ?? step.files.first
+        let isSelected = target.map { $0.id == selectedID } ?? false
+        return Button { selectedID = target?.id } label: {
+            HStack(spacing: 10) {
+                Text(verbatim: "\(number)")
+                    .font(OMFonts.caption.monospacedDigit()).foregroundStyle(OMColors.accentText)
+                    .frame(width: 20, height: 20)
+                    .background(OMColors.selectedFill, in: OMPillShape())
+                Text(verbatim: step.title).font(OMFonts.small).lineLimit(1)
+                Spacer(minLength: 8)
+                if step.files.count > 1 { Tag(String(localized: "\(step.files.count) 个文件")) }
+                Tag(step.exists ? String(localized: "已存在") : String(localized: "未创建"), color: step.exists ? OMColors.success : OMColors.tertiaryText)
+            }
+            .padding(.horizontal, OMSpacing.sm).padding(.vertical, 3)
+            .background(isSelected ? OMColors.selectedFill : Color.clear, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("第 \(number) 步:\(step.title)")
+    }
+
+    private var listDetail: some View {
         ListDetail {
             VStack(spacing: 0) {
                 HStack {
@@ -49,7 +107,6 @@ struct MemoryManagerView: View {
             guard selectedID == nil, let key = ProcessInfo.processInfo.environment["OMA_OPEN_ITEM"], !key.isEmpty else { return }
             selectedID = files.first { $0.title.localizedCaseInsensitiveContains(key) }?.id
         }
-        .sheet(isPresented: $showCreateRule) { RuleCreateSheet(center: center) { showCreateRule = false } }
     }
 
     /// 列表里的一行:标题 + 状态/路径过滤标签;选中态用主题 `selectedFill`,不用系统列表的选中色。

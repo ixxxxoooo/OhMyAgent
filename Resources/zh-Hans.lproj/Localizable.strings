@@ -2481,3 +2481,13 @@
 "切换模型来源失败:%@" = "切换模型来源失败:%@";
 "切换到源码" = "切换到源码";
 "切换到预览" = "切换到预览";
+"显示更多 %lld 条" = "显示更多 %lld 条";
+"规则加载顺序" = "规则加载顺序";
+"后加载的优先级更高" = "后加载的优先级更高";
+"%lld 个文件" = "%lld 个文件";
+"第 %lld 步:%@" = "第 %lld 步:%@";
+"用户指令 ~/.claude/CLAUDE.md" = "用户指令 ~/.claude/CLAUDE.md";
+"用户规则 ~/.claude/rules/" = "用户规则 ~/.claude/rules/";
+"项目指令 CLAUDE.md" = "项目指令 CLAUDE.md";
+"项目规则 .claude/rules/" = "项目规则 .claude/rules/";
+"本地指令 CLAUDE.local.md" = "本地指令 CLAUDE.local.md";
