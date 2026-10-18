@@ -36,17 +36,14 @@ struct DockedChatTab: View {
             if iconOnly {
                 Image.om("message-square", size: 14).frame(width: 28, height: 24).contentShape(Rectangle())
             } else {
-                HStack(spacing: 4) {
-                    Image.om("message-square", size: 12)
-                    Text(title).lineLimit(1).frame(maxWidth: 140)
-                }
+                Text(title).lineLimit(1).frame(maxWidth: 140)
             }
         }
         .omTooltip(title)
         .accessibilityLabel(title)
         .buttonStyle(.plain)
         .font(OMFonts.small.weight(selected ? .medium : .regular))
-        .foregroundStyle(selected ? OMColors.primaryText : OMColors.secondaryText)
+        .foregroundStyle(selected ? (iconOnly ? OMColors.accent : OMColors.primaryText) : OMColors.secondaryText)
         .padding(.horizontal, iconOnly ? 0 : 8).padding(.vertical, iconOnly ? 0 : 3)
         .background(selected ? OMColors.selectedFill : .clear, in: iconOnly ? AnyShape(RoundedRectangle(cornerRadius: OMRadius.tag)) : AnyShape(OMPillShape()))
         .omContextMenu {
