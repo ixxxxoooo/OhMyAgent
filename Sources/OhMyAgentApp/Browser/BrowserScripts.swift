@@ -17,16 +17,27 @@ enum BrowserScripts {
       });
       window.addEventListener('error', function(e){ post('console', {level: 'error', text: 'Uncaught ' + e.message + ' (' + (e.filename || '') + ':' + e.lineno + ')'}); });
       window.addEventListener('unhandledrejection', function(e){ post('console', {level: 'error', text: 'Unhandled rejection: ' + String(e.reason)}); });
+      const textual = function(ct){ return /json|text|xml|javascript|html|x-www-form-urlencoded/i.test(ct || ''); };
+      const bodyText = function(b){ if (b == null) return undefined; if (typeof b === 'string') return b.slice(0, 4000); if (b instanceof URLSearchParams) return b.toString().slice(0, 4000); return undefined; };
       const of = window.fetch;
       if (of) window.fetch = function(input, init){
         const t = Date.now(); const u = typeof input === 'string' ? input : ((input && input.url) || String(input)); const m = (init && init.method) || (input && input.method) || 'GET';
-        return of.apply(this, arguments).then(function(r){ post('net', {method: m, url: u, status: r.status, ms: Date.now() - t}); return r; },
-          function(err){ post('net', {method: m, url: u, status: 0, ms: Date.now() - t, error: String(err)}); throw err; });
+        const req = bodyText(init && init.body);
+        return of.apply(this, arguments).then(function(r){
+          const ct = r.headers.get('content-type') || '';
+          const base = {method: m, url: u, status: r.status, ms: Date.now() - t, ct: ct.split(';')[0], req: req};
+          if (textual(ct)) { r.clone().text().then(function(s){ post('net', Object.assign(base, {res: s.slice(0, 4000)})); }, function(){ post('net', base); }); }
+          else { post('net', base); }
+          return r; },
+          function(err){ post('net', {method: m, url: u, status: 0, ms: Date.now() - t, error: String(err), req: req}); throw err; });
       };
       const oo = XMLHttpRequest.prototype.open, os = XMLHttpRequest.prototype.send;
       XMLHttpRequest.prototype.open = function(m, u){ this.__m = m; this.__u = String(u); return oo.apply(this, arguments); };
-      XMLHttpRequest.prototype.send = function(){ const t = Date.now(); const self = this;
-        this.addEventListener('loadend', function(){ post('net', {method: self.__m, url: self.__u, status: self.status, ms: Date.now() - t}); });
+      XMLHttpRequest.prototype.send = function(body){ const t = Date.now(); const self = this; const req = bodyText(body);
+        this.addEventListener('loadend', function(){
+          const ct = (self.getResponseHeader && self.getResponseHeader('content-type')) || '';
+          let res; try { if (textual(ct) && (self.responseType === '' || self.responseType === 'text')) res = String(self.responseText).slice(0, 4000); } catch (e) {}
+          post('net', {method: self.__m, url: self.__u, status: self.status, ms: Date.now() - t, ct: ct.split(';')[0], req: req, res: res}); });
         return os.apply(this, arguments); };
     })();
     """

@@ -53,3 +53,33 @@ struct BrowserBridgeTests {
         for tool in browserTools { #expect(tool.isBrowser) }
     }
 }
+
+@Suite("浏览器日志呈现")
+struct BrowserLogFormatTests {
+    @Test("行数不多时原样返回;为空时给空文案")
+    func inline() {
+        #expect(BrowserLogFormat.render(lines: [], noun: "x", empty: "none", filePath: nil) == "none")
+        #expect(BrowserLogFormat.render(lines: ["a", "b"], noun: "x", empty: "none", filePath: nil) == "a\nb")
+        #expect(!BrowserLogFormat.needsFile(BrowserLogFormat.inlineLimit) && BrowserLogFormat.needsFile(BrowserLogFormat.inlineLimit + 1))
+    }
+
+    @Test("日志太长:只返回总行数、最近预览与文件路径,不含更早的行")
+    func truncated() {
+        let lines = (1...200).map { "line \($0)" }
+        let text = BrowserLogFormat.render(lines: lines, noun: "console messages", empty: "none", filePath: "/tmp/x.log")
+        #expect(text.contains("200 console messages") && text.contains("/tmp/x.log"))
+        #expect(text.contains("line 200") && text.contains("line \(200 - BrowserLogFormat.previewCount + 1)"))
+        #expect(!text.contains("line 100\n") && !text.hasSuffix("line 1"))
+        #expect(text.split(separator: "\n").count == 1 + BrowserLogFormat.previewCount)
+    }
+
+    @Test("载荷预览按长度截断并标明剩余字符数;network 的 request 参数必须是正整数")
+    func clipAndParse() throws {
+        #expect(BrowserLogFormat.clip("abc", limit: 10) == "abc")
+        #expect(BrowserLogFormat.clip(String(repeating: "x", count: 15), limit: 10).hasSuffix("… (5 more characters)"))
+        #expect(try BrowserArguments.parse(.browserNetwork, [:]).get() == .network())
+        #expect(try BrowserArguments.parse(.browserNetwork, ["request": 3]).get() == .network(request: 3))
+        #expect(throws: BrowserParseError.self) { try BrowserArguments.parse(.browserNetwork, ["request": 0]).get() }
+        #expect(throws: BrowserParseError.self) { try BrowserArguments.parse(.browserNetwork, ["request": "abc"]).get() }
+    }
+}

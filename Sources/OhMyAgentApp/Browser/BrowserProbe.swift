@@ -1,7 +1,7 @@
 // @author ixxxxoooo
 // 调试探针(脚本化界面验证,仅在设置了环境变量时生效):在内置浏览器标签里按顺序执行 Agent 同款的浏览器命令,并把结果写到文件。
 // `OMA_BROWSER_PROBE=<输出文件>` 启用;`OMA_BROWSER_ACTIONS` 用分号分隔动作:
-//   snapshot | click:<ref> | dblclick:<ref> | rightclick:<ref> | hover:<ref> | back | forward | reload | type:<ref>:<文本>[:submit] | scroll:<up|down|top|bottom|ref> | screenshot | console | network | tabs
+//   snapshot | click:<ref> | dblclick:<ref> | rightclick:<ref> | hover:<ref> | back | forward | reload | type:<ref>:<文本>[:submit] | scroll:<up|down|top|bottom|ref> | screenshot | console | network[:序号] | tabs
 // 截图保存为 `<输出文件>.png`。
 
 import AppKit
@@ -40,7 +40,7 @@ enum BrowserProbe {
                 }
             case "screenshot": return .screenshot
             case "console": return .console
-            case "network": return .network
+            case "network": return .network(request: parts.count > 1 ? Int(parts[1]) : nil)
             case "tabs": return .tabs
             default: return nil
             }

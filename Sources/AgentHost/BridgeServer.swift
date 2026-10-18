@@ -100,8 +100,10 @@ public enum BridgeTool: String, CaseIterable, Sendable, Codable {
         case .browserType: return "Type text into the input/textarea with the given ref (replaces its value). Set `submit` to press Enter afterwards."
         case .browserScroll: return "Scroll the page (`direction`: up, down, top, bottom) or scroll the element with `ref` into view."
         case .browserScreenshot: return "Take a screenshot (PNG) of the current page viewport to check layout and visuals."
-        case .browserConsole: return "Read recent console messages and uncaught errors of the current page (written since it was opened)."
-        case .browserNetwork: return "Read recent network requests (method, URL, status, duration) of the current page, newest last."
+        case .browserConsole: return "Read console messages and uncaught errors of the current page (written since it was opened). Long logs are saved to a file; the result then gives a preview and the path to search."
+        case .browserNetwork:
+            return "Read the network requests (fetch/XHR and the page load) of the current page: numbered, with method, URL, status, content type and duration. "
+                + "Pass `request` (a number from the list) to get that request's request/response payload preview. Long lists are saved to a file; the result then gives a preview and the path."
         case .browserTabs: return "List the open browser tabs of this workspace (id, title, URL)."
         case .askUserQuestion:
             return "Ask the user one or more multiple-choice questions in the OhMyAgent UI and wait for the answers. Use this INSTEAD of any built-in question/ask tool "
@@ -133,7 +135,8 @@ public enum BridgeTool: String, CaseIterable, Sendable, Codable {
                            "path": ["type": "string", "description": "Only search files whose path contains this substring"],
                            "max_results": ["type": "integer", "description": "Max matches to return (1-200, default 50)"]], required: ["query"])
         case .browserNavigate: return object(["url": ["type": "string", "description": "http or https URL; a missing scheme defaults to https (http for localhost)"]], required: ["url"])
-        case .browserSnapshot, .browserScreenshot, .browserConsole, .browserNetwork, .browserTabs, .browserBack, .browserForward, .browserReload: return object([:], required: [])
+        case .browserSnapshot, .browserScreenshot, .browserConsole, .browserTabs, .browserBack, .browserForward, .browserReload: return object([:], required: [])
+        case .browserNetwork: return object(["request": ["type": "integer", "description": "Request number from the list; returns its payload preview"]], required: [])
         case .browserClick:
             return object(["ref": ["type": "string", "description": "Element ref from the latest browser_snapshot, e.g. e12"],
                            "button": ["type": "string", "description": "left (default) or right"],

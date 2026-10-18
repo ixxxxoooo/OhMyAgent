@@ -25,6 +25,9 @@ struct BrowserNetworkLine: Sendable, Equatable {
     var status: Int
     var milliseconds: Int
     var error: String?
+    var contentType: String?
+    var requestBody: String?
+    var responseBody: String?
 }
 
 /// 一个浏览器标签:拥有 `WKWebView`,记录控制台与网络,并把页面状态暴露给界面。
@@ -151,7 +154,8 @@ final class BrowserTabModel: NSObject {
             if console.count > Self.logLimit { console.removeFirst(console.count - Self.logLimit) }
         case "net":
             network.append(BrowserNetworkLine(method: body["method"] as? String ?? "GET", url: String((body["url"] as? String ?? "").prefix(300)),
-                                              status: body["status"] as? Int ?? 0, milliseconds: body["ms"] as? Int ?? 0, error: body["error"] as? String))
+                                              status: body["status"] as? Int ?? 0, milliseconds: body["ms"] as? Int ?? 0, error: body["error"] as? String,
+                                              contentType: body["ct"] as? String, requestBody: body["req"] as? String, responseBody: body["res"] as? String))
             if network.count > Self.logLimit { network.removeFirst(network.count - Self.logLimit) }
         default: break
         }
@@ -353,13 +357,10 @@ final class BrowserController {
                 guard let png = await model.screenshot() else { return BrowserResult("Screenshot failed", isError: true) }
                 return BrowserResult("Screenshot of \(model.urlString)", imagePNG: png)
             case .console:
-                let lines = model.console.suffix(100)
-                return BrowserResult(lines.isEmpty ? "No console messages." : lines.map { "[\($0.level)] \($0.text)" }.joined(separator: "\n"))
-            case .network:
-                let lines = model.network.suffix(100)
-                return BrowserResult(lines.isEmpty ? "No network requests recorded." : lines.map { line in
-                    "\(line.method) \(line.url) → \(line.error ?? String(line.status)) (\(line.milliseconds) ms)"
-                }.joined(separator: "\n"))
+                let lines = model.console.map { "[\($0.level)] \($0.text)" }
+                return BrowserResult(BrowserLogFiles.render(lines: lines, kind: "console", tabID: model.id, noun: "console messages", empty: "No console messages."))
+            case .network(let request):
+                return BrowserResult(model.describeNetwork(request: request))
             case .navigate, .tabs:
                 return BrowserResult("", isError: true)
             }

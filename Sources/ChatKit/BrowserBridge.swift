@@ -22,7 +22,8 @@ public enum BrowserCommand: Sendable, Equatable {
     case scroll(BrowserScroll)
     case screenshot
     case console
-    case network
+    /// 网络请求记录;`request` 为序号时返回该请求的详情(请求/响应载荷预览)
+    case network(request: Int? = nil)
     case tabs
 }
 
@@ -134,7 +135,10 @@ public enum BrowserArguments {
             }
         case .browserScreenshot: return .success(.screenshot)
         case .browserConsole: return .success(.console)
-        case .browserNetwork: return .success(.network)
+        case .browserNetwork:
+            guard let raw = arguments["request"] else { return .success(.network()) }
+            guard let index = raw.intValue, index >= 1 else { return .failure(.init("request must be a positive request number from the browser_network list")) }
+            return .success(.network(request: index))
         case .browserTabs: return .success(.tabs)
         default: return .failure(.init("Not a browser tool"))
         }
