@@ -69,7 +69,7 @@ public enum LocalCommands {
         LocalCommandSpec(name: "permissions", summary: ChatL10n.t("管理工具权限规则")),
         LocalCommandSpec(name: "agents", summary: ChatL10n.t("管理子 Agent")),
         LocalCommandSpec(name: "skills", summary: ChatL10n.t("管理 Skills 与自定义命令")),
-        LocalCommandSpec(name: "memory", summary: ChatL10n.t("编辑 CLAUDE.md 记忆与指令")),
+        LocalCommandSpec(name: "memory", summary: ChatL10n.t("编辑 CLAUDE.md 规则")),
         LocalCommandSpec(name: "hooks", summary: ChatL10n.t("管理 Hooks")),
         LocalCommandSpec(name: "plugin", summary: ChatL10n.t("管理插件")),
         LocalCommandSpec(name: "mcp", summary: ChatL10n.t("管理 MCP 服务器(带参数时由 Agent 执行重连/启用/停用)"), hint: ChatL10n.t("[reconnect|enable|disable [服务器]]")),

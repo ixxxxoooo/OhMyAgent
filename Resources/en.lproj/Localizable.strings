@@ -2522,3 +2522,15 @@
 "思考中…" = "Thinking…";
 "%lld 个子 Agent 运行中" = "%lld sub-agents running";
 "主代理发送的任务" = "Task sent by parent agent";
+"规则" = "Rules";
+"编辑 CLAUDE.md 规则" = "Edit CLAUDE.md rules";
+"新建命令" = "New Command";
+"参数提示" = "Argument hint";
+"可选:命令名后面要填什么,如 [PR 编号]" = "Optional: what follows the command name, e.g. [PR number]";
+"在输入框用 /%@ 触发" = "Type /%@ in the composer to run it";
+"它做什么,显示在命令补全里" = "What it does (shown in command completion)";
+"把常用提示词保存成斜杠命令,在输入框用 /命令名 触发,保存在 ~/.claude/commands 或项目的 .claude/commands。" = "Save frequent prompts as slash commands. Type /name in the composer; stored in ~/.claude/commands or the project's .claude/commands.";
+"用 SKILL.md 扩展 Claude 的能力,保存在 ~/.claude/skills 或项目的 .claude/skills。" = "Extend Claude with SKILL.md, stored in ~/.claude/skills or the project's .claude/skills.";
+"当前没有工作区,无法创建项目命令" = "No workspace open; cannot create a project command";
+"描述这个命令做什么" = "Describe what this command does";
+"在这里写下执行 /%@ 时发给 Claude 的提示词。可以用 $ARGUMENTS 引用命令后面的参数。" = "Write the prompt sent to Claude when /%@ runs. Use $ARGUMENTS to reference arguments after the command.";

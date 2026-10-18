@@ -12,15 +12,16 @@ import WorkbenchKit
 
 /// 自定义页的类型筛选。
 enum CustomizeFilter: String, CaseIterable, Identifiable {
-    case plugins, mcp, skills, subagents, rules, hooks
+    case plugins, mcp, skills, commands, subagents, rules, hooks
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .plugins: return String(localized: "插件")
         case .skills: return String(localized: "技能")
+        case .commands: return String(localized: "命令")
         case .subagents: return String(localized: "子 Agent")
-        case .rules: return String(localized: "记忆与指令")
+        case .rules: return String(localized: "规则")
         case .mcp: return "MCP"
         case .hooks: return "Hooks"
         }
@@ -30,6 +31,7 @@ enum CustomizeFilter: String, CaseIterable, Identifiable {
         switch self {
         case .plugins: return "puzzlepiece.extension"
         case .skills: return "sparkles"
+        case .commands: return "terminal"
         case .subagents: return "person.2"
         case .rules: return "brain"
         case .mcp: return "brand.mcp"
@@ -146,6 +148,7 @@ struct CustomizePage: View {
         switch filter {
         case .mcp: MCPSettingsPage(center: center, query: query)
         case .skills: SkillsSettingsPage(center: center, kind: .skill, query: query)
+        case .commands: SkillsSettingsPage(center: center, kind: .command, query: query)
         case .subagents: SkillsSettingsPage(center: center, kind: .agent, query: query)
         case .hooks: HooksSettingsPage(center: center, query: query)
         case .plugins: PluginsSettingsPage(center: center, query: query)

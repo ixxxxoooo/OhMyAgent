@@ -282,6 +282,20 @@ struct SkillAgentTests {
         #expect(linked.isSymlink)
     }
 
+    @Test("新建自定义命令:写入 commands 目录、带参数提示,重名与非法名称被拒绝")
+    func createCommand() throws {
+        let box = try Sandbox(); defer { box.cleanup() }
+        let store = SkillStore(paths: box.paths)
+        let file = try store.createCommand(name: "review-pr", description: "审查 PR", argumentHint: "[PR 编号]", scope: .user)
+        #expect(file.path.hasSuffix(".claude/commands/review-pr.md"))
+        let item = try #require(store.list().first { $0.name == "review-pr" })
+        #expect(item.kind == .command)
+        #expect(item.description == "审查 PR")
+        #expect(try store.load(item).value("argument-hint") == "[PR 编号]")
+        #expect(throws: ConfigError.alreadyExists("review-pr")) { try store.createCommand(name: "review-pr", description: "", scope: .user) }
+        #expect(throws: ConfigError.self) { try store.createCommand(name: "Bad Name", description: "", scope: .user) }
+    }
+
     @Test("插件内的 Skill 带命名空间且只读")
     func pluginSkills() throws {
         let box = try Sandbox(); defer { box.cleanup() }

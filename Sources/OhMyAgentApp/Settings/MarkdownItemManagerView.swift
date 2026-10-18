@@ -19,7 +19,7 @@ struct SkillsSettingsPage: View {
     @State private var pendingDelete: MarkdownItem?
 
     private var items: [MarkdownItem] {
-        let all = kind == .agent ? center.snapshot.agents : center.snapshot.skills
+        let all = kind == .agent ? center.snapshot.agents : Self.filtered(center.snapshot.skills, kind: kind)
         guard !query.isEmpty else { return all }
         return all.filter { $0.name.localizedCaseInsensitiveContains(query) || $0.description.localizedCaseInsensitiveContains(query) }
     }
@@ -38,16 +38,32 @@ struct SkillsSettingsPage: View {
         }
     }
 
-    private var total: Int { kind == .agent ? center.snapshot.agents.count : center.snapshot.skills.count }
-    private var noun: String { kind == .agent ? String(localized: "子 Agent") : String(localized: "技能") }
-    private var pageIcon: String { kind == .agent ? "person.2" : "sparkles" }
+    /// 技能页只显示 Skill、命令页只显示斜杠命令(两者共用 `SkillStore` 扫描结果)。
+    static func filtered(_ items: [MarkdownItem], kind: MarkdownItem.Kind) -> [MarkdownItem] {
+        items.filter { kind == .command ? $0.kind == .command : $0.kind != .command }
+    }
+
+    private var total: Int { kind == .agent ? center.snapshot.agents.count : Self.filtered(center.snapshot.skills, kind: kind).count }
+    private var noun: String {
+        switch kind {
+        case .agent: return String(localized: "子 Agent")
+        case .command: return String(localized: "命令")
+        case .skill: return String(localized: "技能")
+        }
+    }
+    private var pageIcon: String { kind == .agent ? "person.2" : (kind == .command ? "terminal" : "sparkles") }
+    private var pageSubtitle: String {
+        switch kind {
+        case .agent: return String(localized: "给 Claude 配置可委派任务的专用子 Agent,定义保存在 ~/.claude/agents 或项目的 .claude/agents。")
+        case .command: return String(localized: "把常用提示词保存成斜杠命令,在输入框用 /命令名 触发,保存在 ~/.claude/commands 或项目的 .claude/commands。")
+        case .skill: return String(localized: "用 SKILL.md 扩展 Claude 的能力,保存在 ~/.claude/skills 或项目的 .claude/skills。")
+        }
+    }
 
     var body: some View {
         ExtensionPage(
             center: center, icon: pageIcon, title: noun,
-            subtitle: kind == .agent
-                ? String(localized: "给 Claude 配置可委派任务的专用子 Agent,定义保存在 ~/.claude/agents 或项目的 .claude/agents。")
-                : String(localized: "用 SKILL.md 与自定义命令扩展 Claude 的能力,保存在 ~/.claude/skills、commands 或项目的 .claude 目录。")
+            subtitle: pageSubtitle
         ) {
             Button { center.reload() } label: { Image.om("arrow.clockwise") }
                 .buttonStyle(.omIcon)
@@ -84,8 +100,11 @@ struct SkillsSettingsPage: View {
             MarkdownItemEditorSheet(center: center, item: item, onDelete: { pendingDelete = item }) { editing = nil }
         }
         .sheet(isPresented: $showCreate) {
-            if kind == .agent { AgentCreateSheet(center: center) { showCreate = false } }
-            else { SkillCreateSheet(center: center) { showCreate = false } }
+            switch kind {
+            case .agent: AgentCreateSheet(center: center) { showCreate = false }
+            case .command: CommandCreateSheet(center: center) { showCreate = false }
+            case .skill: SkillCreateSheet(center: center) { showCreate = false }
+            }
         }
         .confirmationDialog("删除\(noun)?", isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }), presenting: pendingDelete) { item in
             Button("移到废纸篓", role: .destructive) {

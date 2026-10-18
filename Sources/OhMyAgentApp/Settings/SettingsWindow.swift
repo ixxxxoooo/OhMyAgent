@@ -69,7 +69,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .subagents: return String(localized: "子 Agent")
         case .hooks: return "Hooks"
         case .plugins: return String(localized: "插件")
-        case .memory: return String(localized: "记忆与指令")
+        case .memory: return String(localized: "规则")
         case .editor: return String(localized: "编辑器")
         case .terminal: return String(localized: "终端")
         case .sourceControl: return String(localized: "源代码管理")

@@ -335,7 +335,7 @@ struct WorkbenchView: View {
         if env["OMA_OPEN_SETTINGS"] != nil {
             workbench.openSettings()
         }
-        // 调试:OMA_OPEN_CUSTOMIZE=all|plugins|skills|subagents|rules|mcp|hooks 直接打开「自定义」页
+        // 调试:OMA_OPEN_CUSTOMIZE=all|plugins|skills|commands|subagents|rules|mcp|hooks 直接打开「自定义」页
         // 调试:OMA_OPEN_CANVAS=<画布 id> 直接打开画布标签
         if let canvasID = env["OMA_OPEN_CANVAS"], !canvasID.isEmpty { workbench.openCanvas(id: canvasID, title: String(localized: "画布")) }
         if let filter = env["OMA_OPEN_CUSTOMIZE"] { workbench.openCustomize(filter: filter) }

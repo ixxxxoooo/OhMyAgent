@@ -158,6 +158,32 @@ public struct SkillStore: Sendable {
         return file
     }
 
+    /// 新建自定义斜杠命令(`<scope>/.claude/commands/<name>.md`)。
+    /// - Parameters:
+    ///   - name: 命令名(小写字母、数字、连字符),即 `/name`
+    ///   - description: 描述(显示在命令补全里)
+    ///   - argumentHint: 参数提示(如 `[文件路径]`),可为空
+    ///   - scope: 用户或项目
+    /// - Returns: 新建的命令文件路径
+    @discardableResult
+    public func createCommand(name: String, description: String, argumentHint: String = "", scope: ConfigScope) throws -> URL {
+        guard name.range(of: Self.namePattern, options: .regularExpression) != nil else {
+            throw ConfigError.invalidValue(String(localized: "名称只能包含小写字母、数字和连字符,且不超过 64 个字符"))
+        }
+        guard let base = paths.directory("commands", scope: scope == .local ? .project : scope) else {
+            throw ConfigError.invalidValue(String(localized: "当前没有工作区,无法创建项目命令"))
+        }
+        let file = base.appendingPathComponent("\(name).md")
+        guard !FileManager.default.fileExists(atPath: file.path) else { throw ConfigError.alreadyExists(name) }
+        var document = MarkdownDocument(body: String(localized: "\n在这里写下执行 /\(name) 时发给 Claude 的提示词。可以用 $ARGUMENTS 引用命令后面的参数。\n"))
+        document.setValue("description", description.isEmpty ? String(localized: "描述这个命令做什么") : description)
+        let hint = argumentHint.trimmingCharacters(in: .whitespaces)
+        if !hint.isEmpty { document.setValue("argument-hint", hint) }
+        try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        try document.render().write(to: file, atomically: true, encoding: .utf8)
+        return file
+    }
+
     /// 读取条目文档。
     public func load(_ item: MarkdownItem) throws -> MarkdownDocument {
         MarkdownDocument(parsing: try String(contentsOf: item.fileURL, encoding: .utf8))
