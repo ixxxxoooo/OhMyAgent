@@ -205,4 +205,46 @@ struct DemoCoverageTests {
         #expect(entry.planWorkspaceURL == saved)
         model.shutdown()
     }
+
+    @Test("子代理生命周期:卡片先后出现启动中、运行中,最终全部完成;父会话等待前台子代理")
+    func subagentLifecycle() async throws {
+        let ws = try M3ScenarioTests.tempWorkspace()
+        defer { try? FileManager.default.removeItem(at: ws) }
+        let model = try await M3ScenarioTests.readyModel(workspace: ws)
+        model.send("#demo-subagents-lifecycle")
+        _ = await SessionModelTests.wait(timeout: .seconds(5)) { model.isRunning }
+
+        var phases = Set<String>()
+        var maxWaiting = 0
+        let deadline = Date().addingTimeInterval(60)
+        while model.isRunning, Date() < deadline {
+            maxWaiting = max(maxWaiting, model.timeline.runningForegroundSubagentCount())
+            for entry in model.timeline.entries where entry.tool.map(ToolPresentation.isSubagentLaunch) == true {
+                if let status = SubagentStatus.make(entry: entry) { phases.insert("\(status.phase)") }
+            }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        for entry in model.timeline.entries where entry.tool.map(ToolPresentation.isSubagentLaunch) == true {
+            if let status = SubagentStatus.make(entry: entry) { phases.insert("\(status.phase)") }
+        }
+        #expect(phases.isSuperset(of: ["starting", "running", "completed"]), "出现过的阶段:\(phases.sorted())")
+        #expect(maxWaiting >= 1)
+        #expect(model.timeline.runningForegroundSubagentCount() == 0)
+        model.shutdown()
+    }
+
+    @Test("Await 工具:被识别为「等待」,摘要含任务数与匹配模式")
+    func awaitTool() async throws {
+        let ws = try M3ScenarioTests.tempWorkspace()
+        defer { try? FileManager.default.removeItem(at: ws) }
+        let model = try await M3ScenarioTests.readyModel(workspace: ws)
+        #expect(await Self.run(model, "await-tasks"))
+        let wait = try #require(Self.allTools(in: model.timeline).first { $0.name == "Await" })
+        let presentation = ToolPresentation(tool: wait)
+        #expect(presentation.category == .other)
+        #expect(presentation.verb == String(localized: "等待"))
+        #expect(presentation.subject.contains("Ready|Error"))
+        #expect(wait.status == .completed)
+        model.shutdown()
+    }
 }

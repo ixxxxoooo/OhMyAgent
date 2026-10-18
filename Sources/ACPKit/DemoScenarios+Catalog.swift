@@ -30,6 +30,7 @@ extension DemoScenarios {
         list.append(contentsOf: modeScenarios)
         list.append(contentsOf: permissionScenarios)
         list.append(contentsOf: askScenarios)
+        list.append(contentsOf: lifecycleScenarios)
         return list
     }()
 }

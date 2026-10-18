@@ -51,11 +51,14 @@ public struct ScenarioTool: Sendable {
     public var extra: [JSONValue]
     public var finish: ScenarioFinish
     public var locations: JSONValue
+    /// 进行中与完成之间停留的毫秒数(按节奏缩放),让转圈状态能被看到;0 表示不停留
+    public var holdMillis: Int
 
     public init(
         id: String, title: String, kind: String, name: String, input: JSONValue = .object([:]),
-        output: String? = nil, extra: [JSONValue] = [], finish: ScenarioFinish = .completed, locations: JSONValue = .array([])
+        output: String? = nil, extra: [JSONValue] = [], finish: ScenarioFinish = .completed, locations: JSONValue = .array([]), holdMillis: Int = 0
     ) {
+        self.holdMillis = holdMillis
         self.id = id
         self.title = title
         self.kind = kind

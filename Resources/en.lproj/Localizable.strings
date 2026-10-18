@@ -2464,3 +2464,13 @@
 "无法读取计划文件:%@" = "Unable to read the plan file: %@";
 "保存失败:%@" = "Save failed: %@";
 "在标签页打开" = "Open in tab";
+"在标签页中打开子代理的完整对话" = "Open the subagent's full conversation in a tab";
+"子代理:%@" = "Subagent: %@";
+"启动中" = "Starting up";
+"后台运行" = "Running in background";
+"等待子代理" = "Waiting for subagent";
+"等待 %lld 个子代理" = "Waiting for %lld subagents";
+"等待" = "Wait";
+"%lld 个后台任务" = "%lld background tasks";
+"输出匹配 %@" = "Output matches %@";
+"超时 %@" = "Timeout %@";

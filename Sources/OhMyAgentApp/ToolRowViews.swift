@@ -83,6 +83,12 @@ struct ToolRowView: View {
             let isExpanded = canExpand && (expanded ?? defaultExpanded(tool, presentation))
             VStack(alignment: .leading, spacing: 0) {
                 row(tool, presentation, canExpand: canExpand, isExpanded: isExpanded)
+                // 子代理:行下方给出实时状态卡片(启动中/运行中/已完成、待办计数、当前活动),点击在标签页打开
+                if presentation.category == .subagent {
+                    SubagentCardView(entry: entry)
+                        .padding(.leading, 23)
+                        .padding(.vertical, 4)
+                }
                 // Canvas 工具完成后,在工具行下方给出可点击的画布卡片
                 if let ref = CanvasToolRef.of(tool) {
                     CanvasCardView(ref: ref)

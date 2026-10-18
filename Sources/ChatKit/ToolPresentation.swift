@@ -74,6 +74,19 @@ public struct ToolPresentation: Sendable, Equatable {
             return
         }
 
+        if name == "Await" {
+            // Await:等后台命令/子代理结束,或等到输出里出现指定内容(Ready / Error 等)
+            category = .other
+            verb = String(localized: "等待")
+            var parts: [String] = []
+            let tasks = input?["task_ids"]?.arrayValue?.count ?? 0
+            if tasks > 0 { parts.append(String(localized: "\(tasks) 个后台任务")) }
+            if let pattern = input?["pattern"]?.stringValue, !pattern.isEmpty { parts.append(String(localized: "输出匹配 \(pattern)")) }
+            subject = parts.isEmpty ? Self.stripVerb(tool.title) : parts.joined(separator: " · ")
+            if let timeout = input?["timeout_ms"]?.intValue, timeout > 0 { detail = String(localized: "超时 \(WorkingStatus.elapsed(timeout / 1000))") }
+            return
+        }
+
         if ElicitationOutcome.isAskQuestion(tool) {
             // AskUserQuestion:标题固定为「向你提问」,摘要显示题数;适配器给的英文标题不展示
             category = .other

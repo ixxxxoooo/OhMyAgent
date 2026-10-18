@@ -170,6 +170,7 @@ extension ScriptedAgent {
         await emit(sessionId, parent: parent, start)
         await pause(sessionId)
         guard !frozen else { return }
+        if tool.holdMillis > 0 { await scaledDelay(tool.holdMillis) }
         await emit(sessionId, parent: parent, [
             "sessionUpdate": "tool_call_update", "toolCallId": .string(toolId),
             "status": tool.finish == .failed ? "failed" : "completed", "content": .array(content),

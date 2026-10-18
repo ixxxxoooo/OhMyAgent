@@ -42,6 +42,12 @@ struct WorkingIndicatorView: View {
         if waitingForUser {
             return "\(String(localized: "等待你的回复"))… (\(WorkingStatus.elapsed(seconds)))"
         }
+        // 父会话在等前台子代理:显示「等待子代理」,与 Cursor 一致
+        let waiting = model.timeline.runningForegroundSubagentCount()
+        if waiting > 0 {
+            let verb = waiting == 1 ? String(localized: "等待子代理") : String(localized: "等待 \(waiting) 个子代理")
+            return WorkingStatus.line(verb: verb, seconds: seconds, canInterrupt: true)
+        }
         let verb = WorkingStatus.verb(seed: Int(start.timeIntervalSince1970), style: style)
         return WorkingStatus.line(verb: verb, seconds: seconds, canInterrupt: true)
     }
