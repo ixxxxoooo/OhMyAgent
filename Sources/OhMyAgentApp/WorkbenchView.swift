@@ -307,6 +307,20 @@ struct WorkbenchView: View {
             for name in names.dropFirst() where !existing.contains(name) { TerminalPanelStore.shared.addTerminal(root: root, name: name) }
             TerminalPanelStore.shared.activate(TerminalPanelState.baseID(root), root: root)
         }
+        if let ms = env["OMA_CYCLE_TERMINALS"].flatMap(Int.init) {
+            // 调试(性能采样):给每个终端灌 3000 行输出后,每 ms 毫秒循环切换一次终端,持续约 20 秒
+            let root = workbench.selectedProjectID ?? NSHomeDirectory()
+            for _ in 0..<TerminalPanelStore.shared.state(for: root).instances.count {
+                TerminalStore.shared.controllers.values.forEach { $0.send("seq 1 3000\r") }
+                TerminalPanelStore.shared.cycle(1, root: root)
+                try? await Task.sleep(for: .milliseconds(400))
+            }
+            try? await Task.sleep(for: .seconds(3))
+            for _ in 0..<(20_000 / max(ms, 50)) {
+                TerminalPanelStore.shared.cycle(1, root: root)
+                try? await Task.sleep(for: .milliseconds(max(ms, 50)))
+            }
+        }
         if env["OMA_VIEW_AGENT_TERMINAL"] != nil {
             // 调试:等到出现运行中的 Agent 终端后,在终端面板里只读打开它(验证后台命令的实时查看)
             for _ in 0..<60 {

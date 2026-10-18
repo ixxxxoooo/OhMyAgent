@@ -54,7 +54,7 @@ final class TerminalController: Identifiable {
         self.arguments = arguments ?? prefs.shellArguments
         self.extraEnvironment = environment
         self.appliedPrefs = prefs
-        let terminalView = TerminalView(frame: CGRect(x: 0, y: 0, width: 640, height: 360))
+        let terminalView = OMTerminalView(frame: CGRect(x: 0, y: 0, width: 640, height: 360))
         view = terminalView
         terminalView.terminalDelegate = self
         // 回滚行数只能在创建时设定(视图尚为空,重置缓冲不丢内容)

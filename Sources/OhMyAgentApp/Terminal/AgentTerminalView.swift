@@ -44,7 +44,7 @@ final class AgentTerminalScreen: NSObject, TerminalViewDelegate {
     private var themeToken: NotificationToken?
 
     override init() {
-        view = TerminalView(frame: CGRect(x: 0, y: 0, width: 640, height: 360))
+        view = OMTerminalView(frame: CGRect(x: 0, y: 0, width: 640, height: 360))
         super.init()
         view.terminalDelegate = self
         view.getTerminal().options.scrollback = 5000

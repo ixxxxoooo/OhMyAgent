@@ -109,6 +109,25 @@ struct TerminalControllerTests {
         await wait { !bottom.isRunning }
     }
 
+    @Test("切换标签时视图被置零尺寸不触发重排:列数保持,回滚内容不变")
+    func ignoresDegenerateSize() async {
+        let controller = TerminalController(id: "t-size", directory: NSTemporaryDirectory(), executable: "/bin/sh", arguments: ["-c", "seq 1 500"])
+        controller.view.setFrameSize(NSSize(width: 800, height: 300))
+        await wait { !controller.isRunning && controller.screenText.contains("500") }
+        let terminal = controller.view.getTerminal()
+        let cols = terminal.cols, rows = terminal.rows
+        #expect(cols > 20 && rows > 5)
+        controller.view.setFrameSize(.zero)
+        controller.view.setFrameSize(NSSize(width: 4, height: 300))
+        #expect(terminal.cols == cols && terminal.rows == rows, "退化尺寸必须被忽略")
+        #expect(controller.view.frame.size == NSSize(width: 800, height: 300))
+        controller.view.setFrameSize(NSSize(width: 800, height: 300))
+        #expect(terminal.cols == cols, "同样尺寸再次设置不变")
+        controller.view.setFrameSize(NSSize(width: 500, height: 300))
+        #expect(terminal.cols < cols, "正常的尺寸变化仍然生效")
+        #expect(OMTerminalView.accepts(NSSize(width: 100, height: 40)) && !OMTerminalView.accepts(.zero))
+    }
+
     @Test("宽字符:中英混排按双宽占两列,后续字符不错位")
     func wideCharacters() async {
         let controller = TerminalController(id: "t-wide", directory: NSTemporaryDirectory(), executable: "/bin/sh", arguments: ["-c", "printf 'ab你c是d谁\\n'"], environment: ["LANG": "en_US.UTF-8"])
