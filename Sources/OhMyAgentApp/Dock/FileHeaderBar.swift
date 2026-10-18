@@ -34,7 +34,9 @@ struct FileHeaderBar: View {
         HStack(spacing: 10) {
             breadcrumb
             Spacer(minLength: 8)
-            if modes.count > 1 { ModeSwitch(modes: modes, mode: mode, onMode: onMode) }
+            if modes.count > 1 {
+                HeaderIconButton(icon: mode.toggleIcon, help: mode == .preview ? "切换到源码" : "切换到预览", tint: nil) { onMode(mode.other) }
+            }
             if let onToggleCompare {
                 HeaderIconButton(icon: "file-diff", help: isComparing ? "返回编辑器" : "对比 HEAD(Git 差异)", tint: isComparing ? OMColors.accent : nil, action: onToggleCompare)
             }
@@ -112,22 +114,6 @@ private struct HeaderIconButton: View {
         .onHover { hovering = $0 }
         .omTooltip(help)
         .accessibilityLabel(help)
-    }
-}
-
-/// 显示模式切换:使用统一的紧凑分段控件 `OMCompactSegmented`。
-private struct ModeSwitch: View {
-    let modes: [FileViewMode]
-    let mode: FileViewMode
-    let onMode: (FileViewMode) -> Void
-
-    var body: some View {
-        OMCompactSegmented(
-            options: modes.map { (value: $0, title: $0.title) },
-            selection: mode,
-            accessibilityName: String(localized: "文件显示模式"),
-            onSelect: onMode
-        )
     }
 }
 

@@ -32,44 +32,60 @@ enum FilePreviewKind: Equatable {
     var isBinary: Bool { self == .image || self == .pdf || self == .spreadsheet }
 }
 
-/// 文件标签的显示模式。
+/// 文件标签的显示模式:只有「源码」与「预览」两种,由工具条上的图标原地切换。
 enum FileViewMode: String, CaseIterable, Identifiable {
-    /// Markdown 就地渲染(Typora 式)
-    case live
     case source, preview
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .live: return String(localized: "渲染")
         case .source: return String(localized: "源码")
         case .preview: return String(localized: "预览")
         }
     }
 
-    /// 某类型可用的模式(就地渲染只对 Markdown 有意义)。
-    static func available(for kind: FilePreviewKind) -> [FileViewMode] {
-        kind == .markdown ? [.live, .source, .preview] : [.source, .preview]
-    }
+    /// 工具条图标:显示的是「点击后将切换到」的模式(源码 → 预览用眼睛,预览 → 源码用代码)。
+    var toggleIcon: String { self == .preview ? "code" : "eye" }
+
+    /// 另一种模式。
+    var other: FileViewMode { self == .preview ? .source : .preview }
+
+    /// 某类型可用的模式。
+    static func available(for kind: FilePreviewKind) -> [FileViewMode] { [.source, .preview] }
 
     /// 编辑器是否可见(预览模式下隐藏编辑器)。
     var showsEditor: Bool { self != .preview }
 }
 
-/// 各文件的显示模式记忆(同一文件再次打开时沿用)。
+/// 文件显示模式记忆:按文件类型(而非单个文件)持久化到 `UserDefaults`,
+/// 在多个 Markdown 之间切换、或重启应用后都沿用上次的选择。
 @MainActor
 @Observable
 final class FileViewModeStore {
     static let shared = FileViewModeStore()
     private var modes: [String: FileViewMode] = [:]
+    @ObservationIgnored private let defaults: UserDefaults
 
-    /// 取某文件的模式;未设置时 Markdown 默认就地渲染,其余可渲染类型默认预览。
-    func mode(for path: String, kind: FilePreviewKind) -> FileViewMode {
-        if let stored = modes[path], FileViewMode.available(for: kind).contains(stored) { return stored }
-        return kind == .markdown ? .live : .preview
+    init(defaults: UserDefaults = .standard) { self.defaults = defaults }
+
+    /// 持久化键:仅取类型名(忽略 csv 的分隔符等关联值)。
+    private func key(_ kind: FilePreviewKind) -> String {
+        "editor.viewMode." + String(String(describing: kind).prefix { $0 != "(" })
     }
 
-    func set(_ mode: FileViewMode, for path: String) { modes[path] = mode }
+    /// 取某类型的模式;未设置时默认预览。
+    func mode(for path: String, kind: FilePreviewKind) -> FileViewMode {
+        let key = key(kind)
+        if let stored = modes[key] { return stored }
+        return defaults.string(forKey: key).flatMap(FileViewMode.init(rawValue:)) ?? .preview
+    }
+
+    /// 记录某类型的模式(对同类型的所有文件生效)。
+    func set(_ mode: FileViewMode, for kind: FilePreviewKind) {
+        let key = key(kind)
+        modes[key] = mode
+        defaults.set(mode.rawValue, forKey: key)
+    }
 }
 
 // MARK: - 预览分发
