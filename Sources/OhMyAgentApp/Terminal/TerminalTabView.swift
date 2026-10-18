@@ -68,7 +68,7 @@ struct TerminalTabView: View {
                 .font(OMFonts.small)
             Spacer()
             Button("重新启动") { controller.start() }
-                .controlSize(.small)
+                .buttonStyle(.omSecondary)
         }
         .foregroundStyle(OMColors.secondaryText)
         .padding(.horizontal, 10).padding(.vertical, 5)
