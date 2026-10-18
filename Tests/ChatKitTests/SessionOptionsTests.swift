@@ -182,4 +182,32 @@ struct WidthSliderPresetTests {
         #expect(ChatWidth.presets[ChatWidth.presetIndex(raw: "custom", custom: 1180)] == .ultra)
         #expect(SettingsContentWidth.presets[SettingsContentWidth.presetIndex(raw: "乱写", custom: 900)] == .standard)
     }
+
+    @Test("自动压缩窗口:夹到范围并生成环境变量")
+    func autoCompactWindowEnv() {
+        var options = SessionOptions()
+        #expect(options.effectiveAutoCompactWindow == nil)
+        #expect(options.environment[SessionOptions.autoCompactKey] == nil)
+        options.autoCompactWindow = 1_000
+        #expect(options.environment[SessionOptions.autoCompactKey] == "50000")
+        options.autoCompactWindow = 200_000
+        #expect(options.environment[SessionOptions.autoCompactKey] == "200000")
+        options.autoCompactWindow = 9_000_000
+        #expect(options.environment[SessionOptions.autoCompactKey] == "1000000")
+    }
+
+    @Test("自动压缩窗口:与模型映射的窗口取较小值")
+    func autoCompactWindowTakesSmaller() {
+        let mapped: JSONValue = .object(["claudeCode": .object(["options": .object(["settings": .object(["env": .object([SessionOptions.autoCompactKey: .string("1000000")])])])])])
+        var options = SessionOptions()
+        options.autoCompactWindow = 200_000
+        let merged = options.merged(into: mapped)
+        let settingsEnv = merged?["claudeCode"]?["options"]?["settings"]?["env"]
+        #expect(settingsEnv?[SessionOptions.autoCompactKey]?.stringValue == "200000")
+        #expect(merged?["claudeCode"]?["options"]?["env"]?[SessionOptions.autoCompactKey] == nil)
+        // 映射的窗口更小时保持映射的值
+        options.autoCompactWindow = 500_000
+        let kept = options.merged(into: .object(["claudeCode": .object(["options": .object(["settings": .object(["env": .object([SessionOptions.autoCompactKey: .string("128000")])])])])]))
+        #expect(kept?["claudeCode"]?["options"]?["settings"]?["env"]?[SessionOptions.autoCompactKey]?.stringValue == "128000")
+    }
 }

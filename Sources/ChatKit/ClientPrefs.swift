@@ -44,6 +44,8 @@ public enum ClientPrefs {
         public static let terminalSandboxNetwork = "terminal.sandbox.network"
         public static let budgetUSD = "usage.budgetUSD"
         public static let redactLogs = "privacy.redactLogs"
+        /// 自动压缩窗口(token,0 = 默认):给上下文设上限,对应 CLAUDE_CODE_AUTO_COMPACT_WINDOW
+        public static let autoCompactWindow = "advanced.autoCompactWindow"
         public static let pathNode = "advanced.path.node"
         public static let pathClaude = "advanced.path.claude"
         public static let pathAdapter = "advanced.path.adapter"
