@@ -84,4 +84,34 @@ struct ScenarioEngineStepsTests {
         let normalized = DemoHistory.normalize(steps)
         #expect(normalized.count == 1)
     }
+
+    @Test("套餐限额场景发出多轮限额更新,上下文用量逐步升高")
+    func usageLimitsScenario() async throws {
+        let scenario = try #require(DemoScenarios.scenario(named: "usage-limits"))
+        let result = try await execute(scenario.build(ScenarioContext(cwd: NSTemporaryDirectory(), sessionId: "s")))
+        let usages = result.updates.compactMap { update -> UsageUpdate? in
+            if case .usage(let value) = update { return value }
+            return nil
+        }
+        let limits = usages.filter { $0.rateLimit != nil }
+        #expect(limits.count == 3)
+        let used = usages.compactMap(\.used)
+        #expect(used == used.sorted() && (used.last ?? 0) > 180_000)
+    }
+
+    @Test("上下文压缩场景:用量先高后落,并出现压缩完成提示")
+    func contextCompactScenario() async throws {
+        let scenario = try #require(DemoScenarios.scenario(named: "context-compact"))
+        let result = try await execute(scenario.build(ScenarioContext(cwd: NSTemporaryDirectory(), sessionId: "s")))
+        let used = result.updates.compactMap { update -> Int? in
+            if case .usage(let value) = update { return value.used }
+            return nil
+        }
+        #expect(used.first ?? 0 > 180_000 && used.last ?? Int.max < 50_000)
+        let titles = result.updates.compactMap { update -> String? in
+            if case .notice(_, let title, _) = update { return title }
+            return nil
+        }
+        #expect(titles.contains("上下文已压缩"))
+    }
 }

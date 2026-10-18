@@ -26,6 +26,7 @@ extension DemoScenarios {
         ]
         list.append(contentsOf: agentScenarios)
         list.append(contentsOf: endingScenarios)
+        list.append(contentsOf: usageScenarios)
         return list
     }()
 }
