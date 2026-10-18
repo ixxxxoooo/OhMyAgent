@@ -48,6 +48,8 @@ struct TabContentView: View {
                 BrowserTabView(browserID: browserID, workspace: workbench.selectedProjectID ?? NSHomeDirectory()).id(browserID)
             } else if let canvasID = WorkbenchModel.canvasID(fromTab: id) {
                 CanvasTabView(canvasID: canvasID).id(canvasID)
+            } else if let planPath = WorkbenchModel.planPath(fromTab: id) {
+                PlanTabView(path: planPath).id(planPath)
             } else {
                 PreviewTabView(id: id)
             }

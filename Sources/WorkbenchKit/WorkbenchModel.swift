@@ -1238,6 +1238,30 @@ public final class WorkbenchModel {
         return tab
     }
 
+    // MARK: 计划标签
+
+    /// 计划标签的标识前缀(预览类标签,后缀为计划文件的绝对路径)。
+    public nonisolated static let planTabPrefix = "oma-plan:"
+
+    /// 从预览标签标识里取计划文件路径;不是计划标签返回 nil。
+    /// - Parameter tabID: 预览标签标识
+    public nonisolated static func planPath(fromTab tabID: String) -> String? {
+        tabID.hasPrefix(planTabPrefix) ? String(tabID.dropFirst(planTabPrefix.count)) : nil
+    }
+
+    /// 打开(或切到)计划标签。
+    /// - Parameters:
+    ///   - path: 计划文件(`*.plan.md`)的绝对路径
+    ///   - title: 标签标题
+    @discardableResult
+    public func openPlan(path: String, title: String) -> UUID {
+        mode = .workspace
+        let tab = dock.open(.preview(id: Self.planTabPrefix + path), title: title)
+        dock.activate(tab)
+        syncSelectionFromDock()
+        return tab
+    }
+
     // MARK: 浏览器标签
 
     /// 浏览器标签的标识前缀(预览类标签,后缀为浏览器标签 id)。

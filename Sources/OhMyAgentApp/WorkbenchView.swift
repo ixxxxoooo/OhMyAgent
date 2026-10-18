@@ -187,6 +187,13 @@ struct WorkbenchView: View {
         } else if env["OMA_AUTOSEND"] != nil {
             Log.app.warning("调试钩子:没有可用会话,未发送", ["active": "\(workbench.activeSession != nil)"])
         }
+        if env["OMA_OPEN_PLAN"] != nil, let model = workbench.activeSession {
+            // 调试:等计划文件落盘后以标签打开最近的计划(配合 OMA_AUTOALLOW 验证 Plan 标签页)
+            for _ in 0..<100 where !model.timeline.entries.contains(where: { $0.planFileURL != nil }) { try? await Task.sleep(for: .milliseconds(100)) }
+            if let entry = model.timeline.entries.last(where: { $0.planFileURL != nil }), let file = entry.planFileURL {
+                workbench.openPlan(path: file.path, title: entry.planDocument?.name ?? String(localized: "计划"))
+            }
+        }
         if let toolID = env["OMA_OPEN_SUBAGENT"], !toolID.isEmpty, let project = workbench.selectedProjectID, let model = workbench.sessions[project] {
             // 调试:等待子 Agent 条目出现后以标签打开其只读会话
             for _ in 0..<60 where model.timeline.toolEntry(id: toolID) == nil { try? await Task.sleep(for: .milliseconds(100)) }

@@ -2458,3 +2458,9 @@
 "保存到工作区" = "Save to workspace";
 "已保存到工作区" = "Saved to workspace";
 "已保存到 %@" = "Saved to %@";
+"计划视图模式" = "Plan view mode";
+"导出为 Markdown" = "Export as Markdown";
+"有未保存的修改,已跳过重新读取;请先保存或还原。" = "There are unsaved changes, so reloading was skipped. Save or revert first.";
+"无法读取计划文件:%@" = "Unable to read the plan file: %@";
+"保存失败:%@" = "Save failed: %@";
+"在标签页打开" = "Open in tab";

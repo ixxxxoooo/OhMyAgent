@@ -40,6 +40,22 @@ enum PlanActions {
         return true
     }
 
+    /// 在指定项目里新开会话并 Build(计划标签页使用,没有所属会话)。
+    /// - Parameters:
+    ///   - document: 计划
+    ///   - fileURL: 计划文件
+    ///   - projectID: 项目;nil 取当前选中的项目
+    /// - Returns: 是否成功发起
+    @discardableResult
+    static func buildInNewSession(_ document: PlanDocument, fileURL: URL?, projectID: String?) -> Bool {
+        let workbench = AppEnvironment.shared.workbench
+        guard let project = projectID ?? workbench.selectedProjectID else { return false }
+        workbench.newConversation(in: project)
+        guard let session = workbench.activeSession else { return false }
+        session.send(buildPrompt(document, fileURL: fileURL))
+        return true
+    }
+
     /// 路径缩写(主目录显示为 `~`)。
     /// - Parameter url: 文件地址
     static func displayPath(_ url: URL) -> String {
@@ -219,6 +235,10 @@ struct PlanDocView: View {
                     .buttonStyle(.omPlain)
                 Button("在新会话中 Build") { PlanActions.buildInNewSession(plan, fileURL: entry.planFileURL, from: model) }
                     .buttonStyle(.omPlain)
+                if let file = entry.planFileURL {
+                    Button("在标签页打开") { AppEnvironment.shared.workbench.openPlan(path: file.path, title: plan.name) }
+                        .buttonStyle(.omPlain)
+                }
                 Button(entry.planWorkspaceURL == nil ? "保存到工作区" : "已保存到工作区") {
                     if let url = model.savePlanToWorkspace(entry) {
                         savedNote = String(localized: "已保存到 \(url.path.replacingOccurrences(of: model.workspace.path + "/", with: ""))")

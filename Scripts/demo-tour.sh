@@ -65,6 +65,7 @@ for s in states-working states-frozen permissions permissions-variants plan-appr
   add "scenario-$s" 10 "OMA_DEMO_SCENARIO=$s;OMA_EXPAND_ALL=1"
 done
 add "scenario-plan-approval-built" 12 "OMA_DEMO_SCENARIO=plan-approval;OMA_AUTOALLOW=1;OMA_EXPAND_ALL=1"
+add "scenario-plan-tab" 14 "OMA_DEMO_SCENARIO=plan-approval;OMA_AUTOALLOW=1;OMA_OPEN_PLAN=1"
 add "scenario-permissions-autoallow" 12 "OMA_DEMO_SCENARIO=permissions;OMA_AUTOALLOW=1;OMA_EXPAND_ALL=1"
 # 3) 会话流相关
 add "chat-collapsed" 10 "OMA_DEMO_SCENARIO=tools-files"

@@ -72,6 +72,7 @@ func tabIcon(_ kind: TabKind) -> String {
         if id == WorkbenchModel.customizeTabID { return "sliders-horizontal" }
         if WorkbenchModel.canvasID(fromTab: id) != nil { return "chart-column" }
         if WorkbenchModel.browserID(fromTab: id) != nil { return "globe" }
+        if WorkbenchModel.planPath(fromTab: id) != nil { return "list-todo" }
         return id == WorkbenchModel.outputTabID ? "file-text" : "eye"
     case .history: return "git-graph"
     case .blame: return "user"
