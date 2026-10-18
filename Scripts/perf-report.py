@@ -21,6 +21,7 @@
       --hitch-ms N          基准期间单次主线程卡顿上限(默认 250)
       --idle-cpu N          无会话运行时本进程 CPU 平均上限(默认 5,仅 --cpu-check 时判)
       --cpu-check           同时检查 CPU(运行中冻结场景下用 --run-cpu 上限)
+      --cpu-only            只检查 CPU(运行中冻结场景没有交互数据)
       --run-cpu N           会话运行中本进程 CPU 平均上限(默认 15)
 默认只看最近一次启动的那个进程(按 pid 过滤,避免开发版与安装版混在一起);
 --all 看全部保留的日志;--pid N 指定进程。
@@ -245,8 +246,10 @@ def ui_metrics(entries):
             "stacks": [e for e in scope if e[3] == "卡顿栈"]}
 
 
-def ui(entries, opts, check_cpu):
-    """打印交互性能画像并返回失败原因列表。"""
+def ui(entries, opts, check_cpu, cpu_only=False):
+    """打印交互性能画像并返回失败原因列表;cpu_only 时只判 CPU(运行中冻结场景没有交互数据)。"""
+    if cpu_only:
+        return ui_cpu(entries, opts)
     m = ui_metrics(entries)
     problems = []
     print("== 侧栏开关 ==")
@@ -283,13 +286,22 @@ def ui(entries, opts, check_cpu):
     for e in m["stacks"][-5:]:
         print(f"  卡顿栈 stalled={e[4].get('stalledMs')}ms: {e[4].get('top', '')[-300:]}")
     if check_cpu:
-        cpu = [num(e[4].get("cpuPct")) for e in entries if e[3] == "资源采样" and "cpuPct" in e[4]]
-        # 丢弃前两个采样(启动期)
-        cpu = cpu[2:] if len(cpu) > 4 else cpu
-        if cpu:
-            print(f"\n== CPU ==\n  平均 {statistics.mean(cpu):.1f}%  最大 {max(cpu):.0f}%  (n={len(cpu)})")
-            if statistics.mean(cpu) > opts["run_cpu"]:
-                problems.append(f"本进程 CPU 平均 {statistics.mean(cpu):.1f}% > {opts['run_cpu']}%")
+        problems += ui_cpu(entries, opts)
+    return problems
+
+
+def ui_cpu(entries, opts):
+    """CPU 门槛:丢弃启动期采样后取平均。"""
+    problems = []
+    cpu = [num(e[4].get("cpuPct")) for e in entries if e[3] == "资源采样" and "cpuPct" in e[4]]
+    # 丢弃前两个采样(启动期)
+    cpu = cpu[2:] if len(cpu) > 4 else cpu
+    if cpu:
+        print(f"\n== CPU ==\n  平均 {statistics.mean(cpu):.1f}%  最大 {max(cpu):.0f}%  (n={len(cpu)})")
+        if statistics.mean(cpu) > opts["run_cpu"]:
+            problems.append(f"本进程 CPU 平均 {statistics.mean(cpu):.1f}% > {opts['run_cpu']}%")
+    else:
+        problems.append("没有 CPU 采样数据")
     return problems
 
 
@@ -337,13 +349,14 @@ def main():
     elif cmd == "ui":
         rest = args[1:]
         check_cpu = "--cpu-check" in rest
-        rest = [a for a in rest if a != "--cpu-check"]
+        cpu_only = "--cpu-only" in rest
+        rest = [a for a in rest if a not in ("--cpu-check", "--cpu-only")]
         opts = {}
         for flag, key, default in (("--panel-avg-ms", "panel_avg_ms", 17.5), ("--panel-hitches", "panel_hitches", 1.0), ("--panel-max-ms", "panel_max_ms", 33.0),
                                    ("--first-frame-ms", "first_frame_ms", 80.0), ("--cold-open-ms", "cold_open_ms", 150.0), ("--warm-switch-ms", "warm_switch_ms", 50.0),
                                    ("--hitch-ms", "hitch_ms", 250.0), ("--run-cpu", "run_cpu", 15.0)):
             opts[key], rest = option(rest, flag, default)
-        problems = ui(entries, opts, check_cpu)
+        problems = ui(entries, opts, check_cpu, cpu_only)
         print()
         if problems:
             print("交互性能门槛未通过:")

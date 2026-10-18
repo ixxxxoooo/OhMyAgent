@@ -67,8 +67,8 @@ if [[ "$MODE" == cpu || "$MODE" == all ]]; then
   [[ -n "$PID" ]] || { echo "应用没有启动" >&2; exit 1; }
   sleep "$CPU_SECONDS"
   kill -0 "$PID" 2>/dev/null || { echo "应用已退出(崩溃?)" >&2; exit 1; }
-  python3 -I Scripts/perf-report.py ui --pid "$PID" --cpu-check $(thresholds) 2>&1 | sed -n '/== CPU ==/,$p' || true
-  python3 -I Scripts/perf-report.py ui --pid "$PID" --cpu-check $(thresholds) >/dev/null 2>&1 || STATUS=1
+  python3 -I Scripts/perf-report.py ui --pid "$PID" --cpu-only $(thresholds) 2>&1 | sed -n '/== CPU ==/,$p' || true
+  python3 -I Scripts/perf-report.py ui --pid "$PID" --cpu-only $(thresholds) >/dev/null 2>&1 || STATUS=1
   killDemoApp
 fi
 exit $STATUS
