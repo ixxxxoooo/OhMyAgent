@@ -81,7 +81,12 @@ public enum DemoHistory {
         var steps: [ScenarioStep] = [.user(session.prompt)]
         switch session.body {
         case .scenario(let id):
-            if let scenario = DemoScenarios.scenario(named: id) { steps += normalize(scenario.build(ctx)) }
+            if let scenario = DemoScenarios.scenario(named: id) {
+                let body = normalize(scenario.build(ctx))
+                // 场景自带开场用户消息时,以场景的为准,避免回放出两条相邻的提问
+                if case .user = body.first { steps = [] }
+                steps += body
+            }
         case .qa(let lines):
             steps.append(.text(lines))
         }
@@ -131,7 +136,7 @@ extension DemoHistory {
 
     static let atlas = make("atlas-web", [
         ("梳理 AtlasCore 路由架构", "帮我梳理一下 AtlasCore 的路由架构,列出主要文件和调用关系", 5, true, false, .scenario("tools-files")),
-        ("修复路由大小写匹配", "路由匹配对大小写敏感,/Users 和 /users 被当成两条路由,帮我修一下", 38, false, false, .scenario("tools-plan-todo")),
+        ("修复路由大小写匹配", "路由匹配对大小写敏感,/Users 和 /users 被当成两条路由,帮我修一下", 38, false, false, .scenario("showcase-tour")),
         ("接入 Metrics 指标上报", "给 Router 加上请求耗时与命中率的指标上报", 130, false, false, .scenario("permissions")),
         ("为 Session 增加超时与重试", "Session 需要支持空闲超时和重试,先让几个子 Agent 分别调研再动手", 1_500, true, false, .scenario("subagents")),
         ("并行审查三个模块", "同时审查 Router、Session、Cache 三个模块的并发安全", 1_700, false, false, .scenario("subagents-parallel")),
@@ -153,6 +158,8 @@ extension DemoHistory {
         ("发布 0.2.0", "准备发布 0.2.0,整理变更日志", 6_000, false, false, .scenario("tools-web-mcp")),
         ("一个很短的问题", "怎么在 zsh 里补全 notes 命令?", 9_000, false, true, .qa(["可以用 `notes completion zsh > ~/.zsh/completions/_notes`,然后确保 `fpath` 包含该目录并重新执行 `compinit`。"])),
         ("清理过期笔记命令", "加一个 purge 命令清理 90 天前的笔记", 12_000, false, false, .scenario("changes")),
+        ("排查看板报错", "打开本地看板,看看延迟表格为什么报错", 14_400, false, false, .scenario("tools-browser")),
+        ("对比页面截图", "对比一下这两张页面截图的差异", 16_000, false, false, .scenario("user-variants")),
     ])
 
     static let mergeLab = make("merge-lab", [
@@ -175,6 +182,8 @@ extension DemoHistory {
         ("导出接口文档", "把接口文档导出成 Markdown", 5_000, false, false, .scenario("markdown")),
         ("遗留代码风险图", "画一张遗留代码的风险热力图", 7_000, false, false, .scenario("mermaid")),
         ("初始化仓库", "帮我 git init 并做首次提交", 10_000, false, true, .scenario("states-notices")),
+        ("核对额度与上下文用量", "这个迁移任务大概会用掉多少额度?上下文快满了吗", 12_000, false, false, .scenario("usage-limits")),
+        ("查看图标与报错截图", "看一下仓库里的图标资源和那张报错页截图", 13_500, false, false, .scenario("tools-image")),
     ])
 
     static let emptyProject = make("empty-project", [

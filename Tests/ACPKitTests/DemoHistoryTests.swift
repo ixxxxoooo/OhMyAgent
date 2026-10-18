@@ -39,6 +39,15 @@ struct DemoHistoryTests {
         }
     }
 
+    @Test("场景自带开场用户消息时,回放不会再重复插入首条提问")
+    func replayDoesNotDuplicateOpeningUser() throws {
+        let ctx = ScenarioContext(cwd: "/tmp/x", sessionId: "s")
+        let session = try #require(DemoHistory.all.first { if case .scenario("showcase-tour") = $0.body { return true } else { return false } })
+        let steps = DemoHistory.replaySteps(for: session, ctx: ctx)
+        guard case .user = steps[0] else { Issue.record("回放应以用户消息开头"); return }
+        if case .user = steps[1] { Issue.record("首条用户消息被重复插入") }
+    }
+
     @Test("规整后没有停顿、冻结、内置交互与并行")
     func normalizeRemovesLiveOnlySteps() {
         let ctx = ScenarioContext(cwd: "/tmp/x", sessionId: "s")
@@ -46,7 +55,7 @@ struct DemoHistoryTests {
             func check(_ steps: [ScenarioStep]) {
                 for step in steps {
                     switch step {
-                    case .delay, .hold, .builtin, .permission, .parallel: Issue.record("\(scenario.id) 仍含实时步骤")
+                    case .delay, .hold, .builtin, .permission, .parallel, .stop, .fail, .rateLimit, .elicit, .elicitURL: Issue.record("\(scenario.id) 仍含实时步骤")
                     case .tool(let tool): #expect(tool.finish == .completed || tool.finish == .failed)
                     case .subagent(let sub):
                         #expect(sub.finish == .completed || sub.finish == .failed)
