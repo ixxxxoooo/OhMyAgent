@@ -9,6 +9,8 @@ import SwiftUI
 /// 插件管理页。
 struct PluginsManagerView: View {
     let center: ConfigCenter
+    /// 顶栏搜索词(由自定义页传入),过滤已安装列表
+    var query = ""
     @State private var installName = ""
     @State private var marketplaceSource = ""
     @State private var installScope = "user"
@@ -65,15 +67,23 @@ struct PluginsManagerView: View {
 
     // MARK: 已安装
 
+    private var installedPlugins: [InstalledPlugin] {
+        guard !query.isEmpty else { return center.snapshot.plugins }
+        return center.snapshot.plugins.filter {
+            $0.name.localizedCaseInsensitiveContains(query) || $0.description.localizedCaseInsensitiveContains(query)
+                || $0.marketplace.localizedCaseInsensitiveContains(query)
+        }
+    }
+
     private var installedSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ExtensionSectionLabel(title: String(localized: "已安装"), count: center.snapshot.plugins.count)
-            if center.snapshot.plugins.isEmpty {
+            ExtensionSectionLabel(title: String(localized: "已安装"), count: installedPlugins.count)
+            if installedPlugins.isEmpty {
                 ExtensionEmptyCard(icon: "puzzlepiece.extension", title: String(localized: "还没有安装插件"),
                                    message: String(localized: "在上方输入 plugin@marketplace 安装,或先添加一个插件市场。"))
             } else {
                 ExtensionCardList {
-                    ForEach(Array(center.snapshot.plugins.enumerated()), id: \.element.id) { index, plugin in
+                    ForEach(Array(installedPlugins.enumerated()), id: \.element.id) { index, plugin in
                         if index > 0 { ExtensionRowDivider() }
                         pluginRow(plugin)
                     }

@@ -9,11 +9,16 @@ import SwiftUI
 /// 记忆管理页。
 struct MemoryManagerView: View {
     let center: ConfigCenter
+    /// 顶栏搜索词(由自定义页传入),过滤文件列表
+    var query = ""
     @State private var selectedID: String?
     @State private var showCreateRule = false
 
-    private var files: [MemoryFile] { center.snapshot.memory }
-    private var selected: MemoryFile? { files.first { $0.id == selectedID } }
+    private var allFiles: [MemoryFile] { center.snapshot.memory }
+    private var files: [MemoryFile] {
+        query.isEmpty ? allFiles : allFiles.filter { $0.title.localizedCaseInsensitiveContains(query) || $0.url.path.localizedCaseInsensitiveContains(query) }
+    }
+    private var selected: MemoryFile? { allFiles.first { $0.id == selectedID } }
 
     var body: some View {
         ListDetail {

@@ -9,6 +9,7 @@ import SwiftUI
 /// 插件设置页(与 MCP / Hooks 同一套可滚动卡片页骨架)。
 struct PluginsSettingsPage: View {
     let center: ConfigCenter
+    var query = ""
 
     var body: some View {
         ExtensionPage(
@@ -20,7 +21,7 @@ struct PluginsSettingsPage: View {
                 .omTooltip("重新读取配置")
                 .accessibilityLabel("刷新")
         } content: {
-            PluginsManagerView(center: center)
+            PluginsManagerView(center: center, query: query)
         }
     }
 }
@@ -28,6 +29,7 @@ struct PluginsSettingsPage: View {
 /// 记忆与指令设置页。
 struct MemorySettingsPage: View {
     let center: ConfigCenter
+    var query = ""
 
     var body: some View {
         ExtensionFixedPage(
@@ -39,7 +41,7 @@ struct MemorySettingsPage: View {
                 .omTooltip("重新读取配置")
                 .accessibilityLabel("刷新")
         } content: {
-            MemoryManagerView(center: center)
+            MemoryManagerView(center: center, query: query)
         }
     }
 }

@@ -12,15 +12,16 @@ import SwiftUI
 struct SkillsSettingsPage: View {
     let center: ConfigCenter
     let kind: MarkdownItem.Kind
-    @State private var search = ""
+    /// 顶栏搜索词(由自定义页传入)
+    var query = ""
     @State private var showCreate = false
     @State private var editing: MarkdownItem?
     @State private var pendingDelete: MarkdownItem?
 
     private var items: [MarkdownItem] {
         let all = kind == .agent ? center.snapshot.agents : center.snapshot.skills
-        guard !search.isEmpty else { return all }
-        return all.filter { $0.name.localizedCaseInsensitiveContains(search) || $0.description.localizedCaseInsensitiveContains(search) }
+        guard !query.isEmpty else { return all }
+        return all.filter { $0.name.localizedCaseInsensitiveContains(query) || $0.description.localizedCaseInsensitiveContains(query) }
     }
     private var total: Int { kind == .agent ? center.snapshot.agents.count : center.snapshot.skills.count }
     private var noun: String { kind == .agent ? String(localized: "子 Agent") : String(localized: "技能") }
@@ -40,7 +41,6 @@ struct SkillsSettingsPage: View {
             Button { showCreate = true } label: { Label(String(localized: "新建\(noun)"), om: "plus") }
                 .buttonStyle(.omPrimary)
         } content: {
-            if total > 0 { ExtensionSearchField(placeholder: "搜索名称或描述", text: $search).frame(maxWidth: 360) }
             if items.isEmpty {
                 ExtensionEmptyCard(
                     icon: pageIcon,

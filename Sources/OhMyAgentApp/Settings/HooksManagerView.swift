@@ -9,11 +9,17 @@ import SwiftUI
 /// Hooks 设置页。
 struct HooksSettingsPage: View {
     let center: ConfigCenter
+    /// 顶栏搜索词(由自定义页传入)
+    var query = ""
     @State private var editor: HookEditorTarget?
     @State private var pendingDelete: HookEntry?
 
     private var grouped: [(String, [HookEntry])] {
-        let groups = Dictionary(grouping: center.snapshot.hooks, by: \.event)
+        let hooks = query.isEmpty ? center.snapshot.hooks : center.snapshot.hooks.filter {
+            $0.event.localizedCaseInsensitiveContains(query) || $0.matcher.localizedCaseInsensitiveContains(query)
+                || $0.handler.summary.localizedCaseInsensitiveContains(query)
+        }
+        let groups = Dictionary(grouping: hooks, by: \.event)
         return groups.keys.sorted().map { ($0, groups[$0] ?? []) }
     }
 

@@ -10,6 +10,8 @@ import SwiftUI
 /// MCP 设置页。
 struct MCPSettingsPage: View {
     let center: ConfigCenter
+    /// 顶栏搜索词(由自定义页传入)
+    var query = ""
     @State private var filter: ConfigScope?
     @State private var expandedID: String?
     @State private var editor: MCPEditorTarget?
@@ -17,7 +19,14 @@ struct MCPSettingsPage: View {
     @State private var pendingDelete: MCPServerEntry?
 
     private var all: [MCPServerEntry] { center.snapshot.mcp }
-    private var entries: [MCPServerEntry] { filter.map { scope in all.filter { $0.scope == scope } } ?? all }
+    private var entries: [MCPServerEntry] {
+        let scoped = filter.map { scope in all.filter { $0.scope == scope } } ?? all
+        guard !query.isEmpty else { return scoped }
+        return scoped.filter {
+            $0.config.name.localizedCaseInsensitiveContains(query) || $0.config.url.localizedCaseInsensitiveContains(query)
+                || $0.config.command.localizedCaseInsensitiveContains(query)
+        }
+    }
 
     var body: some View {
         ExtensionPage(
