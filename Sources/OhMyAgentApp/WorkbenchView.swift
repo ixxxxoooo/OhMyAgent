@@ -303,7 +303,8 @@ struct WorkbenchView: View {
         if let names = env["OMA_TERMINAL_NAMES"]?.split(separator: ",").map(String.init), let first = names.first {
             let root = workbench.selectedProjectID ?? NSHomeDirectory()
             TerminalPanelStore.shared.rename(TerminalPanelState.baseID(root), to: first, root: root)
-            for name in names.dropFirst() { TerminalPanelStore.shared.addTerminal(root: root, name: name) }
+            let existing = Set(TerminalPanelStore.shared.state(for: root).instances.compactMap(\.customTitle))  // 重复启动不重复新建
+            for name in names.dropFirst() where !existing.contains(name) { TerminalPanelStore.shared.addTerminal(root: root, name: name) }
             TerminalPanelStore.shared.activate(TerminalPanelState.baseID(root), root: root)
         }
         if env["OMA_SHOW_RIGHT"] != nil { workbench.layout.rightVisible = true }
