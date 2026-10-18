@@ -246,7 +246,12 @@ public final class SessionModel {
     public var dockSelection: ComposerDockSection?
     public var dockHidden = false
     public private(set) var agentName: String
-    public private(set) var configOptions: [SessionConfigOption] = []
+    public private(set) var configOptions: [SessionConfigOption] = [] {
+        didSet { if !configOptions.isEmpty { Self.lastConfigOptions[activeDescriptor.id] = configOptions } }
+    }
+    /// 各 Agent 最近一次拿到的配置选项(模式/模型/思考强度):恢复历史会话时先用它占位,
+    /// 避免在 `session/load` 返回前(约 1.5 秒)输入框底部一片空白、随后突然冒出来。
+    @MainActor private static var lastConfigOptions: [String: [SessionConfigOption]] = [:]
     public private(set) var availableCommands: [AvailableCommand] = []
     public private(set) var usage: UsageUpdate?
     /// 提示缓存统计(本次打开会话以来各轮的主对话用量;不支持缓存时为 nil)。
@@ -1264,6 +1269,11 @@ public final class SessionModel {
     public func prepareRestore(_ summary: SessionSummary) {
         guard phase == .idle, restoreTarget == nil, sessionId == nil, !summary.sessionId.isEmpty else { return }
         restoreTarget = summary
+        // 连接与回放要 1~2 秒:先用本地能拿到的数据把输入框底部与用量环占好位,不等 Agent
+        if configOptions.isEmpty, let cached = Self.lastConfigOptions[activeDescriptor.id] { configOptions = cached }
+        if let parsing = startTranscriptParse() {
+            Task { [weak self] in self?.seedUsage(from: await parsing.value) }
+        }
         if let manual = ClientPrefs.sessionTitleOverrides()[summary.sessionId] {
             titleSource = .manual; sessionTitle = manual
         } else if let generated = ClientPrefs.generatedSessionTitles()[summary.sessionId] {
@@ -1314,6 +1324,7 @@ public final class SessionModel {
             Task { [weak self] in
                 let turns = await transcriptTurns.value
                 self?.timeline.replayTurns = turns
+                self?.seedUsage(from: turns)
             }
         }
         let replaySpan = Log.perf.span("历史会话回放", warnMs: 800, ["target": String(summary.sessionId.prefix(8))])
@@ -2144,6 +2155,13 @@ extension SessionModel {
     /// 无法得知真实窗口时的默认上下文窗口(token)。
     static let defaultContextWindow = 200_000
 
+    /// 重新打开的会话还没有 Agent 上报的用量:用记录里最后一次请求的上下文占用顶上,窗口取默认 20 万(发送后以实际上报为准)。
+    /// - Parameter turns: 记录解析出的回合
+    func seedUsage(from turns: [TranscriptTurn]) {
+        guard usage?.used == nil, let tokens = turns.last(where: { $0.lastContextTokens != nil })?.lastContextTokens else { return }
+        usage = UsageUpdate(used: tokens, size: Self.defaultContextWindow)
+    }
+
     /// 在后台开始解析会话记录(没有记录文件的引擎返回 nil)。
     /// - Returns: 解析任务;回放结束后交给 `attachReplayedSummaries(parsing:)`
     func startTranscriptParse() -> Task<[TranscriptTurn], Never>? {
@@ -2155,10 +2173,7 @@ extension SessionModel {
     /// - Parameter turns: `startTranscriptParse()` 解析出的回合(nil 表示没有记录文件)
     func attachReplayedSummaries(turns: [TranscriptTurn]?) {
         guard let turns else { return }
-        // 重新打开的会话还没有 Agent 上报的用量:用记录里最后一次请求的上下文占用顶上,窗口取默认 20 万(发送后以实际上报为准)
-        if usage?.used == nil, let tokens = turns.last(where: { $0.lastContextTokens != nil })?.lastContextTokens {
-            usage = UsageUpdate(used: tokens, size: Self.defaultContextWindow)
-        }
+        seedUsage(from: turns)
         timeline.attachReplayedSummaries(turns) { [weak self] raw in self?.resolveReplayModel(raw) ?? (raw, nil) }
     }
 
