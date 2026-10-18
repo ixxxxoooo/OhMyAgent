@@ -23,6 +23,21 @@ struct SkillsSettingsPage: View {
         guard !query.isEmpty else { return all }
         return all.filter { $0.name.localizedCaseInsensitiveContains(query) || $0.description.localizedCaseInsensitiveContains(query) }
     }
+    /// 内置子 Agent(Claude Code 自带,无需配置):Explore 用于快速只读检索,输入框 `/explore` 是快捷入口。
+    private var builtinAgents: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ExtensionSectionLabel(title: String(localized: "内置"), count: 1)
+            ExtensionCardList {
+                ExtensionRow(icon: "search", title: "Explore",
+                             subtitle: String(localized: "快速、只读地检索代码库并回答问题;配合 search_code 索引搜索。在输入框用 /explore 提问。")) {
+                    OMTag("/explore", tint: OMColors.accent)
+                } trailing: {
+                    EmptyView()
+                }
+            }
+        }
+    }
+
     private var total: Int { kind == .agent ? center.snapshot.agents.count : center.snapshot.skills.count }
     private var noun: String { kind == .agent ? String(localized: "子 Agent") : String(localized: "技能") }
     private var pageIcon: String { kind == .agent ? "person.2" : "sparkles" }
@@ -41,6 +56,7 @@ struct SkillsSettingsPage: View {
             Button { showCreate = true } label: { Label(String(localized: "新建\(noun)"), om: "plus") }
                 .buttonStyle(.omPrimary)
         } content: {
+            if kind == .agent { builtinAgents }
             if items.isEmpty {
                 ExtensionEmptyCard(
                     icon: pageIcon,
