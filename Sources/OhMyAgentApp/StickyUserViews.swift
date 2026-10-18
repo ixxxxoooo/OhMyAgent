@@ -198,7 +198,7 @@ struct StickyUserCard: View {
         .onHover { hovering = $0 }
         .onTapGesture { sticky?.beginEditing(entry, pinned: true) }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(String(localized: "你:\(entry.text)"))
+        .accessibilityLabel(String(localized: "你:\(entry.displayText)"))
         .accessibilityHint(String(localized: "点击放大编辑"))
     }
 }
@@ -223,7 +223,7 @@ struct UserMessageEditor: View {
         self.entry = entry
         self.maxWidth = maxWidth
         self.onClose = onClose
-        _text = State(initialValue: entry.text)
+        _text = State(initialValue: entry.displayText)
     }
 
     /// 作为新消息重新发送(原消息与回复保留)。
