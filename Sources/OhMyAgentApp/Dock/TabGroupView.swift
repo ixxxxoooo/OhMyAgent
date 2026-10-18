@@ -142,7 +142,7 @@ struct TabGroupView: View {
             TabBarView(
                 workbench: workbench, group: group, isFocused: isFocused,
                 leadingInset: edges.top && edges.left && workbench.layout.visibleColumns(on: .left).isEmpty
-                    ? TitlebarMetrics.leftClusterWidth(toggles: workbench.layout.toggleCount(on: .left)) : 0,
+                    ? TitlebarMetrics.leftClusterWidth(toggles: workbench.layout.toggleCount(on: .left), collapsed: true) : 0,
                 trailingInset: edges.top && edges.right && workbench.layout.visibleColumns(on: .right).isEmpty
                     ? TitlebarMetrics.rightClusterWidth(toggles: workbench.layout.toggleCount(on: .right)) : 0
             )

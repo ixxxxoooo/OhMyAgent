@@ -20,10 +20,12 @@ enum TitlebarMetrics {
     static let buttonSpacing: CGFloat = 2
     /// 左上浮层固定按钮数:搜索、回退、前进(面板开关另计)。
     static let fixedLeftButtons = 3
+    /// 侧栏收起时左上浮层的固定按钮数:搜索、新对话(回退/前进隐藏,只留快捷键)。
+    static let collapsedLeftButtons = 2
     /// 左上浮层(红绿灯让位 + `toggles` 个面板开关 + 搜索/回退/前进)的总宽度:`toggles == 1` 时为 198(对齐 Cursor 的
     /// 「红绿灯 → 侧栏开关 → 搜索 → 后退 → 前进」)。修改浮层按钮构成时必须同步此函数。
-    static func leftClusterWidth(toggles: Int) -> CGFloat {
-        let count = fixedLeftButtons + toggles
+    static func leftClusterWidth(toggles: Int, collapsed: Bool = false) -> CGFloat {
+        let count = (collapsed ? collapsedLeftButtons : fixedLeftButtons) + toggles
         return trafficLightInset + buttonSize * CGFloat(count) + buttonSpacing * CGFloat(count - 1)
     }
 
@@ -72,16 +74,27 @@ struct TitlebarOverlay: View {
                 OverlayButton(icon: "search", label: String(localized: "搜索") + " (\(ShortcutStore.shared.binding(for: .hubSearch).display))") {
                     HubModel.shared.present(.all, workbench: workbench)
                 }
-                OverlayButton(
-                    icon: "arrow-left",
-                    label: String(localized: "回退") + " (\(ShortcutStore.shared.binding(for: .goBack).display))",
-                    enabled: workbench.nav.canGoBack
-                ) { workbench.goBack() }
-                OverlayButton(
-                    icon: "arrow-right",
-                    label: String(localized: "前进") + " (\(ShortcutStore.shared.binding(for: .goForward).display))",
-                    enabled: workbench.nav.canGoForward
-                ) { workbench.goForward() }
+                if workbench.layout.visibleColumns(on: .left).isEmpty {
+                    // 侧栏收起:「+」放在搜索右边,回退/前进隐藏(仅保留快捷键)
+                    OverlayButton(
+                        icon: "plus",
+                        label: String(localized: "新对话") + " (\(ShortcutStore.shared.binding(for: .newConversation).display))",
+                        enabled: workbench.selectedProjectID != nil
+                    ) {
+                        if let id = workbench.selectedProjectID { workbench.newConversation(in: id) }
+                    }
+                } else {
+                    OverlayButton(
+                        icon: "arrow-left",
+                        label: String(localized: "回退") + " (\(ShortcutStore.shared.binding(for: .goBack).display))",
+                        enabled: workbench.nav.canGoBack
+                    ) { workbench.goBack() }
+                    OverlayButton(
+                        icon: "arrow-right",
+                        label: String(localized: "前进") + " (\(ShortcutStore.shared.binding(for: .goForward).display))",
+                        enabled: workbench.nav.canGoForward
+                    ) { workbench.goForward() }
+                }
             }
             .padding(.leading, TitlebarMetrics.trafficLightInset)
             Spacer(minLength: 0)

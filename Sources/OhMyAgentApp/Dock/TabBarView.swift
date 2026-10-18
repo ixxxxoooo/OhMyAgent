@@ -34,7 +34,7 @@ struct TabBarView: View {
     @State private var stripWidth: CGFloat = 0
     @State private var showOverflow = false
 
-    /// 是否为第一个(主)标签组:只有它显示「+ 新对话」按钮。
+    /// 是否为第一个(主)标签组。
     private var isMainGroup: Bool { workbench.dock.groups.first?.id == group.id }
 
     var body: some View {
@@ -47,11 +47,6 @@ struct TabBarView: View {
                             TabItemView(workbench: workbench, group: group, tab: tab, isActive: tab.id == group.activeID, isFocused: isFocused)
                                 .id(tab.id)
                                 .onDrop(of: [.plainText, .fileURL], delegate: TabStripDropDelegate(workbench: workbench, groupID: group.id, index: index))
-                        }
-                        // 标签放得下时「+」紧跟最后一个标签;溢出后固定在滚动区右侧,不会被挤出可视范围
-                        if isMainGroup {
-                            // 溢出后用等宽占位保持内容宽度不变,避免「+」移出后又判定为不溢出而来回抖动
-                            if overflowing { Color.clear.frame(width: TabMetrics.height, height: TabMetrics.height) } else { newConversationButton }
                         }
                         Color.clear
                             .frame(minWidth: 24, maxWidth: .infinity)
@@ -81,28 +76,12 @@ struct TabBarView: View {
                 }
             }
             if overflowing {
-                if isMainGroup { newConversationButton }
                 overflowButton
             }
             if trailingInset > 0 { Color.clear.frame(width: trailingInset).background(WindowDragArea()) }
         }
         .frame(height: TitlebarMetrics.height)
         .background(OMColors.surface)
-    }
-
-    /// 紧跟最后一个标签的「+」:在当前项目开始新对话。
-    private var newConversationButton: some View {
-        Button {
-            if let id = workbench.selectedProjectID { workbench.newConversation(in: id) }
-        } label: {
-            Image.om("plus", size: 13)
-                .frame(width: TabMetrics.height, height: TabMetrics.height)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(TabBarIconButtonStyle())
-        .disabled(workbench.selectedProjectID == nil)
-        .omTooltip(String(localized: "新对话") + " (\(ShortcutStore.shared.binding(for: .newConversation).display))")
-        .accessibilityLabel("新对话")
     }
 
     /// 标签放不下时右端的「全部标签」下拉入口。
