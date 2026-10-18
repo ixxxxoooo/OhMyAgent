@@ -178,4 +178,31 @@ struct DemoCoverageTests {
         #expect(await SessionModelTests.wait { !model.isRunning })
         model.shutdown()
     }
+
+    @Test("批准计划:时间线出现已 Build 的计划条目,并写出 .plan.md 文件")
+    func planApprovalPersistsFile() async throws {
+        let ws = try M3ScenarioTests.tempWorkspace()
+        let plans = FileManager.default.temporaryDirectory.appendingPathComponent("oma-plans-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: ws); try? FileManager.default.removeItem(at: plans) }
+        let model = try await M3ScenarioTests.readyModel(workspace: ws)
+        model.planDirectory = plans
+
+        model.send("#demo-plan-approval")
+        #expect(await SessionModelTests.wait { model.pendingPermissions.first?.isPlanApproval == true })
+        if let prompt = model.pendingPermissions.first { model.resolve(prompt, optionId: "default") }
+        #expect(await SessionModelTests.wait { !model.isRunning })
+
+        let entry = try #require(model.timeline.entries.last { $0.kind == .planDoc })
+        #expect(entry.planBuilt)
+        #expect(entry.planDocument?.todos.isEmpty == false)
+        #expect(await SessionModelTests.wait { entry.planFileURL != nil })
+        let file = try #require(entry.planFileURL)
+        #expect(file.lastPathComponent.hasSuffix(".plan.md") && file.deletingLastPathComponent().path == plans.path)
+        #expect(try String(contentsOf: file, encoding: .utf8).hasPrefix("---\nname:"))
+
+        let saved = try #require(model.savePlanToWorkspace(entry))
+        #expect(saved.path.contains("/.oma/plans/") && FileManager.default.fileExists(atPath: saved.path))
+        #expect(entry.planWorkspaceURL == saved)
+        model.shutdown()
+    }
 }

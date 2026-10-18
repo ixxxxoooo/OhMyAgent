@@ -42,6 +42,20 @@ public struct PlanDocument: Sendable, Equatable {
     /// 待办里已完成的数量。
     public var completedCount: Int { todos.filter { $0.status == "completed" }.count }
 
+    /// 用 Agent 最新的待办进度(TodoWrite / plan 更新)刷新各待办的状态:按内容匹配,匹配不到的保持原状态。
+    /// - Parameter entries: Agent 上报的待办条目
+    /// - Returns: 状态已刷新的待办
+    public func syncedTodos(with entries: [(content: String, status: String)]) -> [PlanTodo] {
+        guard !entries.isEmpty else { return todos }
+        func normalized(_ text: String) -> String { text.replacingOccurrences(of: "`", with: "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+        let latest = Dictionary(entries.map { (normalized($0.content), $0.status) }, uniquingKeysWith: { _, new in new })
+        return todos.map { todo in
+            var updated = todo
+            if let status = latest[normalized(todo.content)] { updated.status = status }
+            return updated
+        }
+    }
+
     // MARK: 解析
 
     /// 从计划 Markdown 解析(带或不带 YAML 头都可以)。

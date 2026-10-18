@@ -323,6 +323,8 @@ public final class SessionModel {
     /// 「在工作树中运行」开关:开启后首条消息会先创建工作树(界面层处理)
     public var runInWorktree = false
     @ObservationIgnored public var canvasStore = CanvasStore(directory: CanvasStore.defaultDirectory())
+    /// 计划文件的全局目录(默认 `~/.claude/plans`;测试可替换)
+    @ObservationIgnored public var planDirectory = PlanStore.globalDirectory
 
     private var supervisor: AgentSupervisor?
     private var client: ACPClient?
@@ -1674,10 +1676,44 @@ public final class SessionModel {
         if prompt.isPlanApproval, let plan = prompt.planText,
            let option = prompt.request.options.first(where: { $0.optionId == optionId }),
            option.kind == .allowOnce || option.kind == .allowAlways {
-            timeline.appendPlanDoc(plan)
+            let entry = timeline.appendPlanDoc(plan)
+            entry.planBuilt = true
+            persistPlan(entry)
         }
         prompt.choose(optionId)
         pendingPermissions.removeAll { $0.id == prompt.id }
+    }
+
+    /// 把计划条目写成全局目录下的 `*.plan.md`(后台写入,完成后回填 `planFileURL`)。
+    /// - Parameter entry: 计划条目
+    public func persistPlan(_ entry: TimelineEntry) {
+        guard let document = entry.planDocument, entry.planFileURL == nil else { return }
+        let directory = planDirectory
+        let log = self.log
+        Task { [weak entry] in
+            do {
+                let url = try await Task.detached(priority: .utility) { try PlanStore.save(document, in: directory) }.value
+                entry?.planFileURL = url
+            } catch {
+                log.warning("保存计划文件失败", ["dir": directory.path, "error": error.localizedDescription])
+            }
+        }
+    }
+
+    /// 把计划保存到工作区(`<项目>/.oma/plans/`),便于随项目提交或分享。
+    /// - Parameter entry: 计划条目
+    /// - Returns: 写入的文件;失败时为 nil(已记录日志)
+    @discardableResult
+    public func savePlanToWorkspace(_ entry: TimelineEntry) -> URL? {
+        guard let document = entry.planDocument else { return nil }
+        do {
+            let url = try PlanStore.save(document, in: PlanStore.workspaceDirectory(workspace.path))
+            entry.planWorkspaceURL = url
+            return url
+        } catch {
+            log.warning("保存计划到工作区失败", ["workspace": workspace.path, "error": error.localizedDescription])
+            return nil
+        }
     }
 
     private func cancelPendingPrompts() {

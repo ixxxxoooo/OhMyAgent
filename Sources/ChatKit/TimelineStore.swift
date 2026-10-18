@@ -66,6 +66,14 @@ public final class TimelineEntry: Identifiable {
     public var summary: TurnSummary?
     /// 提问结果(`kind == .tool` 且为 AskUserQuestion:回答/跳过后写入,用于渲染问答卡)
     public var elicitationOutcome: ElicitationOutcome?
+    /// 计划文档(`kind == .planDoc`):解析出的标题、概述、待办与正文
+    public var planDocument: PlanDocument?
+    /// 计划已落盘的文件(`~/.claude/plans/*.plan.md`);写入完成前为 nil
+    public var planFileURL: URL?
+    /// 计划是否已点「Build」(只有批准时才追踪,在别处实现不会回写)
+    public var planBuilt = false
+    /// 计划已保存到工作区的文件(`<项目>/.oma/plans/*.plan.md`)
+    public var planWorkspaceURL: URL?
 
     /// 创建条目。
     /// - Parameters:
@@ -263,11 +271,16 @@ public final class TimelineStore {
 
     /// 追加计划文档(计划模式批准后)。
     /// - Parameter markdown: 计划 Markdown
-    public func appendPlanDoc(_ markdown: String) {
+    /// - Returns: 新增的计划条目(已解析出 `planDocument`,`planBuilt` 为 false,由调用方按批准结果设置)
+    @discardableResult
+    public func appendPlanDoc(_ markdown: String) -> TimelineEntry {
         finishStreaming()
-        entries.append(TimelineEntry(kind: .planDoc, text: markdown))
+        let entry = TimelineEntry(kind: .planDoc, text: markdown)
+        entry.planDocument = PlanDocument.parse(markdown: markdown)
+        entries.append(entry)
         revision += 1
         structureRevision += 1
+        return entry
     }
 
     /// 追加提示或错误。

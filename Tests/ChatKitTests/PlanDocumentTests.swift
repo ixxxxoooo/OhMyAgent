@@ -89,4 +89,16 @@ struct PlanDocumentTests {
         let saved = try PlanStore.save(plan, in: workspace)
         #expect(saved.lastPathComponent == plan.fileName)
     }
+
+    @Test("按内容匹配 Agent 上报的待办进度,匹配不到的保持原状态")
+    func syncTodos() {
+        let plan = PlanDocument.parse(markdown: Self.sample)
+        let synced = plan.syncedTodos(with: [
+            (content: "新增 Router.normalize", status: "completed"),
+            (content: "补充回归测试", status: "in_progress"),
+            (content: "与计划无关的事", status: "completed"),
+        ])
+        #expect(synced.map(\.status) == ["completed", "pending", "in_progress"])
+        #expect(plan.syncedTodos(with: []) == plan.todos)
+    }
 }
