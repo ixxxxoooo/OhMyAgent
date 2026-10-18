@@ -341,7 +341,14 @@ struct WorkbenchView: View {
         if let filter = env["OMA_OPEN_CUSTOMIZE"] { workbench.openCustomize(filter: filter) }
         // 调试:OMA_OPEN_BROWSER=<网址> 在浏览器标签里打开页面
         if let raw = env["OMA_OPEN_BROWSER"], let url = BrowserArguments.normalize(raw), let workspace = workbench.selectedProjectID {
-            Task { _ = await BrowserController.shared.run(.navigate(url: url), workspace: workspace, activate: true) }
+            Task {
+                let first = await BrowserController.shared.run(.navigate(url: url), workspace: workspace, activate: true)
+                // 调试:OMA_BROWSER_PROBE=<输出文件> + OMA_BROWSER_ACTIONS 在导航后按顺序执行浏览器命令并记录结果
+                if let output = env["OMA_BROWSER_PROBE"], let actions = env["OMA_BROWSER_ACTIONS"] {
+                    await BrowserProbe.run(output: output, actions: actions, workspace: workspace)
+                    _ = first
+                }
+            }
         }
         // 启动稍后按间隔检查一次工作树数量(超限时询问是否清理;演示模式不触发)
         if env["OMA_DEMO"] == nil {
