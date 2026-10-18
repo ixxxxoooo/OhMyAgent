@@ -28,6 +28,8 @@ public struct DemoScenario: Sendable, Identifiable {
         case interactive
         /// 冻结:最后停在某个状态,直到用户取消
         case frozen
+        /// 自动跑完,但回合以非 `end_turn` 的停止原因(拒绝、输出上限等)或 JSON-RPC 错误收尾,用来展示各类结束提示
+        case failing
     }
 
     public init(id: String, group: String, title: String, summary: String, behavior: Behavior = .auto, build: @escaping @Sendable (ScenarioContext) -> [ScenarioStep]) {
@@ -166,5 +168,16 @@ public enum DemoScenarios {
     // MARK: 演示目录
 
     /// 演示场景目录(见 `DemoScenarios+Catalog.swift`)。
-    static var catalog: [DemoScenario] { catalogScenarios }
+    static var catalog: [DemoScenario] { orderedCatalog }
+
+    /// 分组的展示顺序(命令面板与斜杠补全按此排列;组内保持注册顺序)。
+    static let groupOrder = ["全景", "工具卡", "交互", "会话流样式", "子 Agent", "状态与错误", "输入区与模式", "回归"]
+
+    /// 按分组顺序稳定排序后的目录;未登记的分组排在最后。
+    private static let orderedCatalog: [DemoScenario] = {
+        let rank = { (group: String) in groupOrder.firstIndex(of: group) ?? groupOrder.count }
+        return catalogScenarios.enumerated()
+            .sorted { (rank($0.element.group), $0.offset) < (rank($1.element.group), $1.offset) }
+            .map(\.element)
+    }()
 }

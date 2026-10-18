@@ -67,6 +67,17 @@ struct DemoScenarioTests {
         #expect(!ids.isEmpty)
     }
 
+    @Test("目录按分组顺序排列,分组都已登记,标题唯一且非空")
+    func catalogIsOrderedByGroup() {
+        let groups = DemoScenarios.all.map(\.group)
+        #expect(groups.allSatisfy { DemoScenarios.groupOrder.contains($0) }, "存在未登记的分组")
+        let ranks = groups.compactMap { DemoScenarios.groupOrder.firstIndex(of: $0) }
+        #expect(ranks == ranks.sorted(), "目录没有按分组顺序排列")
+        let titles = DemoScenarios.all.map(\.title)
+        #expect(Set(titles).count == titles.count)
+        #expect(DemoScenarios.all.allSatisfy { !$0.title.isEmpty && !$0.summary.isEmpty })
+    }
+
     @Test("提示词匹配:旧关键字与 #demo- 场景", arguments: [
         ("#sub", "legacy-sub", false), ("#sub2", "legacy-sub2", false), ("#showcase", "legacy-showcase", false),
         ("#mermaid", "legacy-mermaid", false), ("跑一下 #demo-tools-files 看看", "tools-files", true),

@@ -6,18 +6,18 @@ import Foundation
 extension DemoScenarios {
     /// 子 Agent 与状态类场景。
     static let agentScenarios: [DemoScenario] = [
-        DemoScenario(id: "subagents", group: "子 Agent", title: "多种子 Agent", summary: "Explore / code-reviewer / general-purpose、两层嵌套、失败的子 Agent", build: subagents),
-        DemoScenario(id: "subagents-parallel", group: "子 Agent", title: "并行子 Agent", summary: "三个子 Agent 同时运行,一个失败,一个转入后台", build: subagentsParallel),
-        DemoScenario(id: "subagents-background", group: "子 Agent", title: "后台子 Agent", summary: "子 Agent 在后台保持运行,用于任务坞的「子 Agent」面板", build: subagentsBackground),
-        DemoScenario(id: "states-working", group: "状态", title: "等待与思考", summary: "长时间思考后保持运行(冻结),可测试发送引导、排队消息、/goal 与取消", behavior: .frozen, build: statesWorking),
-        DemoScenario(id: "states-frozen", group: "状态", title: "冻结的工具卡", summary: "待处理、进行中的工具与子 Agent 停在原地,用于检查转圈与样式", behavior: .frozen, build: statesFrozen),
-        DemoScenario(id: "states-notices", group: "状态", title: "提示与用量", summary: "info/warning/error 三级提示、上下文接近上限、标题与模式更新", build: statesNotices),
-        DemoScenario(id: "states-errors", group: "状态", title: "各类失败", summary: "失败的工具、失败的子 Agent、错误提示", build: statesErrors),
-        DemoScenario(id: "states-streaming", group: "状态", title: "慢速长输出", summary: "较长的流式文本,用于检查滚动跟随与渲染性能", build: statesStreaming),
-        DemoScenario(id: "roles", group: "样式", title: "会话流角色样式", summary: "用户/助手/思维/计划/各级提示/计划文档同屏", build: roles),
-        DemoScenario(id: "terminal", group: "工具卡", title: "内嵌终端", summary: "通过客户端终端执行命令(需开启「终端」能力)", build: terminal),
-        DemoScenario(id: "long-running", group: "状态", title: "长时间占用", summary: "约 20 秒的终端与未完成的子 Agent,任务坞三个分区同时有数据", build: longRunning),
-        DemoScenario(id: "all", group: "回归", title: "全量串联", summary: "依次运行全部自动场景,用于一次性回归", build: runAll),
+        DemoScenario(id: "subagents", group: "子 Agent", title: "子 Agent:代码审查与调研", summary: "Explore / code-reviewer / general-purpose、两层嵌套、失败的子 Agent", build: subagents),
+        DemoScenario(id: "subagents-parallel", group: "子 Agent", title: "并行子 Agent:同时审查三个模块", summary: "三个子 Agent 同时运行,一个失败,一个转入后台", build: subagentsParallel),
+        DemoScenario(id: "subagents-background", group: "子 Agent", title: "后台子 Agent:持续运行的调研", summary: "子 Agent 在后台保持运行,用于任务坞的「子 Agent」面板", build: subagentsBackground),
+        DemoScenario(id: "states-working", group: "状态与错误", title: "运行中:长思考、引导与排队", summary: "长时间思考后保持运行(冻结),可测试发送引导、排队消息、/goal 与取消", behavior: .frozen, build: statesWorking),
+        DemoScenario(id: "states-frozen", group: "状态与错误", title: "冻结态:待处理与进行中的工具", summary: "待处理、进行中的工具与子 Agent 停在原地,用于检查转圈与样式", behavior: .frozen, build: statesFrozen),
+        DemoScenario(id: "states-notices", group: "状态与错误", title: "提示与用量:额度回退与上下文告急", summary: "info/warning/error 三级提示、第三方 TPS 通知行、上下文接近上限、标题与模式更新", build: statesNotices),
+        DemoScenario(id: "states-errors", group: "状态与错误", title: "失败:工具、子 Agent 与错误提示", summary: "失败的工具(终端/编辑/MCP)、失败的子 Agent、错误提示", build: statesErrors),
+        DemoScenario(id: "states-streaming", group: "状态与错误", title: "长输出:流式渲染与滚动跟随", summary: "较长的流式文本,用于检查滚动跟随与渲染性能", build: statesStreaming),
+        DemoScenario(id: "roles", group: "会话流样式", title: "角色样式:所有条目同屏", summary: "用户/助手/思维/计划/各级提示/计划文档同屏对比", build: roles),
+        DemoScenario(id: "terminal", group: "工具卡", title: "内嵌终端:在客户端终端运行命令", summary: "通过客户端终端执行命令(需在设置里开启「终端」能力)", build: terminal),
+        DemoScenario(id: "long-running", group: "状态与错误", title: "长时间任务:终端与后台子 Agent", summary: "约 20 秒的终端与未完成的子 Agent,任务坞三个分区同时有数据", build: longRunning),
+        DemoScenario(id: "all", group: "回归", title: "全量回归:依次运行所有自动场景", summary: "依次运行全部自动场景(跳过终端/长占用/慢速输出),用于一次性回归", build: runAll),
     ]
 
     // MARK: 子 Agent
