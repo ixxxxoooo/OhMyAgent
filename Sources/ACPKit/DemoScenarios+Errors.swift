@@ -9,6 +9,10 @@ extension DemoScenarios {
     static let endingScenarios: [DemoScenario] = [
         DemoScenario(id: "errors-refusal", group: "状态与错误", title: "模型拒绝:无法协助该请求", summary: "回合以 refusal 结束,末尾出现「模型拒绝了该请求」提示", behavior: .failing, build: errorsRefusal),
         DemoScenario(id: "errors-max-tokens", group: "状态与错误", title: "输出上限:回复被截断", summary: "长回复写到一半以 max_tokens 结束,末尾出现「已达到输出上限」提示", behavior: .failing, build: errorsMaxTokens),
+        DemoScenario(id: "errors-rate-limit", group: "状态与错误", title: "上游限流:请求过于频繁", summary: "session/prompt 返回限流错误,末尾出现「上游触发限流」提示", behavior: .failing, build: errorsRateLimit),
+        DemoScenario(id: "errors-auth", group: "状态与错误", title: "登录失效:需要重新登录 Claude Code", summary: "session/prompt 返回 -32000 鉴权错误,提示去终端重新登录", behavior: .failing, build: errorsAuth),
+        DemoScenario(id: "errors-render-failed", group: "状态与错误", title: "提示渲染失败:换个模型或新建对话", summary: "上游返回 prompt_rendering_failed,给出可操作的中文说明", behavior: .failing, build: errorsRenderFailed),
+        DemoScenario(id: "errors-unknown", group: "状态与错误", title: "请求失败:未识别的上游错误", summary: "无法归类的错误回退为「请求失败:原始描述」", behavior: .failing, build: errorsUnknown),
     ]
 
     /// 模型拒绝:只有一句简短的说明,随后以 refusal 结束。
@@ -41,5 +45,33 @@ extension DemoScenarios {
             """),
             .stop("max_tokens"),
         ]
+    }
+
+    /// 一段正在进行的工作被错误打断:先有一点进展,再以指定错误结束本轮。
+    private static func interrupted(_ intro: String, code: Int, message: String) -> [ScenarioStep] {
+        [
+            DemoSteps.say(intro),
+            .fail(code: code, message: message),
+        ]
+    }
+
+    /// 上游限流。
+    static func errorsRateLimit(_ c: ScenarioContext) -> [ScenarioStep] {
+        interrupted("我先读取路由层的实现,再决定怎么改。\n", code: -32603, message: "429 Too Many Requests: rate limit exceeded, retry after 30s")
+    }
+
+    /// 登录失效(ACP 约定的 -32000)。
+    static func errorsAuth(_ c: ScenarioContext) -> [ScenarioStep] {
+        interrupted("开始处理你的请求。\n", code: -32000, message: "Authentication required")
+    }
+
+    /// 提示渲染失败。
+    static func errorsRenderFailed(_ c: ScenarioContext) -> [ScenarioStep] {
+        interrupted("我来整理一下这段对话的上下文。\n", code: -32603, message: "prompt_rendering_failed: unable to render conversation history")
+    }
+
+    /// 未识别的错误:原样回退显示。
+    static func errorsUnknown(_ c: ScenarioContext) -> [ScenarioStep] {
+        interrupted("正在连接上游服务。\n", code: -32603, message: "upstream connect error or disconnect/reset before headers (reset reason: connection termination)")
     }
 }

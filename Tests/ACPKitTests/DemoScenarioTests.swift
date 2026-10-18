@@ -107,6 +107,18 @@ struct DemoScenarioTests {
         #expect(!updates.isEmpty)
     }
 
+    @Test("报错收尾类场景让 session/prompt 以对应错误码失败", arguments: [
+        ("errors-rate-limit", -32603), ("errors-auth", -32000), ("errors-render-failed", -32603), ("errors-unknown", -32603),
+    ])
+    func failingScenarioThrows(id: String, code: Int) async throws {
+        do {
+            _ = try await runPrompt("#demo-\(id)")
+            Issue.record("场景 \(id) 应以错误结束")
+        } catch let error as JSONRPCError {
+            #expect(error.code == code)
+        }
+    }
+
     @Test("交互场景在用户批准后跑到 end_turn", arguments: DemoScenarios.all.filter { $0.behavior == .interactive && $0.id != "changes" }.map(\.id))
     func interactiveScenarioFinishes(id: String) async throws {
         let (stop, updates) = try await runPrompt("#demo-\(id)")
