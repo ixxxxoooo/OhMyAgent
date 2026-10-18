@@ -114,4 +114,15 @@ struct ScenarioEngineStepsTests {
         }
         #expect(titles.contains("上下文已压缩"))
     }
+
+    @Test("权限模式场景依次切换六种模式,最后回到 default")
+    func modesMatrixScenario() async throws {
+        let scenario = try #require(DemoScenarios.scenario(named: "modes-matrix"))
+        let result = try await execute(scenario.build(ScenarioContext(cwd: NSTemporaryDirectory(), sessionId: "s")))
+        let modes = result.updates.compactMap { update -> String? in
+            if case .currentMode(let id) = update { return id }
+            return nil
+        }
+        #expect(modes == ["acceptEdits", "plan", "auto", "dontAsk", "bypassPermissions", "default"])
+    }
 }

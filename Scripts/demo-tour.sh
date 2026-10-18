@@ -55,6 +55,8 @@ for s in errors-refusal errors-max-tokens errors-rate-limit errors-auth errors-r
 done
 add "scenario-usage-limits" 12 "OMA_DEMO_SCENARIO=usage-limits;OMA_EXPAND_ALL=1;OMA_USAGE_PANEL=1"
 add "scenario-context-compact" 12 "OMA_DEMO_SCENARIO=context-compact;OMA_EXPAND_ALL=1"
+add "scenario-errors-premature-end" 10 "OMA_DEMO_SCENARIO=errors-premature-end;OMA_EXPAND_ALL=1"
+add "scenario-modes-matrix" 14 "OMA_DEMO_SCENARIO=modes-matrix;OMA_EXPAND_ALL=1"
 add "scenario-long-running" 14 "OMA_DEMO_SCENARIO=long-running;OMA_EXPAND_ALL=1"
 add "scenario-terminal" 12 "OMA_DEMO_SCENARIO=terminal;OMA_EXPAND_ALL=1"
 add "scenario-all" 60 "OMA_DEMO_SCENARIO=all;OMA_EXPAND_ALL=1"

@@ -13,6 +13,7 @@ extension DemoScenarios {
         DemoScenario(id: "errors-auth", group: "状态与错误", title: "登录失效:需要重新登录 Claude Code", summary: "session/prompt 返回 -32000 鉴权错误,提示去终端重新登录", behavior: .failing, build: errorsAuth),
         DemoScenario(id: "errors-render-failed", group: "状态与错误", title: "提示渲染失败:换个模型或新建对话", summary: "上游返回 prompt_rendering_failed,给出可操作的中文说明", behavior: .failing, build: errorsRenderFailed),
         DemoScenario(id: "errors-unknown", group: "状态与错误", title: "请求失败:未识别的上游错误", summary: "无法归类的错误回退为「请求失败:原始描述」", behavior: .failing, build: errorsUnknown),
+        DemoScenario(id: "errors-premature-end", group: "状态与错误", title: "疑似被提前结束:停在工具调用之后", summary: "回合以 end_turn 结束,但最后停在工具调用上,提示发送「继续」(适配器把中断当作正常结束时才会出现)", build: errorsPrematureEnd),
     ]
 
     /// 模型拒绝:只有一句简短的说明,随后以 refusal 结束。
@@ -73,5 +74,13 @@ extension DemoScenarios {
     /// 未识别的错误:原样回退显示。
     static func errorsUnknown(_ c: ScenarioContext) -> [ScenarioStep] {
         interrupted("正在连接上游服务。\n", code: -32603, message: "upstream connect error or disconnect/reset before headers (reset reason: connection termination)")
+    }
+
+    /// 疑似被提前结束:最后一个实质性条目是工具调用,而不是助手文字。
+    static func errorsPrematureEnd(_ c: ScenarioContext) -> [ScenarioStep] {
+        [
+            DemoSteps.say("我先跑一遍完整测试,确认改动没有破坏其他用例。\n\n"),
+            DemoSteps.bash("pe_test", "swift test", description: "运行完整测试", output: "Building for debugging...\n[41/58] Compiling AtlasCore Router.swift"),
+        ]
     }
 }
