@@ -744,22 +744,22 @@ struct ExploreGroupView: View {
     var body: some View {
         let isExpanded = expanded ?? DebugFlags.expandAll
         VStack(alignment: .leading, spacing: 0) {
+            // 贴合内容宽度的文字行(无底色长条):悬停时文字加深、箭头显现,点击区域只在文字与箭头上
             HStack(spacing: 7) {
                 Image.om(group.style == .activity ? "layers" : "text.magnifyingglass", size: 11.5)
                     .frame(width: 16)
                     .foregroundStyle(OMColors.secondaryText)
                 Text(group.summary)
                     .font(OMFonts.small)
-                    .foregroundStyle(OMColors.secondaryText)
+                    .foregroundStyle(hovering || isExpanded ? OMColors.primaryText : OMColors.secondaryText)
                 if group.isRunning { OMSpinner(.mini) }
-                Spacer(minLength: 8)
                 Image.om("chevron.right", size: 9, weight: .bold)
                     .foregroundStyle(OMColors.tertiaryText)
                     .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    .opacity(hovering || isExpanded ? 1 : 0)
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
-            .background(hovering ? OMColors.subtleFill : Color.clear, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
             .contentShape(Rectangle())
             .onHover { hovering = $0 }
             .onTapGesture {
@@ -797,18 +797,17 @@ struct TurnDigestView: View {
     var body: some View {
         let isExpanded = expanded ?? DebugFlags.expandAll
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 6) {
+            // 纯文字样式(贴合内容宽度,无底色长条):悬停时文字加深、箭头显现;点击区域只在文字与箭头上
+            HStack(spacing: 4) {
                 Text("已工作 \(digest.durationText)")
                     .font(OMFonts.small)
-                    .foregroundStyle(OMColors.secondaryText)
+                    .foregroundStyle(hovering || isExpanded ? OMColors.primaryText : OMColors.secondaryText)
                 Image.om("chevron.right", size: 9, weight: .bold)
                     .foregroundStyle(OMColors.tertiaryText)
                     .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                Spacer(minLength: 0)
+                    .opacity(hovering || isExpanded ? 1 : 0)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .background(hovering ? OMColors.subtleFill : Color.clear, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
+            .padding(.vertical, 4)
             .contentShape(Rectangle())
             .onHover { hovering = $0 }
             .onTapGesture {
