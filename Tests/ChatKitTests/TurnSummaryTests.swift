@@ -26,6 +26,23 @@ struct TurnSummaryTests {
         #expect(TurnSummary(model: "m", durationSeconds: 2, usage: TurnUsage(inputTokens: 5)).tokensPerSecond == nil)
     }
 
+    @Test("token 明细:输入含缓存、总计、命中率与悬停明细;无缓存时不显示命中率")
+    func tokenDetail() throws {
+        let usage = TurnUsage(inputTokens: 100, outputTokens: 50, cachedReadTokens: 800, cachedWriteTokens: 100)
+        let summary = TurnSummary(model: "m", durationSeconds: 5, usage: usage)
+        #expect(summary.inputTotal == 1000)
+        #expect(summary.cacheHitRate == 0.8)
+        #expect(summary.parts.contains { $0.contains("1,000") && $0.contains("1,050") })
+        #expect(summary.parts.contains { $0.contains("80%") })
+        let detail = try #require(summary.tokenDetail)
+        #expect(detail.contains("800") && detail.contains("1,050") && detail.contains("80%"))
+        #expect(summary.copyText.contains(detail))
+        let plain = TurnSummary(model: "m", durationSeconds: 5, usage: TurnUsage(inputTokens: 100, outputTokens: 50))
+        #expect(plain.cacheHitRate == nil)
+        #expect(!plain.parts.contains { $0.contains("缓存") })
+        #expect(TurnSummary(model: "m", durationSeconds: 5).tokenDetail == nil)
+    }
+
     @Test("文本:模型、耗时、token、tps 依次出现,无 usage 时只有模型与耗时")
     func text() {
         let full = TurnSummary(model: "GLM 5", durationSeconds: 12.34, usage: TurnUsage(inputTokens: 1200, outputTokens: 360))

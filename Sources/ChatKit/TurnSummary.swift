@@ -61,20 +61,46 @@ public struct TurnSummary: Sendable, Equatable {
         return String(localized: "\(Int(seconds) / 60) 分 \(Int(seconds) % 60) 秒")
     }
 
-    /// 展示用的各个片段(模型、耗时、token、tps),已本地化。
+    /// 输入侧总量:未缓存 + 缓存读取 + 缓存写入。
+    public var inputTotal: Int {
+        guard let usage else { return 0 }
+        return usage.inputTokens + usage.cachedReadTokens + usage.cachedWriteTokens
+    }
+
+    /// 提示缓存命中率(缓存读取 ÷ 输入侧总量);没有缓存读写(模型或提供商不支持缓存)或没有输入时为 nil。
+    public var cacheHitRate: Double? {
+        guard let usage, usage.cachedReadTokens + usage.cachedWriteTokens > 0, inputTotal > 0 else { return nil }
+        return Double(usage.cachedReadTokens) / Double(inputTotal)
+    }
+
+    /// 展示用的各个片段(模型、耗时、输入/输出/总计 token、缓存命中率、tps),已本地化。
     public var parts: [String] {
         var result: [String] = []
         if !model.isEmpty { result.append(model) }
         result.append(durationText)
         if let usage, usage.totalTokens > 0 {
-            let input = usage.inputTokens + usage.cachedReadTokens + usage.cachedWriteTokens
-            result.append(String(localized: "输入 \(input.formatted()) · 输出 \(usage.outputTokens.formatted()) token"))
+            result.append(String(localized: "输入 \(inputTotal.formatted()) · 输出 \(usage.outputTokens.formatted()) · 共 \(usage.totalTokens.formatted()) token"))
+            if let rate = cacheHitRate { result.append(String(localized: "缓存命中 \(Int((rate * 100).rounded()))%")) }
         }
         if let tps = tokensPerSecond { result.append(String(format: String(localized: "%.1f tps"), tps)) }
         if let finishedAt { result.append(String(localized: "完成于 \(finishedAt.formatted(date: .omitted, time: .shortened))")) }
         return result
     }
 
+    /// token 明细(多行,悬停提示用):未缓存输入、缓存读取、缓存写入、输出、总计与命中率;没有用量时为 nil。
+    public var tokenDetail: String? {
+        guard let usage, usage.totalTokens > 0 else { return nil }
+        var lines = [
+            String(localized: "未缓存输入 \(usage.inputTokens.formatted())"),
+            String(localized: "缓存读取 \(usage.cachedReadTokens.formatted())(约 0.1 倍计费)"),
+            String(localized: "缓存写入 \(usage.cachedWriteTokens.formatted())(约 1.25 倍计费)"),
+            String(localized: "输出 \(usage.outputTokens.formatted())"),
+            String(localized: "总计 \(usage.totalTokens.formatted())"),
+        ]
+        if let rate = cacheHitRate { lines.append(String(localized: "缓存命中率 \(Int((rate * 100).rounded()))%")) }
+        return lines.joined(separator: "\n")
+    }
+
     /// 复制到剪贴板的完整文本。
-    public var copyText: String { parts.joined(separator: " · ") }
+    public var copyText: String { ([parts.joined(separator: " · ")] + [tokenDetail].compactMap { $0 }).joined(separator: "\n") }
 }

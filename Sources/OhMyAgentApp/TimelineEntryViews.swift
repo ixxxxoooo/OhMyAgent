@@ -91,6 +91,7 @@ struct TurnSummaryView: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .layoutPriority(1)
+                    .omTooltip(summary.tokenDetail ?? "")
             }
             .padding(.horizontal, 4)
             .padding(.vertical, 2)
