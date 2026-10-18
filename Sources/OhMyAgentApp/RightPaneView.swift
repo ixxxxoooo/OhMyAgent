@@ -72,11 +72,13 @@ struct RightPaneView: View {
             }
             Spacer(minLength: 4)
             // 标题区同时是拖动手柄:按住拖到窗口左/右半边即可把工具栏换到那一侧
-            Text(Self.title(workbench.layout.rightPane))
+            Text(workbench.layout.sidebarBrowserActive && workbench.layout.sidebarBrowserID != nil ? String(localized: "浏览器") : Self.title(workbench.layout.rightPane))
                 .font(OMFonts.small.weight(.medium))
                 .foregroundStyle(OMColors.secondaryText)
                 .lineLimit(1)
-                .frame(minWidth: 60, maxHeight: .infinity, alignment: .trailing)
+                .frame(minWidth: 0, maxHeight: .infinity, alignment: .trailing)
+                // 图标变多(浏览器、停靠会话)时优先压缩标题,避免撑宽标签条把右上角开关挤错位
+                .layoutPriority(-1)
                 .terminalDragHandle(workbench, panel: .tools)
         }
         // 位于最外侧时,顶部角落留给面板开关浮层
