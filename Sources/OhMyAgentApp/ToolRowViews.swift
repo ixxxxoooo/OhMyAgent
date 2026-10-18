@@ -81,13 +81,13 @@ struct ToolRowView: View {
             let presentation = ToolPresentation(tool: tool, hasChild: entry.childStore != nil)
             let canExpand = hasDetails(tool, presentation)
             let isExpanded = canExpand && (expanded ?? defaultExpanded(tool, presentation))
+            // 子代理整块换成无框卡片:类型图标 + 标题 + 状态,点击在标签页打开完整对话
+            let isSubagentCard = presentation.category == .subagent
             VStack(alignment: .leading, spacing: 0) {
-                row(tool, presentation, canExpand: canExpand, isExpanded: isExpanded)
-                // 子代理:行下方给出实时状态卡片(启动中/运行中/已完成、待办计数、当前活动),点击在标签页打开
-                if presentation.category == .subagent {
+                if isSubagentCard {
                     SubagentCardView(entry: entry)
-                        .padding(.leading, 23)
-                        .padding(.bottom, 2)
+                } else {
+                    row(tool, presentation, canExpand: canExpand, isExpanded: isExpanded)
                 }
                 // Canvas 工具完成后,在工具行下方给出可点击的画布卡片
                 if let ref = CanvasToolRef.of(tool) {
@@ -95,7 +95,7 @@ struct ToolRowView: View {
                         .padding(.leading, 23)
                         .padding(.vertical, 6)
                 }
-                if isExpanded {
+                if isExpanded && !isSubagentCard {
                     detailsBlock(tool, presentation)
                         .padding(.leading, 23)
                         .padding(.top, 4)

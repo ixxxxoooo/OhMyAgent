@@ -2520,3 +2520,5 @@
 "Agent 命令运行中" = "Agent command running";
 "在终端面板查看" = "View in terminal panel";
 "思考中…" = "Thinking…";
+"%lld 个子 Agent 运行中" = "%lld sub-agents running";
+"主代理发送的任务" = "Task sent by parent agent";

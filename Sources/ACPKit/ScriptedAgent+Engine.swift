@@ -255,6 +255,7 @@ extension ScriptedAgent {
         let subId = ctx.scoped(sub.id)
         var input: [String: JSONValue] = ["description": .string(sub.title), "run_in_background": .bool(sub.background)]
         if let type = sub.agentType { input["subagent_type"] = .string(type) }
+        input["prompt"] = .string(sub.prompt ?? "请完成这项子任务:\(sub.title)。\n\n背景:主对话正在修复 AtlasCore 的路由问题,需要你只做读取与调研,不要修改任何文件。\n最后请给出结论,并列出关键代码位置(文件名与行号)。")
         await emit(ctx.sessionId, parent: parent, [
             "sessionUpdate": "tool_call", "toolCallId": .string(subId), "title": .string(sub.title), "kind": "other",
             "name": "Task", "status": "in_progress", "rawInput": .object(input),

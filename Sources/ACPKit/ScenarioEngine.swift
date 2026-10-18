@@ -131,11 +131,14 @@ public struct ScenarioSubagent: Sendable {
     public var finish: ScenarioFinish
     /// 子 Agent 结束时返回给父会话的结论文本
     public var result: String?
+    /// 主代理交给子代理的任务原文(`Task` 的 `prompt`);为空时由引擎按标题生成
+    public var prompt: String?
 
     public init(
         id: String, title: String, agentType: String? = nil, background: Bool = false,
-        children: [ScenarioStep], finish: ScenarioFinish = .completed, result: String? = nil
+        children: [ScenarioStep], finish: ScenarioFinish = .completed, result: String? = nil, prompt: String? = nil
     ) {
+        self.prompt = prompt
         self.id = id
         self.title = title
         self.agentType = agentType

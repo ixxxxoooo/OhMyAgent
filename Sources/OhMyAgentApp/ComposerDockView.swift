@@ -156,7 +156,7 @@ struct ComposerDockView: View {
     private static func panelTitle(_ section: ComposerDockSection, count: Int) -> String {
         switch section {
         case .queued: return String(localized: "\(count) 条排队,本轮结束后发送")
-        case .subagents: return String(localized: "\(count) 个后台子 Agent")
+        case .subagents: return String(localized: "\(count) 个子 Agent 运行中")
         case .terminals: return String(localized: "\(count) 个终端运行中")
         }
     }
@@ -275,7 +275,7 @@ private struct QueuedRow: View {
     }
 }
 
-/// 后台子 Agent 行:点击以新标签页打开其只读会话。
+/// 运行中的子 Agent 行:点击以新标签页打开其只读会话。
 private struct SubagentDockRow: View {
     let entry: TimelineEntry
     let depth: Int
@@ -286,7 +286,7 @@ private struct SubagentDockRow: View {
         if let tool = entry.tool {
             let presentation = ToolPresentation(tool: tool, hasChild: true)
             DockRowShell(title: presentation.subject, meta: meta(presentation), tap: { open(tool) }) {
-                OMSpinner(.mini).scaleEffect(0.8)
+                Image.om(SubagentIcon.symbol(for: presentation.agentType), size: 12).foregroundStyle(OMColors.accent)
             } actions: {
                 HStack(spacing: 4) {
                     Text("在新标签页打开").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
