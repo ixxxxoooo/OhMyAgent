@@ -376,6 +376,13 @@ final class BrowserController {
         return error.localizedDescription
     }
 
+    /// 工作区当前浏览器标签的地址;没有已打开且有页面的标签时为 nil。
+    /// - Parameter workspace: 工作区路径
+    func currentURL(workspace: String) -> String? {
+        guard let id = active[workspace], let model = tabs[id], AppEnvironment.shared.workbench.isBrowserOpen(id: id), !model.urlString.isEmpty else { return nil }
+        return model.urlString
+    }
+
     private func describeTabs(workspace: String) -> String {
         let workbench = AppEnvironment.shared.workbench
         let list = order.compactMap { tabs[$0] }.filter { $0.workspace == workspace && workbench.isBrowserOpen(id: $0.id) }

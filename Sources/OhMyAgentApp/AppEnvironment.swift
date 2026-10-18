@@ -36,6 +36,10 @@ final class AppEnvironment {
         BrowserProvider.shared.install { workspace, command in
             await BrowserController.shared.run(command, workspace: workspace)
         }
+        // 审批用:点击、输入等没有 url 参数的动作按浏览器当前页面判断(权限请求在主线程处理)
+        BrowserProvider.shared.installCurrentURL { workspace in
+            MainActor.assumeIsolated { BrowserController.shared.currentURL(workspace: workspace) }
+        }
         // Bridge 的 search_code:走三元组索引,覆盖主目录与全部附加文件夹
         CodeSearchProvider.shared.install { workspace, query in
             let (extras, cached) = await MainActor.run { () -> ([String], [String]?) in

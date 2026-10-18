@@ -61,12 +61,19 @@ struct ToolApprovalTests {
     }
 
     @Test("从权限请求里识别终端命令与浏览器 URL")
-    func subjectOfCall() {
+    func subjectOfCall() throws {
         let shell = ToolCall(toolCallId: "1", name: "Bash", title: "Run", kind: .execute, rawInput: ["command": "ls -la"])
         #expect(ToolApprovalPolicy.subject(of: shell)?.domain == .terminal)
         #expect(ToolApprovalPolicy.subject(of: shell)?.subject == "ls -la")
         let nav = ToolCall(toolCallId: "2", name: "mcp__ohmyagent__browser_navigate", kind: .other, rawInput: ["url": "https://a.com"])
         #expect(ToolApprovalPolicy.subject(of: nav)?.domain == .browser)
+        // 点击/输入等没有 url 的浏览器动作:按当前页面算,自动运行档放行,允许列表档要求当前页面命中
+        let click = ToolCall(toolCallId: "4", name: "mcp__ohmyagent__browser_click", kind: .other, rawInput: ["ref": "e1"])
+        let clickTarget = try #require(ToolApprovalPolicy.subject(of: click, browserPageURL: "http://localhost:5173/a"))
+        #expect(clickTarget.domain == .browser && clickTarget.subject == "http://localhost:5173/a")
+        #expect(ToolApprovalPolicy(mode: .auto).decide(subject: ToolApprovalPolicy.subject(of: click)?.subject ?? "x", domain: .browser) == .allow, "自动运行不依赖当前页面")
+        #expect(ToolApprovalPolicy(mode: .allowlist, allowlist: ["localhost"]).decide(subject: clickTarget.subject, domain: .browser) == .allow)
+        #expect(ToolApprovalPolicy(mode: .allowlist, allowlist: ["localhost"]).decide(subject: ToolApprovalPolicy.subject(of: click)?.subject ?? "", domain: .browser) == .ask, "没有页面时允许列表档仍要询问")
         #expect(ToolApprovalPolicy.subject(of: ToolCall(toolCallId: "3", name: "Read", kind: .read)) == nil)
     }
 }

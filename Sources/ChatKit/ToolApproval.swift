@@ -129,14 +129,18 @@ public struct ToolApprovalPolicy: Sendable, Equatable {
     }
 
     /// 从权限请求里提取审批领域与对象。
-    /// - Parameter call: 工具调用(权限请求里的 toolCall)
+    /// - Parameters:
+    ///   - call: 工具调用(权限请求里的 toolCall)
+    ///   - browserPageURL: 浏览器当前页面的地址;点击、输入、截图等没有 `url` 参数的浏览器动作以它作为审批对象
     /// - Returns: 领域与对象(命令/URL);无法识别时为 nil(一律询问)
-    public static func subject(of call: ToolCall) -> (domain: ToolApprovalDomain, subject: String)? {
+    public static func subject(of call: ToolCall, browserPageURL: String? = nil) -> (domain: ToolApprovalDomain, subject: String)? {
         if call.kind == .execute, let command = call.rawInput?["command"]?.stringValue, !command.isEmpty {
             return (.terminal, command)
         }
-        if let name = call.name, name.contains("browser_"), let url = call.rawInput?["url"]?.stringValue, !url.isEmpty {
-            return (.browser, url)
+        if let name = call.name, name.contains("browser_") {
+            if let url = call.rawInput?["url"]?.stringValue, !url.isEmpty { return (.browser, url) }
+            // 没有 url 的动作(点击/输入/截图/控制台…):按当前页面算。自动运行档不看对象,允许列表档要求当前页面命中。
+            return (.browser, browserPageURL ?? "")
         }
         return nil
     }

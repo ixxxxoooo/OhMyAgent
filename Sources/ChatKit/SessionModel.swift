@@ -1737,7 +1737,7 @@ public final class SessionModel {
         snapshotter.capture(ToolCall(json: request.toolCallRaw))
         let call = ToolCall(json: request.toolCallRaw)
         // 审批策略:终端命令/浏览器访问按「每次询问 / 允许列表 / 自动运行」处理
-        if let target = ToolApprovalPolicy.subject(of: call),
+        if let target = ToolApprovalPolicy.subject(of: call, browserPageURL: BrowserProvider.shared.currentURL(workspace: workspace.path)),
            ToolApprovalPolicy.load(target.domain).decide(subject: target.subject, domain: target.domain) == .allow,
            let option = request.options.first(where: { $0.kind == .allowOnce }) ?? request.options.first(where: { $0.kind == .allowAlways }) {
             log.info("审批策略自动放行", ["domain": target.domain.rawValue, "toolCallId": call.toolCallId])

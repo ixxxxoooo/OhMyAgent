@@ -152,8 +152,23 @@ public final class BrowserProvider: Sendable {
     public static let shared = BrowserProvider()
     public typealias Handler = @Sendable (_ workspace: String, _ command: BrowserCommand) async -> BrowserResult
     private let handler = Mutex<Handler?>(nil)
+    /// 查询工作区当前浏览器页面的地址(审批用:点击、输入等没有 url 参数的动作按当前页面的来源判断是否放行)
+    public typealias CurrentURL = @Sendable (_ workspace: String) -> String?
+    private let currentURLHandler = Mutex<CurrentURL?>(nil)
 
     private init() {}
+
+    /// 注入「当前页面地址」查询。
+    /// - Parameter handler: 返回该工作区当前浏览器标签的 URL;没有页面时为 nil
+    public func installCurrentURL(_ handler: @escaping CurrentURL) {
+        currentURLHandler.withLock { $0 = handler }
+    }
+
+    /// 工作区当前浏览器页面的地址。
+    /// - Parameter workspace: 工作区路径
+    public func currentURL(workspace: String) -> String? {
+        currentURLHandler.withLock { $0 }?(workspace)
+    }
 
     /// 注入实现。
     /// - Parameter handler: 在该工作区的浏览器标签页上执行命令
