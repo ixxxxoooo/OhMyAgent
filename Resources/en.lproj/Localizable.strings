@@ -2510,3 +2510,4 @@
 "输出 %@" = "Output %@";
 "总计 %@" = "Total %@";
 "缓存命中率 %lld%%" = "Cache hit rate %lld%%";
+"规划下一步…" = "Planning next step…";

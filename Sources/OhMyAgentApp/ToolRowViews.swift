@@ -767,6 +767,12 @@ struct ExploreGroupView: View {
     @State private var expanded: Bool?
     @State private var hovering = false
 
+    /// 展开/收起分组(标题行与「最新一步」行共用),并暂停底部自动跟随。
+    private func toggle() {
+        scrollState?.followSuspended = true
+        expanded = !(expanded ?? DebugFlags.expandAll)
+    }
+
     var body: some View {
         let isExpanded = expanded ?? DebugFlags.expandAll
         VStack(alignment: .leading, spacing: 0) {
@@ -778,7 +784,7 @@ struct ExploreGroupView: View {
                 Text(group.summary)
                     .font(OMFonts.small)
                     .foregroundStyle(hovering || isExpanded ? OMColors.primaryText : OMColors.secondaryText)
-                if group.isRunning { OMSpinner(.mini) }
+                    .flowingText(group.isRunning)
                 Image.om("chevron.right", size: 9, weight: .bold)
                     .foregroundStyle(OMColors.tertiaryText)
                     .rotationEffect(.degrees(isExpanded ? 90 : 0))
@@ -788,15 +794,12 @@ struct ExploreGroupView: View {
             .padding(.vertical, 5)
             .contentShape(Rectangle())
             .onHover { hovering = $0 }
-            .onTapGesture {
-                scrollState?.followSuspended = true
-                expanded = !isExpanded
-            }
+            .onTapGesture(perform: toggle)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(group.summary)
             .accessibilityAddTraits(.isButton)
             if !isExpanded && group.isRunning {
-                GroupLatestStepView(group: group)
+                GroupLatestStepView(group: group, onTap: toggle)
             }
             if isExpanded {
                 VStack(alignment: .leading, spacing: 0) {
