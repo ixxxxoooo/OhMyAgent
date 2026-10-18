@@ -410,6 +410,7 @@ struct WorkbenchTests {
         #expect(FileManager.default.fileExists(atPath: id))
         #expect(id == env.store.fileURL.deletingLastPathComponent().appendingPathComponent("Chats").standardizedFileURL.path)
         #expect(model.activeSession?.extraSystemPrompt == WorkbenchModel.chatAreaPrompt)
+        #expect(model.activeSession?.isPlainChat == true)
         #expect(model.isChatAreaWorkspace(URL(fileURLWithPath: id)))
         // 空白会话再点「新会话」复用同一标签
         let tabCount = model.dock.allTabs.count

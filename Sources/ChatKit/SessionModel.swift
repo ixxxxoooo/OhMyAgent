@@ -891,8 +891,16 @@ public final class SessionModel {
         if !extras.isEmpty {
             options.appendPrompt = ([options.appendPrompt.trimmingCharacters(in: .whitespacesAndNewlines)] + extras).filter { !$0.isEmpty }.joined(separator: "\n\n")
         }
-        return options.merged(into: providerMeta ?? defaultGatewayMeta)
+        let merged = options.merged(into: providerMeta ?? defaultGatewayMeta)
+        guard isPlainChat else { return merged }
+        // 无模型映射时才并入 settings.json 的 env;映射会话的变量已由提供商 `_meta` 给全
+        let settingsEnv = providerMeta == nil ? plainChatSettingsEnv : [:]
+        return SessionOptions.plainChat(merged, systemPrompt: options.appendPrompt, settingsEnv: settingsEnv)
     }
+    /// 纯文字会话(会话区):不带工具、MCP、CLAUDE.md、技能与 Claude Code 系统提示,只当普通聊天;须在连接前设置。
+    public var isPlainChat = false
+    /// 纯文字会话需要手动并入的 `~/.claude/settings.json` 的 `env`(后台读盘,见 `resolveProvider`)。
+    @ObservationIgnored private var plainChatSettingsEnv: [String: String] = [:]
     /// 额外追加到系统提示末尾的文本(会话区用它约束为纯文字问答);须在连接前设置。
     public var extraSystemPrompt: String?
     /// 多文件夹工作区里除主目录(`workspace`)之外的附加文件夹(绝对路径);须在连接前设置,
@@ -938,6 +946,7 @@ public final class SessionModel {
 
     /// 解析模型映射(后台读盘)并注册到本机网关;缺密钥/配置无效时提示并回退到 ~/.claude 默认配置。
     private func resolveProvider(for descriptor: AgentDescriptor) async {
+        if isPlainChat { plainChatSettingsEnv = await Task.detached(priority: .utility) { ModelGateway.loadSettingsEnv() }.value }
         guard descriptor.kind == .claudeACP else {
             mappedModels = [:]
             providerMeta = nil

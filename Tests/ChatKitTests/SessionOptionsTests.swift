@@ -210,4 +210,23 @@ struct WidthSliderPresetTests {
         let kept = options.merged(into: .object(["claudeCode": .object(["options": .object(["settings": .object(["env": .object([SessionOptions.autoCompactKey: .string("128000")])])])])]))
         #expect(kept?["claudeCode"]?["options"]?["settings"]?["env"]?[SessionOptions.autoCompactKey]?.stringValue == "128000")
     }
+
+    @Test("纯文字会话:替换系统提示、去掉工具与设置来源,并保留提供商变量")
+    func plainChatMeta() {
+        let mapped: JSONValue = .object(["claudeCode": .object(["options": .object(["env": .object(["ANTHROPIC_AUTH_TOKEN": .string("tok")])])])])
+        let meta = SessionOptions.plainChat(mapped, systemPrompt: "只聊天", settingsEnv: ["ANTHROPIC_AUTH_TOKEN": "other", "ANTHROPIC_BASE_URL": "https://gw.example"])
+        #expect(meta["systemPrompt"]?.stringValue == "只聊天")
+        let options = meta["claudeCode"]?["options"]
+        #expect(options?["tools"] == .array([]))
+        #expect(options?["settingSources"] == .array([]))
+        #expect(options?["strictMcpConfig"] == .bool(true))
+        #expect(options?["extraArgs"]?["disable-slash-commands"] == JSONValue.null)
+        let env = options?["env"]
+        #expect(env?["ANTHROPIC_AUTH_TOKEN"]?.stringValue == "tok")
+        #expect(env?["ANTHROPIC_BASE_URL"]?.stringValue == "https://gw.example")
+        #expect(env?["CLAUDE_CODE_DISABLE_CLAUDE_MDS"]?.stringValue == "1")
+        #expect(env?["CLAUDE_CODE_DISABLE_AUTO_MEMORY"]?.stringValue == "1")
+        // 没有基础 _meta 时也能生成
+        #expect(SessionOptions.plainChat(nil, systemPrompt: "x", settingsEnv: [:])["systemPrompt"]?.stringValue == "x")
+    }
 }

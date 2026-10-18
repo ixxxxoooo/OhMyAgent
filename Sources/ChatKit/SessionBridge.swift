@@ -84,6 +84,8 @@ extension SessionModel {
     ///   - environment: 登录 shell 环境(用于解析命令)
     /// - Returns: MCP 服务器配置与已注册的 Bridge
     func prepareMCPServers(registry: AgentRegistryData, environment: [String: String]) async -> (servers: [MCPServerConfig], bridge: BridgeServer?) {
+        // 纯文字会话不注入任何 MCP(含 Bridge),工具定义一个都不进上下文
+        if isPlainChat { return ([], nil) }
         var servers = registry.enabledMCPAgents.map { $0.serverConfig(path: environment["PATH"] ?? "") }
         var started: BridgeServer?
         if registry.bridge.enabled {

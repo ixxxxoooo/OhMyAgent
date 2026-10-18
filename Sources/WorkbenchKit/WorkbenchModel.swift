@@ -277,10 +277,10 @@ public final class WorkbenchModel {
     /// 会话区条目的 ID(尚未使用过时为 nil)。
     public var chatAreaID: String? { projects.first { $0.isChatArea }?.id }
 
-    /// 会话区追加给 Agent 的系统提示:像 ChatGPT 一样直接用文字回答,不碰文件与命令。
+    /// 会话区的系统提示(整体替换 Claude Code 默认提示,见 `SessionModel.isPlainChat`):像 ChatGPT 一样直接用文字回答,没有任何工具。
     public nonisolated static let chatAreaPrompt = """
-    你现在处于「会话区」:没有打开任何项目,工作目录是一个空的临时目录。请像通用对话助手一样直接用文字回答问题,\
-    使用 Markdown 排版,回答语言跟随用户的提问。除非用户明确要求,不要读写文件、执行命令或联网搜索。
+    你是一个通用对话助手。当前没有打开任何项目,也没有文件、命令或联网等工具,请直接用文字回答问题。\
+    使用 Markdown 排版,回答语言跟随用户的提问;需要读写文件、执行命令时,请告诉用户到项目中进行。
     """
 
     /// 确保会话区条目与目录存在(幂等)。
@@ -829,7 +829,10 @@ public final class WorkbenchModel {
         } else {
             model = makeSession(project.url)
         }
-        if project.isChatArea { model.extraSystemPrompt = Self.chatAreaPrompt }
+        if project.isChatArea {
+            model.extraSystemPrompt = Self.chatAreaPrompt
+            model.isPlainChat = true
+        }
         model.additionalDirectories = project.extraFolders
         wire(model, project: id)
         conversations[key] = model

@@ -334,4 +334,38 @@ public struct SessionOptions: Equatable, Sendable {
         }
         return .object(root)
     }
+
+    /// 纯文字会话(会话区)的最小 `_meta`:整体替换 Claude Code 系统提示、去掉全部内置工具、
+    /// 不读设置来源(CLAUDE.md、技能、hooks、插件)与 MCP,等同「普通聊天」,避免为用不到的上下文付费。
+    /// - Parameters:
+    ///   - base: 已合并好的会话 `_meta`(提供商映射、代理等;可为 nil)
+    ///   - systemPrompt: 替换后的完整系统提示
+    ///   - settingsEnv: `~/.claude/settings.json` 的 `env`:不读设置来源后需手动并入(如第三方网关地址),已有同名变量不覆盖
+    /// - Returns: 精简后的 `_meta`
+    public static func plainChat(_ base: JSONValue?, systemPrompt: String, settingsEnv: [String: String]) -> JSONValue {
+        var root: [String: JSONValue] = [:]
+        if case .object(let object)? = base { root = object }
+        var claudeCode: [String: JSONValue] = [:]
+        if case .object(let object)? = root["claudeCode"] { claudeCode = object }
+        var options: [String: JSONValue] = [:]
+        if case .object(let object)? = claudeCode["options"] { options = object }
+        var env: [String: JSONValue] = [:]
+        if case .object(let object)? = options["env"] { env = object }
+        var extraArgs: [String: JSONValue] = [:]
+        if case .object(let object)? = options["extraArgs"] { extraArgs = object }
+
+        root["systemPrompt"] = .string(systemPrompt)
+        options["tools"] = .array([])
+        options["settingSources"] = .array([])
+        options["strictMcpConfig"] = .bool(true)
+        extraArgs["disable-slash-commands"] = .null
+        options["extraArgs"] = .object(extraArgs)
+        for (key, value) in settingsEnv where env[key] == nil { env[key] = .string(value) }
+        env["CLAUDE_CODE_DISABLE_CLAUDE_MDS"] = .string("1")
+        env["CLAUDE_CODE_DISABLE_AUTO_MEMORY"] = .string("1")
+        options["env"] = .object(env)
+        claudeCode["options"] = .object(options)
+        root["claudeCode"] = .object(claudeCode)
+        return .object(root)
+    }
 }
