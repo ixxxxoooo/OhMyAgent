@@ -1677,7 +1677,6 @@
 "有新内容" = "New content";
 "没有匹配的%@" = "No matching %@";
 "添加服务器" = "Add server";
-"演示" = "Demo";
 "点击右上角「新建%@」创建,或安装带有%@的插件。" = "Click “New %@” at the top right, or install a plugin that provides %@.";
 "点击右上角「添加服务器」配置一个,或从 Claude Desktop 导入。" = "Click “Add server” at the top right, or import from Claude Desktop.";
 "用 SKILL.md 与自定义命令扩展 Claude 的能力,保存在 ~/.claude/skills、commands 或项目的 .claude 目录。" = "Extend Claude with SKILL.md files and custom commands, stored in ~/.claude/skills, commands, or the project's .claude directory.";
