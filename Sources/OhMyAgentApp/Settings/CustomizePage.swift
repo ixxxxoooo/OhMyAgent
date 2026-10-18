@@ -32,7 +32,7 @@ enum CustomizeFilter: String, CaseIterable, Identifiable {
         case .skills: return "sparkles"
         case .subagents: return "person.2"
         case .rules: return "brain"
-        case .mcp: return "server.rack"
+        case .mcp: return "brand.mcp"
         case .hooks: return "bolt.horizontal"
         }
     }

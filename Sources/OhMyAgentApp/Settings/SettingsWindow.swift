@@ -95,7 +95,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .permissions: return "lock.shield"
         case .trust: return "shield-check"
         case .agentExtensions: return "square.stack.3d.up"
-        case .mcp: return "server.rack"
+        case .mcp: return "brand.mcp"
         case .skills: return "sparkles"
         case .subagents: return "person.2"
         case .hooks: return "bolt.horizontal"

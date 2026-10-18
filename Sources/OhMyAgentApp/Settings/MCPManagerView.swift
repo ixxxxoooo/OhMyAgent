@@ -30,7 +30,7 @@ struct MCPSettingsPage: View {
 
     var body: some View {
         ExtensionPage(
-            center: center, icon: "server.rack", title: "MCP",
+            center: center, icon: "brand.mcp", title: "MCP",
             subtitle: String(localized: "通过 Model Context Protocol 给 Claude 接入外部工具与数据源。配置写入 ~/.claude.json 或项目的 .mcp.json。"),
             errorKey: "MCP"
         ) {
@@ -67,7 +67,7 @@ struct MCPSettingsPage: View {
             if !all.isEmpty { scopeFilter }
             if entries.isEmpty {
                 ExtensionEmptyCard(
-                    icon: "server.rack",
+                    icon: "brand.mcp",
                     title: all.isEmpty ? String(localized: "还没有 MCP 服务器") : String(localized: "这个范围内没有服务器"),
                     message: String(localized: "点击右上角「添加服务器」配置一个,或从 Claude Desktop 导入。")
                 )
@@ -117,7 +117,7 @@ struct MCPSettingsPage: View {
         let config = entry.config
         let dimmed = entry.overriddenBy != nil || entry.isDisabled
         return ExtensionRow(
-            icon: "server.rack", tint: tint(entry), title: config.name,
+            icon: "brand.mcp", tint: tint(entry), title: config.name,
             subtitle: summary(of: config), monoSubtitle: true, dimmed: dimmed,
             expanded: expandedID == entry.id,
             onTap: { omWithAnimation { expandedID = expandedID == entry.id ? nil : entry.id } },

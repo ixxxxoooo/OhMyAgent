@@ -61,6 +61,8 @@ public enum OMIconRenderer {
     ///   - weight: 线宽
     /// - Returns: 模板图像;未知图标回退为同名 SF Symbol,再不行返回空图像
     public static func nsImage(_ symbol: String, size: CGFloat = 14, weight: OMIconWeight = .regular) -> NSImage {
+        // `brand.<名>`:品牌实心图标(如 `brand.mcp`),与 Lucide 线条图标共用 `Image.om` 入口
+        if symbol.hasPrefix("brand."), let brand = BrandIconRenderer.nsImage(String(symbol.dropFirst("brand.".count)), size: size) { return brand }
         guard let lucide = IconCatalog.lucideName(for: symbol), let path = cache.path(lucide) else {
             Log.ui.warning("未知图标,回退 SF Symbol", ["symbol": symbol])
             return NSImage(systemSymbolName: symbol, accessibilityDescription: nil) ?? NSImage(size: NSSize(width: size, height: size))

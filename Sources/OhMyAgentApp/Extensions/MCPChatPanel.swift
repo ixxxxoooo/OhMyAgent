@@ -19,7 +19,7 @@ struct MCPPanelButton: View {
         let servers = center.snapshot.mcp.filter { $0.overriddenBy == nil }
         Button { shown.toggle() } label: {
             HStack(spacing: 4) {
-                Image.om("plug", size: 12)
+                Image.om("brand.mcp", size: 12)
                 if !servers.isEmpty { Text("\(servers.count)").font(OMFonts.small) }
                 if hasProblem(servers, center: center) {
                     Circle().fill(OMColors.warning).frame(width: 6, height: 6)

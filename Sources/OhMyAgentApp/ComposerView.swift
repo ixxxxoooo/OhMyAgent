@@ -615,7 +615,7 @@ struct CompletionPopup: View {
         case .folder: return "folder"
         case .skill: return "sparkles"
         case .customCommand: return "command"
-        case .mcpPrompt: return "plug"
+        case .mcpPrompt: return "brand.mcp"
         case .subagent: return "bot"
         }
     }

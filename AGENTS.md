@@ -20,7 +20,7 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit;**唯一例外**:内置
 - `LSPKit`:LSP 客户端(Content-Length 分帧、`LSPClient` actor、服务器定位、`LSPManager` 懒启动/复用/空闲回收;复用 ACPKit 的 JSON-RPC 连接,无视图)。
 - `ProviderProxyKit`:本机回环网关 `LocalGateway`(一个监听、令牌路由,同时承载模型代理与 Bridge)与模型代理(按槽位别名路由;Anthropic 协议厂商透传、OpenAI 协议厂商做 Anthropic Messages ⇄ Chat Completions 转换,含 SSE 流式、工具调用、图片、思考块);路由令牌在 URL 路径里,真实密钥只在代理内存;无视图,日志只记录路由 ID/状态/耗时。
 - `MermaidKit`:Mermaid 原生渲染(纯 Swift):解析 → 分层布局 → 场景(`MScene`)→ SwiftUI Canvas/PNG;支持 flowchart/graph、sequenceDiagram、stateDiagram-v2、classDiagram、pie、gantt。
-- `IconKit`:Lucide 功能图标(生成数据 + SVG path 解析 + `Image.om`)、彩色文件类型图标(`OMFileIcon`,Material Icon Theme)与模型厂商图标(`BrandIcon`/`BrandIconView`,lobe-icons,`Scripts/gen-brand-icons.py`);界面禁止再用 SF Symbol(`Scripts/gen-icons.py`、`Scripts/gen-file-icons.py` 重新生成)。
+- `IconKit`:Lucide 功能图标(生成数据 + SVG path 解析 + `Image.om`)、彩色文件类型图标(`OMFileIcon`,Material Icon Theme)与模型厂商图标(`BrandIcon`/`BrandIconView`,lobe-icons,`Scripts/gen-brand-icons.py`;`Image.om("brand.<名>")` 可直接取品牌图标,MCP 一律用 `brand.mcp`);界面禁止再用 SF Symbol(`Scripts/gen-icons.py`、`Scripts/gen-file-icons.py` 重新生成)。
 - `DesignSystem`:设计令牌(含 `OMDiffPalette` 不透明 Diff 配色、主题包 `ThemePackage`)、玻璃材质、标签活动状态(`TabActivity`)。
 - `OhMyAgentApp`:应用本体(SwiftUI/AppKit 视图)。
 - `SpreadsheetKit`:xlsx 原生解析(ZIP + zlib 解压、OOXML SAX、单元格格式化、工作簿模型;无视图)。
