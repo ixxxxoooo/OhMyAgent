@@ -229,7 +229,7 @@ struct AppearancePage: View {
                     )
                     ToolDensityPreview(density: density)
                 }
-                Note("调整会话流里工具调用的信息量:精简把连续工具折成一行摘要,标准每个工具一行,详细在每行下方显示 Diff / 命令输出预览。").footnote()
+                Note("调整会话流里工具调用的信息量:无论哪一档,回合结束后整个过程都会折成「已工作 …」一行(点开再按所选档位查看),精简把连续工具折成一行摘要,标准每个工具一行,详细在每行下方显示 Diff / 命令输出预览。").footnote()
                 SettingsSliderRow(
                     title: String(localized: "内容宽度"),
                     valueText: chatWidthSummary,

@@ -215,6 +215,35 @@ struct TimelineGroupingTests {
         #expect(ToolDensity.allCases.map(\.title) == ["精简", "标准", "详细"])
     }
 
+    @Test("已结束回合折叠过程为一行(各档一致),只留用户消息、最终回答与结束行;未结束回合不折叠")
+    func digestFoldsFinishedTurn() {
+        let s = TimelineStore()
+        s.appendUser("改一下")
+        s.apply(.agentThoughtChunk(messageId: nil, content: .text("想一想")))
+        s.apply(.agentMessageChunk(messageId: "m1", content: .text("我先看看")))
+        s.apply(.toolCall(ToolCall(toolCallId: "r1", name: "Read", kind: .read, status: .completed)))
+        s.apply(.toolCall(ToolCall(toolCallId: "e1", name: "Edit", kind: .edit, status: .completed, rawInput: [
+            "file_path": .string("/a.swift"), "old_string": .string("x"), "new_string": .string("y\nz")])))
+        s.apply(.agentMessageChunk(messageId: "m2", content: .text("改好了")))
+        // 未结束(无结束行):不折叠
+        let running = TimelineGrouping.group(s.entries, density: .standard)
+        #expect(!running.contains { if case .digest = $0 { return true } else { return false } })
+
+        s.appendTurnSummary(TurnSummary(model: "m", durationSeconds: 728))
+        let items = TimelineGrouping.group(s.entries, density: .standard)
+        // 用户消息 + 折叠行 + 最终回答 + 结束行
+        #expect(items.count == 4)
+        guard case .digest(let digest) = items[1] else { Issue.record("第二项应为折叠行"); return }
+        #expect(digest.entries.count == 4)   // 思考、中间叙述、读取、编辑
+        #expect(digest.durationText == "12分8秒")
+        // 各档都折叠;折叠后的条目数一致
+        for density in ToolDensity.allCases {
+            let all = TimelineGrouping.group(s.entries, density: density)
+            #expect(all.count == 4, "\(density)")
+        }
+        if case .entry(let final) = items[2] { #expect(final.text == "改好了") } else { Issue.record("最终回答应保持可见") }
+    }
+
     @Test("分组运行态与失败态随工具状态变化")
     func runningState() {
         let s = TimelineStore()
@@ -282,7 +311,12 @@ struct ToolShowcaseEndToEndTests {
         #expect(tools.dropLast().allSatisfy { $0.status == .completed })
 
         // 前两个读取 + 两次搜索 + 联网获取:读/搜合并为一组(联网在 MCP 之后,单独成行)
-        let items = TimelineGrouping.group(model.timeline.entries)
+        // 回合已结束:整段过程折叠成一行,展开后(按所选档位)才是各分组
+        let top = TimelineGrouping.group(model.timeline.entries)
+        guard case .digest(let digest) = top.first(where: { if case .digest = $0 { return true } else { return false } }) else {
+            Issue.record("缺少回合折叠行"); return
+        }
+        let items = TimelineGrouping.group(digest.entries)
         guard case .explore(let group) = items.first(where: { if case .explore = $0 { return true } else { return false } }) else {
             Issue.record("缺少浏览分组"); return
         }

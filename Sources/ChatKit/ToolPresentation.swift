@@ -315,11 +315,14 @@ public enum TimelineItem: Identifiable {
     case entry(TimelineEntry)
     /// 一组连续的“浏览”步骤(读取/搜索/联网获取及其间的思考)。
     case explore(ExploreGroup)
+    /// 已结束回合的整段过程折叠成一行(已工作 · 耗时)。
+    case digest(TurnDigest)
 
     public nonisolated var id: UUID {
         switch self {
         case .entry(let entry): return entry.id
         case .explore(let group): return group.id
+        case .digest(let digest): return digest.id
         }
     }
 
@@ -333,6 +336,11 @@ public enum TimelineItem: Identifiable {
             var hasher = Hasher()
             hasher.combine(group.id)
             hasher.combine(group.entries.count)
+            return hasher.finalize()
+        case .digest(let digest):
+            var hasher = Hasher()
+            hasher.combine(digest.id)
+            hasher.combine(digest.entries.count)
             return hasher.finalize()
         }
     }
@@ -463,6 +471,25 @@ public struct ExploreGroup: Identifiable {
     }
 }
 
+/// 一个已结束回合的折叠过程:思考、工具调用与中间叙述。
+@MainActor
+public struct TurnDigest: Identifiable {
+    /// 取第一个被折叠条目的 ID,保持稳定
+    public let id: UUID
+    /// 被折叠的条目(按时间顺序)
+    public let entries: [TimelineEntry]
+    /// 整轮耗时(秒)
+    public let durationSeconds: Double
+
+    /// 耗时文本:<60 秒「8秒」,否则「12分8秒」,≥1 小时「1小时2分」。
+    public var durationText: String {
+        let total = Int(durationSeconds.rounded())
+        if total < 60 { return String(localized: "\(max(total, 1))秒") }
+        if total < 3600 { return String(localized: "\(total / 60)分\(total % 60)秒") }
+        return String(localized: "\(total / 3600)小时\(total % 3600 / 60)分")
+    }
+}
+
 /// 时间线分组器。
 public enum TimelineGrouping {
     /// 把连续 ≥2 个可合并的工具(及其间的思考)合并为一组,其余条目保持原样。
@@ -473,6 +500,69 @@ public enum TimelineGrouping {
     /// - Returns: 展示单元序列
     @MainActor
     public static func group(_ entries: [TimelineEntry], density: ToolDensity = .standard) -> [TimelineItem] {
+        // 按用户消息切成回合;已结束(有结束行)的回合把过程折成一行,其余按所选档位分组
+        var items: [TimelineItem] = []
+        var segment: [TimelineEntry] = []
+        func flush() {
+            guard !segment.isEmpty else { return }
+            items.append(contentsOf: digestSegment(segment, density: density))
+            segment.removeAll()
+        }
+        for entry in entries {
+            if entry.kind == .user { flush() }
+            segment.append(entry)
+        }
+        flush()
+        return items
+    }
+
+    /// 处理单个回合:保留用户消息、提示、改动汇总、结束行与最终回答,其余过程折成一个 `TurnDigest`。
+    /// 回合未结束(没有结束行)、或没有可折叠的过程时按所选档位分组。
+    /// - Parameters:
+    ///   - segment: 以用户消息开头(或时间线最前)的一个回合
+    ///   - density: 工具调用详细程度
+    /// - Returns: 展示单元序列
+    @MainActor
+    static func digestSegment(_ segment: [TimelineEntry], density: ToolDensity) -> [TimelineItem] {
+        guard let summary = segment.last(where: { $0.kind == .turnSummary })?.summary else {
+            return groupFlat(segment, density: density)
+        }
+        // 最终回答:最后一条助手文本,且其后没有再发生思考/工具调用
+        var finalIndex: Int?
+        for (index, entry) in segment.enumerated().reversed() {
+            if entry.kind == .assistant { finalIndex = index; break }
+            if entry.kind == .thought || entry.kind == .tool { break }
+        }
+        func folds(_ index: Int, _ entry: TimelineEntry) -> Bool {
+            switch entry.kind {
+            case .thought, .plan: return true
+            case .assistant: return index != finalIndex
+            case .tool:
+                // 画布卡片与问答结果本身就是给用户看的产出,保持可见
+                guard let tool = entry.tool else { return true }
+                return !(tool.name ?? "").contains("__canvas_") && entry.elicitationOutcome == nil
+            case .user, .notice, .changes, .planDoc, .turnSummary, .modelSwitch: return false
+            }
+        }
+        let folded = segment.enumerated().filter { folds($0.offset, $0.element) }.map(\.element)
+        guard !folded.isEmpty else { return groupFlat(segment, density: density) }
+
+        let digest = TurnDigest(id: folded[0].id, entries: folded, durationSeconds: summary.durationSeconds)
+        var items: [TimelineItem] = []
+        var inserted = false
+        for (index, entry) in segment.enumerated() {
+            if folds(index, entry) {
+                if !inserted { items.append(.digest(digest)); inserted = true }
+            } else {
+                items.append(.entry(entry))
+            }
+        }
+        return items
+    }
+
+    /// 按精简/标准/详细规则把条目分组。
+    @MainActor
+    static func groupFlat(_ entries: [TimelineEntry], density: ToolDensity) -> [TimelineItem] {
         var items: [TimelineItem] = []
         var run: [TimelineEntry] = []
         let style: ExploreGroup.Style = density == .compact ? .activity : .explore

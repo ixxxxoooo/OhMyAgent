@@ -729,6 +729,7 @@ struct TimelineItemView: View, Equatable {
         switch item {
         case .entry(let entry): TimelineEntryView(entry: entry)
         case .explore(let group): ExploreGroupView(group: group)
+        case .digest(let digest): TurnDigestView(digest: digest)
         }
     }
 }
@@ -778,6 +779,55 @@ struct ExploreGroupView: View {
                 .padding(.leading, 28)
                 .overlay(alignment: .leading) {
                     Rectangle().fill(OMColors.hairline).frame(width: 1).padding(.leading, 15.5)
+                }
+                .transition(.opacity)
+            }
+        }
+    }
+}
+
+/// 回合折叠行(对齐 Cursor 的「Worked for 1h 37m」):回合结束后整段过程折成「已工作 12分8秒」,点击原位展开。
+struct TurnDigestView: View {
+    let digest: TurnDigest
+    @Environment(\.stickyUser) private var scrollState
+    @AppStorage(ClientPrefs.Key.toolDensity) private var densityRaw = ToolDensity.standard.rawValue
+    @State private var expanded: Bool?
+    @State private var hovering = false
+
+    var body: some View {
+        let isExpanded = expanded ?? DebugFlags.expandAll
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Text("已工作 \(digest.durationText)")
+                    .font(OMFonts.small)
+                    .foregroundStyle(OMColors.secondaryText)
+                Image.om("chevron.right", size: 9, weight: .bold)
+                    .foregroundStyle(OMColors.tertiaryText)
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(hovering ? OMColors.subtleFill : Color.clear, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
+            .contentShape(Rectangle())
+            .onHover { hovering = $0 }
+            .onTapGesture {
+                scrollState?.followSuspended = true
+                expanded = !isExpanded
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(Text("已工作 \(digest.durationText)"))
+            .accessibilityAddTraits(.isButton)
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(TimelineGrouping.group(digest.entries, density: ToolDensity(rawValue: densityRaw) ?? .standard)) { item in
+                        TimelineItemView(item: item)
+                    }
+                }
+                .padding(.leading, 12)
+                .padding(.top, 4)
+                .overlay(alignment: .leading) {
+                    Rectangle().fill(OMColors.hairline).frame(width: 1).padding(.leading, 3)
                 }
                 .transition(.opacity)
             }
