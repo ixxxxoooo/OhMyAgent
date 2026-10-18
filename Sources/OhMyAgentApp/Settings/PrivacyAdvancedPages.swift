@@ -4,6 +4,7 @@
 import AgentHost
 import AppKit
 import ChatKit
+import OMLog
 import ClaudeConfigKit
 import DesignSystem
 import SwiftUI
@@ -119,7 +120,7 @@ struct AdvancedPage: View {
     }
 
     static var supportDirectory: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("OhMyAgent", isDirectory: true)
+        AppEnv.supportDirectory
     }
 
     private func envField(_ title: String, _ name: String) -> some View {

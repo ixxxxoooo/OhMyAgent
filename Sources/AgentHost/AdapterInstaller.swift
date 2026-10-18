@@ -39,9 +39,7 @@ public actor AdapterInstaller {
 
     /// 默认安装目录:`~/Library/Application Support/OhMyAgent/acp`。
     public nonisolated static var defaultPrefix: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("OhMyAgent", isDirectory: true)
-            .appendingPathComponent("acp", isDirectory: true)
+        AppEnv.supportDirectory.appendingPathComponent("acp", isDirectory: true)
     }
 
     /// 适配器入口脚本相对安装目录的路径。

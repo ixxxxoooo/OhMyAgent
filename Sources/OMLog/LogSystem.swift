@@ -10,7 +10,7 @@ public final class LogSystem: @unchecked Sendable {
 
     /// 默认日志目录 `~/Library/Logs/OhMyAgent`。
     public static var defaultDirectory: URL {
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/OhMyAgent", isDirectory: true)
+        AppEnv.logsDirectory
     }
 
     /// UserDefaults 键。

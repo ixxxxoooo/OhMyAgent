@@ -121,8 +121,7 @@ public struct AgentRegistryStore: Sendable {
     public init(url: URL = AgentRegistryStore.defaultURL) { self.url = url }
 
     public static var defaultURL: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("OhMyAgent", isDirectory: true).appendingPathComponent("agents.json")
+        AppEnv.supportDirectory.appendingPathComponent("agents.json")
     }
 
     /// 读取;文件缺失或损坏时返回默认内容(损坏文件不会被覆盖,直到下一次保存)。

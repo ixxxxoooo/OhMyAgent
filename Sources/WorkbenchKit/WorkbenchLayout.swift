@@ -2,6 +2,7 @@
 // 工作台布局与持久化模型:三栏 + 底部面板的显隐/尺寸/当前视图,以及项目列表。
 
 import Foundation
+import OMLog
 
 /// 主窗口显示的内容。
 public enum WorkbenchMode: Equatable, Sendable {
@@ -251,9 +252,7 @@ public struct WorkbenchStore: Sendable {
     }
 
     public static var defaultURL: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("OhMyAgent", isDirectory: true)
-            .appendingPathComponent("workbench.json")
+        AppEnv.supportDirectory.appendingPathComponent("workbench.json")
     }
 
     /// 读取状态;文件不存在或损坏时返回 nil。

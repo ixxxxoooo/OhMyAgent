@@ -218,9 +218,7 @@ public struct ProviderSnapshot: Codable, Sendable, Equatable {
 public enum ProviderStorage {
     /// 默认目录:`~/Library/Application Support/OhMyAgent`。
     public static var defaultDirectory: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
-            .appendingPathComponent("OhMyAgent", isDirectory: true)
-            ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support/OhMyAgent")
+        AppEnv.supportDirectory
     }
 
     static func providersURL(_ directory: URL) -> URL { directory.appendingPathComponent("providers.json") }

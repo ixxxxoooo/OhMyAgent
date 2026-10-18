@@ -176,6 +176,8 @@ struct OhMyAgentApp: App {
         MainThreadHitchMonitor.shared.start()
         PerfStats.shared.startPeriodicReport()
         DemoLaunch.activateIfRequested()
+        // 开发版首次启动:从稳定版复制数据与偏好(之后各自独立;演示模式使用沙盒,不复制)
+        if !DemoLaunch.isActive { AppEnv.seedDevDataIfNeeded() }
         // Bundle ID 变更迁移:须早于外观、快捷键等偏好的首次读取(演示模式使用隔离沙盒,不迁移)
         if !DemoLaunch.isActive { LegacyDefaultsMigration.migrateIfNeeded() }
         DiagnosticsStore.shared.markLaunch()

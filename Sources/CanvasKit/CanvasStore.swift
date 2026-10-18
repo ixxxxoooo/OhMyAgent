@@ -3,6 +3,7 @@
 // 无状态(值类型),可在任意线程使用;磁盘读写由调用方放在后台线程。
 
 import Foundation
+import OMLog
 
 public struct CanvasStore: Sendable {
     public let directory: URL
@@ -13,10 +14,10 @@ public struct CanvasStore: Sendable {
     /// 默认存储目录。
     /// - Parameter home: 可注入的用户主目录(测试/演示隔离);nil 取系统 Application Support
     public static func defaultDirectory(home: URL? = nil) -> URL {
-        let base = home?.appendingPathComponent("Library/Application Support", isDirectory: true)
-            ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support")
-        return base.appendingPathComponent("OhMyAgent/canvases", isDirectory: true)
+        if let home {
+            return home.appendingPathComponent("Library/Application Support/OhMyAgent/canvases", isDirectory: true)
+        }
+        return AppEnv.supportDirectory.appendingPathComponent("canvases", isDirectory: true)
     }
 
     // MARK: 标识

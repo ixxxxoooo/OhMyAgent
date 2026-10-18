@@ -31,8 +31,11 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit;**唯一例外**:内置
 - 新增模块请登记在本节与「开发进度.md」的代码索引中。
 
 ## 2. 常用命令
-- 构建并组装应用:`Scripts/bundle.sh [debug|release]`
-- 重启应用(结束旧进程 → 构建 → 启动):`Scripts/restart.sh`(`OMA_AGENT=fake` 使用脚本化 Agent;`OMA_DEMO=1` 进入演示模式)
+- 构建并组装应用:`Scripts/bundle.sh [debug|release|dev]`(`dev` 生成 `build/OhMyAgent Dev.app`,Bundle ID `com.ixxxxoooo.OhMyAgent.dev`)
+- 重启**开发版**(只结束开发版及其子进程 → 构建 → 启动,不影响稳定版):`Scripts/restart.sh`(默认 `dev`;`OMA_AGENT=fake` 使用脚本化 Agent;`OMA_DEMO=1` 进入演示模式)
+- 更新**稳定版**:在系统 Terminal.app 里运行 `Scripts/promote.sh`(release 构建 → 安装到 `/Applications/OhMyAgent.app`)
+- 本地签名证书(一次性,免费):`Scripts/make-signing-cert.sh` 创建自签 `OhMyAgent Local Dev`,`bundle.sh` 自动使用,TCC 权限不再因重编译失效;勿删该证书(可导出备份)
+- 稳定版/开发版隔离:数据目录 `Application Support/OhMyAgent[-Dev]`、日志 `Logs/OhMyAgent[-Dev]` 由 `AppEnv`(`OMLog`)统一提供,**新增落盘路径必须经 `AppEnv.supportDirectory`,禁止再硬编码 `"OhMyAgent"`**;开发版首次启动从稳定版复制数据与偏好(只复制不回写)
 - 演示模式(隔离沙盒 + 脚本化 Agent,测试会话流/工具卡/子 Agent/Git 的首选方式):`Scripts/demo.sh [--reset] [--scenario <名>]`(自动转发全部 `OMA_*` 变量);无人值守导览截图:`Scripts/demo-tour.sh [步骤前缀...]`;完整指南 `.specstory/history/docs/20261016_演示模式自动化演示指南.md`
 - 本地 CI(本地化扫描 + UI 规范扫描 + 零警告构建 + 全部测试 + plist/strings 校验):`Scripts/ci.sh`
 - 运行单元测试:`Scripts/test.sh [参数]`(结束后自动清理测试遗留在系统临时目录的目录;勿直接长期使用 `swift test`,macOS 的 `NSTemporaryDirectory()` 不读 `TMPDIR`,无法隔离)。清理历史遗留:`Scripts/clean-test-tmp.sh [--dry-run]`;新增测试若使用新的临时目录前缀,请加到该脚本的 `PREFIXES`

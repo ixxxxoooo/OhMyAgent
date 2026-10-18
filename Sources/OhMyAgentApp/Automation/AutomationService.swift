@@ -29,9 +29,7 @@ final class AutomationService {
         if let demo = DemoLaunch.environment {
             return demo.workbenchStoreURL.deletingLastPathComponent().appendingPathComponent("automations.json")
         }
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support")
-        return base.appendingPathComponent("OhMyAgent/automations.json")
+        return AppEnv.supportDirectory.appendingPathComponent("automations.json")
     }
 
     /// 应用启动后调用:加载自动化库并开始调度(演示模式只加载,不自动触发)。

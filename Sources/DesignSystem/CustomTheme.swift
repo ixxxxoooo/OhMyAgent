@@ -209,9 +209,7 @@ extension ThemePalette {
 public enum CustomThemeStore {
     /// 主题目录(`Application Support/OhMyAgent/themes`)。
     public static var directory: URL {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support")
-        return base.appendingPathComponent("OhMyAgent/themes", isDirectory: true)
+        AppEnv.supportDirectory.appendingPathComponent("themes", isDirectory: true)
     }
 
     /// 读取目录下全部有效主题;无效文件记录日志后跳过。

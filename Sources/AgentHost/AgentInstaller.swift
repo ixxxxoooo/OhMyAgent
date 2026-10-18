@@ -256,9 +256,7 @@ public struct AgentInstaller: Sendable {
 
     /// 默认安装根目录:`~/Library/Application Support/OhMyAgent/agents`。
     public static var defaultRoot: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("OhMyAgent", isDirectory: true)
-            .appendingPathComponent("agents", isDirectory: true)
+        AppEnv.supportDirectory.appendingPathComponent("agents", isDirectory: true)
     }
 
     public let root: URL

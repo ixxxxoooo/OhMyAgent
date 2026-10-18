@@ -2,6 +2,7 @@
 // 定位 node、claude 与 claude-agent-acp 适配器。
 
 import Foundation
+import OMLog
 
 /// 定位结果。
 public struct LocatedTools: Sendable, Hashable {
@@ -65,7 +66,7 @@ public enum ExecutableLocator {
         var adapterCandidates: [String] = []
         if let value = overrides["adapter"] { adapterCandidates.append(value) }
         if let bundled = Bundle.main.resourcePath { adapterCandidates.append("\(bundled)/acp/\(relative)") }
-        adapterCandidates.append("\(home)/Library/Application Support/OhMyAgent/acp/\(relative)")
+        adapterCandidates.append("\(home)/Library/Application Support/\(AppEnv.folderName)/acp/\(relative)")
         if let projectRoot { adapterCandidates.append("\(projectRoot)/Vendor/acp/\(relative)") }
         adapterCandidates += globalNpmRoots(nodePath: nodePath, home: home).map { "\($0)/@agentclientprotocol/claude-agent-acp/dist/index.js" }
         let adapter = adapterCandidates.first { fm.isReadableFile(atPath: $0) }
