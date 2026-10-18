@@ -124,10 +124,12 @@ struct TabItemView: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            icon
-            // 会话状态点(运行中为呼吸灯)放在标题前,不占用尾部关闭按钮的位置
-            if case .chat = tab.kind, let uid = workbench.session(forTab: tab)?.uid {
-                AttentionDot(uid: uid)
+            // 会话有状态(运行中呼吸灯/等待/未读)时,状态点取代类型图标(二者互斥)
+            if case .chat = tab.kind, let uid = workbench.session(forTab: tab)?.uid,
+               (AttentionCenter.shared.items[uid]?.state ?? .idle) != .idle {
+                AttentionDot(uid: uid).frame(width: 12, height: 12)
+            } else {
+                icon
             }
             Text(workbench.displayTitle(tab))
                 .font(OMFonts.small)
