@@ -420,7 +420,7 @@ struct ToolDetailsView: View {
                 let output = plainOutput.isEmpty ? (tool.resultText ?? "") : plainOutput
                 CommandBox(command: command, output: output, status: tool.status, exitCode: tool.exitCode,
                            copyText: command + (output.isEmpty ? "" : "\n" + ToolOutputText.stripFence(output)))
-            } else if !hasTextContent, let text = tool.resultText {
+            } else if !hasTextContent, !showsTerminalSession, let text = tool.resultText {
                 rawResultView(text)
             }
             if presentation.category != .terminal, let failure = tool.failureText, !failure.isEmpty, !hasTextContent {
@@ -469,6 +469,11 @@ struct ToolDetailsView: View {
         tool.content.contains { if case .terminal = $0 { return true } else { return false } }
     }
 
+    /// 终端内容已有对应的会话在渲染(此时输出由终端视图负责,不再重复显示 `rawOutput` 文本)。
+    private var showsTerminalSession: Bool {
+        tool.content.contains { if case .terminal(let id) = $0 { return model.terminals[id] != nil } else { return false } }
+    }
+
     private var hasDiffContent: Bool {
         tool.content.contains { if case .diff = $0 { return true } else { return false } }
     }
@@ -509,7 +514,7 @@ struct ToolDetailsView: View {
             SnippetDiffView(path: path, oldText: oldText, newText: newText, showHeader: false)
         case .terminal(let id):
             if let session = model.terminals[id] {
-                TerminalOutputView(session: session, onInterrupt: { model.interruptTerminal(id) }, onRetryUnsandboxed: { model.retryWithoutSandbox() })
+                TerminalOutputView(session: session, onInterrupt: session.isExternal ? nil : { model.interruptTerminal(id) }, onRetryUnsandboxed: { model.retryWithoutSandbox() })
             } else {
                 Label(String(localized: "终端 \(id)"), om: "terminal").font(OMFonts.monoSmall)
             }
@@ -885,6 +890,7 @@ struct TerminalOutputView: View {
                 ShellCommandText(command: session.command, lineLimit: 1)
                 Spacer()
                 if session.sandboxed { OMTag(String(localized: "沙箱"), tint: OMColors.secondaryText) }
+                if session.isBackground { OMTag(String(localized: "后台"), tint: OMColors.secondaryText) }
                 if session.isRunning {
                     OMSpinner(.mini)
                     if let onInterrupt {

@@ -35,12 +35,12 @@ enum DemoSteps {
     }
 
     /// 终端命令工具。
-    static func bash(_ id: String, _ command: String, description: String? = nil, output: String?, finish: ScenarioFinish = .completed, background: Bool = false) -> ScenarioStep {
+    static func bash(_ id: String, _ command: String, description: String? = nil, output: String?, finish: ScenarioFinish = .completed, background: Bool = false, terminal: ScenarioTerminal? = nil) -> ScenarioStep {
         var input: [String: JSONValue] = ["command": .string(command)]
         if let description { input["description"] = .string(description) }
         if background { input["run_in_background"] = true }
         let first = command.split(separator: "\n").first.map(String.init) ?? command
-        return .tool(ScenarioTool(id: id, title: "运行 " + first, kind: "execute", name: "Bash", input: .object(input), output: output, finish: finish))
+        return .tool(ScenarioTool(id: id, title: "运行 " + first, kind: "execute", name: "Bash", input: .object(input), output: output, finish: finish, terminal: terminal))
     }
 
     /// 带 Diff 的编辑工具。
@@ -127,10 +127,15 @@ extension DemoScenarios {
             DemoSteps.bash("s_log", "tail -n 90 logs/worker.log", description: "查看 worker 日志(超长输出)", output: longLog),
             DemoSteps.bash("s_multi", "set -e\ncd web\nnpm ci --silent\nnpm run lint -- --max-warnings 0", description: "安装依赖并检查",
                            output: "added 312 packages in 6s\n\n> web@1.0.0 lint\n> eslint src --max-warnings 0\n"),
-            DemoSteps.bash("s_git", "git log --oneline -n 5", output: "e2a84d4 perf: 标签内容 LRU 保活\n4c40961 feat: 去掉窗口工具栏\na94a05e feat: 等待文案\n9ea0c60 feat: 去掉窗口标题行\n55432e3 docs: 更新开发进度"),
-            DemoSteps.bash("s_fail", "cat missing.txt", output: "cat: missing.txt: No such file or directory", finish: .failed),
-            DemoSteps.bash("s_bg", "npm run dev", description: "后台启动开发服务器", output: "  VITE v5.0.0  ready in 312 ms\n\n  ➜  Local:   http://localhost:5173/", finish: .running, background: true),
-            DemoSteps.say("开发服务器已在后台运行,可在任务坞里查看。\n"),
+            DemoSteps.bash("s_git", "git log --oneline -n 5", output: "e2a84d4 perf: 标签内容 LRU 保活\n4c40961 feat: 去掉窗口工具栏\na94a05e feat: 等待文案\n9ea0c60 feat: 去掉窗口标题行\n55432e3 docs: 更新开发进度", terminal: ScenarioTerminal()),
+            DemoSteps.bash("s_fail", "cat missing.txt", output: "cat: missing.txt: No such file or directory", finish: .failed, terminal: ScenarioTerminal()),
+            DemoSteps.bash("s_bg", "npm run dev", description: "后台启动开发服务器", output: "  VITE v5.0.0  ready in 312 ms\n\n  ➜  Local:   http://localhost:5173/", finish: .running, background: true,
+                           terminal: ScenarioTerminal(backgroundLines: [
+                               "\u{1B}[32m  VITE v5.0.0\u{1B}[0m  ready in 312 ms", "", "  ➜  Local:   \u{1B}[36mhttp://localhost:5173/\u{1B}[0m",
+                               "  ➜  Network: use --host to expose", "\u{1B}[2m10:42:01\u{1B}[0m [vite] page reload src/router.ts",
+                               "\u{1B}[2m10:42:09\u{1B}[0m [vite] hmr update /src/App.tsx", "\u{1B}[33m10:42:15 [vite] warning: 中文日志也能正常显示\u{1B}[0m",
+                           ], lineIntervalMillis: 900)),
+            DemoSteps.say("开发服务器已在后台运行,可在任务坞里查看,或在终端面板里实时查看输出。\n"),
         ], used: 74_200)
     }
 

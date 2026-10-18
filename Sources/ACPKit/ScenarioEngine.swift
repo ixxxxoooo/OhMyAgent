@@ -53,11 +53,15 @@ public struct ScenarioTool: Sendable {
     public var locations: JSONValue
     /// 进行中与完成之间停留的毫秒数(按节奏缩放),让转圈状态能被看到;0 表示不停留
     public var holdMillis: Int
+    /// 以 `_meta.terminal_*` 报告输出(客户端声明了 `terminal_output` 才生效,否则退回文本内容)
+    public var terminal: ScenarioTerminal?
 
     public init(
         id: String, title: String, kind: String, name: String, input: JSONValue = .object([:]),
-        output: String? = nil, extra: [JSONValue] = [], finish: ScenarioFinish = .completed, locations: JSONValue = .array([]), holdMillis: Int = 0
+        output: String? = nil, extra: [JSONValue] = [], finish: ScenarioFinish = .completed, locations: JSONValue = .array([]), holdMillis: Int = 0,
+        terminal: ScenarioTerminal? = nil
     ) {
+        self.terminal = terminal
         self.holdMillis = holdMillis
         self.id = id
         self.title = title
@@ -68,6 +72,24 @@ public struct ScenarioTool: Sendable {
         self.extra = extra
         self.finish = finish
         self.locations = locations
+    }
+}
+
+/// 演示用的 Agent 终端:模拟适配器经 `_meta.terminal_*` 报告 Bash 输出。
+/// 前台命令在结束时整段给出输出与退出码;后台命令先报「已转入后台」并给出输出文件路径,
+/// 之后逐行把 `lines` 写进该文件,写完再发 `terminal_exit`(与真实适配器一致:没有实时 `_meta` 输出流)。
+public struct ScenarioTerminal: Sendable {
+    /// 后台命令的输出行(非空表示后台命令)
+    public var backgroundLines: [String]
+    /// 相邻两行之间的毫秒数(按节奏缩放)
+    public var lineIntervalMillis: Int
+    /// 前台命令的退出码
+    public var exitCode: Int?
+
+    public init(backgroundLines: [String] = [], lineIntervalMillis: Int = 600, exitCode: Int? = 0) {
+        self.backgroundLines = backgroundLines
+        self.lineIntervalMillis = lineIntervalMillis
+        self.exitCode = exitCode
     }
 }
 

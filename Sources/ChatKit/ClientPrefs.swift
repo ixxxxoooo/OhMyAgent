@@ -51,6 +51,8 @@ public enum ClientPrefs {
         public static let pathAdapter = "advanced.path.adapter"
         public static let featureFileSystem = "feature.fileSystem"
         public static let featureTerminal = "feature.terminal"
+        /// 声明 `_meta.terminal_output`:显示 Agent 自己执行的命令输出(含后台命令)
+        public static let featureAgentTerminalOutput = "feature.agentTerminalOutput"
         public static let featureElicitation = "feature.elicitation"
         /// 聊天内容宽度档位(narrow/standard/wide/full)
         public static let chatWidth = "chat.width"

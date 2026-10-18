@@ -73,6 +73,9 @@ public struct ClientFeatures: Sendable, Equatable {
     public var terminal = false
     /// 支持 Agent 向用户提问(AskUserQuestion、MCP 表单)
     public var elicitation = true
+    /// 声明 `_meta.terminal_output`:Claude Code 的 Bash 输出经 `_meta` 报告,
+    /// 本应用据此显示 Agent 终端(含后台命令的实时输出与结束状态)
+    public var agentTerminalOutput = true
 
     public init() {}
 
@@ -82,6 +85,7 @@ public struct ClientFeatures: Sendable, Equatable {
         if defaults.object(forKey: "feature.fileSystem") != nil { features.fileSystem = defaults.bool(forKey: "feature.fileSystem") }
         if defaults.object(forKey: "feature.terminal") != nil { features.terminal = defaults.bool(forKey: "feature.terminal") }
         if defaults.object(forKey: "feature.elicitation") != nil { features.elicitation = defaults.bool(forKey: "feature.elicitation") }
+        if defaults.object(forKey: "feature.agentTerminalOutput") != nil { features.agentTerminalOutput = defaults.bool(forKey: "feature.agentTerminalOutput") }
         return features
     }
 
@@ -90,6 +94,7 @@ public struct ClientFeatures: Sendable, Equatable {
         // 会话提示(notice):压缩、模型回退、Hook 拦截等以结构化提示行呈现,而非夹在回复里的粗体文字
         var caps: [String: JSONValue] = ["session": ["notices": .object([:])]]
         if elicitation { caps["elicitation"] = ["form": .object([:]), "url": .object([:])] }
+        if agentTerminalOutput { caps["_meta"] = ["terminal_output": true] }
         return caps
     }
 }
@@ -268,7 +273,7 @@ public final class SessionModel {
     public private(set) var pendingPermissions: [PermissionPrompt] = [] { didSet { if pendingPermissions.isEmpty != oldValue.isEmpty { publishAttention() } } }
     public private(set) var pendingElicitations: [ElicitationPrompt] = [] { didSet { if pendingElicitations.isEmpty != oldValue.isEmpty { publishAttention() } } }
     /// 终端会话(按终端 ID)
-    public private(set) var terminals: [String: TerminalSession] = [:]
+    public internal(set) var terminals: [String: TerminalSession] = [:]
     public private(set) var sessionId: String? { didSet { if sessionId != oldValue { publishAttention(); recordRecent() } } }
     /// 进程内唯一标识(注意力中心与通知使用)
     public let uid = UUID().uuidString
@@ -1853,6 +1858,7 @@ public final class SessionModel {
 
     /// 工具完成时:与开始前的快照比较并记录改动。
     private func observeTool(_ call: ToolCall) {
+        syncExternalTerminal(for: call)
         if call.status.isTerminal { log.debug("工具结束", ["toolCallId": call.toolCallId, "title": call.title, "kind": "\(call.kind)", "status": "\(call.status)"]) }
         let paths = FileSnapshotter.paths(of: call)
         guard !paths.isEmpty, call.status == .completed, let shot = snapshotter.take(call.toolCallId) else { return }
@@ -1997,6 +2003,7 @@ public final class SessionModel {
     }
 
     private func handle(_ update: SessionUpdate) {
+        observeTerminalMeta(update)
         switch update {
         case .availableCommands(let commands): availableCommands = commands
         case .configOptions(let options): configOptions = options

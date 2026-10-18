@@ -33,6 +33,8 @@ public actor ScriptedAgent: ACPRequestHandler {
     /// 各会话收到的引导消息
     var steered: [String: [String]] = [:]
     var clientTerminal = false
+    /// 客户端是否声明了 `_meta.terminal_output`(Bash 输出经 `_meta` 报告)
+    var clientTerminalMeta = false
     /// 是否提供演示历史会话(`session/list` 返回目录、`session/load` 回放完整内容);演示模式开启
     let demoHistory: Bool
     /// 正在回放历史的会话(回放不做任何停顿)
@@ -89,6 +91,7 @@ public actor ScriptedAgent: ACPRequestHandler {
         switch method {
         case "initialize":
             clientTerminal = p["clientCapabilities"]?["terminal"]?.boolValue ?? false
+            clientTerminalMeta = p["clientCapabilities"]?["_meta"]?["terminal_output"]?.boolValue ?? false
             return [
                 "protocolVersion": 1,
                 "agentCapabilities": [

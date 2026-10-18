@@ -156,6 +156,8 @@ public struct ToolCall: Sendable, Hashable, Identifiable {
     public var rawOutput: JSONValue?
     /// 父工具调用 ID(子 Agent 内部的工具调用,来自 `_meta.claudeCode.parentToolUseId`)
     public var parentToolCallId: String?
+    /// 首个 `tool_call` 里带的终端事件(`_meta.terminal_info`);增量更新里的事件由会话直接从原始 JSON 解析
+    public var terminalEvent: ToolTerminalEvent?
 
     public init(toolCallId: String, name: String? = nil, title: String = "", kind: ToolKind = .other, status: ToolStatus = .pending, content: [ToolCallContent] = [], locations: [ToolLocation] = [], rawInput: JSONValue? = nil, rawOutput: JSONValue? = nil) {
         self.toolCallId = toolCallId
@@ -183,6 +185,7 @@ public struct ToolCall: Sendable, Hashable, Identifiable {
             rawOutput: json["rawOutput"].flatMap { $0.isNull ? nil : $0 }
         )
         parentToolCallId = json["_meta"]?["claudeCode"]?["parentToolUseId"]?.stringValue
+        terminalEvent = ToolTerminalEvent.parse(json["_meta"])
         if name == nil { name = json["_meta"]?["claudeCode"]?["toolName"]?.stringValue }
         if name == nil { name = ToolInputNormalizer.toolName(fromTitle: title) }
     }

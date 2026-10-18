@@ -187,6 +187,7 @@ struct TerminalPage: View {
     @AppStorage(ClientPrefs.Key.terminalOutputKB) private var outputKB = 1024
     @AppStorage(ClientPrefs.Key.terminalInheritEnv) private var inheritEnv = true
     @AppStorage(ClientPrefs.Key.featureTerminal) private var terminalCapability = false
+    @AppStorage(ClientPrefs.Key.featureAgentTerminalOutput) private var agentTerminalOutput = true
     @AppStorage(ClientPrefs.Key.terminalSandbox) private var sandboxEnabled = false
     @AppStorage(ClientPrefs.Key.terminalSandboxNetwork) private var sandboxNetwork = TerminalSandboxConfig.Network.local.rawValue
     // 交互终端
@@ -325,6 +326,7 @@ struct TerminalPage: View {
     private var agentCard: some View {
         SettingsCard("Agent 终端") {
             SettingsToggleRow("让 Agent 使用 OhMyAgent 的终端", detail: "声明 terminal 能力:开启后 Claude 的命令会在客户端终端里运行并实时显示输出;对已打开的窗口在重新连接后生效。关闭时由 claude 自己执行命令。", isOn: $terminalCapability)
+            SettingsToggleRow("显示 Agent 自己执行的命令输出", detail: "声明 _meta.terminal_output:Claude 自己执行的命令(含后台命令)会作为终端显示,后台命令可在终端面板里实时查看;对已打开的窗口在重新连接后生效。", isOn: $agentTerminalOutput)
             SettingsRow(String(localized: "输出字号 \(String(format: "%.1f", outputFontSize)) pt"), detail: "会话里命令输出的字号。") {
                 Slider(value: $outputFontSize, in: 9...20, step: 0.5).frame(width: 220)
             }

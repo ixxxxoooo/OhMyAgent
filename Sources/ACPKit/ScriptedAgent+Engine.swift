@@ -156,6 +156,10 @@ extension ScriptedAgent {
 
     /// 工具调用:进行中 → 完成/失败;冻结态只发开头。
     func runTool(_ tool: ScenarioTool, ctx: ScenarioContext, parent: String?) async {
+        if let terminal = tool.terminal, clientTerminalMeta {
+            await runMetaTerminalTool(tool, terminal: terminal, ctx: ctx, parent: parent)
+            return
+        }
         let sessionId = ctx.sessionId
         let toolId = ctx.scoped(tool.id)
         var content = tool.extra

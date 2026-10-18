@@ -2515,3 +2515,5 @@
 "终端列表" = "Terminal list";
 "收起终端列表" = "Hide terminal list";
 "显示终端列表" = "Show terminal list";
+"显示 Agent 自己执行的命令输出" = "Show output of commands the agent runs itself";
+"声明 _meta.terminal_output:Claude 自己执行的命令(含后台命令)会作为终端显示,后台命令可在终端面板里实时查看;对已打开的窗口在重新连接后生效。" = "Declares _meta.terminal_output: commands Claude runs itself (including background commands) are shown as terminals, and background commands can be followed live in the terminal panel. Takes effect after reconnecting open windows.";
