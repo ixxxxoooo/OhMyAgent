@@ -91,8 +91,34 @@ enum BrowserScripts {
     if (!el) throw new Error('Element ' + ref + ' not found. Take a new browser_snapshot.');
     el.scrollIntoView({block: 'center', inline: 'center'});
     if (typeof el.focus === 'function') el.focus({preventScroll: true});
+    const r = el.getBoundingClientRect();
+    const opts = function(b, detail){ return {bubbles: true, cancelable: true, view: window, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, button: b, buttons: b === 2 ? 2 : 1, detail: detail}; };
+    const label = (el.getAttribute('aria-label') || el.innerText || el.value || '').replace(/\\s+/g, ' ').trim().slice(0, 60);
+    if (button === 'right') {
+      ['mousedown', 'mouseup', 'contextmenu'].forEach(function(t){ el.dispatchEvent(new MouseEvent(t, opts(2, 1))); });
+      return 'Right-clicked ' + el.tagName.toLowerCase() + ' "' + label + '"';
+    }
+    if (double) {
+      el.click(); el.click();
+      el.dispatchEvent(new MouseEvent('dblclick', opts(0, 2)));
+      return 'Double-clicked ' + el.tagName.toLowerCase() + ' "' + label + '"';
+    }
     el.click();
-    return 'Clicked ' + el.tagName.toLowerCase() + ' "' + (el.getAttribute('aria-label') || el.innerText || el.value || '').replace(/\\s+/g, ' ').trim().slice(0, 60) + '"';
+    return 'Clicked ' + el.tagName.toLowerCase() + ' "' + label + '"';
+    """
+
+    /// 悬停:依次派发 pointer/mouse 的 over/enter/move 事件,触发 hover 菜单与 tooltip(CSS :hover 由 WebKit 按真实指针决定,脚本无法伪造)。
+    static let hover = """
+    const el = document.querySelector('[data-oma-ref="' + ref + '"]');
+    if (!el) throw new Error('Element ' + ref + ' not found. Take a new browser_snapshot.');
+    el.scrollIntoView({block: 'center', inline: 'center'});
+    const r = el.getBoundingClientRect();
+    const o = {bubbles: true, cancelable: true, view: window, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2};
+    ['pointerover', 'pointerenter', 'mouseover', 'mouseenter', 'pointermove', 'mousemove'].forEach(function(t){
+      const ev = t.indexOf('pointer') === 0 ? new PointerEvent(t, Object.assign({pointerId: 1, pointerType: 'mouse'}, o)) : new MouseEvent(t, o);
+      el.dispatchEvent(ev);
+    });
+    return 'Hovered ' + el.tagName.toLowerCase() + ' "' + (el.getAttribute('aria-label') || el.innerText || el.value || '').replace(/\\s+/g, ' ').trim().slice(0, 60) + '"';
     """
 
     /// 输入:替换输入框的值并触发 input/change;`submit` 时再模拟回车并提交所在表单。

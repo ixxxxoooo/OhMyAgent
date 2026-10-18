@@ -12,13 +12,28 @@ public enum BrowserCommand: Sendable, Equatable {
     case navigate(url: URL)
     /// 页面可访问性快照(带可点击元素的 ref)
     case snapshot
-    case click(ref: String)
+    /// 点击(`button`:左键/右键;`double`:双击)
+    case click(ref: String, button: BrowserMouseButton = .left, double: Bool = false)
+    /// 悬停(触发 hover 样式、下拉菜单、tooltip)
+    case hover(ref: String)
+    /// 前进 / 后退 / 刷新
+    case history(BrowserHistoryAction)
     case type(ref: String, text: String, submit: Bool)
     case scroll(BrowserScroll)
     case screenshot
     case console
     case network
     case tabs
+}
+
+/// 鼠标按键。
+public enum BrowserMouseButton: String, Sendable, Equatable {
+    case left, right
+}
+
+/// 历史导航动作。
+public enum BrowserHistoryAction: String, Sendable, Equatable {
+    case back, forward, reload
 }
 
 /// 滚动目标。
@@ -94,7 +109,15 @@ public enum BrowserArguments {
         case .browserSnapshot: return .success(.snapshot)
         case .browserClick:
             guard let ref = ref() else { return .failure(.init("Missing or invalid ref (call browser_snapshot first to get one)")) }
-            return .success(.click(ref: ref))
+            let raw = arguments["button"]?.stringValue?.lowercased() ?? "left"
+            guard let button = BrowserMouseButton(rawValue: raw) else { return .failure(.init("button must be left or right")) }
+            return .success(.click(ref: ref, button: button, double: arguments["double"]?.boolValue ?? false))
+        case .browserHover:
+            guard let ref = ref() else { return .failure(.init("Missing or invalid ref (call browser_snapshot first to get one)")) }
+            return .success(.hover(ref: ref))
+        case .browserBack: return .success(.history(.back))
+        case .browserForward: return .success(.history(.forward))
+        case .browserReload: return .success(.history(.reload))
         case .browserType:
             guard let ref = ref() else { return .failure(.init("Missing or invalid ref (call browser_snapshot first to get one)")) }
             guard let text = arguments["text"]?.stringValue else { return .failure(.init("Missing text argument")) }

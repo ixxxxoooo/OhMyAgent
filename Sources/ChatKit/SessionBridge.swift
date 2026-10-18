@@ -33,7 +33,7 @@ final class SessionBridge: BridgeHandler, @unchecked Sendable {
         switch tool {
         case .canvasCreate, .canvasUpdate, .canvasList: return await callCanvas(tool, arguments: arguments)
         case .searchCode: return await callSearch(arguments: arguments)
-        case .browserNavigate, .browserSnapshot, .browserClick, .browserType, .browserScroll, .browserScreenshot, .browserConsole, .browserNetwork, .browserTabs:
+        case .browserNavigate, .browserSnapshot, .browserClick, .browserHover, .browserBack, .browserForward, .browserReload, .browserType, .browserScroll, .browserScreenshot, .browserConsole, .browserNetwork, .browserTabs:
             return await callBrowser(tool, arguments: arguments)
         case .askUserQuestion: return await callAskUserQuestion(arguments: arguments)
         default: return BridgeResult("当前客户端不支持工具 \(tool.rawValue)", isError: true)

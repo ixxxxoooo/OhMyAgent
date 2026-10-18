@@ -51,6 +51,10 @@ public enum BridgeTool: String, CaseIterable, Sendable, Codable {
     case browserNavigate = "browser_navigate"
     case browserSnapshot = "browser_snapshot"
     case browserClick = "browser_click"
+    case browserHover = "browser_hover"
+    case browserBack = "browser_back"
+    case browserForward = "browser_forward"
+    case browserReload = "browser_reload"
     case browserType = "browser_type"
     case browserScroll = "browser_scroll"
     case browserScreenshot = "browser_screenshot"
@@ -88,7 +92,11 @@ public enum BridgeTool: String, CaseIterable, Sendable, Codable {
         case .browserSnapshot:
             return "Get a text snapshot of the current page: URL, title and a tree of visible elements. Interactive elements carry a `[ref=eN]` you pass to browser_click / browser_type / browser_scroll. "
                 + "Take a new snapshot after the page changes; refs are only valid for the latest snapshot."
-        case .browserClick: return "Click the element with the given ref from the latest browser_snapshot."
+        case .browserClick: return "Click the element with the given ref from the latest browser_snapshot. Set `button` to right for a context-menu click, or `double` for a double click."
+        case .browserHover: return "Move the pointer over the element with the given ref (reveals hover menus, tooltips and :hover styles). Take a browser_snapshot or browser_screenshot afterwards to see the result."
+        case .browserBack: return "Go back one entry in the current tab's history and wait for the page to load."
+        case .browserForward: return "Go forward one entry in the current tab's history and wait for the page to load."
+        case .browserReload: return "Reload the current page and wait for it to load again."
         case .browserType: return "Type text into the input/textarea with the given ref (replaces its value). Set `submit` to press Enter afterwards."
         case .browserScroll: return "Scroll the page (`direction`: up, down, top, bottom) or scroll the element with `ref` into view."
         case .browserScreenshot: return "Take a screenshot (PNG) of the current page viewport to check layout and visuals."
@@ -125,8 +133,12 @@ public enum BridgeTool: String, CaseIterable, Sendable, Codable {
                            "path": ["type": "string", "description": "Only search files whose path contains this substring"],
                            "max_results": ["type": "integer", "description": "Max matches to return (1-200, default 50)"]], required: ["query"])
         case .browserNavigate: return object(["url": ["type": "string", "description": "http or https URL; a missing scheme defaults to https (http for localhost)"]], required: ["url"])
-        case .browserSnapshot, .browserScreenshot, .browserConsole, .browserNetwork, .browserTabs: return object([:], required: [])
-        case .browserClick: return object(["ref": ["type": "string", "description": "Element ref from the latest browser_snapshot, e.g. e12"]], required: ["ref"])
+        case .browserSnapshot, .browserScreenshot, .browserConsole, .browserNetwork, .browserTabs, .browserBack, .browserForward, .browserReload: return object([:], required: [])
+        case .browserClick:
+            return object(["ref": ["type": "string", "description": "Element ref from the latest browser_snapshot, e.g. e12"],
+                           "button": ["type": "string", "description": "left (default) or right"],
+                           "double": ["type": "boolean", "description": "Double click (default false)"]], required: ["ref"])
+        case .browserHover: return object(["ref": ["type": "string", "description": "Element ref from the latest browser_snapshot, e.g. e12"]], required: ["ref"])
         case .browserType:
             return object(["ref": ["type": "string"], "text": ["type": "string"], "submit": ["type": "boolean", "description": "Press Enter after typing (default false)"]], required: ["ref", "text"])
         case .askUserQuestion:
@@ -255,7 +267,7 @@ public final class BridgeServer: Sendable {
         case .notify:
             guard let message = arguments["message"]?.stringValue, !message.isEmpty else { return BridgeResult("缺少 message 参数", isError: true) }
             return await handler.notify(title: arguments["title"]?.stringValue ?? "OhMyAgent", message: message)
-        case .canvasCreate, .canvasUpdate, .canvasList, .searchCode, .browserNavigate, .browserSnapshot, .browserClick, .browserType, .browserScroll, .browserScreenshot, .browserConsole, .browserNetwork, .browserTabs, .askUserQuestion:
+        case .canvasCreate, .canvasUpdate, .canvasList, .searchCode, .browserNavigate, .browserSnapshot, .browserClick, .browserHover, .browserBack, .browserForward, .browserReload, .browserType, .browserScroll, .browserScreenshot, .browserConsole, .browserNetwork, .browserTabs, .askUserQuestion:
             return await handler.callExtended(tool, arguments: arguments)
         }
     }

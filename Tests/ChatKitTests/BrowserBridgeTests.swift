@@ -30,7 +30,15 @@ struct BrowserBridgeTests {
     func parse() throws {
         #expect(try BrowserArguments.parse(.browserNavigate, ["url": "a.com"]).get() == .navigate(url: URL(string: "https://a.com")!))
         #expect(throws: BrowserParseError.self) { try BrowserArguments.parse(.browserNavigate, ["url": "javascript:1"]).get() }
-        #expect(try BrowserArguments.parse(.browserClick, ["ref": "e12"]).get() == .click(ref: "e12"))
+        #expect(try BrowserArguments.parse(.browserClick, ["ref": "e12"]).get() == .click(ref: "e12", button: .left, double: false))
+        #expect(try BrowserArguments.parse(.browserClick, ["ref": "e12", "button": "RIGHT"]).get() == .click(ref: "e12", button: .right, double: false))
+        #expect(try BrowserArguments.parse(.browserClick, ["ref": "e12", "double": true]).get() == .click(ref: "e12", button: .left, double: true))
+        #expect(throws: BrowserParseError.self) { try BrowserArguments.parse(.browserClick, ["ref": "e12", "button": "middle"]).get() }
+        #expect(try BrowserArguments.parse(.browserHover, ["ref": "e4"]).get() == .hover(ref: "e4"))
+        #expect(throws: BrowserParseError.self) { try BrowserArguments.parse(.browserHover, [:]).get() }
+        #expect(try BrowserArguments.parse(.browserBack, [:]).get() == .history(.back))
+        #expect(try BrowserArguments.parse(.browserForward, [:]).get() == .history(.forward))
+        #expect(try BrowserArguments.parse(.browserReload, [:]).get() == .history(.reload))
         #expect(throws: BrowserParseError.self) { try BrowserArguments.parse(.browserClick, ["ref": "e1\"]x"]).get() }
         #expect(throws: BrowserParseError.self) { try BrowserArguments.parse(.browserClick, [:]).get() }
         #expect(try BrowserArguments.parse(.browserType, ["ref": "e3", "text": "hi", "submit": true]).get() == .type(ref: "e3", text: "hi", submit: true))
@@ -41,7 +49,7 @@ struct BrowserBridgeTests {
         #expect(throws: BrowserParseError.self) { try BrowserArguments.parse(.browserScroll, ["direction": "left"]).get() }
         #expect(try BrowserArguments.parse(.browserSnapshot, [:]).get() == .snapshot)
         let browserTools = BridgeTool.allCases.filter { $0.rawValue.hasPrefix("browser_") }
-        #expect(browserTools.count == 9)
+        #expect(browserTools.count == 13)
         for tool in browserTools { #expect(tool.isBrowser) }
     }
 }

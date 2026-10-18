@@ -89,6 +89,25 @@ final class BrowserTabModel: NSObject {
         await waitForLoad(timeout: 20)
     }
 
+    /// 前进 / 后退 / 刷新,并等待加载结束。
+    /// - Parameter action: 历史动作
+    /// - Returns: 面向模型的结果说明(无可前进/后退的记录时为错误)
+    func go(_ action: BrowserHistoryAction) async -> BrowserResult {
+        switch action {
+        case .back:
+            guard webView.canGoBack else { return BrowserResult("There is no previous page in this tab's history.", isError: true) }
+            webView.goBack()
+        case .forward:
+            guard webView.canGoForward else { return BrowserResult("There is no next page in this tab's history.", isError: true) }
+            webView.goForward()
+        case .reload:
+            webView.reload()
+        }
+        try? await Task.sleep(for: .milliseconds(150))
+        await waitForLoad(timeout: 20)
+        return BrowserResult("\(action == .reload ? "Reloaded" : (action == .back ? "Went back to" : "Went forward to")) \(urlString.isEmpty ? "about:blank" : urlString) — title: \(title.isEmpty ? "(none)" : title)")
+    }
+
     /// 等待当前加载结束;没有加载时立即返回。
     /// - Parameter timeout: 超时秒数
     func waitForLoad(timeout: TimeInterval) async {
@@ -277,7 +296,9 @@ final class BrowserController {
         switch command {
         case .navigate(let url): return "navigate(\(url.host ?? ""))"
         case .snapshot: return "snapshot"
-        case .click: return "click"
+        case .click(_, let button, let double): return double ? "double-click" : (button == .right ? "right-click" : "click")
+        case .hover: return "hover"
+        case .history(let action): return action.rawValue
         case .type: return "type"
         case .scroll: return "scroll"
         case .screenshot: return "screenshot"
@@ -301,11 +322,15 @@ final class BrowserController {
             switch command {
             case .snapshot:
                 return BrowserResult(String(describing: try await model.evaluate(BrowserScripts.snapshot) ?? ""))
-            case .click(let ref):
-                let text = try await model.evaluate(BrowserScripts.click, arguments: ["ref": ref])
+            case .click(let ref, let button, let double):
+                let text = try await model.evaluate(BrowserScripts.click, arguments: ["ref": ref, "button": button.rawValue, "double": double])
                 try? await Task.sleep(for: .milliseconds(400))
                 await model.waitForLoad(timeout: 8)
                 return BrowserResult("\(text ?? "Clicked"). Now at \(model.urlString) — \(model.title)")
+            case .hover(let ref):
+                return BrowserResult(String(describing: try await model.evaluate(BrowserScripts.hover, arguments: ["ref": ref]) ?? "Hovered"))
+            case .history(let action):
+                return await model.go(action)
             case .type(let ref, let text, let submit):
                 let result = try await model.evaluate(BrowserScripts.type, arguments: ["ref": ref, "text": text, "submit": submit])
                 if submit {

@@ -1,7 +1,7 @@
 // @author ixxxxoooo
 // 调试探针(脚本化界面验证,仅在设置了环境变量时生效):在内置浏览器标签里按顺序执行 Agent 同款的浏览器命令,并把结果写到文件。
 // `OMA_BROWSER_PROBE=<输出文件>` 启用;`OMA_BROWSER_ACTIONS` 用分号分隔动作:
-//   snapshot | click:<ref> | type:<ref>:<文本>[:submit] | scroll:<up|down|top|bottom|ref> | screenshot | console | network | tabs
+//   snapshot | click:<ref> | dblclick:<ref> | rightclick:<ref> | hover:<ref> | back | forward | reload | type:<ref>:<文本>[:submit] | scroll:<up|down|top|bottom|ref> | screenshot | console | network | tabs
 // 截图保存为 `<输出文件>.png`。
 
 import AppKit
@@ -22,6 +22,12 @@ enum BrowserProbe {
             switch parts[0] {
             case "snapshot": return .snapshot
             case "click": return parts.count > 1 ? .click(ref: parts[1]) : nil
+            case "dblclick": return parts.count > 1 ? .click(ref: parts[1], button: .left, double: true) : nil
+            case "rightclick": return parts.count > 1 ? .click(ref: parts[1], button: .right, double: false) : nil
+            case "hover": return parts.count > 1 ? .hover(ref: parts[1]) : nil
+            case "back": return .history(.back)
+            case "forward": return .history(.forward)
+            case "reload": return .history(.reload)
             case "type": return parts.count > 2 ? .type(ref: parts[1], text: parts[2], submit: parts.count > 3 && parts[3] == "submit") : nil
             case "scroll":
                 guard parts.count > 1 else { return nil }
