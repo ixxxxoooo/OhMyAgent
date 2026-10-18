@@ -33,7 +33,7 @@ struct MemorySettingsPage: View {
 
     var body: some View {
         ExtensionFixedPage(
-            center: center, icon: "brain", title: String(localized: "记忆与指令"),
+            center: center, icon: "brain", title: String(localized: "规则"),
             subtitle: String(localized: "管理 CLAUDE.md 与 rules 规则文件,决定 Claude 在用户、项目层面默认遵循的指令。")
         ) {
             Button { center.reload() } label: { Image.om("arrow.clockwise") }

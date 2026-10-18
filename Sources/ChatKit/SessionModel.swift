@@ -725,6 +725,8 @@ public final class SessionModel {
             switchModel(named: name)
         case .accountNotice:
             timeline.appendNotice(ChatL10n.t("账号登录由本机 `claude` 管理"), detail: String(localized: "OhMyAgent 不处理登录/登出。请在终端运行 `claude`,执行 `/login` 或 `/logout`。"))
+        case .unsupported(let name):
+            timeline.appendNotice(ChatL10n.f("`/%@` 在 OhMyAgent 里不可用", name), detail: ClaudeBuiltinCommands.unsupported[name], severity: "warning")
         case .explore(let question):
             if question.isEmpty {
                 timeline.appendNotice(ChatL10n.t("用法:`/explore 要弄清的问题`"), severity: "warning")

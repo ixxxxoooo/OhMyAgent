@@ -1,5 +1,5 @@
 // @author ixxxxoooo
-// 记忆与指令:多层级 CLAUDE.md / rules 编辑器,规则创建与删除。
+// 规则:多层级 CLAUDE.md / rules 编辑器,规则创建与删除。
 
 import IconKit
 import ClaudeConfigKit

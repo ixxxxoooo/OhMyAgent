@@ -31,6 +31,8 @@ public enum LocalCommand: Sendable, Equatable {
     case setModel(String)
     /// 提示账号相关命令由 `claude` 自己管理
     case accountNotice
+    /// 依赖终端界面、无法在 OhMyAgent 里执行的内置命令(取值为命令名),由客户端直接说明
+    case unsupported(name: String)
     /// 交给 Explore 子 Agent 做只读的代码库探索(`/explore <问题>`;问题为空时提示用法)
     case explore(String)
     /// 在新的 Git 工作树里开始一个隔离任务(`/worktree [标题]`)
@@ -68,7 +70,7 @@ public enum LocalCommands {
         LocalCommandSpec(name: "config", summary: ChatL10n.t("打开设置")),
         LocalCommandSpec(name: "permissions", summary: ChatL10n.t("管理工具权限规则")),
         LocalCommandSpec(name: "agents", summary: ChatL10n.t("管理子 Agent")),
-        LocalCommandSpec(name: "skills", summary: ChatL10n.t("管理 Skills 与自定义命令")),
+        LocalCommandSpec(name: "skills", summary: ChatL10n.t("管理 Skills")),
         LocalCommandSpec(name: "memory", summary: ChatL10n.t("编辑 CLAUDE.md 规则")),
         LocalCommandSpec(name: "hooks", summary: ChatL10n.t("管理 Hooks")),
         LocalCommandSpec(name: "plugin", summary: ChatL10n.t("管理插件")),
@@ -151,7 +153,7 @@ public enum LocalCommands {
         case "apply-worktree": return .applyWorktree
         case "delete-worktree": return .deleteWorktree
         case "best-of-n": return .bestOfN(models: parseBestOfN(argument)?.models ?? [], task: parseBestOfN(argument)?.task ?? "")
-        default: return nil
+        default: return ClaudeBuiltinCommands.unsupported[name] == nil ? nil : .unsupported(name: name)
         }
     }
 

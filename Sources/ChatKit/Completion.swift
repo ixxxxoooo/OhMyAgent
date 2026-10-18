@@ -164,7 +164,8 @@ public enum CompletionEngine {
         var items = localCommands
         let known = Dictionary(entries.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
         var seen = Set(items.map(\.insertText))
-        for command in agentCommands where !seen.contains("/\(command.name)") {
+        for command in agentCommands where !seen.contains("/\(command.name)")
+            && !command.name.hasPrefix("__") && !ClaudeBuiltinCommands.hiddenFromCompletion.contains(command.name) {
             seen.insert("/\(command.name)")
             let hint = (command.inputHint ?? known[command.name]?.hint).map { " <\($0)>" } ?? ""
             let summary = command.description.isEmpty ? (known[command.name]?.summary ?? "") : command.description

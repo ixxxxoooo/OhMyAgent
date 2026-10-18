@@ -13,8 +13,12 @@ struct CompletionGroupTests {
     func builtinFallback() {
         let items = CompletionEngine.slashItems(query: "", agentCommands: [], limit: 200)
         let names = Set(items.map(\.insertText))
-        for name in ["/compact", "/init", "/review", "/add-dir", "/rewind", "/todos", "/security-review", "/output-style"] {
+        for name in ["/compact", "/init", "/review", "/security-review", "/output-style", "/effort"] {
             #expect(names.contains(name), "缺少 \(name)")
+        }
+        // 经适配器实测不可用的内置命令不再推荐
+        for name in ["/add-dir", "/rewind", "/todos", "/vim", "/ide", "/bug", "/pr-comments"] {
+            #expect(!names.contains(name), "\(name) 不该出现在补全里")
         }
         #expect(items.count == Set(items.map(\.insertText)).count)
         #expect(items.first { $0.insertText == "/compact" }?.badge == "Claude Code")
