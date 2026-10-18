@@ -13,22 +13,36 @@ struct MarkdownView: View {
     let text: String
     /// 文本是否仍在流式增长(影响解析缓存策略,见 `MarkdownCache.blocks`)
     var streaming = false
+    /// 是否懒加载各段(放在 ScrollView 里的整页预览用,只排版可见段,避免大文档一次性排版卡主线程)
+    var lazy = false
 
     var body: some View {
         let segments = MarkdownSegment.split(MarkdownCache.blocks(for: text, streaming: streaming))
-        VStack(alignment: .leading, spacing: 10) {
-            ForEach(Array(segments.enumerated()), id: \.offset) { _, segment in
-                // equatable:流式追加时只有末尾的段变化,其余段跳过 body 重算(含行内 Markdown 解析与代码高亮)
-                switch segment {
-                case .textRun(let blocks):
-                    // 相邻文字块合并为一个 NSTextView,支持跨段落连续选择与复制
-                    MarkdownTextRunView(blocks: blocks).equatable()
-                case .block(let block):
-                    MarkdownBlockView(block: block).equatable()
-                }
+        Group {
+            if lazy {
+                LazyVStack(alignment: .leading, spacing: 10) { segmentViews(segments) }
+            } else {
+                VStack(alignment: .leading, spacing: 10) { segmentViews(segments) }
             }
         }
         .textSelection(.enabled)
+    }
+
+    /// 各渲染段的视图。
+    /// - Parameter segments: 渲染段序列
+    /// - Returns: 段视图集合
+    @ViewBuilder
+    private func segmentViews(_ segments: [MarkdownSegment]) -> some View {
+        ForEach(Array(segments.enumerated()), id: \.offset) { _, segment in
+            // equatable:流式追加时只有末尾的段变化,其余段跳过 body 重算(含行内 Markdown 解析与代码高亮)
+            switch segment {
+            case .textRun(let blocks):
+                // 相邻文字块合并为一个 NSTextView,支持跨段落连续选择与复制
+                MarkdownTextRunView(blocks: blocks).equatable()
+            case .block(let block):
+                MarkdownBlockView(block: block).equatable()
+            }
+        }
     }
 }
 
