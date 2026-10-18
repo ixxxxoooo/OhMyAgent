@@ -18,17 +18,11 @@ struct GroupLatestStepView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var gapReady = false
 
-    /// 最后一个工具条目。
-    /// - Returns: 工具条目;分组内没有工具时为 nil
-    private var latest: TimelineEntry? {
-        group.entries.last { $0.kind == .tool && $0.tool != nil }
-    }
+    /// 要展示的工具条目(并行时取仍在运行的最后一个)。
+    private var latest: TimelineEntry? { group.tickerEntry }
 
-    /// 是否处于工具之间的空窗:分组仍在运行,但最后一个工具已结束。
-    private var inGap: Bool {
-        guard let tool = latest?.tool else { return true }
-        return tool.status.isTerminal
-    }
+    /// 是否处于工具之间的空窗:没有任何运行中的工具。
+    private var inGap: Bool { group.isBetweenSteps }
 
     /// 是否显示「规划下一步」行:处于空窗且延迟已到。
     private var showsPlanning: Bool { inGap && gapReady }
