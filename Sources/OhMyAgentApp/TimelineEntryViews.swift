@@ -172,6 +172,7 @@ struct UserMessageView: View {
         .onHover { hovering = $0 }
         // 单击进入编辑(运行中引导的消息不可编辑);拖动选字不会触发点击
         .onTapGesture { if !entry.isSteered { sticky?.beginEditing(entry, pinned: false) } }
+        .accessibilityAddTraits(entry.isSteered ? [] : .isButton)
         .omContextMenu {
             OMMenuItem("复制", icon: "copy") {
                 NSPasteboard.general.clearContents()
