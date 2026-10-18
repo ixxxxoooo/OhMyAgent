@@ -117,7 +117,7 @@ struct TabGroupView: View {
                     ? TitlebarMetrics.rightClusterWidth(toggles: workbench.layout.toggleCount(on: .right)) : 0
             )
             GeometryReader { proxy in
-                content
+                content(size: proxy.size)
                     .frame(width: proxy.size.width, height: proxy.size.height)
                     .clipped()
                     .overlay { DropOverlay(zone: zone).allowsHitTesting(false) }
@@ -134,12 +134,14 @@ struct TabGroupView: View {
     /// 内容区:当前标签 + 最近使用的标签都保持挂载,非激活的隐藏(隐藏会让 AppKit 视图让出键盘焦点),
     /// 因此切换标签不再重建编辑器、重新高亮或重新连接语言服务器。
     @ViewBuilder
-    private var content: some View {
+    private func content(size: CGSize) -> some View {
         if group.active != nil {
             ZStack {
                 ForEach(keepAlive.mounted(in: group.tabs, active: group.activeID)) { tab in
                     let isActive = tab.id == group.activeID
                     TabContentView(workbench: workbench, tab: tab)
+                        // 隐藏的保活标签冻结在失活时的尺寸:窗口/侧栏宽度变化不再让每个隐藏会话重新排版,激活时才一次性恢复
+                        .modifier(InactiveSizeFreeze(isActive: isActive, size: size))
                         .environment(\.tabIsActive, isActive)
                         .opacity(isActive ? 1 : 0)
                         .allowsHitTesting(isActive)
@@ -158,6 +160,27 @@ struct TabGroupView: View {
         } else {
             WelcomeView(workbench: workbench)
         }
+    }
+}
+
+/// 冻结隐藏标签的布局尺寸。
+///
+/// 保活的标签只是 `opacity(0)`,仍参与布局;每次容器尺寸变化(开关侧栏、拖动分隔条、改窗口大小)
+/// 所有隐藏会话的时间线都要重新排版,标签越多越卡。失活时记住当时的尺寸并固定,重新激活时再跟随容器。
+struct InactiveSizeFreeze: ViewModifier {
+    /// 标签是否处于活动状态
+    let isActive: Bool
+    /// 容器当前尺寸
+    let size: CGSize
+    @State private var frozen: CGSize?
+
+    func body(content: Content) -> some View {
+        // 活动时始终跟随容器(激活当帧就是正确尺寸);失活后才使用记住的尺寸
+        let fixed = isActive ? size : (frozen ?? size)
+        content
+            .frame(width: fixed.width, height: fixed.height)
+            .frame(width: size.width, height: size.height, alignment: .topLeading)
+            .onChange(of: isActive, initial: true) { _, active in frozen = active ? nil : size }
     }
 }
 

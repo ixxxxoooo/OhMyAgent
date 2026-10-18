@@ -66,8 +66,9 @@ struct WorkbenchView: View {
             // 右侧由内向外排列
             ForEach(workbench.layout.visibleColumns(on: .right).reversed()) { panelColumn($0, side: .right) }
         }
-        // 面板显隐带滑入/滑出动画(仅显隐变化时触发,拖动宽度不受影响;遵循「减弱动态效果」)
-        .animation(omShouldReduceMotion() ? nil : Self.panelToggleAnimation, value: panelVisibilitySignature)
+        // 面板显隐的滑入/滑出动画只挂在面板自己的 transition 上(见 `panelTransition`),这里不给整个 HStack 加动画:
+        // 否则中栏的宽度会逐帧变化,整条会话时间线与所有常驻会话标签每帧重新排版,开关侧栏就会掉帧。
+        // 现在中栏一次性排到最终宽度,面板在其上方做位移 + 淡入淡出(拖动宽度同样不受影响)。
         .onChange(of: panelVisibilitySignature) { _, _ in PanelToggleProbe.begin(stamp: workbench.panelToggleStamp, window: actions.mainWindow) }
         .overlay(alignment: .top) { TitlebarOverlay(workbench: workbench) }
         .overlay { TerminalDropOverlay() }
@@ -87,9 +88,11 @@ struct WorkbenchView: View {
         workbench.layout.visibleColumns(on: .left) + workbench.layout.visibleColumns(on: .right)
     }
 
-    /// 面板插入/移除的过渡:从所在侧边缘滑入滑出。
+    /// 面板插入/移除的过渡:从所在侧边缘滑入滑出;动画绑定在过渡本身(而非事务)上,不会带动中栏逐帧重排。
+    /// 「减弱动态效果」下无过渡。
     private func panelTransition(_ side: PanelSide) -> AnyTransition {
-        .move(edge: side == .left ? .leading : .trailing).combined(with: .opacity)
+        if omShouldReduceMotion() { return .identity }
+        return AnyTransition.move(edge: side == .left ? .leading : .trailing).combined(with: .opacity).animation(Self.panelToggleAnimation)
     }
 
     /// 一列面板 + 它与中栏之间的分隔条(分隔条总在靠近中栏的一侧)。
@@ -108,7 +111,7 @@ struct WorkbenchView: View {
         )
         let range = column == .sidebar ? PanelMetrics.leftRange : (column == .tools ? PanelMetrics.rightRange : PanelMetrics.terminalRange)
         let defaultWidth = column == .sidebar ? PanelMetrics.leftDefault : (column == .tools ? PanelMetrics.rightDefault : PanelMetrics.terminalDefault)
-        if side == .right { PanelResizer(width: width, side: side, range: range, defaultWidth: defaultWidth).transition(panelTransition(side)) }
+        if side == .right { PanelResizer(width: width, side: side, range: range, defaultWidth: defaultWidth).zIndex(1).transition(panelTransition(side)) }
         Group {
             switch column {
             case .sidebar:
@@ -126,8 +129,10 @@ struct WorkbenchView: View {
         }
         .frame(width: CGFloat(width.wrappedValue))
         .clipped()
+        // 滑出时面板仍盖在(已一次性扩宽的)中栏之上,否则会被后绘制的中栏遮住而「瞬间消失」
+        .zIndex(1)
         .transition(panelTransition(side))
-        if side == .left { PanelResizer(width: width, side: side, range: range, defaultWidth: defaultWidth).transition(panelTransition(side)) }
+        if side == .left { PanelResizer(width: width, side: side, range: range, defaultWidth: defaultWidth).zIndex(1).transition(panelTransition(side)) }
     }
 
     /// 导航历史的触发信号:聚焦组的激活标签与标签总数(关闭标签时需要清理历史)。
