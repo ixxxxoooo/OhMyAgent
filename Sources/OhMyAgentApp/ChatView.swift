@@ -134,6 +134,10 @@ struct ChatView: View {
                         // 原位编辑的那条要压在后面的行(如折叠的工具分组)之上;zIndex 必须设在列表直接子项上才对兄弟行生效
                         .modifier(EditingElevation(id: item.id))
                 }
+                // 回放历史时最后一个回合的结束行要等回放结束才插入:先按它的高度占位(按钮 22 + 上下内边距 2×2),插入时不顶动内容
+                if model.isReplaying, let last = model.timeline.entries.last, last.kind != .turnSummary {
+                    Color.clear.frame(height: 26)
+                }
                 WorkingIndicatorView(model: model)
                 Color.clear.frame(height: 8).id("bottom")
             }
