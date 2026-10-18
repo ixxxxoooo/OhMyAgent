@@ -448,24 +448,6 @@ struct NoticeView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
-
-/// 计划模式批准后的计划文档(Markdown 卡片)。
-struct PlanDocView: View {
-    let entry: TimelineEntry
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label("计划", om: "list.bullet.clipboard")
-                .font(OMFonts.small.weight(.medium))
-                .foregroundStyle(OMColors.secondaryText)
-            MarkdownView(text: entry.text)
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .omSolidCard()
-    }
-}
-
 /// 输入区上方的待办折叠卡:默认收起为一行「已完成 x / n」,点击展开完整计划。
 struct PlanDock: View {
     let model: SessionModel

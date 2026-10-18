@@ -15,6 +15,14 @@ struct PermissionCard: View {
     let onChoose: (String) -> Void
 
     var body: some View {
+        if prompt.isPlanApproval {
+            PlanApprovalCard(prompt: prompt, onChoose: onChoose)
+        } else {
+            requestCard
+        }
+    }
+
+    private var requestCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Image.om(prompt.isPlanApproval ? "list-todo" : ToolIcons.symbol(for: prompt.kind)).foregroundStyle(OMColors.warning)
