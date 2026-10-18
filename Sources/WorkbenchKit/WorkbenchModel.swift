@@ -1300,11 +1300,37 @@ public final class WorkbenchModel {
     @discardableResult
     public func openBrowser(id: String, title: String, activate: Bool = true) -> UUID {
         mode = .workspace
-        let tab = dock.open(.preview(id: Self.browserTabPrefix + id), title: title)
+        // 默认在会话右侧分屏打开(已有右侧组就放进去),焦点留在会话;之后可把标签拖到任意位置重新分屏
+        let tab = dock.openBeside(.preview(id: Self.browserTabPrefix + id), title: title, of: dock.focusedGroupID, preview: false, keepFocus: true)
         if activate {
             dock.activate(tab)
             syncSelectionFromDock()
         }
+        scheduleSave()
+        return tab
+    }
+
+    // MARK: 工具面板标签(右栏的文件 / 搜索 / Git 拖进编辑区)
+
+    /// 工具面板标签的标识前缀(预览类标签,后缀为 `RightPane` 的 rawValue)。
+    public nonisolated static let toolsTabPrefix = "oma-tools:"
+
+    /// 从预览标签标识里取右栏视图;不是工具面板标签返回 nil。
+    /// - Parameter tabID: 预览标签标识
+    public nonisolated static func toolsPane(fromTab tabID: String) -> RightPane? {
+        tabID.hasPrefix(toolsTabPrefix) ? RightPane(rawValue: String(tabID.dropFirst(toolsTabPrefix.count))) : nil
+    }
+
+    /// 打开(或切到)某个右栏视图对应的编辑区标签,供拖拽分屏使用。
+    /// - Parameters:
+    ///   - pane: 右栏视图(文件 / 搜索 / Git)
+    ///   - title: 标签标题
+    /// - Returns: 标签 ID
+    @discardableResult
+    public func openToolsTab(_ pane: RightPane, title: String) -> UUID {
+        mode = .workspace
+        let tab = dock.open(.preview(id: Self.toolsTabPrefix + pane.rawValue), title: title)
+        scheduleSave()
         return tab
     }
 

@@ -32,9 +32,38 @@ final class DockDrag {
             try? await Task.sleep(for: .milliseconds(400))
             guard !Task.isCancelled else { return }
             self?.tabID = nil
+            self?.toolsPane = nil
         }
     }
     nonisolated static let prefix = "oma-tab:"
+
+    /// 正在被拖拽的右栏视图(文件 / 搜索 / Git);落到编辑区时转成工具面板标签
+    var toolsPane: RightPane?
+    /// 工具面板拖拽载荷前缀
+    nonisolated static let toolsPrefix = "oma-toolpane:"
+
+    /// 开始拖拽右栏视图;沿用标签拖拽的复位逻辑(松手后清空)。
+    /// - Parameter pane: 被拖拽的右栏视图
+    func beginTools(_ pane: RightPane) {
+        toolsPane = pane
+        begin(UUID())
+    }
+
+    /// 是否有可落下的拖拽(标签或右栏视图)。
+    var hasPayload: Bool { tabID != nil || toolsPane != nil }
+
+    /// 把拖拽载荷解析成编辑区里的标签 ID:标签载荷直接解析,右栏视图载荷则打开对应的工具面板标签。
+    /// - Parameters:
+    ///   - text: 拖拽载荷
+    ///   - workbench: 工作台模型
+    /// - Returns: 标签 ID;载荷无效为 nil
+    @MainActor
+    static func resolveTab(_ text: String, in workbench: WorkbenchModel) -> UUID? {
+        if let id = parse(text) { return id }
+        guard text.hasPrefix(toolsPrefix), let pane = RightPane(rawValue: String(text.dropFirst(toolsPrefix.count))),
+              RightPane.available.contains(pane) else { return nil }
+        return workbench.openToolsTab(pane, title: RightPaneView.title(pane))
+    }
 
     /// 由拖拽载荷字符串解析标签 ID。
     nonisolated static func parse(_ text: String) -> UUID? {
@@ -72,6 +101,7 @@ func tabIcon(_ kind: TabKind) -> String {
         if id == WorkbenchModel.customizeTabID { return "sliders-horizontal" }
         if WorkbenchModel.canvasID(fromTab: id) != nil { return "chart-column" }
         if WorkbenchModel.browserID(fromTab: id) != nil { return "globe" }
+        if let pane = WorkbenchModel.toolsPane(fromTab: id) { return RightPaneView.icon(pane) }
         if WorkbenchModel.planPath(fromTab: id) != nil { return "list-todo" }
         return id == WorkbenchModel.outputTabID ? "file-text" : "eye"
     case .history: return "git-graph"
@@ -247,7 +277,7 @@ struct GroupDropDelegate: DropDelegate {
     @Binding var zone: DockDropZone?
 
     func validateDrop(info: DropInfo) -> Bool {
-        (info.hasItemsConforming(to: [.plainText]) && DockDrag.shared.tabID != nil) || DockFileDrop.isFileDrop(info)
+        (info.hasItemsConforming(to: [.plainText]) && DockDrag.shared.hasPayload) || DockFileDrop.isFileDrop(info)
     }
 
     func dropEntered(info: DropInfo) { zone = DockDropZone.zone(at: info.location, in: size) }
@@ -278,11 +308,13 @@ struct GroupDropDelegate: DropDelegate {
         guard let provider = info.itemProviders(for: [.plainText]).first else { return false }
         let model = workbench, group = groupID
         _ = provider.loadObject(ofClass: String.self) { text, _ in
-            guard let text, let id = DockDrag.parse(text) else { return }
+            guard let text else { return }
             Task { @MainActor in
+                guard let id = DockDrag.resolveTab(text, in: model) else { return }
                 model.dock.drop(id, onGroup: group, zone: target)
                 model.syncSelectionFromDock()
                 DockDrag.shared.tabID = nil
+                DockDrag.shared.toolsPane = nil
             }
         }
         return true
@@ -297,7 +329,7 @@ struct TabStripDropDelegate: DropDelegate {
     let index: Int?
 
     func validateDrop(info: DropInfo) -> Bool {
-        (info.hasItemsConforming(to: [.plainText]) && DockDrag.shared.tabID != nil) || DockFileDrop.isFileDrop(info)
+        (info.hasItemsConforming(to: [.plainText]) && DockDrag.shared.hasPayload) || DockFileDrop.isFileDrop(info)
     }
 
     func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: DockFileDrop.isFileDrop(info) ? .copy : .move) }
@@ -320,11 +352,13 @@ struct TabStripDropDelegate: DropDelegate {
         guard let provider = info.itemProviders(for: [.plainText]).first else { return false }
         let model = workbench, group = groupID, at = index
         _ = provider.loadObject(ofClass: String.self) { text, _ in
-            guard let text, let id = DockDrag.parse(text) else { return }
+            guard let text else { return }
             Task { @MainActor in
+                guard let id = DockDrag.resolveTab(text, in: model) else { return }
                 model.dock.move(id, toGroup: group, at: at)
                 model.syncSelectionFromDock()
                 DockDrag.shared.tabID = nil
+                DockDrag.shared.toolsPane = nil
             }
         }
         return true

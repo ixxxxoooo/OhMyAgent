@@ -26,6 +26,19 @@ struct DockIntegrationTests {
         return (model, ids, root, store)
     }
 
+    @Test("浏览器默认在会话右侧分屏打开,工具面板标签可解析")
+    func browserOpensBesideAndToolsTab() throws {
+        let (model, _, _, _) = try makeModel()
+        let chatGroup = model.dock.focusedGroupID
+        _ = model.openBrowser(id: "b1", title: "浏览器")
+        #expect(model.dock.groups.count == 2)
+        #expect(model.dock.focusedGroupID == chatGroup || model.dock.group(chatGroup) != nil)
+        let tab = model.openToolsTab(.git, title: "Git")
+        #expect(model.dock.allTabs.contains { $0.id == tab })
+        #expect(WorkbenchModel.toolsPane(fromTab: WorkbenchModel.toolsTabPrefix + "git") == .git)
+        #expect(WorkbenchModel.toolsPane(fromTab: "oma-browser:x") == nil)
+    }
+
     @Test("打开项目会创建会话标签,切换项目聚焦对应标签")
     func chatTabsFollowProjects() throws {
         let (model, ids, root, _) = try makeModel()

@@ -46,6 +46,8 @@ struct TabContentView: View {
                 CustomizePage(workbench: workbench)
             } else if let browserID = WorkbenchModel.browserID(fromTab: id) {
                 BrowserTabView(browserID: browserID, workspace: workbench.selectedProjectID ?? NSHomeDirectory()).id(browserID)
+            } else if let pane = WorkbenchModel.toolsPane(fromTab: id) {
+                ToolsTabView(workbench: workbench, pane: pane)
             } else if let canvasID = WorkbenchModel.canvasID(fromTab: id) {
                 CanvasTabView(canvasID: canvasID).id(canvasID)
             } else if let planPath = WorkbenchModel.planPath(fromTab: id) {

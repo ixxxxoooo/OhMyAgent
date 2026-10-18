@@ -43,6 +43,11 @@ struct RightPaneView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                // 图标可拖进中间编辑区(边缘分屏、中心并入标签组)
+                .onDrag {
+                    DockDrag.shared.beginTools(pane)
+                    return NSItemProvider(object: (DockDrag.toolsPrefix + pane.rawValue) as NSString)
+                }
                 .foregroundStyle(selected ? OMColors.accent : OMColors.secondaryText)
                 .omTooltip(pane == .git ? (gitBadge?.tooltip.map { Self.title(pane) + ":" + $0 } ?? Self.title(pane)) : Self.title(pane))
                 .accessibilityLabel(Self.title(pane))
@@ -101,7 +106,7 @@ struct RightPaneView: View {
     }
 
     /// 右栏视图对应的图标(Lucide 名)。
-    static func icon(_ pane: RightPane) -> String {
+    nonisolated static func icon(_ pane: RightPane) -> String {
         switch pane {
         case .changes: return "file-diff"
         case .plan: return "list-checks"
@@ -114,7 +119,7 @@ struct RightPaneView: View {
         }
     }
 
-    static func title(_ pane: RightPane) -> String {
+    nonisolated static func title(_ pane: RightPane) -> String {
         switch pane {
         case .changes: return String(localized: "改动")
         case .plan: return String(localized: "计划")
