@@ -15,8 +15,8 @@ private let omInlineCodeKey = NSAttributedString.Key("OMInlineCode")
 private let omQuoteKey = NSAttributedString.Key("OMQuote")
 /// 软换行占位:用 U+2028(行分隔符)代替 `\n`,使同一段落内的换行不触发段间距;复制时还原。
 private let softBreak = "\u{2028}"
-/// 行内代码两侧的内边距字符:细空格(U+2009)。
-private let codePadding = "\u{2009}"
+/// 行内代码两侧的内边距字符:发丝空格(U+200A)。
+private let codePadding = "\u{200A}"
 
 /// 是否属于「文字段」的块(可合并进同一个文本视图)。
 /// - Parameter block: Markdown 块
