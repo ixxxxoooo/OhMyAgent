@@ -501,6 +501,26 @@ private struct ProjectGroup: View {
     }
 }
 
+/// 侧栏相对时间文案缓存:`Date.formatted(.relative)` 每次都会新建格式化器(约百微秒),
+/// 展开侧栏时几十行同时计算会拖慢首帧;文案按「分钟」粒度变化,故以 (时间点, 当前分钟) 为键缓存。
+@MainActor
+enum SidebarRelativeTime {
+    private static var cache: [String: String] = [:]
+
+    /// - Parameters:
+    ///   - date: 会话更新时间
+    ///   - now: 当前时间(测试可注入)
+    /// - Returns: 例如「5 分钟前」
+    static func text(for date: Date, now: Date = .now) -> String {
+        let key = "\(Int(date.timeIntervalSince1970))#\(Int(now.timeIntervalSince1970) / 60)"
+        if let cached = cache[key] { return cached }
+        let text = date.formatted(.relative(presentation: .numeric, unitsStyle: .narrow))
+        if cache.count > 2000 { cache.removeAll(keepingCapacity: true) }
+        cache[key] = text
+        return text
+    }
+}
+
 /// 会话行:状态点 + 渐隐标题 + 固定 76pt 保留区(相对时间 ⇄ 悬停时的置顶/归档按钮),对齐 kuku 的 SessionRow。
 private struct SessionLine: View {
     enum Mode { case tree, pinned, general }
@@ -573,7 +593,7 @@ private struct SessionLine: View {
         } else if let date = item.updatedAt {
             HStack(spacing: 4) {
                 if isPinned { Image.om("pin.fill", size: 9) }
-                Text(date.formatted(.relative(presentation: .numeric, unitsStyle: .narrow)))
+                Text(SidebarRelativeTime.text(for: date))
                     .monospacedDigit()
                     .lineLimit(1)
             }

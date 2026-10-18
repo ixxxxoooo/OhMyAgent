@@ -20,6 +20,34 @@ public enum DemoClaudeHome {
         for (name, text) in agents { try put(claude.appendingPathComponent("agents/\(name).md"), text) }
         try writePlugins(claude: claude)
         try writeJSON(claude.appendingPathComponent("stats-cache.json"), statsCache)
+        try writeStressSkills(claude: claude, count: stressSkillCount(environment: ProcessInfo.processInfo.environment))
+    }
+
+    /// 压测用的额外 Skill 数量(`OMA_DEMO_EXTRA_SKILLS`,上限 2000;缺省 0 表示不生成)。
+    /// 用来复现「真实 `~/.claude` 有上千个技能/插件文件」时的配置加载与补全开销。
+    /// - Parameter environment: 进程环境变量
+    /// - Returns: 要生成的数量
+    static func stressSkillCount(environment: [String: String]) -> Int {
+        min(max(Int(environment["OMA_DEMO_EXTRA_SKILLS"] ?? "") ?? 0, 0), 2000)
+    }
+
+    /// 生成压测 Skill(`skills/stress-0001/SKILL.md` …,内容为带 frontmatter 的虚构说明)。
+    private static func writeStressSkills(claude: URL, count: Int) throws {
+        guard count > 0 else { return }
+        for index in 1...count {
+            let name = String(format: "stress-%04d", index)
+            let text = """
+            ---
+            name: \(name)
+            description: 压测用的虚构技能 \(index),用于模拟大量技能时的配置加载与补全开销。
+            ---
+
+            # \(name)
+
+            这是第 \(index) 个压测技能,没有实际用途。\(String(repeating: "占位说明。", count: 40))
+            """
+            try put(claude.appendingPathComponent("skills/\(name)/SKILL.md"), text)
+        }
     }
 
     /// 演示用统计缓存(`stats-cache.json`):固定截止日期与确定性公式生成 30 天活动、每日按模型 token 与按模型累计,

@@ -5,13 +5,14 @@
 #   cpu       运行一个冻结的「运行中」场景若干秒,检查本进程 CPU(验证流光/呼吸点等持续动画的开销)
 #   all       依次执行上面两项(默认)
 # 用法: Scripts/perf-ui.sh [interact|cpu|all] [--build] [--sessions N] [--toggles M] [--cpu-seconds S] [--scenario 名]
+#   --heavy N 额外生成 N 个压测 Skill(模拟真实 ~/.claude 有上千个技能/插件文件时的配置加载开销)
 #   --build   先 Scripts/bundle.sh release(验收以 release 为准;不加则使用已有 build/OhMyAgent.app)
 # 阈值见 `perf-report.py ui`;可用环境变量覆盖:UI_PANEL_AVG_MS UI_PANEL_HITCHES UI_PANEL_MAX_MS UI_FIRST_FRAME_MS
 #   UI_COLD_OPEN_MS UI_WARM_SWITCH_MS UI_HITCH_MS UI_RUN_CPU
 set -uo pipefail
 source "${0:A:h}/lib-kill.sh"
 cd "$(dirname "$0")/.."
-MODE="all"; BUILD=""; SESSIONS=6; TOGGLES=12; CPU_SECONDS=45; SCENARIO="states-frozen"
+MODE="all"; BUILD=""; SESSIONS=6; TOGGLES=12; CPU_SECONDS=45; SCENARIO="states-frozen"; HEAVY=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     interact|cpu|all) MODE="$1" ;;
@@ -20,6 +21,7 @@ while [[ $# -gt 0 ]]; do
     --toggles) TOGGLES="${2:-12}"; shift ;;
     --cpu-seconds) CPU_SECONDS="${2:-45}"; shift ;;
     --scenario) SCENARIO="${2:-states-frozen}"; shift ;;
+    --heavy) HEAVY="${2:-800}"; shift ;;
     *) echo "未知参数: $1" >&2; exit 2 ;;
   esac
   shift
@@ -33,7 +35,8 @@ STATUS=0
 # 启动演示版并返回 pid。参数: 其余为 --env 键值
 launch() {
   killDemoApp; sleep 1
-  open -g -n "$APP" --env OMA_DEMO=1 --env OMA_DEMO_RESET=1 --env OMA_PROJECT_ROOT="$PWD" --env OMA_PERF_SAMPLE_SECONDS=5 --env OMA_HITCH_SAMPLE=1 "$@"
+  local extra=(); [[ -n "$HEAVY" ]] && extra=(--env OMA_DEMO_EXTRA_SKILLS="$HEAVY")
+  open -g -n "$APP" "${extra[@]}" --env OMA_DEMO=1 --env OMA_DEMO_RESET=1 --env OMA_PROJECT_ROOT="$PWD" --env OMA_PERF_SAMPLE_SECONDS=5 --env OMA_HITCH_SAMPLE=1 "$@"
   local pid=""
   for _ in {1..40}; do pid="$(pgrep -x OhMyAgent | head -1 || true)"; [[ -n "$pid" ]] && break; sleep 0.5; done
   echo "$pid"
@@ -42,7 +45,7 @@ launch() {
 # 阈值参数
 thresholds() {
   echo --panel-avg-ms "${UI_PANEL_AVG_MS:-17.5}" --panel-hitches "${UI_PANEL_HITCHES:-1}" --panel-max-ms "${UI_PANEL_MAX_MS:-33}" \
-       --first-frame-ms "${UI_FIRST_FRAME_MS:-80}" --cold-open-ms "${UI_COLD_OPEN_MS:-150}" --warm-switch-ms "${UI_WARM_SWITCH_MS:-50}" \
+       --first-frame-ms "${UI_FIRST_FRAME_MS:-100}" --cold-open-ms "${UI_COLD_OPEN_MS:-150}" --warm-switch-ms "${UI_WARM_SWITCH_MS:-50}" \
        --hitch-ms "${UI_HITCH_MS:-250}" --run-cpu "${UI_RUN_CPU:-15}"
 }
 

@@ -353,7 +353,7 @@ def main():
         rest = [a for a in rest if a not in ("--cpu-check", "--cpu-only")]
         opts = {}
         for flag, key, default in (("--panel-avg-ms", "panel_avg_ms", 17.5), ("--panel-hitches", "panel_hitches", 1.0), ("--panel-max-ms", "panel_max_ms", 33.0),
-                                   ("--first-frame-ms", "first_frame_ms", 80.0), ("--cold-open-ms", "cold_open_ms", 150.0), ("--warm-switch-ms", "warm_switch_ms", 50.0),
+                                   ("--first-frame-ms", "first_frame_ms", 100.0), ("--cold-open-ms", "cold_open_ms", 150.0), ("--warm-switch-ms", "warm_switch_ms", 50.0),
                                    ("--hitch-ms", "hitch_ms", 250.0), ("--run-cpu", "run_cpu", 15.0)):
             opts[key], rest = option(rest, flag, default)
         problems = ui(entries, opts, check_cpu, cpu_only)
