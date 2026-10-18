@@ -161,7 +161,6 @@ struct ToolRowView: View {
                     .foregroundStyle(OMColors.tertiaryText)
                     .lineLimit(1)
             }
-            Spacer(minLength: 8)
             if hovering, let path = openablePath(tool, p) {
                 Button {
                     model.viewerRequest = FileViewRequest(path: path, line: tool.locations.first?.line)
@@ -202,11 +201,13 @@ struct ToolRowView: View {
                     .foregroundStyle(OMColors.tertiaryText)
                     .rotationEffect(.degrees(isExpanded ? 90 : 0))
                     .animation(.snappy(duration: 0.15), value: isExpanded)
+                    .opacity(hovering || isExpanded ? 1 : 0)
             }
         }
+        // 纯文字行(对齐 Cursor):贴合内容宽度,没有整行底色长条与右侧对齐的状态列;
+        // 悬停时才显现箭头,点击区域只在内容上
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
-        .background(hovering && (canExpand || openablePath(tool, p) != nil) ? OMColors.subtleFill : Color.clear, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture { handleTap(tool, p, canExpand: canExpand, isExpanded: isExpanded) }
@@ -292,9 +293,12 @@ struct ToolRowView: View {
     @ViewBuilder
     private func durationText(_ tool: ToolCall) -> some View {
         if tool.status.isTerminal {
-            Text(Self.format(entry.elapsedSeconds))
-                .font(OMFonts.caption)
-                .foregroundStyle(OMColors.tertiaryText)
+            // 已结束且不到 1 秒的不显示耗时(历史回放里恒为 0.0 秒,只是噪音)
+            if entry.elapsedSeconds >= 1 {
+                Text(Self.format(entry.elapsedSeconds))
+                    .font(OMFonts.caption)
+                    .foregroundStyle(OMColors.tertiaryText)
+            }
         } else {
             ActiveTimeline(interval: 1) { _ in
                 Text(Self.format(entry.elapsedSeconds))
@@ -309,7 +313,7 @@ struct ToolRowView: View {
         switch status {
         case .pending: OMStatusDot(.idle)
         case .inProgress: OMSpinner(.mini)
-        case .completed: Image.om("checkmark", size: 9, weight: .bold).foregroundStyle(OMColors.success.opacity(0.8))
+        case .completed: EmptyView()   // 成功不加勾,只在进行中/失败时标示状态
         case .failed: Image.om("xmark", size: 9, weight: .bold).foregroundStyle(OMColors.danger)
         }
     }
