@@ -21,6 +21,15 @@ enum ChartFence {
     }
 }
 
+extension ChartFence {
+    /// 解析 Mermaid xychart-beta 源码为图表。
+    /// - Parameter source: 围栏内容
+    /// - Returns: 图表;不是 xychart 或解析失败为 nil(继续走 Mermaid 渲染/回退)
+    static func parseXY(_ source: String) -> CanvasChart? {
+        XYChartParser.isXYChart(source) ? XYChartParser.parse(source) : nil
+    }
+}
+
 /// 会话里的图表卡片:直接复用画布图表视图(自带纯色卡片)。
 struct ChartFenceView: View {
     let chart: CanvasChart

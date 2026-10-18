@@ -160,7 +160,10 @@ struct MarkdownBlockView: View, Equatable {
             MarkdownTextRunView(blocks: [block])
         case .code(let language, let code, let isClosed):
             // 围栏闭合后才渲染 Mermaid,避免流式输出中途反复解析失败
-            if isClosed, language?.lowercased() == "mermaid" {
+            if isClosed, language?.lowercased() == "mermaid", let chart = ChartFence.parseXY(code) {
+                // MermaidKit 不支持 xychart-beta:转成原生图表
+                ChartFenceView(chart: chart)
+            } else if isClosed, language?.lowercased() == "mermaid" {
                 MermaidBlockView(source: code)
             } else if isClosed, language?.lowercased() == "chart", let chart = ChartFence.parse(code) {
                 // 围栏闭合且 JSON 合法才画图;否则回退为普通代码块
