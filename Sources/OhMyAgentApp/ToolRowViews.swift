@@ -590,8 +590,8 @@ struct CommandBox: View {
                 CopyButton(text: copyText, copied: $copied)
             }
             if !cleaned.isEmpty {
-                CollapsibleOutput(raw: cleaned, followTail: status == .inProgress)
-                    .foregroundStyle(status == .failed ? OMColors.danger : OMColors.primaryText)
+                CollapsibleOutput(raw: cleaned, followTail: status == .inProgress,
+                                  tint: status == .failed ? OMColors.danger : OMColors.secondaryText)
             }
         }
         .padding(8)

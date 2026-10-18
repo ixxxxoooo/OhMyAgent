@@ -39,6 +39,8 @@ struct CollapsibleOutput: View {
     var followTail = false
     /// 是否按 ANSI 解析(普通文本输出传 false,原样展示)
     var ansi = true
+    /// 输出默认文字色:次要色,与上方高亮的命令区分(失败时由调用方传危险色);ANSI 显式着色的片段不受影响
+    var tint: Color = OMColors.secondaryText
     @State private var expanded = false
     @State private var contentHeight: CGFloat = 0
 
@@ -71,11 +73,14 @@ struct CollapsibleOutput: View {
     /// 输出正文:按需解析 ANSI。
     @ViewBuilder
     private func textBody(_ text: String) -> some View {
+        // 输出默认用次要色(与上方高亮的命令区分,对齐 Cursor);ANSI 显式着色的片段仍保持原色
         if ansi {
             ANSITextView(raw: text, fontSize: fontSize, maxLines: Self.renderLimit)
+                .foregroundStyle(tint)
         } else {
             Text(text)
                 .font(OMFonts.custom(fontSize, design: .monospaced))
+                .foregroundStyle(tint)
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
