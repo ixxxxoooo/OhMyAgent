@@ -35,6 +35,8 @@ final class GitModel {
     /// 修补上一次提交(amend)
     var amend = false
     @ObservationIgnored private var refreshing = false
+    /// 装饰索引缓存:状态快照未变时直接复用,避免资源管理器每次 body 重算(逐路径字符串拼接 + 祖先冒泡)。
+    @ObservationIgnored private var decorationCache: (status: GitStatus, index: GitDecorationIndex)?
 
     init(projectPath: String) {
         self.projectPath = projectPath
@@ -54,6 +56,16 @@ final class GitModel {
     /// 把绝对路径转为仓库相对路径;不在仓库内返回 nil。
     func relativePath(_ absolute: String) -> String? {
         repo?.relativePath(of: absolute)
+    }
+
+    /// 当前状态对应的文件装饰索引(带缓存;非仓库或无改动时为空索引)。
+    var decorationIndex: GitDecorationIndex {
+        guard phase == .ready, !status.isClean else { return GitDecorationIndex() }
+        if let cache = decorationCache, cache.status == status { return cache.index }
+        let base = absolutePath("")
+        let index = GitDecorationIndex(status: status, base: base.hasSuffix("/") ? String(base.dropLast()) : base)
+        decorationCache = (status, index)
+        return index
     }
 
     /// 可提交的改动(不含冲突)。

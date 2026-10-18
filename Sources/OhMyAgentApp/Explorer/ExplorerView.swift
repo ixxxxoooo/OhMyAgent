@@ -16,9 +16,7 @@ struct ExplorerView: View {
 
     /// 某根目录的 Git 装饰(随状态轮询更新;非仓库时为空)
     fileprivate static func decorations(forRoot root: String) -> GitDecorationIndex {
-        let git = GitStore.shared.model(for: root)
-        guard git.phase == .ready, !git.status.isClean else { return GitDecorationIndex() }
-        return GitDecorationIndex(status: git.status, base: git.absolutePath("").trimmingSuffix("/"))
+        GitStore.shared.model(for: root).decorationIndex
     }
 
     var body: some View {

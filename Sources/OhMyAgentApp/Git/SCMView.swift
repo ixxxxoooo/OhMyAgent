@@ -409,7 +409,8 @@ private struct SCMContent: View {
 
     private var changeList: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
+            // 惰性容器:大仓库改动数百个文件时只创建可见行
+            LazyVStack(alignment: .leading, spacing: 0) {
                 let conflicts = model.status.conflicts
                 if !conflicts.isEmpty {
                     SectionHeader(title: "冲突", count: conflicts.count, tint: OMColors.warning) { EmptyView() }
