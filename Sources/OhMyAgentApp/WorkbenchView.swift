@@ -170,9 +170,12 @@ struct WorkbenchView: View {
     private func runDebugHooks() async {
         var env = ProcessInfo.processInfo.environment
         // 调试:OMA_TOGGLE_LEFT=秒 延迟后切换左栏显隐(不依赖鼠标点击,用于脚本化验证左栏收起/展开)
-        if let delay = env["OMA_TOGGLE_LEFT"], let seconds = Double(delay) {
+        // OMA_TOGGLE_RIGHT=秒 同理切换右栏;OMA_TOGGLE_COUNT=N 重复切换 N 次(间隔 1.5 秒,配合侧栏切换性能日志)
+        let toggleCount = env["OMA_TOGGLE_COUNT"].flatMap(Int.init) ?? 1
+        for (key, toggle) in [("OMA_TOGGLE_LEFT", { workbench.toggleLeft() }), ("OMA_TOGGLE_RIGHT", { workbench.toggleRight() })] {
+            guard let delay = env[key], let seconds = Double(delay) else { continue }
             try? await Task.sleep(for: .seconds(seconds))
-            workbench.toggleLeft()
+            for _ in 0..<max(toggleCount, 1) { toggle(); try? await Task.sleep(for: .seconds(1.5)) }
         }
         // 演示模式:OMA_DEMO_SCENARIO=<场景名> 等价于 OMA_AUTOSEND="/demo-<场景名>"
         if let scenario = DemoLaunch.environment?.scenario, env["OMA_AUTOSEND"] == nil { env["OMA_AUTOSEND"] = "/demo-" + scenario }

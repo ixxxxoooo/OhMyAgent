@@ -10,8 +10,8 @@ import WorkbenchKit
 /// 侧栏开关性能探针(仅主线程使用)。
 @MainActor
 enum PanelToggleProbe {
-    /// 本次采样期间各视图 body 的重算次数。
-    private static var bodyCounts: [String: Int] = [:]
+    /// 最近的 body 重算记录(名称 + 时刻),上限 2000 条;汇总时只统计切换之后的。
+    private static var bodyEvents: [(name: String, at: ContinuousClock.Instant)] = []
     private static var sampler: FrameSampler?
 
     /// 登记一次 body 重算;放在视图 body 开头:`let _ = PanelToggleProbe.count("名称")`。
@@ -19,7 +19,8 @@ enum PanelToggleProbe {
     /// - Returns: 恒为 0(便于写成 `let _ =`)
     @discardableResult
     static func count(_ name: String) -> Int {
-        if sampler != nil { bodyCounts[name, default: 0] += 1 }
+        bodyEvents.append((name, .now))
+        if bodyEvents.count > 2000 { bodyEvents.removeFirst(1000) }
         return 0
     }
 
@@ -30,16 +31,17 @@ enum PanelToggleProbe {
     static func begin(stamp: PanelToggleStamp?, window: NSWindow?) {
         guard let view = window?.contentView else { return }
         sampler?.finish()
-        bodyCounts = [:]
         let sampler = FrameSampler(name: stamp?.name ?? "未知", start: stamp?.at ?? .now, view: view) { result in
-            Self.report(result)
+            Self.report(result, since: stamp?.at ?? .now)
             Self.sampler = nil
         }
         Self.sampler = sampler
     }
 
     /// 输出汇总日志;存在超过 33ms 的帧时记为 warning。
-    private static func report(_ r: FrameSampler.Result) {
+    private static func report(_ r: FrameSampler.Result, since: ContinuousClock.Instant) {
+        var bodyCounts: [String: Int] = [:]
+        for event in bodyEvents where event.at >= since { bodyCounts[event.name, default: 0] += 1 }
         let counts = bodyCounts.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: ",")
         let fields: [String: String] = [
             "panel": r.name, "firstFrameMs": String(format: "%.1f", r.firstFrameMs),
