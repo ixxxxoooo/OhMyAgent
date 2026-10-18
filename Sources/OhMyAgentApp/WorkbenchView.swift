@@ -68,6 +68,7 @@ struct WorkbenchView: View {
         }
         // 面板显隐带滑入/滑出动画(仅显隐变化时触发,拖动宽度不受影响;遵循「减弱动态效果」)
         .animation(omShouldReduceMotion() ? nil : Self.panelToggleAnimation, value: panelVisibilitySignature)
+        .onChange(of: panelVisibilitySignature) { _, _ in PanelToggleProbe.begin(stamp: workbench.panelToggleStamp, window: actions.mainWindow) }
         .overlay(alignment: .top) { TitlebarOverlay(workbench: workbench) }
         .overlay { TerminalDropOverlay() }
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { TerminalDragState.shared.workspaceFrame = $0 }
@@ -306,6 +307,7 @@ struct CenterColumn: View {
     private let appearance = AppearanceModel.shared
 
     var body: some View {
+        let _ = PanelToggleProbe.count("center")
         VStack(spacing: 0) {
             DockView(workbench: workbench)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

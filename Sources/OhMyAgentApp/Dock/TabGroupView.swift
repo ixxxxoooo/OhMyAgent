@@ -107,6 +107,7 @@ struct TabGroupView: View {
     private var isFocused: Bool { workbench.dock.focusedGroupID == group.id }
 
     var body: some View {
+        let _ = PanelToggleProbe.count("tabGroup")
         VStack(spacing: 0) {
             TabBarView(
                 workbench: workbench, group: group, isFocused: isFocused,

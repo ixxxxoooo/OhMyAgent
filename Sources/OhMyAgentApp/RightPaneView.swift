@@ -15,6 +15,7 @@ struct RightPaneView: View {
     private var gitModel: GitModel? { workbench.selectedProjectID.map { GitStore.shared.model(for: $0) } }
 
     var body: some View {
+        let _ = PanelToggleProbe.count("rightPane")
         VStack(spacing: 0) {
             paneBar
             switch workbench.layout.rightPane {

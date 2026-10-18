@@ -1065,8 +1065,11 @@ public final class WorkbenchModel {
         activateTab(id)
     }
 
-    public func toggleLeft() { layout.leftVisible.toggle() }
-    public func toggleRight() { layout.rightVisible.toggle() }
+    /// 最近一次侧栏开关的时间戳(性能探针读取,用于计算点击到首帧的耗时)。
+    public var panelToggleStamp: PanelToggleStamp?
+
+    public func toggleLeft() { panelToggleStamp = PanelToggleStamp(name: "left", at: .now); layout.leftVisible.toggle() }
+    public func toggleRight() { panelToggleStamp = PanelToggleStamp(name: "right", at: .now); layout.rightVisible.toggle() }
     public func toggleBottom() { layout.bottomVisible.toggle() }
 
     /// 显示右栏并切换到某视图。
@@ -1410,4 +1413,13 @@ public final class WorkbenchModel {
         defer { span.end() }
         do { try store.save(state) } catch { log.error("保存工作台状态失败", error: error, ["file": store.fileURL.path]) }
     }
+}
+
+
+/// 侧栏开关的时间戳(性能探针用)。
+public struct PanelToggleStamp: Sendable {
+    /// 面板名(left/right)。
+    public let name: String
+    /// 切换发生的时刻。
+    public let at: ContinuousClock.Instant
 }

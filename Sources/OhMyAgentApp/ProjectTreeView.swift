@@ -84,6 +84,7 @@ struct ProjectTreeView: View {
     }
 
     var body: some View {
+        let _ = PanelToggleProbe.count("tree")
         VStack(spacing: 0) {
             // 顶部 35pt:红绿灯与侧栏开关浮层所在区域,可拖动窗口
             Color.clear.frame(height: TitlebarMetrics.height).background(WindowDragArea())
