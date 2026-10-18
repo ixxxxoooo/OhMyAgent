@@ -50,6 +50,9 @@ for s in tools-files tools-shell tools-web-mcp canvas tools-browser tools-image 
          states-notices states-errors states-streaming roles user-variants markdown markdown-edge mermaid showcase-tour; do
   add "scenario-$s" 12 "OMA_DEMO_SCENARIO=$s;OMA_EXPAND_ALL=1"
 done
+for s in errors-refusal errors-max-tokens; do
+  add "scenario-$s" 10 "OMA_DEMO_SCENARIO=$s;OMA_EXPAND_ALL=1"
+done
 add "scenario-long-running" 14 "OMA_DEMO_SCENARIO=long-running;OMA_EXPAND_ALL=1"
 add "scenario-terminal" 12 "OMA_DEMO_SCENARIO=terminal;OMA_EXPAND_ALL=1"
 add "scenario-all" 60 "OMA_DEMO_SCENARIO=all;OMA_EXPAND_ALL=1"

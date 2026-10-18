@@ -100,6 +100,13 @@ struct DemoScenarioTests {
         #expect(!updates.isEmpty)
     }
 
+    @Test("回合收尾类场景以预期的停止原因结束", arguments: [("errors-refusal", StopReason.refusal), ("errors-max-tokens", StopReason.maxTokens)])
+    func endingScenarioStops(id: String, expected: StopReason) async throws {
+        let (stop, updates) = try await runPrompt("#demo-\(id)")
+        #expect(stop == expected)
+        #expect(!updates.isEmpty)
+    }
+
     @Test("交互场景在用户批准后跑到 end_turn", arguments: DemoScenarios.all.filter { $0.behavior == .interactive && $0.id != "changes" }.map(\.id))
     func interactiveScenarioFinishes(id: String) async throws {
         let (stop, updates) = try await runPrompt("#demo-\(id)")

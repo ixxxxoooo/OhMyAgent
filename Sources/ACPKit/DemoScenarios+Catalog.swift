@@ -25,6 +25,7 @@ extension DemoScenarios {
             DemoScenario(id: "markdown-edge", group: "会话流样式", title: "Markdown 边界:嵌套、宽表格与回退", summary: "多级嵌套列表、引用含列表、宽表格、更多围栏语言、公式/图片/HTML 的回退、超长单词、未闭合围栏", build: markdownEdge),
         ]
         list.append(contentsOf: agentScenarios)
+        list.append(contentsOf: endingScenarios)
         return list
     }()
 }

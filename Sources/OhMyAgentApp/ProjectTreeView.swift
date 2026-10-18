@@ -397,7 +397,6 @@ private struct ProjectGroup: View {
                 let visible = showAll ? all : Array(all.prefix(Self.previewCount))
                 ForEach(visible) { item in
                     SessionLine(workbench: workbench, item: item, mode: .tree, below: GeneralSessionList.idsBelow(item, in: all))
-                    if item.isCurrent { SubagentRows(workbench: workbench, projectID: project.id) }
                 }
                 if all.count > Self.previewCount {
                     Button(showAll ? String(localized: "收起") : String(localized: "显示更多(还有 \(all.count - Self.previewCount) 条)")) {
@@ -496,41 +495,6 @@ private struct ProjectGroup: View {
             OMMenuItem("归档全部会话", icon: "archive") { workbench.archiveAllSessions(in: project.id) }
             OMMenuDivider()
             OMMenuItem("移除项目", icon: "trash", isDestructive: true) { workbench.removeProject(project.id) }
-        }
-    }
-}
-
-/// 当前会话下缩进显示的子任务(子 Agent):点击在标签中打开其只读会话;运行中带活动点。
-private struct SubagentRows: View {
-    let workbench: WorkbenchModel
-    let projectID: String
-
-    var body: some View {
-        if let model = workbench.sessions[projectID] {
-            let items = model.timeline.subagentEntries()
-            ForEach(Array(items.enumerated()), id: \.element.entry.id) { _, item in
-                if let tool = item.entry.tool {
-                    HStack(spacing: 6) {
-                        Image.om("bot", size: 11).foregroundStyle(OMColors.tertiaryText).frame(width: 16)
-                        Text(tool.title).font(OMFonts.caption).lineLimit(1).foregroundStyle(OMColors.secondaryText)
-                        Spacer(minLength: 4)
-                        if !tool.status.isTerminal {
-                            Circle().fill(OMColors.accent).frame(width: 6, height: 6)
-                                .accessibilityLabel("运行中")
-                        }
-                    }
-                    .padding(.leading, CGFloat(12 + item.depth * 12))
-                    .padding(.horizontal, 6)
-                    .frame(height: 24)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        workbench.openSubagent(project: projectID, toolCallID: tool.toolCallId, title: tool.title)
-                    }
-                    .omTooltip(tool.title)
-                    .accessibilityElement(children: .combine)
-                    .accessibilityAddTraits(.isButton)
-                }
-            }
         }
     }
 }
