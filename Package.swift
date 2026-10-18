@@ -12,7 +12,7 @@ let package = Package(
     ],
     dependencies: [
         // 终端模拟器(VT/xterm 解析与渲染视图)
-        .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", exact: "1.5.1"),
+        .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", exact: "1.11.2"),
     ],
     targets: [
         // 统一日志:os.Logger + 文件轮转 + 脱敏 + 协议流量日志

@@ -29,6 +29,9 @@ final class TerminalController: Identifiable {
     @ObservationIgnored private var process: LocalProcess?
     /// 已登记到资源采样的 shell pid(退出时注销)。
     @ObservationIgnored private var registeredPID: Int32?
+    /// 自己的子进程退出监听。SwiftTerm 1.11.x 在读到 EOF 时会取消它内部的退出监听,
+    /// 导致 `processTerminated` 回调丢失(被 SIGHUP 的 shell 会一直显示为运行中),所以这里独立兜底并收尸。
+    @ObservationIgnored private var exitMonitor: DispatchSourceProcess?
     @ObservationIgnored private let executable: String
     @ObservationIgnored private let arguments: [String]
     @ObservationIgnored private let extraEnvironment: [String: String]
@@ -116,8 +119,41 @@ final class TerminalController: Identifiable {
         if isRunning {
             registeredPID = process.shellPid
             ProcessRegistry.shared.register(pid: process.shellPid, role: .terminal, label: (executable as NSString).lastPathComponent)
+            watchExit(of: process)
         }
         Log.ui.info("终端已启动", ["id": id, "shell": (executable as NSString).lastPathComponent, "running": "\(isRunning)"])
+    }
+
+    /// 监听子进程退出:退出事件触发时尝试收尸并结束状态;若 SwiftTerm 已先处理则为空操作。
+    /// - Parameter process: 刚启动的进程
+    private func watchExit(of process: LocalProcess) {
+        let pid = process.shellPid
+        guard pid > 0 else { return }
+        exitMonitor?.cancel()
+        let monitor = DispatchSource.makeProcessSource(identifier: pid, eventMask: .exit, queue: .main)
+        monitor.setEventHandler { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.process === process, self.isRunning else { return }
+                var status: Int32 = 0
+                let reaped = waitpid(pid, &status, WNOHANG)
+                self.finishProcess(status: reaped == pid ? status : nil)
+            }
+        }
+        monitor.activate()
+        exitMonitor = monitor
+    }
+
+    /// 进程结束的统一收尾(只生效一次):更新状态、注销资源采样、停止监听、记录日志。
+    /// - Parameter status: `waitpid` 状态;信号终止或未取到时为 nil
+    private func finishProcess(status: Int32?) {
+        guard isRunning else { return }
+        isRunning = false
+        exitMonitor?.cancel()
+        exitMonitor = nil
+        if let pid = registeredPID { ProcessRegistry.shared.unregister(pid: pid) }
+        registeredPID = nil
+        exitCode = status.flatMap(Self.decodeWaitStatus)
+        Log.ui.info("终端进程已退出", ["id": id, "code": exitCode.map { String($0) } ?? "signal"])
     }
 
     /// 终止进程(关闭标签时调用)。交互式 shell 会忽略 SIGTERM,所以先发 SIGHUP(与关闭终端窗口一致),
@@ -215,12 +251,10 @@ extension TerminalController: TerminalViewDelegate {
 
 extension TerminalController: LocalProcessDelegate {
     nonisolated func processTerminated(_ source: LocalProcess, exitCode: Int32?) {
+        let sourceID = ObjectIdentifier(source)
         MainActor.assumeIsolated {
-            isRunning = false
-            if let pid = registeredPID { ProcessRegistry.shared.unregister(pid: pid) }
-            registeredPID = nil
-            self.exitCode = exitCode.flatMap(Self.decodeWaitStatus)
-            Log.ui.info("终端进程已退出", ["id": id, "code": self.exitCode.map { String($0) } ?? "signal"])
+            guard let process, ObjectIdentifier(process) == sourceID else { return }
+            finishProcess(status: exitCode)
         }
     }
 
@@ -230,49 +264,5 @@ extension TerminalController: LocalProcessDelegate {
 
     nonisolated func getWindowSize() -> winsize {
         MainActor.assumeIsolated { windowSize() }
-    }
-}
-
-/// 终端仓库:按标签标识持有控制器,标签关闭后回收。
-@MainActor
-final class TerminalStore {
-    static let shared = TerminalStore()
-    private(set) var controllers: [String: TerminalController] = [:]
-    /// 已登记但尚未创建控制器的启动目录
-    private var pendingDirectories: [String: String] = [:]
-
-    private init() {}
-
-    /// 登记终端启动目录(打开标签前调用)。
-    func register(id: String, directory: String) {
-        pendingDirectories[id] = directory
-    }
-
-    /// 获取(必要时创建)终端控制器。
-    /// - Parameters:
-    ///   - id: 终端标识
-    ///   - fallbackDirectory: 未登记目录时使用的目录
-    func controller(for id: String, fallbackDirectory: String) -> TerminalController {
-        if let existing = controllers[id] { return existing }
-        let controller = TerminalController(id: id, directory: pendingDirectories[id] ?? fallbackDirectory)
-        controllers[id] = controller
-        return controller
-    }
-
-    /// 终止并移除不再被任何标签引用的终端。
-    /// - Parameter keeping: 仍然存在的终端标识
-    func prune(keeping: Set<String>) {
-        for (id, controller) in controllers where !keeping.contains(id) && !id.hasPrefix("bottom:") {
-            controller.terminate()
-            controllers[id] = nil
-            pendingDirectories[id] = nil
-        }
-    }
-
-    /// 终止并移除指定终端。
-    func remove(_ id: String) {
-        controllers[id]?.terminate()
-        controllers[id] = nil
-        pendingDirectories[id] = nil
     }
 }

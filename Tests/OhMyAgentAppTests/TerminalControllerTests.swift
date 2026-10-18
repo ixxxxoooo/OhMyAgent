@@ -108,6 +108,19 @@ struct TerminalControllerTests {
         store.remove("bottom:/x")
         await wait { !bottom.isRunning }
     }
+
+    @Test("宽字符:中英混排按双宽占两列,后续字符不错位")
+    func wideCharacters() async {
+        let controller = TerminalController(id: "t-wide", directory: NSTemporaryDirectory(), executable: "/bin/sh", arguments: ["-c", "printf 'ab你c是d谁\\n'"], environment: ["LANG": "en_US.UTF-8"])
+        await wait { !controller.isRunning && controller.screenText.contains("谁") }
+        // 缓冲导出时宽字符的第二格是 NUL 占位,去掉后顺序必须一致
+        #expect(controller.screenText.filter { !$0.isWhitespace && $0 != "\0" }.contains("ab你c是d谁"))
+        let terminal = controller.view.getTerminal()
+        // a b [你 占 2 列] c [是 占 2 列] d [谁 占 2 列]:列 2 是汉字、列 3 是其占位格,列 4 是 c
+        #expect(terminal.getCharData(col: 2, row: 0)?.width == 2)
+        #expect(terminal.getCharData(col: 4, row: 0)?.getCharacter() == "c")
+        #expect(terminal.getCharData(col: 7, row: 0)?.getCharacter() == "d")
+    }
 }
 
 @Suite("waitpid 状态解码")
