@@ -119,10 +119,25 @@ public enum PromptOptimizer {
     /// - Returns: 参数列表
     static func claudeArguments(environment: [String: String]) -> [String] {
         var arguments = ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--no-session-persistence",
-                         "--tools", "", "--strict-mcp-config", "--disable-slash-commands"]
+                         "--tools", "", "--strict-mcp-config", "--disable-slash-commands",
+                         // 不读 user/project/local 设置(hooks、插件、技能、权限规则),实测首轮输入约 13K → 0.6K token
+                         "--setting-sources", ""]
         if (environment["ANTHROPIC_BASE_URL"] ?? "").isEmpty { arguments += ["--model", "haiku"] }
         arguments += ["--system-prompt", systemPrompt]
         return arguments
+    }
+
+    /// 优化专用的最小环境:`--setting-sources ""` 会忽略 `~/.claude/settings.json`,
+    /// 所以把其中的 `env`(如第三方网关地址)并进来保持与终端一致,再关闭 CLAUDE.md 与自动记忆注入。
+    /// - Parameters:
+    ///   - base: claude 运行时的环境变量
+    ///   - settingsEnv: `~/.claude/settings.json` 的 `env`(同名时优先,与 Claude Code 一致)
+    /// - Returns: 实际传给子进程的环境
+    static func minimalEnvironment(base: [String: String], settingsEnv: [String: String]) -> [String: String] {
+        var env = base.merging(settingsEnv) { _, settings in settings }
+        env["CLAUDE_CODE_DISABLE_CLAUDE_MDS"] = "1"
+        env["CLAUDE_CODE_DISABLE_AUTO_MEMORY"] = "1"
+        return env
     }
 
     /// 构造 stream-json 输入里的用户消息。
@@ -152,6 +167,7 @@ public enum PromptOptimizer {
     /// - Returns: 清洗后的提示词;失败返回 nil
     public static func viaClaude(claude: String, environment: [String: String], cwd: String, text: String, timeout: Duration = .seconds(90)) async -> String? {
         guard !claude.isEmpty, let payload = userMessage(text) else { return nil }
+        let environment = minimalEnvironment(base: environment, settingsEnv: ModelGateway.loadSettingsEnv())
         let transport = StdioTransport(launch: ProcessLaunch(executable: claude, arguments: claudeArguments(environment: environment), environment: environment, workingDirectory: cwd))
         let events: AsyncStream<TransportEvent>
         do { events = try transport.start() } catch {

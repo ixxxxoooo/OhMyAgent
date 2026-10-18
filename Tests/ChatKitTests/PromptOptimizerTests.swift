@@ -65,4 +65,16 @@ struct PromptOptimizerTests {
     func demo() {
         #expect(PromptOptimizer.demoRewrite("  修 bug ").hasSuffix("修 bug"))
     }
+
+    @Test("claude 通道:不读设置来源,并把 settings.json 的 env 并入、关闭 CLAUDE.md 注入")
+    func minimalClaudeChannel() {
+        let arguments = PromptOptimizer.claudeArguments(environment: [:])
+        let index = try? #require(arguments.firstIndex(of: "--setting-sources"))
+        #expect(index.map { arguments[$0 + 1] } == "")
+        let env = PromptOptimizer.minimalEnvironment(base: ["A": "1", "ANTHROPIC_BASE_URL": "http://base"], settingsEnv: ["ANTHROPIC_BASE_URL": "https://gw.example", "B": "2"])
+        #expect(env["ANTHROPIC_BASE_URL"] == "https://gw.example")
+        #expect(env["A"] == "1" && env["B"] == "2")
+        #expect(env["CLAUDE_CODE_DISABLE_CLAUDE_MDS"] == "1")
+        #expect(env["CLAUDE_CODE_DISABLE_AUTO_MEMORY"] == "1")
+    }
 }
