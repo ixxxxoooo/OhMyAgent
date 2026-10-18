@@ -19,6 +19,15 @@ public extension View {
         omGlass(in: OMPillShape(), tint: tint, interactive: interactive)
     }
 
+    /// 带文字的玻璃控件(放在 `OMGlassGroup` 里的胶囊/按钮):玻璃直接加在内容上,文字不会被容器合并渲染的玻璃盖住;
+    /// 主题不允许玻璃或「减少透明度」时回退为不透明 + 发丝线,`tint` 作为选中底色叠在上面。
+    /// - Parameters:
+    ///   - shape: 形状
+    ///   - tint: 可选着色(选中态)
+    func omGlassLabel<S: Shape>(in shape: S, tint: Color? = nil) -> some View {
+        modifier(OMGlassLabelModifier(shape: shape, tint: tint))
+    }
+
     /// 悬浮在输入区周围的功能卡片(任务坞、提问、权限、目标、待办):使用与输入框一致的 Liquid Glass。
     /// - Parameters:
     ///   - cornerRadius: 圆角,默认取弹窗令牌 `OMRadius.modal`
@@ -58,6 +67,26 @@ struct OMGlassModifier<S: Shape>: ViewModifier {
                     shape.stroke(OMColors.hairline, lineWidth: 0.5)
                 }
             }
+    }
+}
+
+/// 带文字的玻璃控件修饰器(见 `omGlassLabel`)。
+struct OMGlassLabelModifier<S: Shape>: ViewModifier {
+    let shape: S
+    let tint: Color?
+    private let policy = MaterialPolicy.shared
+
+    func body(content: Content) -> some View {
+        if policy.useGlass && ThemeRuntime.style.allowsGlass {
+            content.glassEffect(.regular.tint(tint), in: shape)
+        } else {
+            content
+                .background {
+                    shape.fill(OMColors.opaqueChrome)
+                    if let tint { shape.fill(tint) }
+                }
+                .overlay { shape.stroke(OMColors.hairline, lineWidth: 0.5) }
+        }
     }
 }
 
