@@ -66,6 +66,8 @@ extension ScriptedAgent {
             }
         case .user(let text):
             await emit(sessionId, parent: parent, ["sessionUpdate": "user_message_chunk", "content": ["type": "text", "text": .string(text)]])
+        case .userImage(let kind):
+            await emit(sessionId, parent: parent, ["sessionUpdate": "user_message_chunk", "content": ScenarioImages.contentBlock(kind)])
         case .tool(let tool):
             await runTool(tool, ctx: ctx, parent: parent)
         case .permission(let permission):
@@ -89,6 +91,7 @@ extension ScriptedAgent {
             await emit(sessionId, parent: parent, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": .string(text)],
                                                     "_meta": ["piAcp": ["notify": ["level": .string(level)]]]])
         case .usage(let used, let size, let cost):
+            lastUsage[sessionId] = (used, size)
             var body: [String: JSONValue] = ["sessionUpdate": "usage_update", "used": .int(used), "size": .int(size)]
             if let cost { body["cost"] = ["amount": .double(cost), "currency": "USD"] }
             await emit(sessionId, parent: nil, body)
@@ -97,6 +100,19 @@ extension ScriptedAgent {
         case .mode(let mode):
             modes[sessionId] = mode
             await emit(sessionId, parent: nil, ["sessionUpdate": "current_mode_update", "currentModeId": .string(mode)])
+        case .rateLimit(let windows):
+            let now = Date().timeIntervalSince1970
+            var unified: [String: JSONValue] = [:]
+            for window in windows {
+                unified[window.type] = ["utilization": .double(window.utilization), "resetsAt": .int(Int(now + Double(window.resetsInMinutes) * 60))]
+            }
+            let usage = lastUsage[sessionId] ?? (0, 200_000)
+            await emit(sessionId, parent: nil, ["sessionUpdate": "usage_update", "used": .int(usage.used), "size": .int(usage.size),
+                                                "_meta": ["_claude/rateLimit": ["status": "allowed", "unifiedWindows": .object(unified)]]])
+        case .stop(let reason):
+            return .stopped(reason)
+        case .fail(let code, let message):
+            throw JSONRPCError(code: code, message: message)
         case .delay(let millis):
             await scaledDelay(millis)
         case .hold:

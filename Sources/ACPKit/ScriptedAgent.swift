@@ -12,6 +12,8 @@ public actor ScriptedAgent: ACPRequestHandler {
     var models: [String: String] = [:]
     /// 各会话的思考强度(仅演示模式提供 `thought_level` 选项)
     var thoughts: [String: String] = [:]
+    /// 各会话最近一次上报的上下文用量(限额更新沿用,避免把用量环清零)
+    var lastUsage: [String: (used: Int, size: Int)] = [:]
     var sessionCounter = 0
     /// 本实例的会话 ID 前缀:并行测试里多个脚本 Agent 的 ID 互不相同(客户端按 ID 全局记忆「空会话」等状态)
     private let idTag = UUID().uuidString.prefix(6).lowercased()
@@ -459,6 +461,7 @@ public actor ScriptedAgent: ACPRequestHandler {
             let outcome = try await runSteps(match.scenario.build(context), ctx: context)
             if outcome == .cancelled { return ["stopReason": "cancelled"] }
             if outcome == .rejected { return ["stopReason": "end_turn"] }
+            if case .stopped(let reason) = outcome { return await finishTurn(sessionId: sessionId, defaultUsage: false, stopReason: reason) }
         }
 
         if !isDemo, text.contains("plan") || text.contains("计划") {
@@ -488,7 +491,7 @@ public actor ScriptedAgent: ACPRequestHandler {
     }
 
     /// 轮次收尾:补发已收到的引导回显与用量,返回正常结束。
-    private func finishTurn(sessionId: String, defaultUsage: Bool = true) async -> JSONValue {
+    private func finishTurn(sessionId: String, defaultUsage: Bool = true, stopReason: String = "end_turn") async -> JSONValue {
         for extra in steered.removeValue(forKey: sessionId) ?? [] {
             await update(sessionId, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": .string("(已收到引导:\(extra))")]])
         }
@@ -502,6 +505,6 @@ public actor ScriptedAgent: ACPRequestHandler {
             }
         }
         // 与真实适配器一致:响应里带本轮 token 用量(回合结束摘要据此显示 token 与 tps;输入大部分来自提示缓存)
-        return ["stopReason": "end_turn", "usage": ["inputTokens": 60, "outputTokens": 360, "cachedReadTokens": 1100, "cachedWriteTokens": 40, "totalTokens": 1560]]
+        return ["stopReason": .string(stopReason), "usage": ["inputTokens": 60, "outputTokens": 360, "cachedReadTokens": 1100, "cachedWriteTokens": 40, "totalTokens": 1560]]
     }
 }

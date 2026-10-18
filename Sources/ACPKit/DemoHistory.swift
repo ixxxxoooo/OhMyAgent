@@ -88,12 +88,12 @@ public enum DemoHistory {
         return steps
     }
 
-    /// 把「正在发生」的场景步骤规整为「已经发生」:去掉停顿/冻结/内置交互,权限请求变为已完成的工具,冻结的工具改为完成,并行改为顺序。
+    /// 把「正在发生」的场景步骤规整为「已经发生」:去掉停顿/冻结/内置交互与回合终止/报错/限额,权限请求变为已完成的工具,冻结的工具改为完成,并行改为顺序。
     /// - Parameter steps: 原步骤
     public static func normalize(_ steps: [ScenarioStep]) -> [ScenarioStep] {
         steps.flatMap { step -> [ScenarioStep] in
             switch step {
-            case .delay, .hold, .builtin, .mode, .title:
+            case .delay, .hold, .builtin, .mode, .title, .stop, .fail, .rateLimit:
                 return []
             case .tool(var tool):
                 tool.finish = settled(tool.finish)

@@ -146,6 +146,22 @@ public enum ScenarioBuiltin: Sendable {
     case longRunning
 }
 
+/// 套餐限额窗口(经 `usage_update._meta["_claude/rateLimit"]` 转发)。
+public struct ScenarioRateWindow: Sendable {
+    /// 窗口类型:five_hour / seven_day / seven_day_opus / seven_day_sonnet
+    public var type: String
+    /// 已用比例 0...1
+    public var utilization: Double
+    /// 距重置的分钟数
+    public var resetsInMinutes: Int
+
+    public init(_ type: String, _ utilization: Double, resetsInMinutes: Int) {
+        self.type = type
+        self.utilization = utilization
+        self.resetsInMinutes = resetsInMinutes
+    }
+}
+
 /// 场景步骤。
 public enum ScenarioStep: Sendable {
     /// 思维流分片
@@ -154,6 +170,8 @@ public enum ScenarioStep: Sendable {
     case text([String])
     /// 用户消息(历史回放使用)
     case user(String)
+    /// 用户消息里的图片(紧随 `.user` 之后发出,合并进同一条用户消息)
+    case userImage(ScenarioImageKind)
     /// 工具调用
     case tool(ScenarioTool)
     /// 需批准的工具调用
@@ -176,6 +194,12 @@ public enum ScenarioStep: Sendable {
     case title(String)
     /// 切换模式
     case mode(String)
+    /// 套餐限额更新(一组窗口同时给出)
+    case rateLimit([ScenarioRateWindow])
+    /// 以指定停止原因结束本轮:`refusal` / `max_tokens` / `max_turn_requests`(后续步骤不再执行)
+    case stop(String)
+    /// 让本轮的 `session/prompt` 以 JSON-RPC 错误失败(如 -32000 鉴权失败、限流、提示渲染失败)
+    case fail(code: Int, message: String)
     /// 停顿(毫秒,会按节奏缩放)
     case delay(Int)
     /// 永不结束,直到被取消(冻结态)
@@ -192,4 +216,6 @@ public enum ScenarioOutcome: Sendable, Equatable {
     case cancelled
     /// 用户拒绝了权限,轮次应直接结束
     case rejected
+    /// 场景要求以该停止原因结束本轮
+    case stopped(String)
 }
