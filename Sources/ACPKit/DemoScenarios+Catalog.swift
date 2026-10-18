@@ -31,6 +31,7 @@ extension DemoScenarios {
         list.append(contentsOf: permissionScenarios)
         list.append(contentsOf: askScenarios)
         list.append(contentsOf: lifecycleScenarios)
+        list.append(contentsOf: tickerScenarios)
         return list
     }()
 }

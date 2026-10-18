@@ -93,7 +93,9 @@ struct GroupLatestStepView: View {
     /// - Returns: 行视图
     private func row(for tool: ToolCall) -> some View {
         let presentation = ToolPresentation(tool: tool)
-        let subject = presentation.subject.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
+        var subject = presentation.subject.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
+        // 绝对路径只显示文件名(对齐 Cursor),避免一行被长路径占满
+        if subject.hasPrefix("/"), !subject.contains(" ") { subject = (subject as NSString).lastPathComponent }
         return HStack(spacing: 6) {
             Image.om(ToolIcons.symbol(for: presentation.category), size: 11)
                 .foregroundStyle(OMColors.tertiaryText)
