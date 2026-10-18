@@ -110,6 +110,13 @@ struct ComposerDockView: View {
                         .foregroundStyle(OMColors.secondaryText)
                         .omTooltip("停止本轮(含所有子 Agent)")
                 }
+                if section == .terminals, terminals.contains(where: { !$0.isExternal }) {
+                    Button("全部终止") { for session in terminals where !session.isExternal { model.interruptTerminal(session.id) } }
+                        .buttonStyle(.plain)
+                        .font(OMFonts.small)
+                        .foregroundStyle(OMColors.secondaryText)
+                        .omTooltip("终止所有后台终端")
+                }
                 Button {
                     omWithAnimation(.snappy(duration: 0.18)) { model.dockHidden = true }
                 } label: {

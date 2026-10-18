@@ -2576,3 +2576,5 @@
 "元素截图 %@" = "Element screenshot %@";
 "关闭会话" = "Close Conversation";
 "关闭浏览器" = "Close Browser";
+"全部终止" = "Stop All";
+"终止所有后台终端" = "Stop all background terminals";
