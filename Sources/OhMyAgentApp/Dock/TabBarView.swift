@@ -131,12 +131,19 @@ struct TabItemView: View {
                 .lineLimit(1)
                 .frame(maxWidth: TabMetrics.labelMaxWidth, alignment: .leading)
                 .fixedSize(horizontal: true, vertical: false)
-            if case .chat = tab.kind, let uid = workbench.session(forTab: tab)?.uid {
-                AttentionDot(uid: uid)
-            }
-            trailing
+                // 尾部有状态/关闭按钮时,标题末端淡出,避免与之重叠
+                .mask(
+                    HStack(spacing: 0) {
+                        Rectangle()
+                        if showsTrailing {
+                            LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing).frame(width: 22) // ui-lint:allow 仅作遮罩/淡出,非装饰
+                        }
+                    }
+                )
         }
         .padding(.horizontal, 8)
+        // 关闭按钮/状态点叠在标签右端,不单独占位
+        .overlay(alignment: .trailing) { trailing.padding(.trailing, 6) }
         .frame(height: TabMetrics.height)
         .foregroundStyle(isActive ? OMColors.secondaryText : OMColors.primaryText)
         .background(
@@ -181,7 +188,18 @@ struct TabItemView: View {
         }
     }
 
-    /// 尾部固定 16pt 保留区:固定图钉 / 未保存点(悬停时换成关闭按钮)/ 关闭按钮(仅悬停显示)。
+    /// 会话标签的注意力状态(运行中/等待/未读);非会话标签为 idle。
+    private var attentionState: AttentionState {
+        guard case .chat = tab.kind, let uid = workbench.session(forTab: tab)?.uid else { return .idle }
+        return AttentionCenter.shared.items[uid]?.state ?? .idle
+    }
+
+    /// 尾部是否有内容(悬停的关闭按钮、图钉、未保存点或会话状态点)。
+    private var showsTrailing: Bool {
+        hovering || tab.isPinned || tab.isDirty || attentionState != .idle
+    }
+
+    /// 尾部叠加区:悬停显示关闭按钮;否则显示图钉 / 未保存点 / 会话状态点(运行中为呼吸灯)。
     @ViewBuilder
     private var trailing: some View {
         ZStack {
@@ -194,9 +212,13 @@ struct TabItemView: View {
                 .omTooltip("取消固定")
                 .accessibilityLabel("取消固定")
             } else {
-                if tab.isDirty && !hovering {
-                    Circle().fill(OMColors.secondaryText).frame(width: 7, height: 7)
-                        .omTooltip("有未保存修改")
+                if !hovering {
+                    if tab.isDirty {
+                        Circle().fill(OMColors.secondaryText).frame(width: 7, height: 7)
+                            .omTooltip("有未保存修改")
+                    } else if case .chat = tab.kind, let uid = workbench.session(forTab: tab)?.uid {
+                        AttentionDot(uid: uid)
+                    }
                 }
                 if hovering {
                     Button { AppActions.shared.requestCloseTab(tab.id) } label: {
