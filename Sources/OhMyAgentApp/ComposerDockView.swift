@@ -181,8 +181,10 @@ private struct DockChip: View {
             .foregroundStyle(selected ? OMColors.primaryText : OMColors.secondaryText)
             .padding(.horizontal, 11)
             .frame(height: 26)
-            // Liquid Glass 胶囊:选中态带主题色着色,悬停由玻璃自带的交互反馈提供
-            .omGlass(in: OMPillShape(), tint: selected ? OMColors.accent.opacity(0.28) : nil, interactive: true)
+            // 不透明胶囊:选中态叠加选中填充,避免玻璃采样/着色让文字发虚
+            .background(OMPillShape().fill(OMColors.opaqueChrome))
+            .background(OMPillShape().fill(selected ? OMColors.selectedFill : Color.clear))
+            .overlay(OMPillShape().stroke(OMColors.hairline, lineWidth: 0.5))
             .contentShape(OMPillShape())
         }
         .buttonStyle(.plain)
