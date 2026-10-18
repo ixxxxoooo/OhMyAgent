@@ -40,6 +40,10 @@ struct ComposerDockView: View {
                 chips(current: current, counts: counts)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            // 面板展开时点击任务坞(面板 + 胶囊)之外就收起,胶囊保留
+            .omCollapseOnOutsideClick(isActive: current != nil) {
+                omWithAnimation { model.dockHidden = true }
+            }
         } else {
             Color.clear.frame(height: 0)
                 .onAppear { model.dockHidden = false }

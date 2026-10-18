@@ -479,6 +479,7 @@ struct PlanDock: View {
                 }
             }
             .omGlassCard(cornerRadius: OMRadius.floating)
+            .omCollapseOnOutsideClick(isActive: expanded) { omWithAnimation { expanded = false } }
         }
     }
 }
