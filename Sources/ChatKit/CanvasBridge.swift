@@ -64,8 +64,7 @@ public struct CanvasToolRef: Sendable, Equatable {
     /// 从工具调用还原画布引用;不是画布工具或尚未完成时返回 nil。
     /// - Parameter tool: 工具调用
     public static func of(_ tool: ToolCall) -> CanvasToolRef? {
-        guard let name = tool.name, name.hasPrefix("mcp__"),
-              name.hasSuffix("__canvas_create") || name.hasSuffix("__canvas_update"),
+        guard let ref = tool.mcpRefs.last(where: { $0.tool == "canvas_create" || $0.tool == "canvas_update" }),
               tool.status == .completed else { return nil }
         var texts: [String] = []
         for item in tool.content {
@@ -73,7 +72,7 @@ public struct CanvasToolRef: Sendable, Equatable {
         }
         if let output = tool.rawOutput?.stringValue { texts.append(output) }
         guard let id = texts.lazy.compactMap({ Self.extractID(from: $0) }).first else { return nil }
-        return CanvasToolRef(canvasID: id, title: tool.rawInput?["title"]?.stringValue, isUpdate: name.hasSuffix("__canvas_update"))
+        return CanvasToolRef(canvasID: id, title: (ref.input ?? tool.mcpInput)?["title"]?.stringValue, isUpdate: ref.tool == "canvas_update")
     }
 
     /// 在结果文本里找 `canvas_id: <id>`。

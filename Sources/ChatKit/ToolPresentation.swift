@@ -49,14 +49,13 @@ public struct ToolPresentation: Sendable, Equatable {
         self.detail = nil
         self.subjectIsPath = false
 
-        if name.hasPrefix("mcp__") {
-            let parts = name.split(separator: "_", omittingEmptySubsequences: true).map(String.init)
-            // mcp__server__tool:server / tool 本身可含单下划线,按双下划线切分
-            let segments = name.components(separatedBy: "__")
+        // MCP 工具:Claude Code 是 mcp__服务器__工具,OpenCode 是包在 execute 里的 tools.服务器.工具(...)
+        if let ref = tool.mcpRef {
             category = .mcp
-            mcpServer = segments.count > 1 ? segments[1] : parts.dropFirst().first
-            verb = segments.count > 2 ? segments[2...].joined(separator: "__") : name
-            subject = input.map(Self.briefInput) ?? ""
+            mcpServer = ref.server
+            let extra = tool.mcpRefs.count - 1
+            verb = extra > 0 ? "\(ref.tool) +\(extra)" : ref.tool
+            subject = tool.mcpInput.map(Self.briefInput) ?? ""
             return
         }
         if hasChild || Self.isSubagentLaunch(tool) {
@@ -556,7 +555,7 @@ public enum TimelineGrouping {
             case .tool:
                 // 画布卡片与问答结果本身就是给用户看的产出,保持可见
                 guard let tool = entry.tool else { return true }
-                return !(tool.name ?? "").contains("__canvas_") && entry.elicitationOutcome == nil
+                return !tool.callsMcpTool(withPrefix: "canvas_") && entry.elicitationOutcome == nil
             case .user, .notice, .changes, .planDoc, .turnSummary, .modelSwitch: return false
             }
         }
@@ -590,7 +589,7 @@ public enum TimelineGrouping {
                 guard presentation.category == .mcp else { return presentation.isExploration }
                 // MCP:等待授权的保持独立可见;画布工具要在行下方展示画布卡片,不并入分组
                 return tool.status != .pending && CanvasToolRef.of(tool) == nil
-                    && !(tool.name ?? "").contains("__canvas_")
+                    && !tool.callsMcpTool(withPrefix: "canvas_")
             }
             // 精简档:等待授权/子 Agent/计划/思考类工具保持独立可见
             if tool.status == .pending || entry.childStore != nil { return false }
