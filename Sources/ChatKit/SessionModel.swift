@@ -875,6 +875,10 @@ public final class SessionModel {
 
     /// 当前会话生效的模型映射(槽位 → 提供商模型);为空表示使用 ~/.claude 的系统默认配置
     public private(set) var mappedModels: [ModelSlot: MappedModel] = [:]
+    /// 已配置的映射(不论是否启用):输入框据此同时列出「Claude Code 原生」与「自定义映射」两组
+    public private(set) var configuredMappings: [ModelSlot: MappedModel] = [:]
+    /// 切换来源后待应用的模型选项(会话刷新完成后再设置)
+    @ObservationIgnored private var pendingModelSelection: (optionId: String, value: String)?
     /// 网关路由键(同一会话重连沿用同一路由令牌)
     @ObservationIgnored private let gatewayKey = "session-\(UUID().uuidString.prefix(8).lowercased())"
     /// 模型映射在运行中被修改:本轮结束后再刷新
@@ -946,6 +950,7 @@ public final class SessionModel {
         }
         let directory = providerDirectory
         let environment = providerEnvironment
+        configuredMappings = await Task.detached(priority: .userInitiated) { ProviderStorage.configuredInfos(directory: directory) }.value
         let initial = await Task.detached(priority: .userInitiated) { () -> Result<ResolvedMapping?, ProviderStorage.ResolveError> in
             do { return .success(try ProviderStorage.resolveMapping(directory: directory, environment: environment)) }
             catch let error as ProviderStorage.ResolveError { return .failure(error) }
@@ -1573,6 +1578,7 @@ public final class SessionModel {
         Task { [weak self] in
             guard let self else { return }
             await self.resolveProvider(for: self.activeDescriptor)
+            defer { self.applyPendingModelSelection() }
             guard self.mappedModels != previous else { return }
             let meta = self.effectiveMeta()
             let target = self.mappedModels[.main].map { "\($0.providerName) · \($0.displayName)" } ?? ChatL10n.t("系统默认")
@@ -1631,6 +1637,40 @@ public final class SessionModel {
                 self?.timeline.appendNotice(String(localized: "设置失败:\(error.localizedDescription)"), isError: true)
             }
         }
+    }
+
+    /// 在输入框的模型下拉里选择一项,必要时先切换来源(原生 ⇄ 自定义映射)。
+    /// 来源变化会写入 providers.json 并刷新会话(上下文保留),刷新完成后再应用所选模型。
+    /// - Parameters:
+    ///   - optionId: 模型配置项 ID
+    ///   - value: 选项值(`default/opus/sonnet/haiku`)
+    ///   - useMapping: 目标来源是否为自定义映射
+    public func selectModel(optionId: String, value: String, useMapping: Bool) {
+        guard !optionId.isEmpty, !value.isEmpty else { return }
+        let active = !mappedModels.isEmpty
+        guard active != useMapping, activeDescriptor.kind == .claudeACP else {
+            setConfigOption(optionId, value: value)
+            return
+        }
+        pendingModelSelection = (optionId, value)
+        let directory = providerDirectory
+        Task { [weak self] in
+            do {
+                try await Task.detached(priority: .userInitiated) { try ProviderStorage.setUseMapping(useMapping, directory: directory) }.value
+                NotificationCenter.default.post(name: .omModelMappingChanged, object: nil)
+            } catch {
+                self?.pendingModelSelection = nil
+                self?.log.error("切换模型来源失败", error: error)
+                self?.timeline.appendNotice(String(localized: "切换模型来源失败:\(error.localizedDescription)"), isError: true)
+            }
+        }
+    }
+
+    /// 来源切换的会话刷新结束后,应用之前选中的模型。
+    private func applyPendingModelSelection() {
+        guard let pending = pendingModelSelection else { return }
+        pendingModelSelection = nil
+        setConfigOption(pending.optionId, value: pending.value)
     }
 
     /// 模型值对应的展示名:启用映射时取「映射名 · 槽位」,否则取选项名,找不到则回退原值。

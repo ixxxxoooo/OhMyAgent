@@ -2474,3 +2474,8 @@
 "%lld 个后台任务" = "%lld background tasks";
 "输出匹配 %@" = "Output matches %@";
 "超时 %@" = "Timeout %@";
+"Claude Code 原生(~/.claude)" = "Claude Code native (~/.claude)";
+"自定义映射" = "Custom mapping";
+"使用自定义映射" = "Use custom mapping";
+"关闭后保留下方映射,Claude Code 使用 ~/.claude 与官方登录(与终端一致);也可在输入框的模型下拉里直接切换。" = "When off, the mapping below is kept and Claude Code uses ~/.claude and the official login (same as the terminal). You can also switch in the composer's model list.";
+"切换模型来源失败:%@" = "Failed to switch model source: %@";

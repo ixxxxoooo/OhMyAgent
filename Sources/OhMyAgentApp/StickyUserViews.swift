@@ -320,7 +320,7 @@ struct UserMessageEditor: View {
                 .accessibilityLabel("切换模型")
                 .omPicker(isPresented: $modelPickerShown, items: rows, selectedID: shown.id, placeholder: String(localized: "搜索模型"),
                           placement: .below, width: 300, row: { ModelPickRowContent(row: $0) }, onSelect: { row in
-                    model.setConfigOption(option.id, value: row.id)
+                    OptionMenu.selectModelRow(row, model: model, optionId: option.id)
                 })
             }
         }

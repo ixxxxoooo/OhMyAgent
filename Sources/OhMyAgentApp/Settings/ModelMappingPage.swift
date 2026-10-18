@@ -21,6 +21,18 @@ struct ModelMappingPage: View {
                     Button("去添加提供商") { SettingsRouter.shared.go(.providers) }
                 }
             }
+            if model.snapshot.mapping[.main] != nil {
+                Section {
+                    Toggle(isOn: Binding(get: { model.snapshot.useMapping }, set: { model.setUseMapping($0) })) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("使用自定义映射")
+                            Text("关闭后保留下方映射,Claude Code 使用 ~/.claude 与官方登录(与终端一致);也可在输入框的模型下拉里直接切换。")
+                                .font(OMFonts.caption).foregroundStyle(OMColors.secondaryText)
+                        }
+                    }
+                    .toggleStyle(.switch).controlSize(.small)
+                }
+            }
             Section("槽位") {
                 ForEach(ModelSlot.allCases) { slot in slotRow(slot) }
             }

@@ -375,19 +375,57 @@ struct OptionMenu: View {
         .accessibilityLabel(option.name))
     }
 
-    /// 模型选择列表的行(输入区与「编辑并重新发送」共用):映射启用时只列已映射槽位,否则沿用 Agent 自带列表。
+    /// 模型选择列表的行(输入区与「编辑并重新发送」共用)。
+    /// 已配置自定义映射时分「Claude Code 原生(~/.claude)」与「自定义映射」两组,行 ID 带来源前缀;否则沿用 Agent 自带列表。
     static func modelPickerRows(model: SessionModel, option: SessionConfigOption) -> [ModelPickerRow] {
         let current = option.currentValue.stringValue ?? ""
-        if !model.mappedModels.isEmpty {
-            return option.options.compactMap { item in
-                guard let slot = ModelSlot(optionValue: item.value), let mapped = model.mappedModels[slot] else { return nil }
-                return ModelPickerRow(id: item.value, name: "\(mapped.displayName) · \(slot.title)", brand: brand(for: mapped),
-                                      copyText: mapped.modelId, isSelected: current == item.value)
+        let mappingActive = !model.mappedModels.isEmpty
+        guard !model.configuredMappings.isEmpty else {
+            if mappingActive {
+                return option.options.compactMap { item in
+                    guard let slot = ModelSlot(optionValue: item.value), let mapped = model.mappedModels[slot] else { return nil }
+                    return ModelPickerRow(id: item.value, name: "\(mapped.displayName) · \(slot.title)", brand: brand(for: mapped),
+                                          copyText: mapped.modelId, isSelected: current == item.value)
+                }
+            }
+            return option.options.map {
+                ModelPickerRow(id: $0.value, name: $0.name, brand: BrandIcon.resolve(modelId: $0.name, providerPreset: nil, providerName: $0.name),
+                               copyText: $0.value, isSelected: current == $0.value)
             }
         }
-        return option.options.map {
-            ModelPickerRow(id: $0.value, name: $0.name, brand: BrandIcon.resolve(modelId: $0.name, providerPreset: nil, providerName: $0.name),
-                           copyText: $0.value, isSelected: current == $0.value)
+        let nativeGroup = String(localized: "Claude Code 原生(~/.claude)")
+        let mappedGroup = String(localized: "自定义映射")
+        let native = option.options.map { item -> ModelPickerRow in
+            // 映射启用时 Agent 选项名已被别名改写,原生组改用槽位名
+            let name = mappingActive ? (ModelSlot(optionValue: item.value)?.title ?? item.name) : item.name
+            return ModelPickerRow(id: sourcePrefixNative + item.value, name: name,
+                                  brand: BrandIcon.resolve(modelId: mappingActive ? "claude" : item.name, providerPreset: nil, providerName: name),
+                                  copyText: nil, isSelected: !mappingActive && current == item.value, group: nativeGroup)
+        }
+        let mapped = option.options.compactMap { item -> ModelPickerRow? in
+            guard let slot = ModelSlot(optionValue: item.value), let info = model.configuredMappings[slot] else { return nil }
+            return ModelPickerRow(id: sourcePrefixMapped + item.value, name: "\(info.displayName) · \(slot.title)", brand: brand(for: info),
+                                  copyText: info.modelId, isSelected: mappingActive && current == item.value, group: mappedGroup)
+        }
+        return native + mapped
+    }
+
+    /// 行 ID 的来源前缀:原生 / 自定义映射
+    static let sourcePrefixNative = "native:"
+    static let sourcePrefixMapped = "mapped:"
+
+    /// 处理模型列表的选择:按行 ID 前缀判断来源,必要时切换来源后再应用模型。
+    /// - Parameters:
+    ///   - row: 被选中的行
+    ///   - model: 会话
+    ///   - optionId: 模型配置项 ID
+    static func selectModelRow(_ row: ModelPickerRow, model: SessionModel, optionId: String) {
+        if row.id.hasPrefix(sourcePrefixMapped) {
+            model.selectModel(optionId: optionId, value: String(row.id.dropFirst(sourcePrefixMapped.count)), useMapping: true)
+        } else if row.id.hasPrefix(sourcePrefixNative) {
+            model.selectModel(optionId: optionId, value: String(row.id.dropFirst(sourcePrefixNative.count)), useMapping: false)
+        } else {
+            model.setConfigOption(optionId, value: row.id)
         }
     }
 
@@ -401,9 +439,9 @@ struct OptionMenu: View {
         .foregroundStyle(tint)
         .omTooltip(option.name)
         .accessibilityLabel(option.name)
-        .omPicker(isPresented: $pickerShown, items: pickerRows, selectedID: current, placeholder: String(localized: "搜索模型"), width: 300,
+        .omPicker(isPresented: $pickerShown, items: pickerRows, selectedID: pickerRows.first(where: \.isSelected)?.id, placeholder: String(localized: "搜索模型"), width: 300,
                   row: { ModelPickRowContent(row: $0) }, onSelect: { row in
-            model.setConfigOption(option.id, value: row.id)
+            Self.selectModelRow(row, model: model, optionId: option.id)
         })
     }
 

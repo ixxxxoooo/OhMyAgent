@@ -178,25 +178,30 @@ public struct ProviderSnapshot: Codable, Sendable, Equatable {
     public var providers: [ModelProvider]
     /// 旧版「全局默认提供商」(只读取用于迁移,不再写出)
     var legacyActive: String?
+    /// 是否启用映射。false 时保留映射内容但不注入网关,Claude Code 走 ~/.claude 与官方登录(旧文件无此字段时为 true)
+    public var useMapping: Bool
 
-    public init(mapping: ModelMapping = ModelMapping(), providers: [ModelProvider] = []) {
+    public init(mapping: ModelMapping = ModelMapping(), providers: [ModelProvider] = [], useMapping: Bool = true) {
         self.mapping = mapping
         self.providers = providers
+        self.useMapping = useMapping
     }
 
-    private enum CodingKeys: String, CodingKey { case mapping, providers, active }
+    private enum CodingKeys: String, CodingKey { case mapping, providers, active, useMapping }
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         mapping = try container.decodeIfPresent(ModelMapping.self, forKey: .mapping) ?? ModelMapping()
         providers = try container.decodeIfPresent([ModelProvider].self, forKey: .providers) ?? []
         legacyActive = try container.decodeIfPresent(String.self, forKey: .active)
+        useMapping = try container.decodeIfPresent(Bool.self, forKey: .useMapping) ?? true
     }
 
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(mapping, forKey: .mapping)
         try container.encode(providers, forKey: .providers)
+        try container.encode(useMapping, forKey: .useMapping)
     }
 
     /// 旧数据迁移:映射为空且存在旧的全局默认提供商时,把它(及其 Opus/Sonnet/Haiku 角色模型)转成映射。
@@ -303,7 +308,7 @@ public enum ProviderStorage {
     /// - Throws: 默认槽位的提供商缺密钥/已停用/配置无效时抛 `ResolveError`(其他槽位的问题只产生警告并退回默认槽位)
     static func resolveMapping(directory: URL = defaultDirectory, environment: [String: String] = ProcessInfo.processInfo.environment) throws -> ResolvedMapping? {
         let snapshot = load(directory: directory)
-        guard let mainTarget = snapshot.mapping[.main] else { return nil }
+        guard snapshot.useMapping, let mainTarget = snapshot.mapping[.main] else { return nil }
         let keys = loadKeys(directory: directory)
 
         func resolve(_ slot: ModelSlot, _ target: ModelTarget) throws -> ResolvedTarget {
@@ -328,6 +333,35 @@ public enum ProviderStorage {
             }
         }
         return ResolvedMapping(main: main, others: others, warnings: warnings)
+    }
+
+    /// 已配置的映射展示信息(不论是否启用,不含密钥,用于输入框同时列出「自定义映射」分组)。
+    /// 未单独设置的槽位沿用默认槽位;默认槽位未设置或提供商已删除则返回空。
+    /// - Parameter directory: 存储目录
+    /// - Returns: 槽位 → 展示信息(仅含出现在模型选择器里的槽位)
+    public static func configuredInfos(directory: URL = defaultDirectory) -> [ModelSlot: MappedModel] {
+        let snapshot = load(directory: directory)
+        guard let main = snapshot.mapping[.main] else { return [:] }
+        var result: [ModelSlot: MappedModel] = [:]
+        for slot in ModelSlot.allCases where slot.optionValue != nil {
+            let target = snapshot.mapping[slot] ?? main
+            guard let provider = snapshot.providers.first(where: { $0.id == target.providerId }), !target.model.isEmpty else { continue }
+            result[slot] = MappedModel(slot: slot, providerId: provider.id, providerName: provider.name, presetId: provider.presetId,
+                                       modelId: target.model, displayName: provider.displayName(forModel: target.model))
+        }
+        return result
+    }
+
+    /// 切换是否启用映射(读-改-写 providers.json,映射内容保持不变)。
+    /// - Parameters:
+    ///   - enabled: 是否启用
+    ///   - directory: 存储目录
+    /// - Throws: 写盘错误
+    public static func setUseMapping(_ enabled: Bool, directory: URL = defaultDirectory) throws {
+        var snapshot = load(directory: directory)
+        guard snapshot.useMapping != enabled else { return }
+        snapshot.useMapping = enabled
+        try save(snapshot, directory: directory)
     }
 
     /// 解析错误(会话会据此提示并回退到系统默认)。
@@ -576,6 +610,15 @@ public final class ProviderSettingsModel {
     public func setMapping(_ slot: ModelSlot, _ target: ModelTarget?) {
         var next = snapshot
         next.mapping[slot] = target
+        persist(next)
+        NotificationCenter.default.post(name: .omModelMappingChanged, object: nil)
+    }
+
+    /// 启用或停用映射(停用后保留映射内容,Claude Code 走 ~/.claude 与官方登录)。空闲会话会即时刷新。
+    /// - Parameter enabled: 是否启用
+    public func setUseMapping(_ enabled: Bool) {
+        var next = snapshot
+        next.useMapping = enabled
         persist(next)
         NotificationCenter.default.post(name: .omModelMappingChanged, object: nil)
     }

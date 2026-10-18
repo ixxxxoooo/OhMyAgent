@@ -97,6 +97,36 @@ struct ProviderAdvancedTests {
         #expect(env["ANTHROPIC_DEFAULT_OPUS_MODEL"] == "oma-large" && env["CLAUDE_CODE_SUBAGENT_MODEL"] == "oma-sub")
     }
 
+    @Test("来源开关:关闭后不解析映射但保留内容;旧文件默认启用;已配置信息仍可展示")
+    func useMappingSwitch() throws {
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("oma-prov-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let mapping = ModelMapping(slots: [.main: ModelTarget(providerId: "p", model: "m1"), .opus: ModelTarget(providerId: "p", model: "m2")])
+        try ProviderStorage.save(ProviderSnapshot(mapping: mapping, providers: [base()]), directory: dir)
+        try ProviderStorage.setKey("k", for: "p", directory: dir)
+        #expect(ProviderStorage.load(directory: dir).useMapping)
+        #expect(try ProviderStorage.resolveMapping(directory: dir, environment: [:]) != nil)
+
+        try ProviderStorage.setUseMapping(false, directory: dir)
+        #expect(!ProviderStorage.load(directory: dir).useMapping)
+        #expect(try ProviderStorage.resolveMapping(directory: dir, environment: [:]) == nil)
+        // 关闭后映射内容仍在,展示信息未设置的槽位沿用默认槽位
+        let infos = ProviderStorage.configuredInfos(directory: dir)
+        #expect(infos[.main]?.modelId == "m1" && infos[.opus]?.modelId == "m2" && infos[.sonnet]?.modelId == "m1")
+        #expect(infos[.subagent] == nil)
+
+        try ProviderStorage.setUseMapping(true, directory: dir)
+        #expect(try ProviderStorage.resolveMapping(directory: dir, environment: [:]) != nil)
+    }
+
+    @Test("来源开关:旧 providers.json 无 useMapping 字段时默认启用;未配置映射时展示信息为空")
+    func useMappingLegacyDefault() throws {
+        let data = Data(#"{"providers":[],"mapping":{}}"#.utf8)
+        #expect(try JSONDecoder().decode(ProviderSnapshot.self, from: data).useMapping)
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("oma-prov-\(UUID().uuidString)")
+        #expect(ProviderStorage.configuredInfos(directory: dir).isEmpty)
+    }
+
     @Test("模型列表解析:data / models / 字符串数组,去重保序")
     func parseModels() {
         #expect(ProviderModelFetcher.parse(Data(#"{"data":[{"id":"a"},{"id":"b"},{"id":"a"}]}"#.utf8)) == ["a", "b"])
