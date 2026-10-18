@@ -204,6 +204,8 @@ extension DemoScenarios {
     /// 计划批准:ExitPlanMode + 计划文档。
     static func planApproval(_ c: ScenarioContext) -> [ScenarioStep] {
         let plan = "# 为路由层加入指标\n\n## 目标\n统计路由命中与未命中次数,并暴露给监控。\n\n## 步骤\n1. 新增 `Metrics`(线程安全计数器)\n2. `Router.route` 在未命中时计数\n3. `Session` 统计请求总量\n4. 为 `RouterTests` 补充计数断言\n\n## 风险\n- 计数器使用锁,高并发下需观察开销\n\n```swift\nmetrics.count(\"router.miss\")\n```\n"
+        let names = ["新增 `Metrics`(线程安全计数器)", "`Router.route` 在未命中时计数", "`Session` 统计请求总量", "为 `RouterTests` 补充计数断言"]
+        func todos(_ states: [String]) -> ScenarioStep { .plan(zip(names, states).map { ScenarioPlanItem($0, priority: "high", status: $1) }) }
         return DemoSteps.withUsage([
             .mode("plan"),
             .thought(["先梳理完再提交计划,", "不直接改代码。"]),
@@ -211,7 +213,14 @@ extension DemoScenarios {
             .permission(ScenarioPermission(tool: ScenarioTool(
                 id: "pa_plan", title: "提交计划", kind: "switch_mode", name: "ExitPlanMode", input: ["plan": .string(plan)]),
                 options: .plan, rejectedText: "好的,我继续完善计划。")),
-            DemoSteps.say("计划已批准,开始实施。\n"),
+            .mode("acceptEdits"),
+            DemoSteps.say("计划已批准,切到自动接受编辑,开始按计划逐项实施。\n\n"),
+            todos(["in_progress", "pending", "pending", "pending"]),
+            DemoSteps.edit("pa_e1", "Sources/AtlasCore/Metrics.swift", c, name: "Write", old: nil, new: "final class Metrics: @unchecked Sendable {\n    func count(_ name: String) { /* ... */ }\n}\n"),
+            todos(["completed", "in_progress", "pending", "pending"]),
+            DemoSteps.edit("pa_e2", "Sources/AtlasCore/Router.swift", c, old: "return handlers[request.path]?(request) ?? .notFound", new: "metrics.count(\"router.miss\")\n        return handlers[request.path]?(request) ?? .notFound", line: 12),
+            todos(["completed", "completed", "in_progress", "pending"]),
+            DemoSteps.say("前两项已完成,计划卡里的 TODO 会随进度同步。\n"),
         ], used: 22_000)
     }
 

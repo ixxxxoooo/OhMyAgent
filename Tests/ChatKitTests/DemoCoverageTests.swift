@@ -195,6 +195,11 @@ struct DemoCoverageTests {
         let entry = try #require(model.timeline.entries.last { $0.kind == .planDoc })
         #expect(entry.planBuilt)
         #expect(entry.planDocument?.todos.isEmpty == false)
+        // 批准后 Agent 按计划逐项推进:计划卡的 TODO 随最新待办同步
+        let latest = try #require(model.timeline.entries.last { $0.kind == .plan })
+        let synced = try #require(entry.planDocument).syncedTodos(with: latest.plan.map { ($0.content, $0.status) })
+        #expect(synced.filter { $0.status == "completed" }.count == 2)
+        #expect(synced.map(\.status) == ["completed", "completed", "in_progress", "pending"])
         #expect(await SessionModelTests.wait { entry.planFileURL != nil })
         let file = try #require(entry.planFileURL)
         #expect(file.lastPathComponent.hasSuffix(".plan.md") && file.deletingLastPathComponent().path == plans.path)
