@@ -772,8 +772,8 @@ struct ExploreGroupView: View {
     @Environment(\.stickyUser) private var scrollState
     @State private var expanded: Bool?
     @State private var hovering = false
-    /// 「最新一步」行的占位:分组运行时置位,结束后延迟收起,避免工具之间分组瞬间「未运行」导致该行被移除再插回、下方内容上下跳动
-    @State private var tickerHeld = false
+    /// 分组是否是进行中会话的最后一项:是则后面还会有下一步,「最新一步」行保持占位(工具之间不收起,界面不跳)
+    @Environment(\.liveTail) private var liveTail
 
     /// 展开/收起分组(标题行与「最新一步」行共用),并暂停底部自动跟随。
     private func toggle() {
@@ -806,7 +806,7 @@ struct ExploreGroupView: View {
             .accessibilityElement(children: .combine)
             .accessibilityLabel(group.summary)
             .accessibilityAddTraits(.isButton)
-            if !isExpanded && (group.isRunning || tickerHeld) {
+            if !isExpanded && (group.isRunning || liveTail) {
                 GroupLatestStepView(group: group, onTap: toggle)
             }
             if isExpanded {
@@ -822,12 +822,6 @@ struct ExploreGroupView: View {
                 }
                 .transition(.opacity)
             }
-        }
-        .task(id: group.isRunning) {
-            // 运行中立即占位;停止后保留 3 秒(覆盖工具间空窗与「规划下一步」),仍无新步骤才收起
-            if group.isRunning { tickerHeld = true; return }
-            try? await Task.sleep(for: .milliseconds(3000))
-            if !Task.isCancelled { tickerHeld = false }
         }
     }
 }

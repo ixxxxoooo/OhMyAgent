@@ -128,11 +128,14 @@ struct ChatView: View {
     }
 
     private var timeline: some View {
-        ScrollView {
+        let items = itemsCache.items(for: model.timeline, density: ToolDensity(rawValue: toolDensityRaw) ?? .standard)
+        let tailID = model.isRunning ? items.last?.id : nil
+        return ScrollView {
             LazyVStack(alignment: .leading, spacing: AppearanceModel.shared.isCompact ? 7 : 14) {
-                ForEach(itemsCache.items(for: model.timeline, density: ToolDensity(rawValue: toolDensityRaw) ?? .standard)) { item in
+                ForEach(items) { item in
                     // Equatable:结构不变时不因父视图重新求值而重建行(行内容由条目自身的可观察状态驱动)
                     TimelineItemView(item: item).equatable()
+                        .environment(\.liveTail, item.id == tailID)
                         // 原位编辑的那条要压在后面的行(如折叠的工具分组)之上;zIndex 必须设在列表直接子项上才对兄弟行生效
                         .modifier(EditingElevation(id: item.id))
                 }

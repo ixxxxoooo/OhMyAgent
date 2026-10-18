@@ -596,10 +596,13 @@ public enum TimelineGrouping {
             return ![.subagent, .plan, .think].contains(presentation.category)
         }
         /// 结束当前连续段:尾部的思考不并入分组。
-        func flush() {
+        func flush(isFinalRun: Bool = false) {
             var members = run
             var trailing: [TimelineEntry] = []
             while let last = members.last, last.kind == .thought {
+                // 精简档:列表末尾的分组里,尾部思考留在分组内,由「最新一步」行显示「思考中…」(占同一个位置,不另起一行),
+                // 思考结束后分组也不会因此「不再是最后一项」而收起,工具间的版面保持稳定
+                if density == .compact && (isFinalRun || last.isStreaming) { break }
                 trailing.insert(members.removeLast(), at: 0)
             }
             while let first = members.first, first.kind == .thought {
@@ -627,7 +630,7 @@ public enum TimelineGrouping {
                 items.append(.entry(entry))
             }
         }
-        flush()
+        flush(isFinalRun: true)
         return items
     }
 }

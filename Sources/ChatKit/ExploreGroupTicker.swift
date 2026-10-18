@@ -12,6 +12,12 @@ extension ExploreGroup {
         return tools.last { !($0.tool?.status.isTerminal ?? true) } ?? tools.last
     }
 
+    /// 分组末尾是否是仍在流式的思考(此时「最新一步」行显示「思考中…」)。
+    public var isThinkingTail: Bool {
+        guard let last = entries.last else { return false }
+        return last.kind == .thought && last.isStreaming
+    }
+
     /// 是否处于工具之间的空窗:没有任何运行中的工具(含分组内尚无工具、只有思考的情况)。
     public var isBetweenSteps: Bool {
         guard let tool = tickerEntry?.tool else { return true }

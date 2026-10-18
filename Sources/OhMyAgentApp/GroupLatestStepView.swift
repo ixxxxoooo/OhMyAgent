@@ -18,6 +18,9 @@ struct GroupLatestStepView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var gapReady = false
 
+    /// 是否在尾部思考:行里显示「思考中…」(占原位,不另起一行)。
+    private var thinking: Bool { group.isThinkingTail }
+
     /// 单行高度(容器与每一行一致,滚动位移恰为一整行)。
     private static let rowHeight: CGFloat = 22
 
@@ -28,20 +31,23 @@ struct GroupLatestStepView: View {
     private var inGap: Bool { group.isBetweenSteps }
 
     /// 是否显示「规划下一步」行:处于空窗且延迟已到。
-    private var showsPlanning: Bool { inGap && gapReady }
+    private var showsPlanning: Bool { inGap && gapReady && !thinking }
 
     var body: some View {
         // 固定一行高度并裁切:新旧两行在容器内滚动交替,不改变外部布局高度
         ZStack(alignment: .leading) {
-            if showsPlanning {
-                planningRow.id("planning")
+            if thinking {
+                stateRow(icon: "brain", text: "思考中…").id("thinking")
+                    .transition(rowTransition)
+            } else if showsPlanning {
+                stateRow(icon: "sparkles", text: "规划下一步…").id("planning")
                     .transition(rowTransition)
             } else if let entry = latest, let tool = entry.tool {
                 row(for: tool)
                     .id(entry.id)
                     .transition(rowTransition)
             } else {
-                planningRow.id("planning")
+                stateRow(icon: "sparkles", text: "规划下一步…").id("planning")
                     .transition(rowTransition)
             }
         }
@@ -53,7 +59,7 @@ struct GroupLatestStepView: View {
         .padding(.leading, 28)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: latest?.id)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: showsPlanning)
-        .task(id: GapKey(toolID: latest?.id, inGap: inGap)) {
+        .task(id: GapKey(toolID: latest?.id, inGap: inGap && !thinking)) {
             // 新工具开始、或最后一个工具刚结束(进入空窗)时重新计时:先收起「规划」行,空窗持续 0.3 秒后才出现
             gapReady = false
             guard inGap else { return }
@@ -74,12 +80,16 @@ struct GroupLatestStepView: View {
         reduceMotion ? .opacity : .asymmetric(insertion: .move(edge: .bottom), removal: .move(edge: .top))
     }
 
-    /// 「规划下一步…」行:工具之间的短暂空窗。
-    private var planningRow: some View {
+    /// 状态行(「规划下一步…」「思考中…」):工具之间的空窗或尾部思考。
+    /// - Parameters:
+    ///   - icon: 图标名
+    ///   - text: 文案
+    /// - Returns: 行视图
+    private func stateRow(icon: String, text: LocalizedStringKey) -> some View {
         HStack(spacing: 6) {
-            Image.om("sparkles", size: 11)
+            Image.om(icon, size: 11)
                 .foregroundStyle(OMColors.tertiaryText)
-            Text("规划下一步…")
+            Text(text)
                 .font(OMFonts.small)
                 .lineLimit(1)
                 .foregroundStyle(OMColors.secondaryText)
@@ -108,4 +118,9 @@ struct GroupLatestStepView: View {
         }
         .frame(height: Self.rowHeight, alignment: .leading)
     }
+}
+
+extension EnvironmentValues {
+    /// 该时间线条目是否是「进行中会话的最后一项」:分组据此决定要不要显示「规划下一步」(后面还会有下一步)。
+    @Entry var liveTail: Bool = false
 }
