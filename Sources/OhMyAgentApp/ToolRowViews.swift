@@ -154,8 +154,17 @@ struct ToolRowView: View {
                     .font(OMFonts.small)
                     .foregroundStyle(OMColors.secondaryText)
             }
-            subject(p, failed: tool.status == .failed)
-            if let detail = p.detail, !detail.isEmpty {
+            if describedCommand(p) {
+                // 命令带 description(Agent 写的一句说明)时,行内直接显示说明,具体命令放进展开详情
+                Text(p.detail ?? "")
+                    .font(OMFonts.small)
+                    .foregroundStyle(tool.status == .failed ? OMColors.danger : OMColors.primaryText)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            } else {
+                subject(p, failed: tool.status == .failed)
+            }
+            if !describedCommand(p), let detail = p.detail, !detail.isEmpty {
                 Text(detail)
                     .font(OMFonts.caption)
                     .foregroundStyle(OMColors.tertiaryText)
@@ -227,6 +236,11 @@ struct ToolRowView: View {
                 OMMenuItem("查看子 Agent 定义…", icon: "bot") { AppActions.shared.openSettings(page: .subagents) }
             }
         }
+    }
+
+    /// 命令是否带说明:终端工具有非空 `description` 时,行内以说明代替命令原文。
+    private func describedCommand(_ p: ToolPresentation) -> Bool {
+        p.category == .terminal && !(p.detail ?? "").isEmpty
     }
 
     /// 点击行:无详情可展开时直接在编辑器打开文件(如 Antigravity 的读取类工具不回传内容),否则展开/折叠。
@@ -330,6 +344,8 @@ struct ToolRowView: View {
         // 不经 content 回传结果的 Agent(Antigravity):结果在 rawOutput;失败原因必须能看到
         if tool.resultText != nil || tool.failureText != nil { return true }
         if p.category == .mcp, tool.rawInput != nil { return true }
+        // 行内显示的是说明而不是命令,命令必须能在详情里看到
+        if describedCommand(p), tool.rawInput?["command"]?.stringValue != nil { return true }
         if p.category == .terminal, let command = tool.rawInput?["command"]?.stringValue, command.contains("\n") || command.count > 80 { return true }
         if [.edit, .write].contains(p.category) {
             if tool.rawInput?["new_string"] != nil || tool.rawInput?["newText"] != nil
