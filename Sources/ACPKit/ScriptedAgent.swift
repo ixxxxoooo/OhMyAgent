@@ -12,6 +12,8 @@ public actor ScriptedAgent: ACPRequestHandler {
     var models: [String: String] = [:]
     /// 各会话的思考强度(仅演示模式提供 `thought_level` 选项)
     var thoughts: [String: String] = [:]
+    /// 演示模式下各新建会话的标题(取首个演示场景的标题,会话列表里显示)
+    var demoTitles: [String: String] = [:]
     /// 各会话最近一次上报的上下文用量(限额更新沿用,避免把用量环清零)
     var lastUsage: [String: (used: Int, size: Int)] = [:]
     var sessionCounter = 0
@@ -457,6 +459,10 @@ public actor ScriptedAgent: ACPRequestHandler {
         if text.contains("#hold") { try await runHold(sessionId: sessionId) }
         if isDemo { demoRunCounter += 1 }
         let context = ScenarioContext(cwd: sessions[sessionId] ?? "/tmp", sessionId: sessionId, idSuffix: isDemo ? "-r\(demoRunCounter)" : "")
+        if isDemo, demoTitles[sessionId] == nil, let first = matches.first {
+            demoTitles[sessionId] = first.scenario.title
+            await update(sessionId, ["sessionUpdate": "session_info_update", "title": .string(first.scenario.title)])
+        }
         for match in matches {
             let outcome = try await runSteps(match.scenario.build(context), ctx: context)
             if outcome == .cancelled { return ["stopReason": "cancelled"] }

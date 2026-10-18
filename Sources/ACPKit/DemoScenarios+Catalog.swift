@@ -11,6 +11,8 @@ extension DemoScenarios {
             DemoScenario(id: "tools-shell", group: "工具卡", title: "终端工具", summary: "ANSI 输出、超长输出、失败、多行命令、后台命令", build: toolsShell),
             DemoScenario(id: "tools-web-mcp", group: "工具卡", title: "联网与 MCP", summary: "WebSearch、WebFetch、多个 MCP 服务器,含失败", build: toolsWebMcp),
             DemoScenario(id: "canvas", group: "工具卡", title: "画布", summary: "canvas_create / canvas_update 与时间线里的画布卡片", build: canvasTools),
+            DemoScenario(id: "tools-browser", group: "工具卡", title: "内置浏览器", summary: "browser_* 全套:导航/快照/输入/点击/滚动/截图(图片结果)/控制台/网络/标签页", build: browserTools),
+            DemoScenario(id: "tools-image", group: "工具卡", title: "读取图片", summary: "Read 返回图片内容块,工具卡里显示可放大的缩略图", build: imageTools),
             DemoScenario(id: "tools-plan-todo", group: "工具卡", title: "待办与计划", summary: "TodoWrite、计划条目推进、思考、模式切换", build: toolsPlanTodo),
             DemoScenario(id: "permissions", group: "交互", title: "权限请求", summary: "Diff 预览、Bash 命令、始终允许、拒绝(交互)", behavior: .interactive, build: permissions),
             DemoScenario(id: "plan-approval", group: "交互", title: "计划批准", summary: "ExitPlanMode 计划卡与批准后的计划文档(交互)", behavior: .interactive, build: planApproval),

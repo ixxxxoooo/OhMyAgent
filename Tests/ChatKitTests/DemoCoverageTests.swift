@@ -50,6 +50,9 @@ struct DemoCoverageTests {
         for kind in [TimelineEntry.Kind.user, .assistant, .thought, .tool, .plan, .notice, .planDoc, .turnSummary] {
             #expect(kinds.contains(kind), "演示场景缺少条目类型:\(kind)")
         }
+        // 工具结果里的图片内容块(浏览器截图、读取图片)
+        let withImage = tools.filter { $0.content.contains { if case .content(.image) = $0 { return true } else { return false } } }
+        #expect(withImage.count >= 3, "演示场景缺少带图片结果的工具卡")
         // 子 Agent:嵌套与多种类型
         let types = Set(tools.compactMap { $0.rawInput?["subagent_type"]?.stringValue })
         #expect(types.isSuperset(of: ["Explore", "code-reviewer", "general-purpose"]))

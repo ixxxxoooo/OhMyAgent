@@ -77,7 +77,8 @@ public actor Toolchain {
         if isDemoMode || ProcessInfo.processInfo.environment["OMA_AGENT"] == "fake" {
             let dir = URL(fileURLWithPath: Bundle.main.executablePath ?? CommandLine.arguments[0]).deletingLastPathComponent()
             let path = dir.appendingPathComponent("FakeAgent").path
-            return AgentDescriptor(id: "fake", name: "Fake Agent", kind: .genericACP, command: path, summary: String(localized: "脚本化测试 Agent"))
+            // 演示模式下对外呈现为 Claude Code,界面不出现「Fake」字样
+            return AgentDescriptor(id: "fake", name: isDemoMode ? "Claude Code" : "Fake Agent", kind: .genericACP, command: path, summary: String(localized: "脚本化测试 Agent"))
         }
         return AgentRegistryStore().load().resolvedDefault
     }

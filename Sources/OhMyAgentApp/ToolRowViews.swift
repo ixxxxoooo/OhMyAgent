@@ -366,6 +366,8 @@ struct ToolRowView: View {
         if DebugFlags.expandAll { return true }
         // 提问结果(问了什么、怎么答的)默认展开
         if entry.elicitationOutcome != nil { return true }
+        // 已完成且返回了图片(浏览器截图、读取图片):图片本身就是结果,默认展开
+        if tool.status == .completed, tool.content.contains(where: { if case .content(.image) = $0 { return true } else { return false } }) { return true }
         // 标准档:命令失败时展开输出
         if density == .standard, p.category == .terminal, tool.status == .failed { return true }
         // 「详细」档:编辑/写入/命令默认带内联预览;其余仍折叠
@@ -404,7 +406,7 @@ struct ToolDetailsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if presentation.category == .mcp, let input = tool.rawInput {
+            if presentation.category == .mcp, let input = tool.rawInput, input.objectValue?.isEmpty != true {
                 KeyValueBox(title: String(localized: "入参"), value: input)
             }
             if presentation.category == .terminal, !hasTerminalContent,
@@ -506,7 +508,9 @@ struct ToolDetailsView: View {
                 Label(String(localized: "终端 \(id)"), om: "terminal").font(OMFonts.monoSmall)
             }
         case .content(let block):
-            if let text = block.plainText, !text.isEmpty {
+            if case .image(let data, let mimeType, _) = block {
+                ToolImageView(base64: data, mimeType: mimeType)
+            } else if let text = block.plainText, !text.isEmpty {
                 switch presentation.category {
                 case .search:
                     SearchResultsView(text: text)

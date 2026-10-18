@@ -14,7 +14,7 @@ extension ScriptedAgent {
         }
         let known = Set(DemoHistory.all.map(\.id))
         for id in sessions.keys.sorted() where !known.contains(id) {
-            list.append(["sessionId": .string(id), "cwd": .string(sessions[id] ?? "/"), "title": .string("脚本会话 \(id)"), "updatedAt": .string(ISO8601DateFormatter().string(from: now))])
+            list.append(["sessionId": .string(id), "cwd": .string(sessions[id] ?? "/"), "title": .string(demoTitles[id] ?? "新会话"), "updatedAt": .string(ISO8601DateFormatter().string(from: now))])
         }
         return ["sessions": .array(list)]
     }
