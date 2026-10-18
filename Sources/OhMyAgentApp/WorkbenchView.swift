@@ -35,7 +35,12 @@ struct WorkbenchView: View {
         .tint(appearance.tint)
         .frame(minWidth: 480, minHeight: 480)
         // 最小模式:窗口足够窄时自动收起左/右栏,拉宽后恢复(对照 Cursor)
-        .onGeometryChange(for: Double.self) { Double($0.size.width) } action: { compact.update(width: $0, layout: &workbench.layout) }
+        .onGeometryChange(for: Double.self) { Double($0.size.width) } action: { width in
+            // 拖动窗口时的自动收起/恢复不做动画(界面本就在连续变化)
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) { compact.update(width: width, layout: &workbench.layout) }
+        }
         .background(WindowFocusReader(onWindow: { window in actions.mainWindow = window; WindowChrome.apply(to: window) }, onChange: { key in
             windowIsKey = key
             if let window = actions.mainWindow { WindowChrome.apply(to: window) }
@@ -91,11 +96,11 @@ struct WorkbenchView: View {
         workbench.layout.visibleColumns(on: .left) + workbench.layout.visibleColumns(on: .right)
     }
 
-    /// 面板插入/移除的过渡:从所在侧边缘滑入滑出;动画绑定在过渡本身(而非事务)上,不会带动中栏逐帧重排。
+    /// 面板插入/移除的过渡:从所在侧边缘纯滑动入出(不淡入淡出,避免看起来像消失);动画绑定在过渡本身(而非事务)上,不会带动中栏逐帧重排。
     /// 「减弱动态效果」下无过渡。
     private func panelTransition(_ side: PanelSide) -> AnyTransition {
         if omShouldReduceMotion() { return .identity }
-        return AnyTransition.move(edge: side == .left ? .leading : .trailing).combined(with: .opacity).animation(Self.panelToggleAnimation)
+        return AnyTransition.move(edge: side == .left ? .leading : .trailing).animation(Self.panelToggleAnimation)
     }
 
     /// 一列面板 + 它与中栏之间的分隔条(分隔条总在靠近中栏的一侧)。
