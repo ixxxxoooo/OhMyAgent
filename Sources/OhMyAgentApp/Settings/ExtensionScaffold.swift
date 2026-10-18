@@ -34,7 +34,7 @@ struct ExtensionHeader<Actions: View>: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            Image.om(icon, size: 18)
+            Image.om(icon, size: 16)
                 .foregroundStyle(OMColors.accent)
                 .frame(width: 38, height: 38)
                 .background(OMColors.selectedFill, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
@@ -132,12 +132,12 @@ struct ExtensionBanners: View {
     private func banner(icon: String?, text: String, tint: Color, showsProgress: Bool = false, dismiss: (() -> Void)? = nil) -> some View {
         HStack(alignment: .top, spacing: 8) {
             if showsProgress { OMSpinner(.small) }
-            if let icon { Image.om(icon, size: 13).foregroundStyle(tint) }
+            if let icon { Image.om(icon, size: 12).foregroundStyle(tint) }
             Text(verbatim: text).font(OMFonts.small).textSelection(.enabled).lineLimit(4)
             Spacer(minLength: 0)
             if let dismiss {
-                Button(action: dismiss) { Image.om("x", size: 11) }
-                    .buttonStyle(.plain)
+                Button(action: dismiss) { Image.om("x", size: 12) }
+                    .buttonStyle(.omIcon)
                     .accessibilityLabel("关闭错误提示")
             }
         }

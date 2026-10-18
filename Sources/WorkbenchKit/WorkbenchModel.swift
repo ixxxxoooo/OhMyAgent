@@ -1199,8 +1199,8 @@ public final class WorkbenchModel {
     /// 自定义页(MCP / 技能 / 子 Agent / Hooks / 插件 / 记忆)在编辑区里的标签标识(预览类标签)。
     public nonisolated static let customizeTabID = "oma-customize"
 
-    /// 自定义页当前的类型筛选(`all/plugins/skills/subagents/rules/mcp/hooks`)。
-    public var customizeFilter = "all"
+    /// 自定义页当前的类型筛选(`plugins/skills/subagents/rules/mcp/hooks`)。
+    public var customizeFilter = "plugins"
 
     /// 打开(或切到)自定义页标签。
     /// - Parameter filter: 预选的类型筛选;nil 保持当前
