@@ -396,10 +396,10 @@ struct OptionMenu: View {
         let nativeGroup = String(localized: "Claude Code 原生(~/.claude)")
         let mappedGroup = String(localized: "自定义映射")
         let native = option.options.map { item -> ModelPickerRow in
-            // 映射启用时 Agent 选项名已被别名改写,原生组改用槽位名
+            // 映射启用时 Agent 选项名已被别名改写,原生组改用槽位名;原生模型一律是 Claude,图标固定用 Claude
             let name = mappingActive ? (ModelSlot(optionValue: item.value)?.title ?? item.name) : item.name
             return ModelPickerRow(id: sourcePrefixNative + item.value, name: name,
-                                  brand: BrandIcon.resolve(modelId: mappingActive ? "claude" : item.name, providerPreset: nil, providerName: name),
+                                  brand: BrandIcon.resolve(modelId: "claude", providerPreset: nil, providerName: name),
                                   copyText: nil, isSelected: !mappingActive && current == item.value, group: nativeGroup)
         }
         let mapped = option.options.compactMap { item -> ModelPickerRow? in
