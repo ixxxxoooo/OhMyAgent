@@ -1,6 +1,6 @@
 // @author ixxxxoooo
 // 标签栏(对齐 kuku 的 CenterTabs / TabItem / TabOverflowMenu):
-// 圆角胶囊标签(激活态浅灰底)、悬停显示关闭、固定标签显示图钉、标签放不下时右端出现「全部标签」下拉、
+// 圆角胶囊标签(未激活态浅灰底,激活态融入内容区)、悬停显示关闭、固定标签显示图钉、标签放不下时右端出现「全部标签」下拉、
 // 中键关闭、激活标签自动滚动到可见。切换标签在鼠标按下抬起时立即生效(不再等待双击判定)。
 
 import ChatKit
@@ -128,7 +128,7 @@ private struct TabBarIconButtonStyle: ButtonStyle {
     }
 }
 
-/// 单个标签:胶囊背景(激活态浅灰,悬停更浅)+ 图标 + 标题 + 运行态/未保存点 + 关闭按钮(悬停显示)。
+/// 单个标签:胶囊背景(未激活态浅灰,悬停加深;激活态透明并融入内容区)+ 图标 + 标题 + 运行态/未保存点 + 关闭按钮(悬停显示)。
 struct TabItemView: View {
     let workbench: WorkbenchModel
     let group: TabGroup
@@ -153,10 +153,10 @@ struct TabItemView: View {
         }
         .padding(.horizontal, 8)
         .frame(height: TabMetrics.height)
-        .foregroundStyle(isActive ? OMColors.primaryText : OMColors.secondaryText)
+        .foregroundStyle(isActive ? OMColors.secondaryText : OMColors.primaryText)
         .background(
             RoundedRectangle(cornerRadius: TabMetrics.radius, style: .continuous)
-                .fill(isActive ? OMColors.hoverFill : (hovering ? OMColors.subtleFill : Color.clear))
+                .fill(isActive ? (hovering ? OMColors.subtleFill : Color.clear) : (hovering ? OMColors.pressedFill : OMColors.hoverFill))
         )
         .contentShape(RoundedRectangle(cornerRadius: TabMetrics.radius, style: .continuous))
         .transaction { $0.animation = nil }
@@ -189,10 +189,10 @@ struct TabItemView: View {
     private var icon: some View {
         if case .file(let path) = tab.kind {
             OMFileIcon(name: (path as NSString).lastPathComponent, size: 14)
-                .opacity(isActive ? 1 : 0.75)
+                .opacity(isActive ? 0.75 : 1)
         } else {
             Image.om(tabIcon(tab.kind), size: 12)
-                .foregroundStyle(isActive ? OMColors.primaryText : OMColors.tertiaryText)
+                .foregroundStyle(isActive ? OMColors.tertiaryText : OMColors.primaryText)
         }
     }
 
