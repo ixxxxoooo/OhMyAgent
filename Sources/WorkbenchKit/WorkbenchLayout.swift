@@ -47,6 +47,10 @@ public struct WorkbenchLayout: Codable, Equatable, Sendable {
     public var leftPane: LeftPane = .sessions
     public var rightPane: RightPane = .files
     public var bottomPane: BottomPane = .output
+    /// 工具栏图标(文件/搜索/Git)的显示顺序,可拖拽调整
+    public var rightPaneOrder: [RightPane] = RightPane.available
+    /// 底部面板标签(终端/输出)的显示顺序,可拖拽调整
+    public var bottomPaneOrder: [BottomPane] = BottomPane.available
     /// 各面板的摆放位置(终端位置、项目栏与工具栏所在侧)
     public var placement = PanelPlacement()
     /// 终端侧栏是否可见(终端放到左/右侧时有效)
@@ -66,7 +70,7 @@ public struct WorkbenchLayout: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case leftVisible, rightVisible, bottomVisible, leftWidth, rightWidth, bottomHeight
-        case leftPane, rightPane, bottomPane, placement, terminalVisible, terminalWidth, outputVisible, outputWidth
+        case leftPane, rightPane, bottomPane, rightPaneOrder, bottomPaneOrder, placement, terminalVisible, terminalWidth, outputVisible, outputWidth
         case terminalListWidth, terminalListCollapsed
     }
 
@@ -82,6 +86,8 @@ public struct WorkbenchLayout: Codable, Equatable, Sendable {
         leftPane = (try? c.decodeIfPresent(LeftPane.self, forKey: .leftPane)) ?? .sessions
         rightPane = (try? c.decodeIfPresent(RightPane.self, forKey: .rightPane)) ?? .files
         bottomPane = (try? c.decodeIfPresent(BottomPane.self, forKey: .bottomPane)) ?? .output
+        rightPaneOrder = PaneOrder.normalized((try? c.decodeIfPresent([RightPane].self, forKey: .rightPaneOrder)) ?? [], all: RightPane.available)
+        bottomPaneOrder = PaneOrder.normalized((try? c.decodeIfPresent([BottomPane].self, forKey: .bottomPaneOrder)) ?? [], all: BottomPane.available)
         placement = (try? c.decodeIfPresent(PanelPlacement.self, forKey: .placement)) ?? PanelPlacement()
         terminalVisible = try c.decodeIfPresent(Bool.self, forKey: .terminalVisible) ?? false
         terminalWidth = try c.decodeIfPresent(Double.self, forKey: .terminalWidth) ?? PanelMetrics.terminalDefault
@@ -99,6 +105,8 @@ public struct WorkbenchLayout: Codable, Equatable, Sendable {
         outputWidth = min(max(outputWidth, PanelMetrics.terminalRange.lowerBound), PanelMetrics.terminalRange.upperBound)
         terminalListWidth = min(max(terminalListWidth, PanelMetrics.terminalListRange.lowerBound), PanelMetrics.terminalListRange.upperBound)
         bottomHeight = min(max(bottomHeight, 120), 600)
+        rightPaneOrder = PaneOrder.normalized(rightPaneOrder, all: RightPane.available)
+        bottomPaneOrder = PaneOrder.normalized(bottomPaneOrder, all: BottomPane.available)
         if !LeftPane.available.contains(leftPane) { leftPane = .sessions }
         if !RightPane.available.contains(rightPane) { rightPane = .files }
         if !BottomPane.available.contains(bottomPane) { bottomPane = .output }

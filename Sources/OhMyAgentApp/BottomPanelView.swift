@@ -13,7 +13,7 @@ struct BottomPanelView: View {
 
     /// 底部面板可用的视图:只列出摆放在底部的面板(终端、输出)。
     private var panes: [BottomPane] {
-        BottomPane.available.filter { pane in
+        workbench.layout.bottomPaneOrder.filter { pane in
             switch pane {
             case .terminal: return workbench.layout.placement.terminal == .bottom
             case .output: return workbench.layout.placement.output == .bottom
@@ -38,6 +38,14 @@ struct BottomPanelView: View {
                         .foregroundStyle(currentPane == pane ? OMColors.primaryText : OMColors.secondaryText)
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(currentPane == pane ? OMColors.selectedFill : .clear, in: OMPillShape())
+                        // 标签可拖动换顺序
+                        .draggable(Self.dragPrefix + pane.rawValue)
+                        .dropDestination(for: String.self) { payloads, _ in
+                            guard let text = payloads.first, text.hasPrefix(Self.dragPrefix),
+                                  let dragged = BottomPane(rawValue: String(text.dropFirst(Self.dragPrefix.count))) else { return false }
+                            omWithAnimation { workbench.moveBottomPane(dragged, onto: pane) }
+                            return true
+                        }
                 }
                 Spacer()
                 Button { workbench.layout.bottomVisible = false } label: { Image.om("xmark") }
@@ -82,6 +90,9 @@ struct BottomPanelView: View {
                         .onEnded { _ in dragStartHeight = nil })
             }
     }
+
+    /// 标签拖拽载荷前缀。
+    private static let dragPrefix = "oma-bpane:"
 
     private static func title(_ pane: BottomPane) -> String {
         switch pane {

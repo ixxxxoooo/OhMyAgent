@@ -33,7 +33,7 @@ struct RightPaneView: View {
     /// 图标分段条:文件 / 搜索 / Git(对齐 VSCode 与 Cursor 的侧栏视图);当前视图标题显示在右侧。
     private var paneBar: some View {
         HStack(spacing: 2) {
-            ForEach(RightPane.available, id: \.self) { pane in
+            ForEach(workbench.layout.rightPaneOrder, id: \.self) { pane in
                 let selected = workbench.layout.rightPane == pane
                 Button { workbench.layout.rightPane = pane } label: {
                     Image.om(Self.icon(pane), size: 14)
@@ -47,6 +47,13 @@ struct RightPaneView: View {
                 .onDrag {
                     DockDrag.shared.beginTools(pane)
                     return NSItemProvider(object: (DockDrag.toolsPrefix + pane.rawValue) as NSString)
+                }
+                // 图标之间也可互相拖放换顺序(同一份载荷同时服务编辑区落点)
+                .dropDestination(for: String.self) { payloads, _ in
+                    guard let text = payloads.first, text.hasPrefix(DockDrag.toolsPrefix),
+                          let dragged = RightPane(rawValue: String(text.dropFirst(DockDrag.toolsPrefix.count))) else { return false }
+                    omWithAnimation { workbench.moveRightPane(dragged, onto: pane) }
+                    return true
                 }
                 .foregroundStyle(selected ? OMColors.accent : OMColors.secondaryText)
                 .omTooltip(pane == .git ? (gitBadge?.tooltip.map { Self.title(pane) + ":" + $0 } ?? Self.title(pane)) : Self.title(pane))

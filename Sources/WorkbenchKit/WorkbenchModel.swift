@@ -1411,6 +1411,22 @@ public final class WorkbenchModel {
         layout.bottomVisible = true
     }
 
+    /// 拖拽调整工具栏图标顺序。
+    /// - Parameters:
+    ///   - pane: 被拖动的视图
+    ///   - target: 落点所在视图;nil 表示移到末尾
+    public func moveRightPane(_ pane: RightPane, onto target: RightPane?) {
+        layout.rightPaneOrder = PaneOrder.moved(layout.rightPaneOrder, item: pane, onto: target)
+    }
+
+    /// 拖拽调整底部面板标签顺序。
+    /// - Parameters:
+    ///   - pane: 被拖动的视图
+    ///   - target: 落点所在视图;nil 表示移到末尾
+    public func moveBottomPane(_ pane: BottomPane, onto target: BottomPane?) {
+        layout.bottomPaneOrder = PaneOrder.moved(layout.bottomPaneOrder, item: pane, onto: target)
+    }
+
     // MARK: 持久化
 
     /// 合并短时间内的多次修改后写盘(拖拽分隔条时不会每帧写文件)。
