@@ -136,7 +136,7 @@ struct TabItemView: View {
                     HStack(spacing: 0) {
                         Rectangle()
                         if showsTrailing {
-                            LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing).frame(width: 22) // ui-lint:allow 仅作遮罩/淡出,非装饰
+                            LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing).frame(width: 40) // ui-lint:allow 仅作遮罩/淡出,非装饰
                         }
                     }
                 )
