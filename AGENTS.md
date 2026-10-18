@@ -41,12 +41,12 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit;**唯一例外**:内置
 - 运行单元测试:`Scripts/test.sh [参数]`(结束后自动清理测试遗留在系统临时目录的目录;勿直接长期使用 `swift test`,macOS 的 `NSTemporaryDirectory()` 不读 `TMPDIR`,无法隔离)。清理历史遗留:`Scripts/clean-test-tmp.sh [--dry-run]`;新增测试若使用新的临时目录前缀,请加到该脚本的 `PREFIXES`
 - 性能门槛:`Scripts/perf.sh`;发布:`Scripts/release.sh`
 - 日志:`Scripts/logs.sh`(P1 之后可用)
-- 启用推送前 CI:`git config core.hooksPath .githooks`(已在本仓库启用)
+- 推送前 CI 钩子默认**不运行**(`.githooks/pre-push` 仅在 `OMA_PREPUSH_CI=1 git push` 时才跑 `Scripts/ci.sh`);钩子目录已启用:`git config core.hooksPath .githooks`
 
 ## 3. 开发流程(必须遵守)
 1. 开发前先读「开发进度.md」,优先复用现有代码,避免重复造轮子。
 2. **每修改完一个功能点或修复完一个问题(含样式微调、小 Bug),必须先提交(并 push),再执行 `Scripts/restart.sh` 重启应用**,确认改动真实生效;顺序固定为「改完 → 提交 → 重启」,不得省略、不得推迟,不要攒多个功能/修复再一起提交。
-   - 提交前必须已通过 `Scripts/ci.sh`(零警告、测试全绿);未验证的改动不得提交。**除提交前外不必额外跑 `Scripts/ci.sh`**,用户明确说「测试 / CI」时再跑。
+   - **CI 只在用户手动运行或明确说「测试 / CI」时才执行**;提交、push、重启流程中一律不自动跑 `Scripts/ci.sh`。
    - 重启后若发现问题,按新的修复另起一次提交(`fix: …`),不要改写已推送的提交。
 3. **每完成一个功能点就提交一次**:一次提交只包含一个功能或修复,不要把多个功能混在一起;
    提交信息使用**中文 Conventional Commits**(`feat: …`、`fix: …`、`refactor: …`、`test: …`、`docs: …`、`chore: …`)。
@@ -136,7 +136,7 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit;**唯一例外**:内置
 - 演示模式:`OMA_DEMO=1`、`OMA_DEMO_ROOT`、`OMA_DEMO_RESET=1`、`OMA_DEMO_SCENARIO=<场景名>`、`OMA_THEME=<主题 id>`(仅演示模式,如 `paper-light`/`paper-dark`/`cursor-light`,用于主题对比截图);输入框 `/demo-<场景名>` 或命令面板「演示场景」运行场景;新增工具卡/条目类型必须补演示场景(覆盖守卫测试会失败提醒)。
 - 调试钩子:`OMA_DRAFT`、`OMA_OPEN_SETTINGS`、`OMA_SETTINGS_PAGE`、`OMA_AGENT=fake|direct`、`OMA_LSP_PROBE=行:列`、`OMA_AUTOALLOW`(自动批准权限)、`OMA_USAGE_PANEL`(展开上下文用量面板)、`OMA_BRANCH_MENU`(展开分支切换弹层)、`OMA_ATTACH_IMAGE=路径1:路径2`(给输入框添加图片附件)、`OMA_PERF_OUT`、`OMA_TOGGLE_LEFT=秒`(延迟切换左栏)、`OMA_TAB_OVERFLOW=1`(标签溢出时自动展开「全部标签」下拉)、`OMA_TERMINAL_PLACEMENT=bottom|right|left|editor`、`OMA_SIDEBAR_SIDE`/`OMA_TOOLS_SIDE=left|right`、`OMA_SHOW_TERMINAL=1`(面板摆放)、`OMA_HUB=all|sessions|projects|files|actions|settings`(打开中央搜索窗)、`OMA_HUB_QUERY`(预填搜索词)、`OMA_OPEN_ITEM=<名称片段>`(设置页的技能/子 Agent/记忆自动打开对应条目)、`OMA_OPEN_AUTOMATION=1`(打开自动化页;`Scripts/restart.sh` 不转发,需直接 `open -g -n … --env`)。`OMA_OPEN_BROWSER=<url>`(启动后打开浏览器标签并导航,演示模式/截图验证用)。
 - 截图用 `screencapture -x -o -l<windowId>`;禁止用 osascript 发送按键;验证后删除截图。
-- 每个功能点提交后重启应用与适配器子进程,确认修改在运行时真实生效;CI 仅在用户要求或提交前运行。
+- 每个功能点提交后重启应用与适配器子进程,确认修改在运行时真实生效;CI 仅在用户手动运行或明确要求时运行。
 
 ## 7. 安全
 - 不读取 Keychain 中的 OAuth 令牌;官方 `claude` 使用自己的凭据。

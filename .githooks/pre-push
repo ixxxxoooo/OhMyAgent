@@ -1,8 +1,7 @@
 #!/bin/zsh
 # @author ixxxxoooo
-# 推送前本地 CI 门槛(零警告构建 + 测试)。启用:git config core.hooksPath .githooks
-# 临时跳过:OMA_SKIP_PREPUSH=1 git push
-[[ "${OMA_SKIP_PREPUSH:-}" == "1" ]] && exit 0
+# 推送前本地 CI 门槛(零警告构建 + 测试),默认不运行,仅手动开启:OMA_PREPUSH_CI=1 git push
+[[ "${OMA_PREPUSH_CI:-}" == "1" ]] || exit 0
 cd "$(git rev-parse --show-toplevel)"
 # 钩子由 git 调用时会带上 GIT_DIR 等变量;测试里的临时仓库如果继承它们,
 # `git init/commit` 会直接写进真实仓库(曾把 main 指向测试提交)。必须在跑 CI 前清掉。
