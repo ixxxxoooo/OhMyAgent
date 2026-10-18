@@ -26,13 +26,18 @@ struct DockIntegrationTests {
         return (model, ids, root, store)
     }
 
-    @Test("浏览器默认在会话右侧分屏打开,工具面板标签可解析")
-    func browserOpensBesideAndToolsTab() throws {
+    @Test("浏览器默认在右侧栏打开,可移到编辑区分屏;工具面板标签可解析")
+    func browserOpensInSidebarAndToolsTab() throws {
         let (model, _, _, _) = try makeModel()
-        let chatGroup = model.dock.focusedGroupID
-        _ = model.openBrowser(id: "b1", title: "浏览器")
-        #expect(model.dock.groups.count == 2)
-        #expect(model.dock.focusedGroupID == chatGroup || model.dock.group(chatGroup) != nil)
+        let groups = model.dock.groups.count
+        #expect(model.openBrowser(id: "b1", title: "浏览器") == nil)
+        #expect(model.dock.groups.count == groups)
+        #expect(model.layout.rightVisible && model.layout.sidebarBrowserActive && model.layout.sidebarBrowserID == "b1")
+        #expect(model.isBrowserOpen(id: "b1"))
+        model.moveSidebarBrowserToEditor(title: "浏览器")
+        #expect(model.layout.sidebarBrowserID == nil)
+        #expect(model.dock.groups.count == groups + 1)
+        #expect(model.isBrowserOpen(id: "b1"))
         let tab = model.openToolsTab(.git, title: "Git")
         #expect(model.dock.allTabs.contains { $0.id == tab })
         #expect(WorkbenchModel.toolsPane(fromTab: WorkbenchModel.toolsTabPrefix + "git") == .git)

@@ -57,6 +57,10 @@ public struct WorkbenchLayout: Codable, Equatable, Sendable {
     public var activeBottomChat: String?
     /// 工具栏当前选中的会话(nil 表示显示文件/搜索/Git)
     public var activeToolsChat: String?
+    /// 停靠在右侧栏里的浏览器标签 id(不持久化:网页随应用重启重建;nil 表示没有)
+    public var sidebarBrowserID: String?
+    /// 右侧栏当前是否显示浏览器(优先于文件/搜索/Git)
+    public var sidebarBrowserActive = false
     /// 各面板的摆放位置(终端位置、项目栏与工具栏所在侧)
     public var placement = PanelPlacement()
     /// 终端侧栏是否可见(终端放到左/右侧时有效)

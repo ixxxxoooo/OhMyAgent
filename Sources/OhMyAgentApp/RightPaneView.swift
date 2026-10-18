@@ -20,6 +20,8 @@ struct RightPaneView: View {
             paneBar
             if let chat = workbench.activeChat(in: .tools) {
                 ChatPane(workbench: workbench, projectID: chat.projectID, slot: chat.slot)
+            } else if workbench.layout.sidebarBrowserActive, let browserID = workbench.layout.sidebarBrowserID {
+                BrowserTabView(browserID: browserID, workspace: workbench.selectedProjectID ?? NSHomeDirectory()).id(browserID)
             } else {
             switch workbench.layout.rightPane {
             case .git: SCMView(workbench: workbench)
@@ -38,8 +40,8 @@ struct RightPaneView: View {
     private var paneBar: some View {
         HStack(spacing: 2) {
             ForEach(workbench.layout.rightPaneOrder, id: \.self) { pane in
-                let selected = workbench.layout.rightPane == pane && workbench.activeChat(in: .tools) == nil
-                Button { workbench.layout.rightPane = pane; workbench.layout.activeToolsChat = nil } label: {
+                let selected = workbench.layout.rightPane == pane && workbench.activeChat(in: .tools) == nil && !workbench.layout.sidebarBrowserActive
+                Button { workbench.layout.rightPane = pane; workbench.layout.activeToolsChat = nil; workbench.layout.sidebarBrowserActive = false } label: {
                     Image.om(Self.icon(pane), size: 14)
                         .frame(width: 28, height: 24)
                         .background(selected ? OMColors.selectedFill : .clear, in: RoundedRectangle(cornerRadius: OMRadius.tag))
@@ -64,6 +66,7 @@ struct RightPaneView: View {
                 .accessibilityLabel(Self.title(pane))
                 .accessibilityAddTraits(selected ? .isSelected : [])
             }
+            if workbench.layout.sidebarBrowserID != nil { sidebarBrowserButton }
             ForEach(workbench.dockedChats(in: .tools)) { chat in
                 DockedChatTab(workbench: workbench, chat: chat, iconOnly: true)
             }
@@ -83,6 +86,29 @@ struct RightPaneView: View {
         .background(WindowDragArea())
         .dropDestination(for: String.self) { payloads, _ in
             return dropChat(payloads, host: .tools, in: workbench)
+        }
+    }
+
+    /// 右侧栏里的浏览器图标:点击切到浏览器;右键可移到编辑区或关闭。
+    private var sidebarBrowserButton: some View {
+        let selected = workbench.layout.sidebarBrowserActive && workbench.activeChat(in: .tools) == nil
+        return Button {
+            workbench.layout.sidebarBrowserActive = true
+            workbench.layout.activeToolsChat = nil
+        } label: {
+            Image.om("globe", size: 14)
+                .frame(width: 28, height: 24)
+                .background(selected ? OMColors.selectedFill : .clear, in: RoundedRectangle(cornerRadius: OMRadius.tag))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(selected ? OMColors.accent : OMColors.secondaryText)
+        .omTooltip(String(localized: "浏览器"))
+        .accessibilityLabel(String(localized: "浏览器"))
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .omContextMenu {
+            OMMenuItem("移到编辑区", icon: "panel-top") { omWithAnimation { workbench.moveSidebarBrowserToEditor(title: String(localized: "浏览器")) } }
+            OMMenuItem("关闭浏览器", icon: "x") { omWithAnimation { workbench.closeSidebarBrowserSlot() } }
         }
     }
 

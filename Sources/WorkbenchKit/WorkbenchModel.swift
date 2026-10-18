@@ -1292,22 +1292,26 @@ public final class WorkbenchModel {
         tabID.hasPrefix(browserTabPrefix) ? String(tabID.dropFirst(browserTabPrefix.count)) : nil
     }
 
-    /// 打开(或切到)浏览器标签。
+    /// 打开(或切到)浏览器标签。默认放进右侧栏;已被拖进编辑区的标签仍在编辑区里切换。
     /// - Parameters:
     ///   - id: 浏览器标签 id
     ///   - title: 标签标题
     ///   - activate: 是否切到该标签(Agent 在后台打开页面时为 false,不抢焦点)
+    /// - Returns: 浏览器在编辑区里的标签 ID;放在右侧栏时为 nil
     @discardableResult
-    public func openBrowser(id: String, title: String, activate: Bool = true) -> UUID {
+    public func openBrowser(id: String, title: String, activate: Bool = true) -> UUID? {
         mode = .workspace
-        // 默认在会话右侧分屏打开(已有右侧组就放进去),焦点留在会话;之后可把标签拖到任意位置重新分屏
-        let tab = dock.openBeside(.preview(id: Self.browserTabPrefix + id), title: title, of: dock.focusedGroupID, preview: false, keepFocus: true)
-        if activate {
-            dock.activate(tab)
-            syncSelectionFromDock()
+        let kind = TabKind.preview(id: Self.browserTabPrefix + id)
+        if let existing = dock.tab(for: kind) {
+            if activate {
+                dock.activate(existing.id)
+                syncSelectionFromDock()
+            }
+            scheduleSave()
+            return existing.id
         }
-        scheduleSave()
-        return tab
+        showSidebarBrowser(id: id)
+        return nil
     }
 
     // MARK: 工具面板标签(右栏的文件 / 搜索 / Git 拖进编辑区)
@@ -1346,7 +1350,7 @@ public final class WorkbenchModel {
     /// 浏览器标签当前是否仍在编辑区里。
     /// - Parameter id: 浏览器标签 id
     public func isBrowserOpen(id: String) -> Bool {
-        dock.allTabs.contains { $0.kind == .preview(id: Self.browserTabPrefix + id) }
+        layout.sidebarBrowserID == id || dock.allTabs.contains { $0.kind == .preview(id: Self.browserTabPrefix + id) }
     }
 
     // MARK: 输出面板
@@ -1430,7 +1434,7 @@ public final class WorkbenchModel {
     // MARK: 持久化
 
     /// 合并短时间内的多次修改后写盘(拖拽分隔条时不会每帧写文件)。
-    private func scheduleSave() {
+    func scheduleSave() {
         saveTask?.cancel()
         saveTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(400))
