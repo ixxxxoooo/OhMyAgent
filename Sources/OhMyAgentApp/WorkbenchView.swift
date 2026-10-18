@@ -66,6 +66,8 @@ struct WorkbenchView: View {
             // 右侧由内向外排列
             ForEach(workbench.layout.visibleColumns(on: .right).reversed()) { panelColumn($0, side: .right) }
         }
+        // 面板显隐带滑入/滑出动画(仅显隐变化时触发,拖动宽度不受影响;遵循「减弱动态效果」)
+        .animation(omShouldReduceMotion() ? nil : Self.panelToggleAnimation, value: panelVisibilitySignature)
         .overlay(alignment: .top) { TitlebarOverlay(workbench: workbench) }
         .overlay { TerminalDropOverlay() }
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { TerminalDragState.shared.workspaceFrame = $0 }
@@ -74,6 +76,19 @@ struct WorkbenchView: View {
         .navigationTitle(title)
         .onAppear { workbench.recordNavigation() }
         .onChange(of: navigationSignature) { _, _ in workbench.recordNavigation() }
+    }
+
+    /// 面板显隐动画。
+    private static let panelToggleAnimation: Animation = .timingCurve(0.25, 0.1, 0.25, 1, duration: 0.22)
+
+    /// 当前可见的面板列(任一列显隐变化即触发动画)。
+    private var panelVisibilitySignature: [PanelColumn] {
+        workbench.layout.visibleColumns(on: .left) + workbench.layout.visibleColumns(on: .right)
+    }
+
+    /// 面板插入/移除的过渡:从所在侧边缘滑入滑出。
+    private func panelTransition(_ side: PanelSide) -> AnyTransition {
+        .move(edge: side == .left ? .leading : .trailing).combined(with: .opacity)
     }
 
     /// 一列面板 + 它与中栏之间的分隔条(分隔条总在靠近中栏的一侧)。
@@ -92,7 +107,7 @@ struct WorkbenchView: View {
         )
         let range = column == .sidebar ? PanelMetrics.leftRange : (column == .tools ? PanelMetrics.rightRange : PanelMetrics.terminalRange)
         let defaultWidth = column == .sidebar ? PanelMetrics.leftDefault : (column == .tools ? PanelMetrics.rightDefault : PanelMetrics.terminalDefault)
-        if side == .right { PanelResizer(width: width, side: side, range: range, defaultWidth: defaultWidth) }
+        if side == .right { PanelResizer(width: width, side: side, range: range, defaultWidth: defaultWidth).transition(panelTransition(side)) }
         Group {
             switch column {
             case .sidebar:
@@ -110,7 +125,8 @@ struct WorkbenchView: View {
         }
         .frame(width: CGFloat(width.wrappedValue))
         .clipped()
-        if side == .left { PanelResizer(width: width, side: side, range: range, defaultWidth: defaultWidth) }
+        .transition(panelTransition(side))
+        if side == .left { PanelResizer(width: width, side: side, range: range, defaultWidth: defaultWidth).transition(panelTransition(side)) }
     }
 
     /// 导航历史的触发信号:聚焦组的激活标签与标签总数(关闭标签时需要清理历史)。
