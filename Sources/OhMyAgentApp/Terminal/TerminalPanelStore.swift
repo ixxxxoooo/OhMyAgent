@@ -44,12 +44,13 @@ final class TerminalPanelStore {
     /// 新建终端并激活。
     /// - Parameters:
     ///   - root: 项目根目录
+    ///   - name: 初始名称(nil 或空白沿用自动标题)
     ///   - prefs: 终端偏好(决定起始目录)
     /// - Returns: 新实例;达到上限返回 nil
     @discardableResult
-    func addTerminal(root: String, prefs: TerminalPrefs = .load()) -> TerminalInstance? {
+    func addTerminal(root: String, name: String? = nil, prefs: TerminalPrefs = .load()) -> TerminalInstance? {
         var state = state(for: root)
-        guard let instance = state.add() else { return nil }
+        guard let instance = state.add(title: name) else { return nil }
         TerminalStore.shared.register(id: instance.id, directory: prefs.startDirectoryPath(project: root))
         commit(state, for: root)
         Log.ui.info("新建终端实例", ["id": instance.id, "count": "\(state.instances.count)"])
@@ -90,6 +91,19 @@ final class TerminalPanelStore {
         var state = state(for: root)
         let closed = state.closeOthers(keeping: id)
         for other in closed { TerminalStore.shared.remove(other) }
+        commit(state, for: root)
+    }
+
+    /// 拖动排序:把终端移到另一个终端之前。
+    /// - Parameters:
+    ///   - id: 被移动的终端
+    ///   - target: 目标终端;nil 表示移到末尾
+    ///   - root: 项目根目录
+    func move(_ id: String, before target: String?, root: String) {
+        var state = state(for: root)
+        let before = state.instances.map(\.id)
+        state.move(id, before: target)
+        guard state.instances.map(\.id) != before else { return }
         commit(state, for: root)
     }
 

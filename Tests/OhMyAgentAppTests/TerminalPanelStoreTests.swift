@@ -49,6 +49,20 @@ struct TerminalPanelStoreTests {
         #expect(restored.title(of: state.instances[1]) == "构建")
     }
 
+    @Test("拖动排序持久化,命名新建的终端")
+    func moveAndNamedAdd() {
+        let defaults = makeDefaults()
+        let root = "/tmp/oma-move"
+        let store = TerminalPanelStore(defaults: defaults)
+        let second = store.addTerminal(root: root, name: "服务")
+        #expect(second?.customTitle == "服务")
+        store.move(second?.id ?? "", before: TerminalPanelState.baseID(root), root: root)
+        let restored = TerminalPanelStore(defaults: defaults).state(for: root)
+        #expect(restored.instances.map(\.id) == [second?.id ?? "", TerminalPanelState.baseID(root)])
+        store.close(second?.id ?? "", root: root)
+        store.close(TerminalPanelState.baseID(root), root: root)
+    }
+
     @Test("标题:自定义 > shell 上报 > 终端 N")
     func titles() {
         let store = TerminalPanelStore(defaults: makeDefaults())

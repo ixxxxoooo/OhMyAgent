@@ -97,4 +97,29 @@ struct TerminalPanelStateTests {
         repaired.normalize()
         #expect(repaired.instances.count == 1 && repaired.activeID == "bottom:/p")
     }
+
+    @Test("拖动排序:移到目标之前/末尾,激活项不变,无效参数忽略")
+    func move() {
+        var state = TerminalPanelState(root: "/p")
+        state.add(); state.add()
+        state.activate("bottom:/p#2")
+        state.move("bottom:/p#3", before: "bottom:/p")
+        #expect(state.instances.map(\.id) == ["bottom:/p#3", "bottom:/p", "bottom:/p#2"])
+        state.move("bottom:/p#3", before: nil)
+        #expect(state.instances.map(\.id) == ["bottom:/p", "bottom:/p#2", "bottom:/p#3"])
+        #expect(state.activeID == "bottom:/p#2", "排序不改变激活项")
+        let snapshot = state
+        state.move("bottom:/p", before: "bottom:/p")
+        state.move("不存在", before: "bottom:/p")
+        state.move("bottom:/p", before: "不存在")
+        #expect(state == snapshot)
+    }
+
+    @Test("新建即命名:空白忽略,超长截断为 40 字")
+    func addWithTitle() {
+        var state = TerminalPanelState(root: "/p")
+        #expect(state.add(title: "  ")?.customTitle == nil)
+        #expect(state.add(title: " 构建 ")?.customTitle == "构建")
+        #expect(state.add(title: String(repeating: "长", count: 60))?.customTitle?.count == 40)
+    }
 }

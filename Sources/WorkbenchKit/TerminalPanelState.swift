@@ -66,13 +66,16 @@ public struct TerminalPanelState: Codable, Equatable, Sendable {
     public var canAdd: Bool { instances.count < Self.maxInstances }
 
     /// 新建终端并激活。
+    /// - Parameter title: 初始名称(空白视为不命名,沿用自动标题);最多 40 字
     /// - Returns: 新实例;已达上限时返回 nil
     @discardableResult
-    public mutating func add() -> TerminalInstance? {
+    public mutating func add(title: String? = nil) -> TerminalInstance? {
         guard canAdd else { return nil }
         let serial = nextSerial
         nextSerial += 1
-        let instance = TerminalInstance(id: serial == 1 ? Self.baseID(root) : "\(Self.baseID(root))#\(serial)", serial: serial)
+        let trimmed = title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let instance = TerminalInstance(id: serial == 1 ? Self.baseID(root) : "\(Self.baseID(root))#\(serial)", serial: serial,
+                                        customTitle: trimmed.isEmpty ? nil : String(trimmed.prefix(40)))
         instances.append(instance)
         activeID = instance.id
         return instance
@@ -123,6 +126,21 @@ public struct TerminalPanelState: Codable, Equatable, Sendable {
         guard let index = instances.firstIndex(where: { $0.id == id }) else { return }
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         instances[index].customTitle = trimmed.isEmpty ? nil : String(trimmed.prefix(40))
+    }
+
+    /// 调整终端顺序(拖动排序):把 `id` 移到 `target` 之前;激活项不变。
+    /// - Parameters:
+    ///   - id: 被移动的实例 id(不存在时忽略)
+    ///   - target: 目标实例 id;nil 表示移到末尾;不存在或等于 `id` 时忽略
+    public mutating func move(_ id: String, before target: String?) {
+        guard id != target, let from = instances.firstIndex(where: { $0.id == id }) else { return }
+        if let target, !instances.contains(where: { $0.id == target }) { return }
+        let item = instances.remove(at: from)
+        if let target, let to = instances.firstIndex(where: { $0.id == target }) {
+            instances.insert(item, at: to)
+        } else {
+            instances.append(item)
+        }
     }
 
     /// 校验并修复(从磁盘读取后调用):保证至少一个实例、激活项存在、实例数不超过上限。
