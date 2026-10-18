@@ -537,7 +537,10 @@ public enum TimelineGrouping {
     /// - Returns: 展示单元序列
     @MainActor
     static func digestSegment(_ segment: [TimelineEntry], density: ToolDensity) -> [TimelineItem] {
-        guard let summary = segment.last(where: { $0.kind == .turnSummary })?.summary else {
+        // 结束行还没插入(回放中)时,用本地记录里的耗时先把已结束的回合折叠起来
+        let duration = segment.last(where: { $0.kind == .turnSummary })?.summary?.durationSeconds
+            ?? segment.first(where: { $0.kind == .user })?.replayDuration
+        guard let duration else {
             return groupFlat(segment, density: density)
         }
         // 最终回答:最后一条助手文本,且其后没有再发生思考/工具调用
@@ -560,7 +563,7 @@ public enum TimelineGrouping {
         let folded = segment.enumerated().filter { folds($0.offset, $0.element) }.map(\.element)
         guard !folded.isEmpty else { return groupFlat(segment, density: density) }
 
-        let digest = TurnDigest(id: folded[0].id, entries: folded, durationSeconds: summary.durationSeconds)
+        let digest = TurnDigest(id: folded[0].id, entries: folded, durationSeconds: duration)
         var items: [TimelineItem] = []
         var inserted = false
         for (index, entry) in segment.enumerated() {

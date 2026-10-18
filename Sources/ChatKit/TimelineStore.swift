@@ -64,6 +64,9 @@ public final class TimelineEntry: Identifiable {
     public var turn = 0
     /// 回合结束语(`kind == .turnSummary`)
     public var summary: TurnSummary?
+    /// 回放时从本地会话记录得知的整轮耗时(`kind == .user`):回合结束行要等回放结束才插入,
+    /// 在此之前凭它就能把已结束的回合折成「已工作 …」,避免回放结束时整段过程突然折叠、画面跳动。
+    public var replayDuration: Double?
     /// 提问结果(`kind == .tool` 且为 AskUserQuestion:回答/跳过后写入,用于渲染问答卡)
     public var elicitationOutcome: ElicitationOutcome?
     /// 计划文档(`kind == .planDoc`):解析出的标题、概述、待办与正文
@@ -581,6 +584,10 @@ public final class TimelineStore {
             replayTurnStart = entries.count
         }
         let entry = TimelineEntry(kind: kind, text: text, isStreaming: true)
+        if replayActive, kind == .user, let turns = replayTurns, replayPrompts - 1 < turns.count {
+            let turn = turns[replayPrompts - 1]
+            entry.replayDuration = max(turn.end.timeIntervalSince(turn.start), 0)
+        }
         entry.messageId = messageId
         if let attachment { entry.attachments = [attachment] }
         entries.append(entry)

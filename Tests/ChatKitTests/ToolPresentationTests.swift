@@ -215,6 +215,22 @@ struct TimelineGroupingTests {
         #expect(ToolDensity.allCases.map(\.title) == ["精简", "标准", "详细"])
     }
 
+    @Test("回放中已知耗时的回合先折叠,结束行稍后插入时折叠结果不变")
+    func replayKnownDurationFoldsEarly() {
+        let s = TimelineStore()
+        let t0 = Date(timeIntervalSince1970: 1_000)
+        s.beginReplay()
+        s.replayTurns = [TranscriptTurn(start: t0, end: t0.addingTimeInterval(30), model: "m")]
+        s.apply(.userMessageChunk(messageId: "u1", content: .text("改一下")))
+        s.apply(.agentThoughtChunk(messageId: nil, content: .text("想一想")))
+        s.apply(.agentMessageChunk(messageId: "m2", content: .text("改好了")))
+        let early = TimelineGrouping.group(s.entries, density: .standard)
+        guard early.contains(where: { if case .digest = $0 { return true } else { return false } }) else { Issue.record("回放中应已折叠"); return }
+        s.endReplay()
+        let late = TimelineGrouping.group(s.entries, density: .standard)
+        #expect(late.count == early.count + 1)   // 只多出结束行
+    }
+
     @Test("已结束回合折叠过程为一行(各档一致),只留用户消息、最终回答与结束行;未结束回合不折叠")
     func digestFoldsFinishedTurn() {
         let s = TimelineStore()
