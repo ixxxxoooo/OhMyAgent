@@ -40,15 +40,29 @@ struct ChatView: View {
         isEmptySession ? min(contentMaxWidth, ChatWidth.narrow.points) : contentMaxWidth
     }
 
+    /// 关闭上下文用量面板(已关闭时无操作)。
+    private func closeUsagePanel() {
+        guard usageOpen else { return }
+        omWithAnimation { usageOpen = false }
+    }
+
     var body: some View {
         ZStack {
             OMColors.surface.ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture { closeUsagePanel() }
             // 输入区在两种布局下处于同一结构位置,发送首条消息时不会被重建(保留焦点与草稿)
             VStack(spacing: 0) {
                 if isEmptySession {
                     Spacer(minLength: 0)
                 } else {
                     timeline
+                        .overlay {
+                            // 面板展开时,点击会话区(面板外)关闭面板
+                            if usageOpen {
+                                Color.clear.contentShape(Rectangle()).onTapGesture { closeUsagePanel() }
+                            }
+                        }
                 }
                 composerStack
                 if isEmptySession {
