@@ -115,6 +115,16 @@ struct DemoCoverageTests {
         }
         #expect(await SessionModelTests.wait { !model.isRunning })
 
+        // 权限变体:前三个依次批准,最后两个命令同时请求(堆叠)
+        model.send("#demo-permissions-variants")
+        for _ in 0..<3 {
+            #expect(await SessionModelTests.wait { !model.pendingPermissions.isEmpty })
+            if let prompt = model.pendingPermissions.first { model.resolve(prompt, optionId: "allow") }
+        }
+        #expect(await SessionModelTests.wait { model.pendingPermissions.count == 2 })
+        for prompt in model.pendingPermissions { model.resolve(prompt, optionId: "allow") }
+        #expect(await SessionModelTests.wait { !model.isRunning })
+
         model.send("#demo-plan-approval")
         #expect(await SessionModelTests.wait { model.pendingPermissions.first?.isPlanApproval == true })
         if let prompt = model.pendingPermissions.first { model.resolve(prompt, optionId: "default") }
