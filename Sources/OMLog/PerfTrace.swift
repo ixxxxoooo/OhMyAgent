@@ -119,7 +119,12 @@ public final class MainThreadHitchMonitor: @unchecked Sendable {
     private let queue = DispatchQueue(label: "oma.hitch-monitor", qos: .utility)
     private let pending = Mutex(false)
     private let counters = Mutex((count: 0, maxMs: 0))
+    /// 最近一次探针的投递时刻(用于判断停滞已持续多久)
+    private let postedAt = Mutex<ContinuousClock.Instant?>(nil)
     private var timer: DispatchSourceTimer?
+    /// 是否在停滞期间抓取调用栈(开发版/演示模式默认开启,见 `HitchStackSampler.isEnabled`)
+    private let sampleStacks = HitchStackSampler.isEnabled()
+    private let sampler = HitchStackSampler.shared
 
     /// 自启动以来的卡顿累计:次数与单次最大毫秒。
     public var totals: (count: Int, maxMs: Int) { counters.withLock { $0 } }
@@ -137,8 +142,15 @@ public final class MainThreadHitchMonitor: @unchecked Sendable {
                     value = true
                     return false
                 }
-                guard !alreadyPending else { return }
+                guard !alreadyPending else {
+                    // 探针迟迟没被主线程执行:停滞仍在进行中,必要时抓栈(此刻主线程恰好卡在问题现场)
+                    if sampleStacks, let since = postedAt.withLock({ $0 }) {
+                        sampler.stallDetected(stalledMs: OMLogger.milliseconds(since: since))
+                    }
+                    return
+                }
                 let posted = ContinuousClock.now
+                postedAt.withLock { $0 = posted }
                 DispatchQueue.main.async { [self] in
                     pending.withLock { $0 = false }
                     let ms = OMLogger.milliseconds(since: posted)
