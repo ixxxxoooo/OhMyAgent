@@ -514,7 +514,8 @@ struct ToolDetailsView: View {
             SnippetDiffView(path: path, oldText: oldText, newText: newText, showHeader: false)
         case .terminal(let id):
             if let session = model.terminals[id] {
-                TerminalOutputView(session: session, onInterrupt: session.isExternal ? nil : { model.interruptTerminal(id) }, onRetryUnsandboxed: { model.retryWithoutSandbox() })
+                TerminalOutputView(session: session, onInterrupt: session.isExternal ? nil : { model.interruptTerminal(id) }, onRetryUnsandboxed: { model.retryWithoutSandbox() },
+                                   onViewInTerminal: { AppActions.shared.viewAgentTerminal(session, model: model) })
             } else {
                 Label(String(localized: "终端 \(id)"), om: "terminal").font(OMFonts.monoSmall)
             }
@@ -880,6 +881,8 @@ struct TerminalOutputView: View {
     var onInterrupt: (() -> Void)?
     /// 沙箱拦截后「放行一次」
     var onRetryUnsandboxed: (() -> Void)?
+    /// 在终端面板里查看(只读,SwiftTerm 渲染)
+    var onViewInTerminal: (() -> Void)?
     @AppStorage(ClientPrefs.Key.terminalFontSize) private var outputFontSize = 12.0
     @State private var copied = false
 
@@ -902,6 +905,12 @@ struct TerminalOutputView: View {
                     OMTag(code == 0 ? String(localized: "退出 0") : String(localized: "退出 \(code)"), tint: code == 0 ? OMColors.success : OMColors.danger)
                 } else if let signal = session.signal {
                     OMTag(signal, tint: OMColors.danger)
+                }
+                if let onViewInTerminal {
+                    Button(action: onViewInTerminal) { Image.om("square-terminal", size: 12) }
+                        .buttonStyle(.omIcon)
+                        .omTooltip("在终端面板查看")
+                        .accessibilityLabel("在终端面板查看")
                 }
                 CopyButton(text: ANSIParser.plainText(session.output), copied: $copied)
             }

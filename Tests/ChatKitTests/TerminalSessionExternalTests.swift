@@ -67,4 +67,15 @@ struct TerminalSessionExternalTests {
         #expect(!session.isRunning)
         #expect(session.output == "你好\nready\n")
     }
+
+    @Test("非追加变化计数:追加不计,整段替换与截断计")
+    func discontinuity() {
+        let s = TerminalSession(id: "d", command: "x", isExternal: true)
+        s.appendExternal("abc")
+        #expect(s.discontinuity == 0)
+        s.replaceExternal("xyz")
+        #expect(s.discontinuity == 1 && s.output == "xyz")
+        s.appendExternal(String(repeating: "a", count: TerminalSession.externalOutputLimit))
+        #expect(s.discontinuity == 2 && s.truncated)
+    }
 }

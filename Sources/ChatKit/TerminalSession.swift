@@ -18,6 +18,9 @@ public final class TerminalSession: Identifiable {
     public let startedAt = Date()
     public private(set) var output = ""
     public private(set) var truncated = false
+    /// 输出发生「非追加式」变化的次数(头部被截断、整段被替换、快照不是上一次的延伸);
+    /// 逐字节镜像输出的视图据此判断要不要整屏重绘
+    public private(set) var discontinuity = 0
     public private(set) var exitCode: Int?
     public private(set) var signal: String?
     public private(set) var isRunning = true
@@ -39,7 +42,11 @@ public final class TerminalSession: Identifiable {
     /// 外部终端输出的字符数上限(超出从头部丢弃)
     static let externalOutputLimit = 1_000_000
 
-    init(id: String, command: String, isExternal: Bool = false) {
+    /// - Parameters:
+    ///   - id: 终端标识
+    ///   - command: 命令文本(外部终端可稍后由 `updateCommand` 补全)
+    ///   - isExternal: 是否外部终端(命令由 Agent 自己执行,这里只镜像输出)
+    public init(id: String, command: String, isExternal: Bool = false) {
         self.id = id
         self.command = command
         self.isExternal = isExternal
@@ -61,7 +68,10 @@ public final class TerminalSession: Identifiable {
     }
 
     private func apply(_ snapshot: TerminalOutputSnapshot) {
-        if output != snapshot.output { output = snapshot.output }
+        if output != snapshot.output {
+            if !snapshot.output.hasPrefix(output) { discontinuity += 1 }
+            output = snapshot.output
+        }
         truncated = snapshot.truncated
         exitCode = snapshot.exitCode
         signal = snapshot.signal
@@ -87,11 +97,13 @@ public final class TerminalSession: Identifiable {
         if output.count > Self.externalOutputLimit {
             output = String(output.suffix(Self.externalOutputLimit))
             truncated = true
+            discontinuity += 1
         }
     }
 
     /// 用整段输出替换(前台命令结束时一次性给出)。
     func replaceExternal(_ text: String) {
+        discontinuity += 1
         output = ""
         appendExternal(text)
     }

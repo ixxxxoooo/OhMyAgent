@@ -94,8 +94,12 @@ final class TerminalController: Identifiable {
         appliedPrefs = prefs
     }
 
-    /// 把当前主题的终端配色(ANSI 16 色、前景、背景、光标、选区)应用到渲染视图。
-    func applyTheme() {
+    /// 把当前主题的终端配色应用到本控制器的渲染视图。
+    func applyTheme() { Self.applyTheme(to: view) }
+
+    /// 把当前主题的终端配色(ANSI 16 色、前景、背景、光标、选区)应用到任意渲染视图(交互终端与只读 Agent 终端共用)。
+    /// - Parameter view: SwiftTerm 渲染视图
+    static func applyTheme(to view: TerminalView) {
         let colors = OMTerminalPalette.ansi(dark: OMTerminalPalette.currentIsDark).map { color -> SwiftTerm.Color in
             let rgb = color.usingColorSpace(.sRGB) ?? color
             func channel(_ value: CGFloat) -> UInt16 { UInt16((min(max(value, 0), 1) * 65535).rounded()) }

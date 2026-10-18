@@ -224,6 +224,23 @@ final class AppActions {
         TerminalPanelStore.shared.cycle(step, root: workbench.selectedProjectID ?? NSHomeDirectory())
     }
 
+    /// 在终端面板里只读查看 Agent 的终端(后台命令的实时输出)。终端放在编辑区时退回只读标签页。
+    /// - Parameters:
+    ///   - session: Agent 终端会话
+    ///   - model: 该终端所属的会话
+    func viewAgentTerminal(_ session: TerminalSession, model: SessionModel) {
+        let workbench = AppEnvironment.shared.workbench
+        if workbench.layout.placement.terminal == .editor {
+            if let project = workbench.projectID(of: model) ?? workbench.selectedProjectID {
+                workbench.openAgentTerminal(project: project, terminalID: session.id, title: session.command)
+            }
+        } else {
+            workbench.showTerminal()
+            AgentTerminalStore.shared.open(session, root: workbench.selectedProjectID ?? NSHomeDirectory())
+        }
+        showMainWindow()
+    }
+
     /// 关闭当前终端实例(最后一个被关闭时隐藏面板)。
     func closeActiveTerminal() {
         let workbench = AppEnvironment.shared.workbench

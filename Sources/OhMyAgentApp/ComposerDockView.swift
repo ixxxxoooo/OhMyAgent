@@ -319,15 +319,20 @@ private struct TerminalDockRow: View {
     let workbench: WorkbenchModel
 
     var body: some View {
-        DockRowShell(title: session.command, meta: WorkingStatus.elapsed(Int(Date().timeIntervalSince(session.startedAt))), tap: open) {
+        DockRowShell(title: session.command, meta: WorkingStatus.elapsed(Int(Date().timeIntervalSince(session.startedAt))), tap: viewInPanel) {
             Image.om("terminal", size: 12).foregroundStyle(OMColors.secondaryText)
         } actions: {
             HStack(spacing: 2) {
                 RowIconButton(icon: "external-link", label: String(localized: "在新标签页打开")) { open() }
-                RowIconButton(icon: "square", label: String(localized: "终止")) { model.interruptTerminal(session.id) }
+                if !session.isExternal {
+                    RowIconButton(icon: "square", label: String(localized: "终止")) { model.interruptTerminal(session.id) }
+                }
             }
         }
     }
+
+    /// 点击行:在终端面板里查看(终端在编辑区时退回只读标签页)。
+    private func viewInPanel() { AppActions.shared.viewAgentTerminal(session, model: model) }
 
     private func open() {
         guard let project = workbench.projectID(of: model) else { return }

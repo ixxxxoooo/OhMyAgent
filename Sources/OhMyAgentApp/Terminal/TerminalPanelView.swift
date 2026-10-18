@@ -15,27 +15,39 @@ struct TerminalPanelView: View {
     /// 项目根目录(终端状态按它分组)
     let root: String
     private let store = TerminalPanelStore.shared
+    private let agentStore = AgentTerminalStore.shared
 
     var body: some View {
         let state = store.state(for: root)
-        let showsList = state.instances.count >= 2 && !workbench.layout.terminalListCollapsed
+        let agents = agentStore.entries(for: root)
+        let activeAgent = agentStore.activeID(for: root).flatMap { id in agents.first { $0.id == id } }
+        let showsList = state.instances.count + agents.count >= 2 && !workbench.layout.terminalListCollapsed
         VStack(spacing: 0) {
             if !showsList {
-                tabStrip(state)
+                tabStrip(state, agents: agents, activeAgentID: activeAgent?.id)
                 Divider()
             }
             HStack(spacing: 0) {
-                TerminalTabView(id: state.active.id, fallbackDirectory: root)
-                    .id(state.active.id)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                Group {
+                    if let activeAgent {
+                        AgentTerminalContentView(session: activeAgent.session).id(activeAgent.id)
+                    } else {
+                        TerminalTabView(id: state.active.id, fallbackDirectory: root).id(state.active.id)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 if showsList {
                     PanelResizer(width: $workbench.layout.terminalListWidth, side: .right,
                                  range: PanelMetrics.terminalListRange, defaultWidth: PanelMetrics.terminalListDefault)
                     TerminalListView(
                         state: state,
+                        agents: agents.map { AgentListRowModel(id: $0.id, title: $0.session.command.isEmpty ? String(localized: "Agent 终端") : $0.session.command, isRunning: $0.session.isRunning) },
+                        activeAgentID: activeAgent?.id,
+                        onSelectAgent: { id in omWithAnimation { agentStore.activate(id, root: root) } },
+                        onCloseAgent: { id in agentStore.close(id, root: root) },
                         titleOf: { store.title(of: $0) },
                         menu: { menu(for: $0, state: state) },
-                        onSelect: { id in omWithAnimation { store.activate(id, root: root) } },
+                        onSelect: { id in omWithAnimation { agentStore.activate(nil, root: root); store.activate(id, root: root) } },
                         onClose: { close($0) },
                         onRename: { id, name in store.rename(id, to: name, root: root) },
                         onMove: { id, target in store.move(id, before: target, root: root) },
@@ -50,25 +62,35 @@ struct TerminalPanelView: View {
 
     // MARK: 标签条
 
-    private func tabStrip(_ state: TerminalPanelState) -> some View {
+    private func tabStrip(_ state: TerminalPanelState, agents: [AgentTerminalEntry], activeAgentID: String?) -> some View {
         HStack(spacing: 2) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 2) {
                     ForEach(state.instances) { instance in
                         TerminalPanelTab(
                             title: store.title(of: instance),
-                            isActive: instance.id == state.activeID,
+                            isActive: instance.id == state.activeID && activeAgentID == nil,
                             canClose: true,
-                            onSelect: { omWithAnimation { store.activate(instance.id, root: root) } },
+                            onSelect: { omWithAnimation { agentStore.activate(nil, root: root); store.activate(instance.id, root: root) } },
                             onClose: { close(instance.id) }
                         )
                         .omContextMenu { menu(for: instance, state: state) }
+                    }
+                    ForEach(agents) { agent in
+                        TerminalPanelTab(
+                            title: agent.session.command.isEmpty ? String(localized: "Agent 终端") : agent.session.command,
+                            icon: "bot",
+                            isActive: agent.id == activeAgentID,
+                            canClose: true,
+                            onSelect: { omWithAnimation { agentStore.activate(agent.id, root: root) } },
+                            onClose: { agentStore.close(agent.id, root: root) }
+                        )
                     }
                 }
                 .padding(.horizontal, 6)
             }
             Spacer(minLength: 0)
-            if state.instances.count >= 2 {
+            if state.instances.count + agents.count >= 2 {
                 Button { omWithAnimation { workbench.layout.terminalListCollapsed = false } } label: { Image.om("panel-right", size: 12) }
                     .buttonStyle(.omIcon)
                     .omTooltip("显示终端列表")
@@ -107,6 +129,7 @@ struct TerminalPanelView: View {
 /// 终端标签:图标 + 标题 + 关闭按钮(悬停或激活时显示)。
 private struct TerminalPanelTab: View {
     let title: String
+    var icon = "square-terminal"
     let isActive: Bool
     let canClose: Bool
     let onSelect: () -> Void
@@ -115,7 +138,7 @@ private struct TerminalPanelTab: View {
 
     var body: some View {
         HStack(spacing: 5) {
-            Image.om("square-terminal", size: 12)
+            Image.om(icon, size: 12)
             Text(verbatim: title)
                 .font(OMFonts.small)
                 .lineLimit(1)

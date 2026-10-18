@@ -307,6 +307,14 @@ struct WorkbenchView: View {
             for name in names.dropFirst() where !existing.contains(name) { TerminalPanelStore.shared.addTerminal(root: root, name: name) }
             TerminalPanelStore.shared.activate(TerminalPanelState.baseID(root), root: root)
         }
+        if env["OMA_VIEW_AGENT_TERMINAL"] != nil {
+            // 调试:等到出现运行中的 Agent 终端后,在终端面板里只读打开它(验证后台命令的实时查看)
+            for _ in 0..<60 {
+                let found = workbench.conversations.values.lazy.compactMap { model in model.terminals.values.first(where: \.isRunning).map { (model, $0) } }.first
+                if let (model, session) = found { actions.viewAgentTerminal(session, model: model); break }
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+        }
         if env["OMA_SHOW_RIGHT"] != nil { workbench.layout.rightVisible = true }
         if env["OMA_SHOW_BOTTOM"] != nil { workbench.layout.bottomVisible = true }
         if let pane = env["OMA_BOTTOM_PANE"].flatMap(BottomPane.init(rawValue:)) { workbench.layout.bottomPane = pane }

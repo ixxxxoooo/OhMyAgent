@@ -26,9 +26,22 @@ enum TerminalDragPayload {
     }
 }
 
+/// 列表里的一个 Agent 终端行(只读镜像,不能重命名与排序)。
+struct AgentListRowModel: Identifiable {
+    let id: String
+    let title: String
+    let isRunning: Bool
+}
+
 /// 终端列表视图(无状态:数据与动作都由 `TerminalPanelView` 传入)。
 struct TerminalListView: View {
     let state: TerminalPanelState
+    /// 面板里已打开的 Agent 终端
+    var agents: [AgentListRowModel] = []
+    /// 当前激活的 Agent 终端(nil 表示激活的是用户终端)
+    var activeAgentID: String?
+    var onSelectAgent: (String) -> Void = { _ in }
+    var onCloseAgent: (String) -> Void = { _ in }
     let titleOf: (TerminalInstance) -> String
     let menu: (TerminalInstance) -> [MenuEntry]
     let onSelect: (String) -> Void
@@ -52,9 +65,13 @@ struct TerminalListView: View {
             ScrollView {
                 VStack(spacing: 2) {
                     ForEach(state.instances) { row($0) }
-                    Color.clear.frame(height: 24).contentShape(Rectangle())
+                    Color.clear.frame(height: agents.isEmpty ? 24 : 6).contentShape(Rectangle())
                         .dropDestination(for: String.self) { payloads, _ in drop(payloads, before: nil) }
                             isTargeted: { dropTarget = $0 ? Self.endMarker : (dropTarget == Self.endMarker ? nil : dropTarget) }
+                    ForEach(agents) { agent in
+                        AgentListRow(model: agent, isActive: agent.id == activeAgentID,
+                                     onSelect: { onSelectAgent(agent.id) }, onClose: { onCloseAgent(agent.id) })
+                    }
                 }
                 .padding(.horizontal, 6).padding(.bottom, 6)
             }
@@ -69,7 +86,7 @@ struct TerminalListView: View {
 
     private var header: some View {
         HStack(spacing: 2) {
-            Text("\(state.instances.count) 个终端")
+            Text("\(state.instances.count + agents.count) 个终端")
                 .font(OMFonts.small)
                 .foregroundStyle(OMColors.secondaryText)
                 .lineLimit(1)
@@ -93,7 +110,7 @@ struct TerminalListView: View {
     private func row(_ instance: TerminalInstance) -> some View {
         TerminalListRow(
             title: titleOf(instance),
-            isActive: instance.id == state.activeID,
+            isActive: instance.id == state.activeID && activeAgentID == nil,
             isExited: !(TerminalStore.shared.controllers[instance.id]?.isRunning ?? true),
             isEditing: editingID == instance.id,
             draft: $draft,
@@ -187,6 +204,42 @@ private struct TerminalListRow: View {
         .onHover { hovering = $0 }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(title)
+        .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
+    }
+}
+
+/// Agent 终端行:机器人图标 + 命令 + 运行状态点 + 关闭按钮;点击在面板里只读查看。
+private struct AgentListRow: View {
+    let model: AgentListRowModel
+    let isActive: Bool
+    let onSelect: () -> Void
+    let onClose: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image.om("bot", size: 12)
+            Text(verbatim: model.title).font(OMFonts.small).lineLimit(1).truncationMode(.tail)
+            Spacer(minLength: 0)
+            OMSessionDot(model.isRunning ? .running : .idle, size: 6)
+                .omTooltip(model.isRunning ? "Agent 命令运行中" : "进程已结束")
+            Button(action: onClose) {
+                Image.om("x", size: 10).frame(width: 16, height: 16).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .opacity(hovering || isActive ? 1 : 0)
+            .omTooltip("关闭终端")
+            .accessibilityLabel("关闭终端")
+        }
+        .foregroundStyle(isActive ? OMColors.primaryText : OMColors.secondaryText)
+        .padding(.leading, 8).padding(.trailing, 4)
+        .frame(height: 26)
+        .background(isActive ? OMColors.selectedFill : (hovering ? OMColors.hoverFill : .clear), in: OMPillShape())
+        .contentShape(OMPillShape())
+        .onTapGesture(perform: onSelect)
+        .onHover { hovering = $0 }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(String(localized: "Agent 终端") + " " + model.title)
         .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
     }
 }
