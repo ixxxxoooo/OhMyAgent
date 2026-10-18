@@ -196,10 +196,21 @@ private struct DockChip: View {
 private struct DockRowShell<Leading: View, Actions: View>: View {
     let title: String
     let meta: String?
+    /// 随时间变化的灰色元信息(每秒刷新,如已运行时长);优先于 `meta`
+    var liveMeta: ((Date) -> String)?
     let tap: (() -> Void)?
     @ViewBuilder let leading: Leading
     @ViewBuilder let actions: Actions
     @State private var hovering = false
+
+    /// 灰色元信息文字。
+    private func metaText(_ text: String) -> some View {
+        Text(text)
+            .font(OMFonts.caption)
+            .monospacedDigit()
+            .foregroundStyle(OMColors.tertiaryText)
+            .lineLimit(1)
+    }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -211,12 +222,10 @@ private struct DockRowShell<Leading: View, Actions: View>: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             if hovering {
                 actions
+            } else if let liveMeta {
+                ActiveTimeline(interval: 1) { date in metaText(liveMeta(date)) }
             } else if let meta {
-                Text(meta)
-                    .font(OMFonts.caption)
-                    .monospacedDigit()
-                    .foregroundStyle(OMColors.tertiaryText)
-                    .lineLimit(1)
+                metaText(meta)
             }
         }
         .padding(.horizontal, 8)
@@ -285,7 +294,7 @@ private struct SubagentDockRow: View {
     var body: some View {
         if let tool = entry.tool {
             let presentation = ToolPresentation(tool: tool, hasChild: true)
-            DockRowShell(title: presentation.subject, meta: meta(presentation), tap: { open(tool) }) {
+            DockRowShell(title: presentation.subject, meta: nil, liveMeta: { meta(presentation, now: $0) }, tap: { open(tool) }) {
                 Image.om(SubagentIcon.symbol(for: presentation.agentType), size: 12).foregroundStyle(OMColors.accent)
             } actions: {
                 HStack(spacing: 4) {
@@ -298,11 +307,11 @@ private struct SubagentDockRow: View {
     }
 
     /// 灰色元信息:类型 · 最近工具 · 已运行时长。
-    private func meta(_ presentation: ToolPresentation) -> String {
+    private func meta(_ presentation: ToolPresentation, now: Date) -> String {
         var parts: [String] = []
         if let type = presentation.agentType { parts.append(type) }
         if let last = entry.childStore?.entries.last(where: { $0.kind == .tool })?.tool?.title, !last.isEmpty { parts.append(last) }
-        parts.append(WorkingStatus.elapsed(Int(entry.elapsedSeconds)))
+        parts.append(WorkingStatus.elapsed(max(0, Int(now.timeIntervalSince(entry.startedAt)))))
         return parts.joined(separator: " · ")
     }
 
@@ -319,7 +328,7 @@ private struct TerminalDockRow: View {
     let workbench: WorkbenchModel
 
     var body: some View {
-        DockRowShell(title: session.command, meta: WorkingStatus.elapsed(Int(Date().timeIntervalSince(session.startedAt))), tap: viewInPanel) {
+        DockRowShell(title: session.command, meta: nil, liveMeta: { WorkingStatus.elapsed(max(0, Int($0.timeIntervalSince(session.startedAt)))) }, tap: viewInPanel) {
             Image.om("terminal", size: 12).foregroundStyle(OMColors.secondaryText)
         } actions: {
             HStack(spacing: 2) {
