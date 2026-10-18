@@ -143,7 +143,6 @@ public enum OMSessionDotKind: Sendable {
 public struct OMSessionDot: View {
     private let kind: OMSessionDotKind
     private let size: CGFloat
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// - Parameters:
     ///   - kind: 状态种类
@@ -156,8 +155,8 @@ public struct OMSessionDot: View {
     public var body: some View {
         Group {
             switch kind {
-            case .running: breathing(shape(fill: OMColors.statusRunning), duration: 0.6)
-            case .waiting: breathing(shape(ring: OMColors.statusWaiting), duration: 0.9)
+            case .running: breathing(ring: false, color: OMColors.statusRunning, duration: 0.6)
+            case .waiting: breathing(ring: true, color: OMColors.statusWaiting, duration: 0.9)
             case .unread: shape(fill: OMColors.statusUnread).frame(width: size * 0.85, height: size * 0.85)
             case .idle: shape(fill: OMColors.statusIdle)
             }
@@ -167,19 +166,10 @@ public struct OMSessionDot: View {
 
     private func shape(fill color: Color) -> some View { Circle().fill(color) }
 
-    private func shape(ring color: Color) -> some View {
-        Circle().strokeBorder(color, lineWidth: max(1.4, size * 0.2))
-    }
-
-    /// 呼吸:单程 `duration` 秒,往复一周期 = 2 × duration。
-    @ViewBuilder
-    private func breathing<V: View>(_ view: V, duration: Double) -> some View {
-        if reduceMotion || omShouldReduceMotion() {
-            view
-        } else {
-            view.phaseAnimator([false, true]) { content, expanded in
-                content.opacity(expanded ? 1 : 0.4).scaleEffect(expanded ? 1 : 0.78)
-            } animation: { _ in .easeInOut(duration: duration) }
+    /// 呼吸:单程 `duration` 秒,往复一周期 = 2 × duration;Core Animation 驱动,门控放行才动。
+    private func breathing(ring: Bool, color: Color, duration: Double) -> some View {
+        OMLoopGated { running in
+            OMBreathingDot(color: color, ring: ring, lineWidth: max(1.4, size * 0.2), duration: duration, running: running)
         }
     }
 }
@@ -198,23 +188,15 @@ public struct OMSpinner: View {
     }
 
     private let size: Size
-    @State private var spinning = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(_ size: Size = .regular) { self.size = size }
 
     public var body: some View {
         let diameter = size.points
-        Circle()
-            .trim(from: 0, to: 0.72)
-            .stroke(OMColors.statusActive, style: StrokeStyle(lineWidth: max(1.5, diameter / 8), lineCap: .round))
-            .frame(width: diameter - 2, height: diameter - 2)
-            .rotationEffect(.degrees(spinning ? 360 : 0))
-            .frame(width: diameter, height: diameter)
-            .onAppear {
-                guard !(reduceMotion || omShouldReduceMotion()) else { return }
-                withAnimation(.linear(duration: 0.9).repeatForever(autoreverses: false)) { spinning = true }
-            }
-            .accessibilityLabel("加载中")
+        OMLoopGated { running in
+            OMSpinnerArc(color: OMColors.statusActive, lineWidth: max(1.5, diameter / 8), running: running)
+        }
+        .frame(width: diameter, height: diameter)
+        .accessibilityLabel("加载中")
     }
 }

@@ -9,7 +9,6 @@ import SwiftUI
 /// 运行中的等待指示行。
 struct WorkingIndicatorView: View {
     let model: SessionModel
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// 外观里选择的等待动词风格(变化时自动刷新)
     @AppStorage(ClientPrefs.Key.workingVerbStyle) private var verbStyleRaw = WorkingVerbStyle.classic.rawValue
 
@@ -17,14 +16,14 @@ struct WorkingIndicatorView: View {
         if model.isRunning, let start = model.turnStartedAt {
             let style = WorkingVerbStyle.resolve(verbStyleRaw)
             let waitingForUser = !model.pendingPermissions.isEmpty || !model.pendingElicitations.isEmpty
-            ActiveTimeline(interval: reduceMotion || waitingForUser ? 1 : 0.15, start: start) { date in
+            // 每秒只刷新耗时文字;字符帧动画由 Core Animation 驱动(OMGlyphCycle),不再每 0.15 秒重算视图
+            ActiveTimeline(interval: 1, start: start) { date in
                 let seconds = Int(date.timeIntervalSince(start))
-                let tick = Int(date.timeIntervalSinceReferenceDate / 0.15)
                 HStack(spacing: 8) {
-                    Text(waitingForUser || reduceMotion ? style.restingGlyph : WorkingStatus.glyph(tick: tick, style: style))
-                        .font(OMFonts.body.weight(.medium))
-                        .foregroundStyle(waitingForUser ? OMColors.tertiaryText : OMColors.accent)
-                        .frame(width: 16)
+                    OMGlyphCycle(
+                        frames: style.glyphFrames, resting: style.restingGlyph, font: OMFonts.body.weight(.medium),
+                        color: waitingForUser ? OMColors.tertiaryText : OMColors.accent, animated: !waitingForUser
+                    )
                     Text(label(seconds: seconds, start: start, waitingForUser: waitingForUser, style: style))
                         .font(OMFonts.small)
                         .foregroundStyle(OMColors.secondaryText)

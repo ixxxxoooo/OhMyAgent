@@ -1,6 +1,7 @@
 // @author ixxxxoooo
 // 流动效果:运行中的会话标题文字做流光。
-// 仅在需要时才创建 TimelineView,并遵循「减弱动态效果」。
+// 高亮带由 Core Animation 驱动(DesignSystem/LoopLayers.swift),不使用 TimelineView(.animation) 每帧重算视图;
+// 并由 OMAnimationGate 门控(标签可见、应用可见、未减弱动态才动)。
 
 import DesignSystem
 import SwiftUI
@@ -14,19 +15,7 @@ private struct FlowingTextModifier: ViewModifier {
         if active && !reduceMotion {
             content
                 .foregroundStyle(OMColors.secondaryText)
-                .overlay {
-                    TimelineView(.animation) { context in
-                        let phase = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 2.4) / 2.4
-                        GeometryReader { geometry in
-                            let band = max(geometry.size.width * 0.45, 28)
-                            LinearGradient(colors: [.clear, OMColors.primaryText, .clear], startPoint: .leading, endPoint: .trailing) // ui-lint:allow 仅作遮罩/淡出,非装饰
-                                .frame(width: band)
-                                .offset(x: -band + phase * (geometry.size.width + band))
-                        }
-                    }
-                    .mask(content)
-                    .allowsHitTesting(false)
-                }
+                .omFlowOverlay(color: OMColors.primaryText)
         } else {
             content
         }

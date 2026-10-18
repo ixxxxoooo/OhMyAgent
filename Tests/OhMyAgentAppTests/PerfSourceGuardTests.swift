@@ -32,4 +32,24 @@ struct PerfSourceGuardTests {
         let lines = try Self.codeLines("Dock/TabGroupView.swift")
         #expect(lines.contains { $0.code.contains("InactiveSizeFreeze(isActive:") }, "TabGroupView 应对保活标签应用 InactiveSizeFreeze")
     }
+
+    @Test("持续动画一律走 Core Animation:禁止逐帧 TimelineView(.animation)、phaseAnimator、repeatForever 显式动画")
+    func noPerFrameLoopAnimations() throws {
+        let root = Self.sources.deletingLastPathComponent().deletingLastPathComponent()
+        var offenders: [String] = []
+        for dir in ["Sources/OhMyAgentApp", "Sources/DesignSystem"] {
+            let enumerator = FileManager.default.enumerator(at: root.appendingPathComponent(dir), includingPropertiesForKeys: nil)
+            while let url = enumerator?.nextObject() as? URL {
+                guard url.pathExtension == "swift" else { continue }
+                let text = try String(contentsOf: url, encoding: .utf8)
+                for (index, line) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
+                    let code = line.split(separator: "//", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? ""
+                    if code.contains("TimelineView(.animation") || code.contains(".phaseAnimator(") || code.contains(".repeatForever(") {
+                        offenders.append("\(url.lastPathComponent):\(index + 1)")
+                    }
+                }
+            }
+        }
+        #expect(offenders.isEmpty, "出现逐帧/SwiftUI 驱动的循环动画(应改用 DesignSystem/LoopLayers.swift):\(offenders.joined(separator: ", "))")
+    }
 }

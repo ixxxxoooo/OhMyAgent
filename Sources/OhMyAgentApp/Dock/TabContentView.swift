@@ -409,7 +409,6 @@ struct SubagentTabView: View {
 struct SubagentStatusFooter: View {
     let entry: TimelineEntry
     let tool: ToolCall
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(ClientPrefs.Key.workingVerbStyle) private var verbStyleRaw = WorkingVerbStyle.classic.rawValue
 
     var body: some View {
@@ -424,14 +423,10 @@ struct SubagentStatusFooter: View {
     /// 运行中:不提示 Esc(子 Agent 不能单独中断,只能在主会话停止本轮)。
     private var running: some View {
         let style = WorkingVerbStyle.resolve(verbStyleRaw)
-        return ActiveTimeline(interval: reduceMotion ? 1 : 0.15, start: entry.startedAt) { date in
+        return ActiveTimeline(interval: 1, start: entry.startedAt) { date in
             let seconds = Int(date.timeIntervalSince(entry.startedAt))
-            let tick = Int(date.timeIntervalSinceReferenceDate / 0.15)
             HStack(spacing: 8) {
-                Text(reduceMotion ? style.restingGlyph : WorkingStatus.glyph(tick: tick, style: style))
-                    .font(OMFonts.body.weight(.medium))
-                    .foregroundStyle(OMColors.accent)
-                    .frame(width: 16)
+                OMGlyphCycle(frames: style.glyphFrames, resting: style.restingGlyph, font: OMFonts.body.weight(.medium), color: OMColors.accent)
                 Text(WorkingStatus.line(verb: WorkingStatus.verb(seed: Int(entry.startedAt.timeIntervalSince1970), style: style), seconds: seconds, canInterrupt: false))
                     .font(OMFonts.small)
                     .foregroundStyle(OMColors.secondaryText)
