@@ -281,12 +281,6 @@ public final class SessionModel {
     public private(set) var capabilities = AgentCapabilities()
     /// 正在回放历史会话
     public private(set) var isReplaying = false
-    /// 会话记录文件(`~/.claude/projects/…/<id>.jsonl`)的已知修改时间:晚于它说明别的进程(如终端里的 claude)写了这个会话
-    var transcriptBaseline: Date?
-    /// `transcriptBaseline` 所属的会话 ID(会话切换后基线作废)
-    var transcriptBaselineSession: String?
-    /// 本应用上一轮结束的时间:结束后几秒内记录文件仍在落盘,这段时间的变化算自己写的
-    var lastTurnEndedAt: Date?
     /// 工作区文件索引(供 @ 补全)
     public let fileIndex = FileIndex()
     /// 最近的 stderr 行(诊断用,最多 200 行)
@@ -1171,7 +1165,6 @@ public final class SessionModel {
                 self.timeline.appendTurnSummary(TurnSummary(model: summaryModel, durationSeconds: Double(turnMs) / 1000, usage: usage, brand: summaryBrand, finishedAt: Date()))
             }
             self.isRunning = false
-            self.lastTurnEndedAt = Date()
             self.turnStartedAt = nil
             self.promptTask = nil
             if self.goal?.isActive == true { self.goal?.isActive = false }
@@ -2115,7 +2108,7 @@ struct AuthenticationFailure: Error, LocalizedError {
 }
 
 
-// MARK: - 外部写入同步(终端里的 claude 续写了同一个会话)
+// MARK: - 会话记录文件
 
 extension SessionModel {
     /// 会话记录文件路径(只认 Claude Code 的存放位置;其他引擎没有这个文件时返回 nil)。
@@ -2125,30 +2118,6 @@ extension SessionModel {
         let slug = String(workspace.path.map { $0.isASCII && ($0.isLetter || $0.isNumber) ? $0 : "-" })
         let path = NSHomeDirectory() + "/.claude/projects/\(slug)/\(sessionId).jsonl"
         return FileManager.default.fileExists(atPath: path) ? URL(fileURLWithPath: path) : nil
-    }
-
-    /// 检查会话记录是否被别的进程改动;空闲时发现改动就重新载入,让终端里续写的内容实时出现在应用里。
-    /// 由界面每隔几秒调用一次(仅当前可见的会话标签)。运行中、回放中、刚结束的回合不处理,避免把自己的写入当成外部改动。
-    public func syncExternalTranscript() async {
-        guard phase == .ready, !isRunning, !isReplaying, let sessionId, let url = transcriptURL else { return }
-        // 还没发过消息的空白会话:记录文件只会被 `/context` 等本地命令写入,没有可同步的内容,不回放(否则会被误判为空会话并隐藏)
-        guard turnNumber > 0 || !timeline.entries.isEmpty else { return }
-        let modified = await Task.detached(priority: .utility) {
-            (try? FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate]) as? Date
-        }.value
-        guard let modified, !isRunning, !isReplaying, self.sessionId == sessionId else { return }
-        // 本轮刚结束(记录文件还在落盘)或还没有基线:只更新基线
-        if transcriptBaseline == nil || transcriptBaselineSession != sessionId || Date().timeIntervalSince(lastTurnEndedAt ?? .distantPast) < 5 {
-            transcriptBaseline = modified
-            transcriptBaselineSession = sessionId
-            return
-        }
-        guard let baseline = transcriptBaseline, modified.timeIntervalSince(baseline) > 0.5 else { return }
-        // 文件还在被持续写入(终端里的 claude 正在输出):等它安静 1.5 秒再整体重载,避免每 2 秒重放一次造成闪烁
-        guard Date().timeIntervalSince(modified) > 1.5 else { return }
-        transcriptBaseline = modified
-        log.info("检测到会话被外部续写,重新载入", ["session": String(sessionId.prefix(8))])
-        openSession(SessionSummary(sessionId: sessionId, cwd: workspace.path, title: sessionTitle), force: true)
     }
 }
 

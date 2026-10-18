@@ -68,7 +68,6 @@ private struct ChatPane: View {
     let projectID: String
     let slot: String?
     private let appearance = AppearanceModel.shared
-    @Environment(\.tabIsActive) private var isActive
 
     var body: some View {
         Group {
@@ -81,14 +80,6 @@ private struct ChatPane: View {
             }
         }
         .task { workbench.ensureSession(project: projectID, slot: slot) }
-        .task(id: isActive) {
-            // 可见时每 2 秒看一眼会话记录:终端里的 claude 续写了同一个会话,应用里实时同步出来
-            guard isActive else { return }
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(2))
-                await workbench.conversations[ConversationKey(projectID: projectID, slot: slot)]?.syncExternalTranscript()
-            }
-        }
     }
 }
 
