@@ -30,6 +30,8 @@ struct TabBarView: View {
     var trailingInset: CGFloat = 0
     /// 标签是否超出可视宽度(决定是否显示「全部标签」下拉)
     @State private var overflowing = false
+    /// 滚动区可视宽度:标签内容至少撑满它,尾部空白才都归窗口拖动区
+    @State private var stripWidth: CGFloat = 0
     @State private var showOverflow = false
 
     /// 是否为第一个(主)标签组:只有它显示「+ 新对话」按钮。
@@ -53,11 +55,15 @@ struct TabBarView: View {
                         }
                         Color.clear
                             .frame(minWidth: 24, maxWidth: .infinity)
-                            .contentShape(Rectangle())
-                            .background(WindowDragArea())
-                            .onDrop(of: [.plainText, .fileURL], delegate: TabStripDropDelegate(workbench: workbench, groupID: group.id, index: nil))
+                            .windowDragGesture()
                     }
                     .padding(.horizontal, 8)
+                    .frame(minWidth: stripWidth, alignment: .leading)
+                }
+                // 放到标签之间/末尾空白处:追加到末尾(单个标签上的落点代理优先)
+                .onDrop(of: [.plainText, .fileURL], delegate: TabStripDropDelegate(workbench: workbench, groupID: group.id, index: nil))
+                .onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.width } action: { _, value in
+                    stripWidth = value
                 }
                 .onScrollGeometryChange(for: Bool.self) { $0.contentSize.width > $0.containerSize.width + 1 } action: { _, value in
                     overflowing = value

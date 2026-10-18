@@ -150,7 +150,8 @@ struct TabGroupView: View {
                 content(size: proxy.size)
                     .frame(width: proxy.size.width, height: proxy.size.height)
                     .clipped()
-                    .overlay { DropOverlay(zone: zone).allowsHitTesting(false) }
+                    // 拖拽结束后(松手在别处、被取消)落点高亮可能没收到 dropExited,以拖拽状态兜底清除
+                    .overlay { DropOverlay(zone: DockDrag.shared.hasPayload ? zone : nil).allowsHitTesting(false) }
                     .onDrop(of: [.plainText, .fileURL], delegate: GroupDropDelegate(workbench: workbench, groupID: group.id, size: proxy.size, zone: $zone))
             }
         }

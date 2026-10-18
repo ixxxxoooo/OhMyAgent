@@ -154,9 +154,13 @@ struct WindowDragArea: NSViewRepresentable {
         override var mouseDownCanMoveWindow: Bool { false }
 
         override func mouseDown(with event: NSEvent) {
+            guard let window else { return }
+            // 窗口默认不可被「按下即拖动」(见 WindowChrome.apply),仅在这里临时放开,拖动结束后恢复
+            window.isMovable = true
+            defer { window.isMovable = false }
             if event.clickCount == 2 {
-                window?.performZoom(nil)
-            } else if let window {
+                window.performZoom(nil)
+            } else {
                 window.performDrag(with: event)
             }
         }
@@ -170,6 +174,8 @@ enum WindowChrome {
     @MainActor
     static func apply(to window: NSWindow) {
         window.titlebarAppearsTransparent = true
+        // 标签、面板标题等可拖拽元素落在标题栏高度内,系统会把按下当成拖动窗口;窗口只通过 WindowDragArea 显式拖动
+        window.isMovable = false
         window.titleVisibility = .hidden
         window.styleMask.insert(.fullSizeContentView)
         for kind in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
@@ -201,5 +207,27 @@ enum MouseNavigationMonitor {
             }
             return handled ? nil : event
         }
+    }
+}
+
+extension View {
+    /// 让该区域像 `WindowDragArea` 一样可拖动窗口、双击缩放,但走 SwiftUI 手势:
+    /// 外层有 `contentShape` + 点击手势时 SwiftUI 会吞掉命中,背景里的 NSView 收不到按下(如标签栏空白处)。
+    func windowDragGesture() -> some View {
+        modifier(WindowDragGesture())
+    }
+}
+
+private struct WindowDragGesture: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 2, coordinateSpace: .global).onChanged { _ in
+                guard let window = NSApp.keyWindow, let event = NSApp.currentEvent else { return }
+                window.isMovable = true
+                defer { window.isMovable = false }
+                window.performDrag(with: event)
+            })
+            .simultaneousGesture(TapGesture(count: 2).onEnded { NSApp.keyWindow?.performZoom(nil) })
     }
 }
