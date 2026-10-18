@@ -128,12 +128,6 @@ struct UserMessageView: View {
         }
     }
 
-    /// 重试:把这条消息(文本 + 图片)作为新消息再发一次,原消息与回复保留;运行中不可用。
-    private func retry() {
-        guard let model = sticky?.model, !model.isRunning else { return }
-        model.send(entry.displayText, images: entry.attachments)
-    }
-
     private var messageCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             if entry.isSteered {
@@ -164,13 +158,15 @@ struct UserMessageView: View {
             HStack(spacing: 0) {
                 OMCopyButton(help: String(localized: "复制消息"), size: 12) { entry.text }
                 if !entry.isSteered {
-                    Button { retry() } label: {
-                        Image.om("rotate-cw", size: 12).foregroundStyle(OMColors.secondaryText).frame(width: 24, height: 24).contentShape(Rectangle())
+                    if sticky?.model?.isLastUserMessage(entry) == true {
+                        Button { sticky?.model?.retryUserMessage(entry) } label: {
+                            Image.om("rotate-cw", size: 12).foregroundStyle(OMColors.secondaryText).frame(width: 24, height: 24).contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(sticky?.model?.isRunning ?? true)
+                        .omTooltip("重试")
+                        .accessibilityLabel("重试")
                     }
-                    .buttonStyle(.plain)
-                    .disabled(sticky?.model?.isRunning ?? true)
-                    .omTooltip("重试")
-                    .accessibilityLabel("重试")
                     Button { sticky?.beginEditing(entry, pinned: false) } label: {
                         Image.om("square-pen", size: 12).foregroundStyle(OMColors.secondaryText).frame(width: 24, height: 24).contentShape(Rectangle())
                     }

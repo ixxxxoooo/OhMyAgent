@@ -593,6 +593,23 @@ public final class SessionModel {
         }
     }
 
+    /// 是否为最后一条用户消息(只有它可以「重试」覆盖原回答)。
+    /// - Parameter entry: 时间线里的用户消息条目
+    /// - Returns: 条目是用户消息且其后没有更新的用户消息
+    public func isLastUserMessage(_ entry: TimelineEntry) -> Bool {
+        entry.kind == .user && timeline.entries.last(where: { $0.kind == .user })?.id == entry.id
+    }
+
+    /// 重试最后一条用户消息:丢弃该消息及其后的旧回答,再用同样的文本与图片重新发送。
+    /// - Parameter entry: 要重试的用户消息(必须是最后一条;运行中无效)
+    public func retryUserMessage(_ entry: TimelineEntry) {
+        guard !isRunning, isLastUserMessage(entry), let index = timeline.entries.firstIndex(where: { $0.id == entry.id }) else { return }
+        let prompt = entry.displayText
+        let images = entry.attachments
+        timeline.reset(with: Array(timeline.entries[..<index]))
+        send(prompt, images: images)
+    }
+
     /// 把命令原样交给 Agent 执行(跳过客户端命令解析)。
     /// - Parameter command: 如 `/mcp reconnect github`
     public func sendToAgent(_ command: String) {
