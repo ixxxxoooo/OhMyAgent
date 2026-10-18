@@ -335,7 +335,10 @@ public struct SessionOptions: Equatable, Sendable {
         return .object(root)
     }
 
-    /// 纯文字会话(会话区)的最小 `_meta`:整体替换 Claude Code 系统提示、去掉全部内置工具、
+    /// 纯文字会话保留的内置工具:只开放联网能力(搜索与抓取网页),并预先放行免弹授权。
+    public static let plainChatTools = ["WebSearch", "WebFetch"]
+
+    /// 纯文字会话(会话区)的最小 `_meta`:整体替换 Claude Code 系统提示、只保留联网工具、
     /// 不读设置来源(CLAUDE.md、技能、hooks、插件)与 MCP,等同「普通聊天」,避免为用不到的上下文付费。
     /// - Parameters:
     ///   - base: 已合并好的会话 `_meta`(提供商映射、代理等;可为 nil)
@@ -355,7 +358,8 @@ public struct SessionOptions: Equatable, Sendable {
         if case .object(let object)? = options["extraArgs"] { extraArgs = object }
 
         root["systemPrompt"] = .string(systemPrompt)
-        options["tools"] = .array([])
+        options["tools"] = .array(plainChatTools.map { .string($0) })
+        options["allowedTools"] = .array(plainChatTools.map { .string($0) })
         options["settingSources"] = .array([])
         options["strictMcpConfig"] = .bool(true)
         extraArgs["disable-slash-commands"] = .null

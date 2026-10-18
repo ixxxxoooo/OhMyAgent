@@ -279,7 +279,8 @@ public final class WorkbenchModel {
 
     /// 会话区的系统提示(整体替换 Claude Code 默认提示,见 `SessionModel.isPlainChat`):像 ChatGPT 一样直接用文字回答,没有任何工具。
     public nonisolated static let chatAreaPrompt = """
-    你是一个通用对话助手。当前没有打开任何项目,也没有文件、命令或联网等工具,请直接用文字回答问题。\
+    你是一个通用对话助手。当前没有打开任何项目,也没有文件或命令工具,但可以使用联网搜索(WebSearch)与网页抓取(WebFetch)。\
+    涉及最新行情、新闻、版本等时效性信息时,请先联网查询再回答,并注明来源;其余问题直接用文字回答。\
     使用 Markdown 排版,回答语言跟随用户的提问;需要读写文件、执行命令时,请告诉用户到项目中进行。
     """
 

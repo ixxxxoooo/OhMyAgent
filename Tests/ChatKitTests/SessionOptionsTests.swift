@@ -217,7 +217,8 @@ struct WidthSliderPresetTests {
         let meta = SessionOptions.plainChat(mapped, systemPrompt: "只聊天", settingsEnv: ["ANTHROPIC_AUTH_TOKEN": "other", "ANTHROPIC_BASE_URL": "https://gw.example"])
         #expect(meta["systemPrompt"]?.stringValue == "只聊天")
         let options = meta["claudeCode"]?["options"]
-        #expect(options?["tools"] == .array([]))
+        #expect(options?["tools"] == .array([.string("WebSearch"), .string("WebFetch")]))
+        #expect(options?["allowedTools"] == options?["tools"])
         #expect(options?["settingSources"] == .array([]))
         #expect(options?["strictMcpConfig"] == .bool(true))
         #expect(options?["extraArgs"]?["disable-slash-commands"] == JSONValue.null)
