@@ -35,4 +35,14 @@ struct AppEnvTests {
         // 第二次不再复制
         #expect(AppEnv.seedDevDefaultsIfNeeded(defaults: defaults, stableValues: stable) == 0)
     }
+
+    @Test("useSystemTimeZone:清除继承来的 TZ,时区回到系统设置")
+    func systemTimeZone() {
+        setenv("TZ", "Pacific/Honolulu", 1)
+        NSTimeZone.resetSystemTimeZone()
+        #expect(TimeZone.current.identifier == "Pacific/Honolulu")
+        AppEnv.useSystemTimeZone()
+        #expect(getenv("TZ") == nil)
+        #expect(TimeZone.current.identifier != "Pacific/Honolulu" || TimeZone.autoupdatingCurrent.identifier == "Pacific/Honolulu")
+    }
 }

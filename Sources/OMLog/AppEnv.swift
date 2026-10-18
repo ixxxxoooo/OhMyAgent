@@ -8,6 +8,13 @@ import Foundation
 /// 开发版由 `Scripts/bundle.sh dev` 生成,Bundle ID 以 `.dev` 结尾;也可用环境变量 `OMA_DEV=1` 强制(调试用)。
 /// 开发版的 Application Support 与日志目录带 `-Dev` 后缀,首次启动时从稳定版复制一份(之后各自独立)。
 public enum AppEnv {
+    /// 以系统设置的时区为准:忽略从启动环境继承来的 `TZ`(例如从 `TZ=UTC` 的终端/CI 会话里启动,
+    /// 界面时间与日志会变成 UTC),并让本进程及其子进程(Agent 适配器、终端)都使用系统时区。须尽早调用。
+    public static func useSystemTimeZone() {
+        unsetenv("TZ")
+        NSTimeZone.resetSystemTimeZone()
+    }
+
     /// 稳定版数据目录名
     public static let stableFolderName = "OhMyAgent"
     /// 开发版数据目录名

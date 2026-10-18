@@ -32,5 +32,5 @@ export OMA_PROJECT_ROOT="$PWD"
 # 当前环境里所有 OMA_* 变量(调试钩子、OMA_AUTOSEND、OMA_ATTACH_IMAGE、OMA_DEMO_ROOT 等)都原样转发给应用
 ARGS=()
 for entry in ${(M)${(f)"$(env)"}:#OMA_*=*}; do ARGS+=(--env "$entry"); done
-open -g -n build/OhMyAgent.app "${ARGS[@]}"
+env -u TZ open -g -n build/OhMyAgent.app "${ARGS[@]}"
 echo "已以演示模式启动 OhMyAgent(沙盒:${OMA_DEMO_ROOT:-~/Library/Caches/OhMyAgent/Demo})"

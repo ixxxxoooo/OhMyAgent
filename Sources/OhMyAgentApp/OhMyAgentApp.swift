@@ -165,6 +165,8 @@ struct OhMyAgentApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
     init() {
+        // 时区以系统设置为准,不受继承来的 TZ 环境变量影响(须早于任何时间格式化与子进程启动)
+        AppEnv.useSystemTimeZone()
         // 关闭系统「自动填充」启发式:它会为每个应用拉起一个常驻的「自动填充」辅助进程(占内存、无用处,
         // 本应用没有账号/密码输入场景);须早于任何文本控件创建
         UserDefaults.standard.register(defaults: ["NSAutoFillHeuristicControllerEnabled": false])

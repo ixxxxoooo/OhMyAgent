@@ -25,5 +25,5 @@ done
 sleep 0.5
 
 Scripts/bundle.sh "$MODE"
-open -n "$APP" --env OMA_AGENT="${OMA_AGENT:-}" --env OMA_DEMO="${OMA_DEMO:-}" --env OMA_PROJECT_ROOT="$PWD"
+env -u TZ open -n "$APP" --env OMA_AGENT="${OMA_AGENT:-}" --env OMA_DEMO="${OMA_DEMO:-}" --env OMA_PROJECT_ROOT="$PWD"
 echo "已启动 $BUNDLE_ID"
