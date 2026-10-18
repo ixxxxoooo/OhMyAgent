@@ -795,6 +795,9 @@ struct ExploreGroupView: View {
             .accessibilityElement(children: .combine)
             .accessibilityLabel(group.summary)
             .accessibilityAddTraits(.isButton)
+            if !isExpanded && group.isRunning {
+                GroupLatestStepView(group: group)
+            }
             if isExpanded {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(group.entries) { entry in
