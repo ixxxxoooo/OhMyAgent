@@ -1,6 +1,6 @@
 // @author ixxxxoooo
 // 吸顶用户消息(对标 Cursor):向上滚动时,当前回合的用户消息固定在会话流顶部;
-// 下一条用户消息上来时把前一条顶出;双击用户消息放大为编辑窗,可切换模型并重新发送。
+// 下一条用户消息上来时把前一条顶出;单击用户消息放大为编辑窗,可切换模型并重新发送。
 
 import ChatKit
 import DesignSystem
@@ -150,7 +150,7 @@ struct StickyUserOverlay: View {
 }
 
 /// 吸顶卡(图4 风格,沿用底部输入框的玻璃卡片):附件缩略图 + 最多三行正文,
-/// 悬停出现「编辑」图标,双击放大编辑。
+/// 悬停出现「编辑」图标,单击放大编辑。
 struct StickyUserCard: View {
     let entry: TimelineEntry
     @Environment(\.stickyUser) private var sticky
@@ -188,7 +188,7 @@ struct StickyUserCard: View {
                     Image.om("square-pen", size: 12).foregroundStyle(OMColors.secondaryText).frame(width: 24, height: 24).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .omTooltip("放大编辑(双击)")
+                .omTooltip("放大编辑")
                 .accessibilityLabel("放大编辑")
             }
             .opacity(hovering ? 1 : 0)
@@ -196,10 +196,10 @@ struct StickyUserCard: View {
         }
         .contentShape(RoundedRectangle(cornerRadius: OMRadius.modal, style: .continuous))
         .onHover { hovering = $0 }
-        .onTapGesture(count: 2) { sticky?.beginEditing(entry, pinned: true) }
+        .onTapGesture { sticky?.beginEditing(entry, pinned: true) }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(String(localized: "你:\(entry.text)"))
-        .accessibilityHint(String(localized: "双击放大编辑"))
+        .accessibilityHint(String(localized: "点击放大编辑"))
     }
 }
 

@@ -10,6 +10,8 @@ public actor ScriptedAgent: ACPRequestHandler {
     var sessions: [String: String] = [:]
     var modes: [String: String] = [:]
     var models: [String: String] = [:]
+    /// 各会话的思考强度(仅演示模式提供 `thought_level` 选项)
+    var thoughts: [String: String] = [:]
     var sessionCounter = 0
     /// 本实例的会话 ID 前缀:并行测试里多个脚本 Agent 的 ID 互不相同(客户端按 ID 全局记忆「空会话」等状态)
     private let idTag = UUID().uuidString.prefix(6).lowercased()
@@ -91,7 +93,9 @@ public actor ScriptedAgent: ACPRequestHandler {
                     "mcpCapabilities": ["http": true, "sse": false],
                     "sessionCapabilities": ["list": .object([:]), "close": .object([:]), "resume": .object([:]), "fork": .object([:]), "delete": .object([:])],
                 ],
-                "agentInfo": ["name": "scripted-agent", "title": "Scripted Agent", "version": "0.1.0"],
+                "agentInfo": demoHistory
+                    ? ["name": "claude-agent-acp", "title": "Claude Code", "version": "2.1.0"]
+                    : ["name": "scripted-agent", "title": "Scripted Agent", "version": "0.1.0"],
                 "authMethods": [["id": "fake-login", "name": "模拟登录", "description": "测试用"]],
                 "_meta": ["steering": ["supported": true]],
             ]
@@ -104,7 +108,7 @@ public actor ScriptedAgent: ACPRequestHandler {
             let id = "scripted-\(idTag)-\(sessionCounter)"
             sessions[id] = p["cwd"]?.stringValue ?? "/"
             modes[id] = "default"
-            models[id] = "scripted-1"
+            models[id] = defaultModel
             Task { await self.sendCommands(sessionId: id) }
             return ["sessionId": .string(id), "configOptions": configOptions(sessionId: id)]
         case "session/list":
@@ -123,7 +127,7 @@ public actor ScriptedAgent: ACPRequestHandler {
             }
             sessions[id] = p["cwd"]?.stringValue ?? sessions[id] ?? "/"
             modes[id] = modes[id] ?? "default"
-            models[id] = models[id] ?? "scripted-1"
+            models[id] = models[id] ?? defaultModel
             if method == "session/load", demoHistory, let history = DemoHistory.session(id: id) {
                 await replayDemoHistory(history, cwd: sessions[id] ?? "/")
             } else if method == "session/load" {
@@ -138,7 +142,7 @@ public actor ScriptedAgent: ACPRequestHandler {
             let id = "scripted-\(idTag)-\(sessionCounter)"
             sessions[id] = p["cwd"]?.stringValue ?? "/"
             modes[id] = "default"
-            models[id] = "scripted-1"
+            models[id] = defaultModel
             return ["sessionId": .string(id), "configOptions": configOptions(sessionId: id)]
         case "session/delete":
             if let id = p["sessionId"]?.stringValue { sessions[id] = nil }
@@ -153,7 +157,7 @@ public actor ScriptedAgent: ACPRequestHandler {
             guard let id = p["sessionId"]?.stringValue, let configId = p["configId"]?.stringValue, let value = p["value"]?.stringValue else {
                 throw JSONRPCError(code: JSONRPCError.invalidParams, message: "缺少参数")
             }
-            if configId == "mode" { modes[id] = value } else if configId == "model" { models[id] = value }
+            if configId == "mode" { modes[id] = value } else if configId == "model" { models[id] = value } else if configId == "thought_level" { thoughts[id] = value }
             return ["configOptions": configOptions(sessionId: id)]
         case "session/prompt":
             return try await runPrompt(p)
@@ -168,26 +172,64 @@ public actor ScriptedAgent: ACPRequestHandler {
         }
     }
 
+    /// 默认模型 ID:演示模式为真实风格的 Claude 模型,其余保持测试用的 `scripted-1`。
+    var defaultModel: String { demoHistory ? "claude-sonnet-5-5" : "scripted-1" }
+
+    /// 构造某会话的配置选项(mode / model,演示模式另含 thought_level)。
+    /// - Parameter sessionId: 会话 ID
+    /// - Returns: `configOptions` JSON
     private func configOptions(sessionId: String) -> JSONValue {
-        [
+        let modeOptions: JSONValue = demoHistory
+            ? [
+                ["value": "default", "name": "Default"],
+                ["value": "acceptEdits", "name": "Accept Edits"],
+                ["value": "plan", "name": "Plan Mode"],
+                ["value": "auto", "name": "Auto"],
+                ["value": "dontAsk", "name": "Don't Ask"],
+                ["value": "bypassPermissions", "name": "Bypass Permissions"],
+            ]
+            : [
+                ["value": "default", "name": "Manual"],
+                ["value": "acceptEdits", "name": "Accept edits"],
+                ["value": "plan", "name": "Plan"],
+            ]
+        let modelOptions: JSONValue = demoHistory
+            ? [
+                ["value": "claude-fable-5-1", "name": "Claude Fable 5.1"],
+                ["value": "claude-opus-5-5", "name": "Claude Opus 5.5"],
+                ["value": "claude-sonnet-5-5", "name": "Claude Sonnet 5.5"],
+                ["value": "claude-haiku-5-5", "name": "Claude Haiku 5.5"],
+            ]
+            : [
+                ["value": "scripted-1", "name": "Scripted 1"],
+                ["value": "scripted-2", "name": "Scripted 2"],
+            ]
+        var options: [JSONValue] = [
             [
                 "id": "mode", "name": "Mode", "category": "mode", "type": "select",
                 "currentValue": .string(modes[sessionId] ?? "default"),
-                "options": [
-                    ["value": "default", "name": "Manual"],
-                    ["value": "acceptEdits", "name": "Accept edits"],
-                    ["value": "plan", "name": "Plan"],
-                ],
+                "options": modeOptions,
             ],
             [
                 "id": "model", "name": "Model", "category": "model", "type": "select",
-                "currentValue": .string(models[sessionId] ?? "scripted-1"),
-                "options": [
-                    ["value": "scripted-1", "name": "Scripted 1"],
-                    ["value": "scripted-2", "name": "Scripted 2"],
-                ],
+                "currentValue": .string(models[sessionId] ?? defaultModel),
+                "options": modelOptions,
             ],
         ]
+        if demoHistory {
+            options.append([
+                "id": "thought_level", "name": "Thinking", "category": "thought_level", "type": "select",
+                "currentValue": .string(thoughts[sessionId] ?? "high"),
+                "options": [
+                    ["value": "low", "name": "Low"],
+                    ["value": "medium", "name": "Medium"],
+                    ["value": "high", "name": "High"],
+                    ["value": "xhigh", "name": "Extra High"],
+                    ["value": "max", "name": "Max"],
+                ],
+            ])
+        }
+        return .array(options)
     }
 
     private func sendCommands(sessionId: String) async {
@@ -324,10 +366,11 @@ public actor ScriptedAgent: ACPRequestHandler {
     }
 
     /// `/context` 的模拟输出。
-    static let contextReport = """
+    static func contextReport(model: String) -> String {
+        """
     ## Context Usage
 
-    **Model:** scripted-1  
+    **Model:** \(model)  
     **Tokens:** 62.4k / 200k (31%)
 
     ### Estimated usage by category
@@ -342,6 +385,7 @@ public actor ScriptedAgent: ACPRequestHandler {
     | Free space | 105.6k | 52.8% |
     | Autocompact buffer | 32k | 16% |
     """
+    }
 
     private func runPrompt(_ p: JSONValue) async throws -> JSONValue {
         guard let sessionId = p["sessionId"]?.stringValue else {
@@ -353,7 +397,7 @@ public actor ScriptedAgent: ACPRequestHandler {
         let text = (p["prompt"]?.arrayValue ?? []).compactMap { $0["text"]?.stringValue }.joined(separator: "\n")
         if text.trimmingCharacters(in: .whitespacesAndNewlines) == "/context" {
             // 模拟 Claude 的本地命令:不调用模型,直接输出 Markdown 明细(格式与真实抓取一致)
-            await update(sessionId, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": .string(Self.contextReport)]])
+            await update(sessionId, ["sessionUpdate": "agent_message_chunk", "content": ["type": "text", "text": .string(Self.contextReport(model: models[sessionId] ?? defaultModel))]])
             return ["stopReason": "end_turn"]
         }
         if text.contains("#notice") {

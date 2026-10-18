@@ -2440,3 +2440,4 @@
 "%lld秒" = "%llds";
 "%lld分%lld秒" = "%lldm %llds";
 "%lld小时%lld分" = "%lldh %lldm";
+"点击放大编辑" = "Click to edit in a larger editor";
