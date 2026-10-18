@@ -2131,6 +2131,8 @@ extension SessionModel {
     /// 由界面每隔几秒调用一次(仅当前可见的会话标签)。运行中、回放中、刚结束的回合不处理,避免把自己的写入当成外部改动。
     public func syncExternalTranscript() async {
         guard phase == .ready, !isRunning, !isReplaying, let sessionId, let url = transcriptURL else { return }
+        // 还没发过消息的空白会话:记录文件只会被 `/context` 等本地命令写入,没有可同步的内容,不回放(否则会被误判为空会话并隐藏)
+        guard turnNumber > 0 || !timeline.entries.isEmpty else { return }
         let modified = await Task.detached(priority: .utility) {
             (try? FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate]) as? Date
         }.value
