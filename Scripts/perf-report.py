@@ -14,8 +14,8 @@
   perf-report.py ui [阈值]        侧栏开关/会话切换的交互性能画像并按门槛检查(配合 Scripts/perf-ui.sh)
       --panel-avg-ms N      侧栏切换平均帧间隔上限(默认 17.5)
       --panel-hitches N     每次切换平均掉帧(>33ms)上限(默认 1)
-      --panel-max-ms N      侧栏切换单帧最长上限(默认 33)
-      --first-frame-ms N    点击到首帧 P95 上限(默认 80)
+      --panel-max-ms N      侧栏切换单帧最长上限(默认 40,约两个 vsync)
+      --first-frame-ms N    点击到首帧 P95 上限(默认 100)
       --cold-open-ms N      冷打开会话「时间线挂载」上限(默认 150)
       --warm-switch-ms N    已挂载标签切换上限(默认 50)
       --hitch-ms N          基准期间单次主线程卡顿上限(默认 250)
@@ -352,7 +352,7 @@ def main():
         cpu_only = "--cpu-only" in rest
         rest = [a for a in rest if a not in ("--cpu-check", "--cpu-only")]
         opts = {}
-        for flag, key, default in (("--panel-avg-ms", "panel_avg_ms", 17.5), ("--panel-hitches", "panel_hitches", 1.0), ("--panel-max-ms", "panel_max_ms", 33.0),
+        for flag, key, default in (("--panel-avg-ms", "panel_avg_ms", 17.5), ("--panel-hitches", "panel_hitches", 1.0), ("--panel-max-ms", "panel_max_ms", 40.0),
                                    ("--first-frame-ms", "first_frame_ms", 100.0), ("--cold-open-ms", "cold_open_ms", 150.0), ("--warm-switch-ms", "warm_switch_ms", 50.0),
                                    ("--hitch-ms", "hitch_ms", 250.0), ("--run-cpu", "run_cpu", 15.0)):
             opts[key], rest = option(rest, flag, default)

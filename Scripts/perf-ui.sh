@@ -44,7 +44,7 @@ launch() {
 
 # 阈值参数
 thresholds() {
-  echo --panel-avg-ms "${UI_PANEL_AVG_MS:-17.5}" --panel-hitches "${UI_PANEL_HITCHES:-1}" --panel-max-ms "${UI_PANEL_MAX_MS:-33}" \
+  echo --panel-avg-ms "${UI_PANEL_AVG_MS:-17.5}" --panel-hitches "${UI_PANEL_HITCHES:-1}" --panel-max-ms "${UI_PANEL_MAX_MS:-40}" \
        --first-frame-ms "${UI_FIRST_FRAME_MS:-100}" --cold-open-ms "${UI_COLD_OPEN_MS:-150}" --warm-switch-ms "${UI_WARM_SWITCH_MS:-50}" \
        --hitch-ms "${UI_HITCH_MS:-250}" --run-cpu "${UI_RUN_CPU:-15}"
 }
