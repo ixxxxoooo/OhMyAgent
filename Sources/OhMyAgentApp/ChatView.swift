@@ -51,6 +51,7 @@ struct ChatView: View {
             OMColors.surface.ignoresSafeArea()
                 .contentShape(Rectangle())
                 .onTapGesture { closeUsagePanel() }
+                .accessibilityHidden(true) // 纯装饰的点击空白关闭面板
             // 输入区在两种布局下处于同一结构位置,发送首条消息时不会被重建(保留焦点与草稿)
             VStack(spacing: 0) {
                 if isEmptySession {
@@ -61,6 +62,7 @@ struct ChatView: View {
                             // 面板展开时,点击会话区(面板外)关闭面板
                             if usageOpen {
                                 Color.clear.contentShape(Rectangle()).onTapGesture { closeUsagePanel() }
+                                    .accessibilityHidden(true)
                             }
                         }
                 }
