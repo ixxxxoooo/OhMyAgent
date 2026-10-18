@@ -85,7 +85,7 @@ enum AutomationRunner {
             return AutomationRunOutcome(status: .failed, summary: String(localized: "连接 Agent 超时"))
         }
         if let option = model.option(category: "mode"), option.options.contains(where: { $0.value == automation.permissionMode.acpValue }) {
-            model.setConfigOption(option.id, value: automation.permissionMode.acpValue)
+            model.setConfigOption(option.id, value: automation.permissionMode.acpValue, remember: false)
             try? await Task.sleep(for: .milliseconds(400))
         }
 

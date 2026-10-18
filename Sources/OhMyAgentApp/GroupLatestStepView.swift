@@ -56,13 +56,19 @@ struct GroupLatestStepView: View {
         .padding(.leading, 28)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: latest?.id)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: showsPlanning)
-        .task(id: latest?.id) {
-            // 新工具开始或空窗重新计时:先收起「规划」行,空窗持续 0.7 秒后才出现
+        .task(id: GapKey(toolID: latest?.id, inGap: inGap)) {
+            // 新工具开始、或最后一个工具刚结束(进入空窗)时重新计时:先收起「规划」行,空窗持续 0.7 秒后才出现
             gapReady = false
             guard inGap else { return }
             try? await Task.sleep(for: .milliseconds(700))
             if !Task.isCancelled { gapReady = true }
         }
+    }
+
+    /// 空窗计时任务的标识:工具变化或「是否空窗」变化都要重新计时。
+    private struct GapKey: Equatable {
+        let toolID: UUID?
+        let inGap: Bool
     }
 
     /// 行的滚入/滚出过渡。

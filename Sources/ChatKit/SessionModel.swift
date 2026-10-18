@@ -428,6 +428,7 @@ public final class SessionModel {
                     let setup = try await self.newSessionAuthenticating(client: client, methods: result.authMethods, servers: prepared.servers)
                     self.sessionId = setup.sessionId
                     self.configOptions = setup.configOptions
+                    self.applyPreferredMode()
                 }
                 self.restoreTarget = nil
                 self.phase = .ready
@@ -1230,6 +1231,7 @@ public final class SessionModel {
                 EmptySessionRegistry.hide(setup.sessionId)
                 self?.sessionId = setup.sessionId
                 self?.configOptions = setup.configOptions
+                self?.applyPreferredMode()
             } catch {
                 self?.log.error("创建新对话失败", error: error)
                 self?.timeline.appendNotice(String(localized: "创建新对话失败:\(error.localizedDescription)"), isError: true)
@@ -1635,6 +1637,7 @@ public final class SessionModel {
         sessionId = setup.sessionId
         configOptions = setup.configOptions
         contextUsage = nil
+        applyPreferredMode()
     }
 
     // MARK: - 配置选项
@@ -1643,11 +1646,14 @@ public final class SessionModel {
     /// - Parameters:
     ///   - optionId: 选项 ID
     ///   - value: 新值
-    public func setConfigOption(_ optionId: String, value: String) {
+    ///   - remember: 权限模式是否记为偏好(自动化、沿用偏好本身传 false,避免覆盖用户的选择)
+    public func setConfigOption(_ optionId: String, value: String, remember: Bool = true) {
         guard let client, let sessionId else { return }
         // 切换模型时记录切换前的显示名,成功后在时间线插入分割线
         let isModel = configOptions.first { $0.id == optionId }?.category == "model"
         let previous = isModel ? modelLabel(forValue: configOptions.first { $0.id == optionId }?.currentValue.stringValue) : nil
+        // 用户选择的权限模式记下来,新开会话时沿用
+        if remember, configOptions.first(where: { $0.id == optionId })?.category == "mode" { PreferredMode.save(value, agentId: activeDescriptor.id) }
         Task { [weak self] in
             do {
                 let updated = try await client.setConfigOption(sessionId: sessionId, configId: optionId, value: .string(value))
