@@ -35,6 +35,7 @@ extension DemoScenarios {
         list.append(contentsOf: tickerScenarios)
         list.append(contentsOf: mcpCatalogScenarios)
         list.append(contentsOf: moreToolScenarios)
+        list.append(contentsOf: heavyScenarios)
         return list
     }()
 }
