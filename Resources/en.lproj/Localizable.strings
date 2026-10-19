@@ -2631,3 +2631,5 @@
 "启用会话休眠" = "Enable session hibernation";
 "系统内存紧张时提前休眠" = "Hibernate earlier when system memory is low";
 "Agent 进程退出,%lld 个后台命令可能已被中断" = "Agent process exited. %lld background command(s) may have been interrupted.";
+"显示更早的 %lld 轮对话" = "Show %lld earlier turns";
+"显示更早的对话" = "Show earlier conversation";

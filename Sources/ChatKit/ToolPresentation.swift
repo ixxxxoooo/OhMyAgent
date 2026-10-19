@@ -366,8 +366,27 @@ public final class TimelineItemsCache {
     private var count = -1
     private var density: ToolDensity = .standard
     private var items: [TimelineItem] = []
+    /// 分组结果的代数:每次重新分组加一,用于判断窗口切片缓存是否仍有效
+    private var generation = 0
+    private var sliceKey: (generation: Int, turns: Int)?
+    private var slice: TimelineWindow.Slice?
 
     public init() {}
+
+    /// 取窗口切片(只含最近 `visibleTurns` 轮);分组结果与窗口大小都没变时复用上次切片。
+    /// - Parameters:
+    ///   - store: 时间线
+    ///   - density: 工具调用详细程度
+    ///   - visibleTurns: 窗口大小(轮数)
+    /// - Returns: 窗口切片
+    public func windowed(for store: TimelineStore, density: ToolDensity = .standard, visibleTurns: Int) -> TimelineWindow.Slice {
+        let all = items(for: store, density: density)
+        if let key = sliceKey, key.generation == generation, key.turns == visibleTurns, let slice { return slice }
+        let result = TimelineWindow.slice(all, visibleTurns: visibleTurns)
+        slice = result
+        sliceKey = (generation, visibleTurns)
+        return result
+    }
 
     /// 取分组结果。
     /// - Parameters:
@@ -378,6 +397,7 @@ public final class TimelineItemsCache {
         if owner == ObjectIdentifier(store), store.structureRevision == revision, store.entries.count == count, self.density == density { return items }
         let span = Log.perf.span("时间线分组", warnMs: 8, quiet: true, ["entries": "\(store.entries.count)"])
         items = TimelineGrouping.group(store.entries, density: density)
+        generation += 1
         span.end()
         self.density = density
         owner = ObjectIdentifier(store)

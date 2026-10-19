@@ -21,6 +21,8 @@ struct ChatView: View {
     @State private var sticky = StickyUserState()
     /// 分组结果缓存(输入区等无关状态变化时不重复分组)
     @State private var itemsCache = TimelineItemsCache()
+    /// 窗口内渲染的最近轮数:长会话只挂载最近若干轮,更早的折在顶部「显示更早」里(见 `TimelineWindow`)
+    @State private var visibleTurns = TimelineWindow.defaultTurns
     /// 贴底滚动的帧内合并:内容高度变化与时间线修订号变化在同一回合触发时只 scrollTo 一次
     @State private var followScroll = FrameCoalescedAction()
     @AppStorage(ClientPrefs.Key.toolDensity) private var toolDensityRaw = ToolDensity.standard.rawValue
@@ -80,6 +82,8 @@ struct ChatView: View {
         .environment(\.stickyUser, sticky)
         .animation(omShouldReduceMotion() ? nil : .easeOut(duration: 0.15), value: sticky.editing?.id)
         .onAppear { sticky.bind(model) }
+        // 换了会话(同一个视图被复用到别的会话)时窗口回到默认大小
+        .onChange(of: ObjectIdentifier(model)) { visibleTurns = TimelineWindow.defaultTurns }
     }
 
     /// 底部(新会话时居中)的输入区栈:权限/提问/连接失败卡、计划与目标、用量面板、输入框与页脚。
@@ -129,11 +133,28 @@ struct ChatView: View {
         .frame(maxWidth: .infinity)
     }
 
+    /// 工具调用详细程度
+    private var toolDensity: ToolDensity { ToolDensity(rawValue: toolDensityRaw) ?? .standard }
+
+    /// 展开更早的若干轮;保持当前顶部那一条不动(用户是点顶部的「显示更早」按钮,不能因为上方长出内容而被顶走)。
+    private func showEarlierTurns(anchor: UUID?) {
+        visibleTurns += TimelineWindow.pageTurns
+        guard let anchor else { return }
+        Task { @MainActor in
+            await Task.yield()
+            position.scrollTo(id: anchor, anchor: .top)
+        }
+    }
+
     private var timeline: some View {
-        let items = itemsCache.items(for: model.timeline, density: ToolDensity(rawValue: toolDensityRaw) ?? .standard)
+        let slice = itemsCache.windowed(for: model.timeline, density: toolDensity, visibleTurns: visibleTurns)
+        let items = slice.items
         let tailID = model.isRunning ? items.last?.id : nil
         return ScrollView {
             LazyVStack(alignment: .leading, spacing: AppearanceModel.shared.isCompact ? 7 : 14) {
+                if slice.hiddenTurns > 0 {
+                    EarlierTurnsRow(hiddenTurns: slice.hiddenTurns) { showEarlierTurns(anchor: items.first?.id) }
+                }
                 ForEach(items) { item in
                     // Equatable:结构不变时不因父视图重新求值而重建行(行内容由条目自身的可观察状态驱动)
                     TimelineItemView(item: item).equatable()
@@ -192,7 +213,17 @@ struct ChatView: View {
             ConversationAnchorRail(model: model, sticky: sticky) { id in
                 // 跳转到某条提问:暂停贴底自动跟随,避免流式输出把视口拽回底部
                 sticky.followSuspended = true
-                omWithAnimation { position.scrollTo(id: id, anchor: .top) }
+                // 目标提问在窗口之外(被折叠的更早轮次)时,先把窗口扩到能包含它,下一回合再滚过去
+                let all = itemsCache.items(for: model.timeline, density: toolDensity)
+                if let needed = TimelineWindow.turnsToReveal(id, in: all, visibleTurns: visibleTurns) {
+                    visibleTurns = needed
+                    Task { @MainActor in
+                        await Task.yield()
+                        omWithAnimation { position.scrollTo(id: id, anchor: .top) }
+                    }
+                } else {
+                    omWithAnimation { position.scrollTo(id: id, anchor: .top) }
+                }
             }
         }
         .onAppear {
@@ -224,6 +255,25 @@ struct ChatView: View {
             .padding(.bottom, 10)
             .transition(.opacity.combined(with: .offset(y: 6)))
         }
+    }
+}
+
+/// 时间线顶部的「显示更早的 N 轮对话」入口(长会话窗口化后更早的轮次折在这里)。
+private struct EarlierTurnsRow: View {
+    let hiddenTurns: Int
+    let action: () -> Void
+
+    var body: some View {
+        HStack {
+            Spacer(minLength: 0)
+            Button(action: action) {
+                Label("显示更早的 \(hiddenTurns) 轮对话", om: "chevron-up", size: 12)
+            }
+            .buttonStyle(.omSecondary)
+            .accessibilityLabel(String(localized: "显示更早的对话"))
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 4)
     }
 }
 
