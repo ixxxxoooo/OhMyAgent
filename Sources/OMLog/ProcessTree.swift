@@ -27,7 +27,8 @@ public enum ProcessTree {
     static func name(of pid: Int32) -> String? {
         var buffer = [CChar](repeating: 0, count: 256)
         guard proc_name(pid, &buffer, UInt32(buffer.count)) > 0 else { return nil }
-        return String(cString: buffer)
+        // 截掉终止符后按 UTF-8 解码(`String(cString:)` 对数组入参已弃用)
+        return String(decoding: buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
     }
 
     /// 全部后代进程号(广度优先,最多 512 个防止异常树)。

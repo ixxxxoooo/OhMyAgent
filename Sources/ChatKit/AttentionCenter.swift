@@ -241,12 +241,16 @@ public enum RecentStore {
         // 原始列表没变且距上次检查不到 TTL 时直接复用结果(目录被删除最迟 TTL 后体现)
         let now = ContinuousClock.now
         let owner = ObjectIdentifier(defaults)
-        if let hit = projectsCache.withLock({ cache -> [String]? in
-            guard let cache, cache.owner == owner, cache.raw == list, now - cache.at < projectsCacheTTL else { return nil }
+        if let hit = projectsCache.withLock({ caches -> [String]? in
+            guard let cache = caches[owner], cache.raw == list, now - cache.at < projectsCacheTTL else { return nil }
             return cache.filtered
         }) { return hit }
         let filtered = list.filter { FileManager.default.fileExists(atPath: $0) }
-        projectsCache.withLock { $0 = ProjectsCache(owner: owner, raw: list, filtered: filtered, at: now) }
+        projectsCache.withLock { caches in
+            // 每个 UserDefaults 一份缓存(生产只有一个;测试各用独立 suite),数量设上限防止无限增长
+            if caches.count >= 64, caches[owner] == nil { caches.removeAll() }
+            caches[owner] = ProjectsCache(raw: list, filtered: filtered, at: now)
+        }
         return filtered
     }
 
@@ -254,15 +258,14 @@ public enum RecentStore {
     static let projectsCacheTTL: Duration = .seconds(5)
 
     private struct ProjectsCache: Sendable {
-        let owner: ObjectIdentifier
         let raw: [String]
         let filtered: [String]
         let at: ContinuousClock.Instant
     }
-    private static let projectsCache = OSAllocatedUnfairLock<ProjectsCache?>(initialState: nil)
+    private static let projectsCache = OSAllocatedUnfairLock<[ObjectIdentifier: ProjectsCache]>(initialState: [:])
 
     /// 丢弃最近项目缓存(测试用)。
-    static func resetProjectsCache() { projectsCache.withLock { $0 = nil } }
+    static func resetProjectsCache() { projectsCache.withLock { $0.removeAll() } }
 
     /// 记录项目(去重置顶,最多 12 个)。
     public static func recordProject(_ path: String, _ defaults: UserDefaults = RecentStore.defaults) {
