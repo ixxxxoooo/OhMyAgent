@@ -11,20 +11,27 @@ import SwiftUI
 let chatScrollSpace = "chatScroll"
 
 /// 吸顶状态:最靠上的可见条目、各用户消息行的位置与解析出的吸顶目标。
-/// 只在目标变化时写 `target`,避免滚动中频繁刷新依赖它的视图。
+/// 滚动中每个可见用户行每帧都会上报位置:位置字典不参与观察(`@ObservationIgnored`),
+/// 只发布取整后的 `pushOffset` 与解析出的 `target`(变化才写),避免滚动帧率刷新依赖它们的视图。
 @MainActor
 @Observable
 final class StickyUserState {
     /// 当前可见的最靠上条目的下标
     private(set) var topIndex: Int?
-    /// 各用户消息行在滚动视口中的顶边 Y
-    private(set) var userMinY: [UUID: CGFloat] = [:]
+    /// 各用户消息行在滚动视口中的顶边 Y(不参与观察:每帧都在变)
+    @ObservationIgnored private(set) var userMinY: [UUID: CGFloat] = [:]
     /// 视口是否贴在时间线最底部(锚点导航据此高亮:最后几条提问滚不到顶部,只能看视口是否已到底)
     var atBottom = false
-    /// 吸顶卡(仅卡片本体)高度
-    var cardHeight: CGFloat = 0
+    /// 吸顶卡(仅卡片本体)高度(不参与观察;变化时重新解析)
+    @ObservationIgnored var cardHeight: CGFloat = 0 {
+        didSet { if cardHeight != oldValue { recompute() } }
+    }
     /// 当前吸顶目标
     private(set) var target: StickyUser.Target?
+    /// 吸顶卡被下一条用户消息顶出的位移(≤ 0,取整后才发布)
+    private(set) var pushOffset: CGFloat = 0
+    /// 条目 ID → 下标表(按结构修订号缓存;不参与观察)
+    @ObservationIgnored private var indexTable = EntryIndexTable()
     /// 正在「编辑并重新发送」的用户消息(非 nil 时弹出编辑窗)
     var editing: TimelineEntry?
     /// 编辑是从吸顶卡发起的:编辑卡就悬浮在顶部、向下展开,不跳回消息原来的滚动位置
@@ -63,30 +70,51 @@ final class StickyUserState {
     /// 可见条目集合变化:取其中最靠上的一条。
     /// - Parameter ids: 可见条目 ID(分组的 ID 等于其首个条目的 ID)
     func updateVisible(_ ids: [UUID]) {
-        guard let entries = model?.timeline.entries else { return }
-        let visible = Set(ids)
-        let index = entries.firstIndex { visible.contains($0.id) }
+        guard let timeline = model?.timeline else { return }
+        // 经下标表取可见条目里最小的下标(O(可见数)),而不是对全部条目线性扫描
+        let index = indexTable.minIndex(of: ids, in: timeline)
         if index != topIndex { topIndex = index }
         recompute()
     }
 
-    /// 用户消息行位置变化。
+    /// 用户消息行位置变化。只有「顶部条目」与「下一条用户消息」的位置会影响解析结果,
+    /// 其余行的上报只记录、不触发重新解析。
     func report(_ id: UUID, minY: CGFloat) {
         guard userMinY[id] != minY else { return }
         userMinY[id] = minY
+        guard isRelevant(id) else { return }
         recompute()
     }
 
     /// 用户消息行离开渲染范围。
     func forget(_ id: UUID) {
         guard userMinY.removeValue(forKey: id) != nil else { return }
+        guard isRelevant(id) else { return }
         recompute()
+    }
+
+    /// 该条目的位置是否影响吸顶解析:当前顶部条目,或当前目标的「下一条用户消息」。
+    private func isRelevant(_ id: UUID) -> Bool {
+        if id == target?.nextID { return true }
+        guard let topIndex, let entries = model?.timeline.entries, entries.indices.contains(topIndex) else { return true }
+        return entries[topIndex].id == id
     }
 
     private func recompute() {
         guard let entries = model?.timeline.entries else { return }
         let next = StickyUser.resolve(entries: entries, topIndex: topIndex, userMinY: userMinY, pushZone: cardHeight + 24)
         if next != target { target = next }
+        // 取整后才发布:亚像素抖动不触发刷新
+        let push = next.flatMap { target in
+            StickyUser.pushOffset(nextMinY: target.nextID.flatMap { userMinY[$0] }, cardHeight: cardHeight)
+        }.map { $0.rounded() } ?? 0
+        if push != pushOffset { pushOffset = push }
+    }
+
+    /// 按 ID 取条目(经下标表,O(1));不在时间线里返回 nil。
+    func entry(for id: UUID) -> TimelineEntry? {
+        guard let timeline = model?.timeline else { return nil }
+        return indexTable.entry(for: id, in: timeline)
     }
 }
 
@@ -112,6 +140,41 @@ struct StickyFadeBackdrop: View {
     }
 }
 
+/// 条目 ID → 下标表:随时间线结构修订号(与条目数)失效重建,查询 O(1)。
+@MainActor
+struct EntryIndexTable {
+    private var revision = -1
+    private var count = -1
+    private var owner: ObjectIdentifier?
+    private var table: [UUID: Int] = [:]
+
+    /// 保证表与当前时间线一致(结构修订号、条目数或所属时间线变化时重建)。
+    private mutating func refresh(_ timeline: TimelineStore) {
+        let id = ObjectIdentifier(timeline)
+        guard owner != id || revision != timeline.structureRevision || count != timeline.entries.count else { return }
+        var next: [UUID: Int] = [:]
+        next.reserveCapacity(timeline.entries.count)
+        for (index, entry) in timeline.entries.enumerated() { next[entry.id] = index }
+        table = next
+        owner = id
+        revision = timeline.structureRevision
+        count = timeline.entries.count
+    }
+
+    /// 一组 ID 里在时间线中最靠前的下标;都不在时间线里返回 nil。
+    mutating func minIndex(of ids: [UUID], in timeline: TimelineStore) -> Int? {
+        refresh(timeline)
+        return ids.compactMap { table[$0] }.min()
+    }
+
+    /// 按 ID 取条目。
+    mutating func entry(for id: UUID, in timeline: TimelineStore) -> TimelineEntry? {
+        refresh(timeline)
+        guard let index = table[id], timeline.entries.indices.contains(index) else { return nil }
+        return timeline.entries[index]
+    }
+}
+
 /// 叠在会话流顶部的吸顶层。
 struct StickyUserOverlay: View {
     let model: SessionModel
@@ -131,9 +194,8 @@ struct StickyUserOverlay: View {
                 .background(alignment: .top) { StickyFadeBackdrop() }
                 .transition(.opacity)
         } else if let target = state.target, target.stickyID != state.editing?.id,
-                  let entry = model.timeline.entries.first(where: { $0.id == target.stickyID }) {
+                  let entry = state.entry(for: target.stickyID) {
             // 正在原位编辑的那条不再吸顶,避免与行内编辑卡重复
-            let push = StickyUser.pushOffset(nextMinY: target.nextID.flatMap { state.userMinY[$0] }, cardHeight: state.cardHeight)
             StickyUserCard(entry: entry)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { state.cardHeight = $0 }
                 .frame(maxWidth: maxWidth)
@@ -143,7 +205,7 @@ struct StickyUserOverlay: View {
                 .frame(maxWidth: .infinity)
                 // 卡片下缘渐隐进内容,和会话流底部淡出衔接
                 .background(alignment: .top) { StickyFadeBackdrop() }
-                .offset(y: push)
+                .offset(y: state.pushOffset)
                 .transition(.opacity)
         }
     }
