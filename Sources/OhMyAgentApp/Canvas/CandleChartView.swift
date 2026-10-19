@@ -127,7 +127,9 @@ struct CandleChartView: View {
                 .onContinuousHover { phase in
                     switch phase {
                     case .active(let point):
-                        let origin = geo[proxy.plotFrame!].origin.x
+                        // 图表尚未完成布局时没有绘图区,忽略这次悬停
+                        guard let plotFrame = proxy.plotFrame else { return }
+                        let origin = geo[plotFrame].origin.x
                         hovered = proxy.value(atX: point.x - origin, as: Double.self).map { min(max(Int($0.rounded()), 0), count - 1) }
                     case .ended: hovered = nil
                     }
