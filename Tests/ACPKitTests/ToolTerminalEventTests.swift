@@ -53,6 +53,8 @@ struct ToolTerminalEventTests {
         #expect(ToolTerminalEvent.backgroundOutputPath(in: text) == "/private/tmp/claude-501/-Users-x-proj/abc/tasks/bk7.output")
         let trailing = "Command running in background with ID: bk7. Output is being written to: /tmp/a/bk7.log."
         #expect(ToolTerminalEvent.backgroundOutputPath(in: trailing) == "/tmp/a/bk7.log")
+        let moved = "Command was moved to the background (ID: b6tugu3ij) so that a message that arrived while it was running can reach you; it was not interrupted. Output is being written to: /private/tmp/claude-501/-Users-x/bb46/tasks/b6tugu3ij.output. You will be notified when it completes."
+        #expect(ToolTerminalEvent.backgroundOutputPath(in: moved) == "/private/tmp/claude-501/-Users-x/bb46/tasks/b6tugu3ij.output")
         #expect(ToolTerminalEvent.backgroundOutputPath(in: "hello world") == nil)
         #expect(ToolTerminalEvent.backgroundOutputPath(in: "Output is being written to: /tmp/x.output") == nil, "不是后台命令的结果文字不识别")
     }

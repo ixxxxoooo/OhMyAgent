@@ -51,12 +51,13 @@ public struct ToolTerminalEvent: Sendable, Hashable {
     }
 
     /// 从后台命令的结果文字里取出输出文件路径。
-    /// Claude Code 的后台 Bash 结果形如「Command running in background with ID: bk1. Output is being written to: /tmp/…/tasks/bk1.output」。
+    /// Claude Code 的后台 Bash 结果形如「Command running in background with ID: bk1. Output is being written to: /tmp/…/tasks/bk1.output」;
+    /// 前台命令运行中被转入后台(有新消息到达等)时形如「Command was moved to the background (ID: bk1) … Output is being written to: …」。
     /// - Parameter text: 工具结果文字
     /// - Returns: 输出文件路径;不是后台命令的结果时返回 nil
     public static func backgroundOutputPath(in text: String) -> String? {
         let marker = "Output is being written to:"
-        guard text.contains("running in background"), let range = text.range(of: marker) else { return nil }
+        guard text.contains("running in background") || text.contains("moved to the background"), let range = text.range(of: marker) else { return nil }
         let rest = text[range.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
         // 路径通常以 .output 结尾;否则取到第一个空白为止,并去掉句末的句号
         if let end = rest.range(of: ".output") { return String(rest[..<end.upperBound]) }
