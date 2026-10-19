@@ -257,6 +257,17 @@ struct TableBlockView: View {
     let rows: [[String]]
 
     var body: some View {
+        // 内容超出容器宽度时可左右滚动(单元格不折行、不截断)
+        ScrollView(.horizontal, showsIndicators: false) {
+            grid
+                .fixedSize(horizontal: true, vertical: false)
+                .padding(10)
+        }
+        .omSolidCard()
+    }
+
+    /// 表格网格本体。
+    private var grid: some View {
         Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
             GridRow {
                 ForEach(Array(header.enumerated()), id: \.offset) { _, cell in
@@ -272,7 +283,5 @@ struct TableBlockView: View {
                 }
             }
         }
-        .padding(10)
-        .omSolidCard()
     }
 }
