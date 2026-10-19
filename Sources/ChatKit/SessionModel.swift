@@ -621,8 +621,9 @@ public final class SessionModel {
                 EventCoalescer.backlog.consumed(batch.count)
                 guard let self else { return }
                 let span = Log.perf.span("事件批处理", warnMs: 16, quiet: true, ["events": "\(batch.count)"])
+                let started = ContinuousClock.now
                 self.handle(batch)
-                coalescer.markApplied(batch.count)
+                coalescer.markApplied(batch.count, elapsed: ContinuousClock.now - started)
                 span.end()
             }
         }
