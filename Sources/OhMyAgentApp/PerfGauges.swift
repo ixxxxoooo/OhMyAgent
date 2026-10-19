@@ -43,6 +43,19 @@ enum PerfGauges {
         return total
     }
 
+    /// 各会话时间线规模的短期缓存:一次采样里 5 个时间线指标共用一次遍历(此前每个指标各遍历一遍全部时间线)。
+    private static var sizeCache: (at: ContinuousClock.Instant, sizes: [TimelineSize])?
+
+    /// 全部会话的时间线规模(1 秒内复用缓存)。
+    /// - Parameter workbench: 工作台模型
+    private static func timelineSizes(_ workbench: WorkbenchModel) -> [TimelineSize] {
+        let now = ContinuousClock.now
+        if let cache = sizeCache, now - cache.at < .seconds(1) { return cache.sizes }
+        let sizes = workbench.allSessions.map { size(of: $0.timeline) }
+        sizeCache = (now, sizes)
+        return sizes
+    }
+
     /// 注册全部指标(应用启动时调用一次)。
     /// - Parameter workbench: 工作台模型
     static func register(workbench: WorkbenchModel) {
@@ -51,11 +64,11 @@ enum PerfGauges {
         gauges.registerMain("sessions.busy") { workbench.allSessions.filter { $0.isRunning }.count }
         gauges.registerMain("sessions.live") { workbench.allSessions.filter { $0.phase == .ready || $0.phase == .connecting }.count }
         gauges.registerMain("sessions.hibernated") { workbench.allSessions.filter { $0.isHibernated }.count }
-        gauges.registerMain("timeline.entries") { workbench.allSessions.reduce(0) { $0 + size(of: $1.timeline).entries } }
-        gauges.registerMain("timeline.textKB") { workbench.allSessions.reduce(0) { $0 + size(of: $1.timeline).textBytes } / 1024 }
-        gauges.registerMain("timeline.imageKB") { workbench.allSessions.reduce(0) { $0 + size(of: $1.timeline).imageBytes } / 1024 }
-        gauges.registerMain("timeline.tools") { workbench.allSessions.reduce(0) { $0 + size(of: $1.timeline).tools } }
-        gauges.registerMain("timeline.maxEntries") { workbench.allSessions.map { size(of: $0.timeline).entries }.max() ?? 0 }
+        gauges.registerMain("timeline.entries") { timelineSizes(workbench).reduce(0) { $0 + $1.entries } }
+        gauges.registerMain("timeline.textKB") { timelineSizes(workbench).reduce(0) { $0 + $1.textBytes } / 1024 }
+        gauges.registerMain("timeline.imageKB") { timelineSizes(workbench).reduce(0) { $0 + $1.imageBytes } / 1024 }
+        gauges.registerMain("timeline.tools") { timelineSizes(workbench).reduce(0) { $0 + $1.tools } }
+        gauges.registerMain("timeline.maxEntries") { timelineSizes(workbench).map(\.entries).max() ?? 0 }
         gauges.registerMain("engine.standby") { workbench.warmPool.standbyCount }
         gauges.registerMain("cache.markdown.hits") { MarkdownCache.hits }
         gauges.registerMain("cache.markdown.misses") { MarkdownCache.misses }
