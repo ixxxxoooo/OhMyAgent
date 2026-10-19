@@ -140,6 +140,14 @@ struct AgentTerminalContentView: View {
             AgentTerminalHost(session: session, revision: session.output.utf8.count &+ session.discontinuity &* 1_000_003)
                 .padding(.leading, 6)
                 .background(Color(nsColor: OMTerminalPalette.background))
+                .overlay(alignment: .topLeading) {
+                    if session.awaitsBufferedOutput {
+                        Text("命令运行中,结束后才会返回输出")
+                            .font(OMFonts.caption)
+                            .foregroundStyle(OMColors.tertiaryText)
+                            .padding(.leading, 12).padding(.top, 20)
+                    }
+                }
         }
         .accessibilityLabel("Agent 终端")
     }

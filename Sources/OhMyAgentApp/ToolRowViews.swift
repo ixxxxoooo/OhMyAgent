@@ -919,6 +919,9 @@ struct TerminalOutputView: View {
             }
             .font(OMFonts.monoSmall)
             .foregroundStyle(OMColors.secondaryText)
+            if session.awaitsBufferedOutput {
+                Text("命令运行中,结束后才会返回输出").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
+            }
             ScrollViewReader { proxy in
                 ScrollView {
                     ANSITextView(raw: session.output, fontSize: outputFontSize)

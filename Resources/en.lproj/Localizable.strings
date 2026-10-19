@@ -2627,3 +2627,4 @@
 "「%@」有未保存的修改,请先保存再移动。" = "“%@” has unsaved changes. Save before moving it.";
 "目标文件夹中已有同名项目" = "An item with the same name already exists in the destination folder";
 "「%@」已存在。要替换吗?被替换的项目会移到废纸篓。" = "“%@” already exists. Replace it? The replaced items will be moved to the Trash.";
+"命令运行中,结束后才会返回输出" = "Command is running. Output appears when it finishes.";

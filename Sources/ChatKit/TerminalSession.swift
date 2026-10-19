@@ -40,6 +40,8 @@ public final class TerminalSession: Identifiable {
     /// 是否应出现在任务坞:外部终端(Agent 自己执行的 Bash)只有后台命令才算「挂着」的任务,
     /// 前台的一次性命令随工具卡展示即可;内置终端(`terminal/*`)沿用运行中即显示
     public var showsInDock: Bool { isRunning && (!isExternal || isBackground) }
+    /// 外部前台命令运行中且还没有任何输出:适配器只在命令结束时整段返回输出,界面据此给出等待提示
+    public var awaitsBufferedOutput: Bool { isExternal && isRunning && !isBackground && output.isEmpty }
     @ObservationIgnored private var tailTask: Task<Void, Never>?
     @ObservationIgnored private var tailOffset: UInt64 = 0
     /// 跟读时尚未凑成完整 UTF-8 字符的尾部字节
