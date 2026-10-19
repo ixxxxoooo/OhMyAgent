@@ -35,11 +35,17 @@ struct WorkbenchView: View {
         .tint(appearance.tint)
         .frame(minWidth: 480, minHeight: 480)
         // 最小模式:窗口足够窄时自动收起左/右栏,拉宽后恢复(对照 Cursor)
-        .onGeometryChange(for: Double.self) { Double($0.size.width) } action: { width in
+        // 只观察宽度「档位」:拖动窗口时宽度每帧都变,但档位仅在跨越阈值时才变,action 不会逐帧触发;
+        // action 内对布局副本更新,无变化则不写回(inout 直接传 `&workbench.layout` 会无条件通知所有观察者)
+        .onGeometryChange(for: CompactLayout.Bucket.self) { CompactLayout.bucket(for: Double($0.size.width)) } action: { bucket in
+            guard let width = bucket.representativeWidth else { return }
+            var copy = workbench.layout
+            compact.update(width: width, layout: &copy)
+            guard copy != workbench.layout else { return }
             // 拖动窗口时的自动收起/恢复不做动画(界面本就在连续变化)
             var transaction = Transaction()
             transaction.disablesAnimations = true
-            withTransaction(transaction) { compact.update(width: width, layout: &workbench.layout) }
+            withTransaction(transaction) { workbench.layout = copy }
         }
         .background(WindowFocusReader(onWindow: { window in actions.mainWindow = window; WindowChrome.apply(to: window) }, onChange: { key in
             windowIsKey = key
