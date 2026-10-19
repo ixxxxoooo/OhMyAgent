@@ -24,6 +24,15 @@ enum PanelToggleProbe {
         return 0
     }
 
+    /// 某时刻之后各视图 body 的重算次数(基准钩子汇总用)。
+    /// - Parameter since: 起始时刻
+    /// - Returns: 视图名 → 次数
+    static func bodyCounts(since: ContinuousClock.Instant) -> [String: Int] {
+        var counts: [String: Int] = [:]
+        for event in bodyEvents where event.at >= since { counts[event.name, default: 0] += 1 }
+        return counts
+    }
+
     /// 面板显隐变化时调用,开始采样约 0.6 秒。
     /// - Parameters:
     ///   - stamp: 模型在切换瞬间记录的时间戳

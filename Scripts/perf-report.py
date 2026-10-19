@@ -11,7 +11,7 @@
       --max-hitch-ms N    单次主线程卡顿上限(默认 1500)
       --min-samples N     至少需要的资源采样次数(默认 3)
   perf-report.py turn <标识>      按会话前缀(session=/sid=)或回合串起相关日志
-  perf-report.py ui [阈值]        侧栏开关/会话切换的交互性能画像并按门槛检查(配合 Scripts/perf-ui.sh)
+  perf-report.py ui [阈值]        侧栏开关/会话切换的交互性能画像并按门槛检查(配合 Scripts/perf-ui.sh);--sweep-only 只汇总缩放/拖分栏/滚动基准
       --panel-avg-ms N      侧栏切换平均帧间隔上限(默认 17.5)
       --panel-hitches N     每次切换平均掉帧(>33ms)上限(默认 1)
       --panel-max-ms N      侧栏切换单帧最长上限(默认 40,约两个 vsync)
@@ -248,8 +248,32 @@ def ui_metrics(entries):
             "stacks": [e for e in scope if e[3] == "卡顿栈"]}
 
 
-def ui(entries, opts, check_cpu, cpu_only=False):
-    """打印交互性能画像并返回失败原因列表;cpu_only 时只判 CPU(运行中冻结场景没有交互数据)。"""
+SWEEP_NAMES = ("缩放基准", "拖分栏基准", "滚动基准")
+
+
+def sweeps(entries):
+    """打印窗口缩放 / 拖分栏 / 滚动 基准(只记录,暂不设门槛):平均帧间隔、掉帧、单帧最长与各视图 body 次数。"""
+    print("== 流畅度基准(缩放/拖分栏/滚动,仅记录)==")
+    found = False
+    for e in entries:
+        if e[3] not in SWEEP_NAMES:
+            continue
+        found = True
+        f = e[4]
+        label = e[3] + (f"[{f['kind']}]" if f.get("kind") else "")
+        print(f"  {label}: 帧数 {f.get('frames')}  平均 {f.get('avgMs')}ms  掉帧(>33ms) {f.get('hitches')}  单帧最长 {f.get('maxMs')}ms")
+        bodies = f.get("bodies", "")
+        if bodies:
+            print(f"    body 次数: {bodies}")
+    if not found:
+        print("  无数据(没有缩放/拖分栏/滚动基准记录)")
+
+
+def ui(entries, opts, check_cpu, cpu_only=False, sweep_only=False):
+    """打印交互性能画像并返回失败原因列表;cpu_only 时只判 CPU(运行中冻结场景没有交互数据);sweep_only 只打印流畅度基准。"""
+    if sweep_only:
+        sweeps(entries)
+        return []
     if cpu_only:
         return ui_cpu(entries, opts)
     m = ui_metrics(entries)
@@ -280,6 +304,8 @@ def ui(entries, opts, check_cpu, cpu_only=False):
         # 冷打开时的标签切换会包含挂载,热切换以中位数衡量
         if statistics.median(ordered) > opts["warm_switch_ms"]:
             problems.append(f"标签切换中位 {statistics.median(ordered):.0f}ms > {opts['warm_switch_ms']}ms")
+    print()
+    sweeps(entries)
     print("\n== 主线程卡顿(按基准阶段)==")
     for phase, values in m["by_phase"].items():
         print(f"  {phase}: {len(values)} 次  最长 {max(values):.0f}ms")
@@ -352,13 +378,14 @@ def main():
         rest = args[1:]
         check_cpu = "--cpu-check" in rest
         cpu_only = "--cpu-only" in rest
-        rest = [a for a in rest if a not in ("--cpu-check", "--cpu-only")]
+        sweep_only = "--sweep-only" in rest
+        rest = [a for a in rest if a not in ("--cpu-check", "--cpu-only", "--sweep-only")]
         opts = {}
         for flag, key, default in (("--panel-avg-ms", "panel_avg_ms", 17.5), ("--panel-hitches", "panel_hitches", 1.0), ("--panel-max-ms", "panel_max_ms", 40.0),
                                    ("--first-frame-ms", "first_frame_ms", 120.0), ("--cold-open-ms", "cold_open_ms", 150.0), ("--warm-switch-ms", "warm_switch_ms", 50.0),
                                    ("--hitch-ms", "hitch_ms", 250.0), ("--run-cpu", "run_cpu", 15.0)):
             opts[key], rest = option(rest, flag, default)
-        problems = ui(entries, opts, check_cpu, cpu_only)
+        problems = ui(entries, opts, check_cpu, cpu_only, sweep_only)
         print()
         if problems:
             print("交互性能门槛未通过:")

@@ -3,19 +3,25 @@
 # 交互性能基准(演示模式:脚本化 Agent + 隔离沙盒,不碰开发版与真实会话):
 #   interact  冷打开 N 个会话 → 在标签间热切换 → 左右侧栏各开关 M 次,汇总「侧栏切换/标签切换/时间线挂载/主线程卡顿」
 #   cpu       运行一个冻结的「运行中」场景若干秒,检查本进程 CPU(验证流光/呼吸点等持续动画的开销)
-#   all       依次执行上面两项(默认)
-# 用法: Scripts/perf-ui.sh [interact|cpu|all] [--build] [--sessions N] [--toggles M] [--cpu-seconds S] [--scenario 名]
+#   resize    窗口宽度 1400↔900 逐帧往返缩放 N 次(OMA_RESIZE_SWEEP),汇总「缩放基准」
+#   drag      逐帧拖动项目栏/工具栏/底栏/编辑分屏(OMA_DRAG_SWEEP=sidebar|tools|bottom|dock),汇总「拖分栏基准」
+#   scroll    对会话流逐帧上下滚动 N 个来回(OMA_SCROLL_SWEEP),汇总「滚动基准」
+#   stream    运行演示场景(流式输出)并汇总主线程卡顿
+#   all       依次执行 interact 与 cpu(默认;resize/drag/scroll/stream 需单独指定,目前只记录不设门槛)
+# 用法: Scripts/perf-ui.sh [interact|cpu|resize|drag|scroll|stream|all] [--build] [--sessions N] [--toggles M] [--cpu-seconds S] [--scenario 名]
 #   --heavy N 额外生成 N 个压测 Skill(模拟真实 ~/.claude 有上千个技能/插件文件时的配置加载开销)
+#   --sweeps N 扫描往返次数(resize/scroll,默认 3)
 #   --build   先 Scripts/bundle.sh release(验收以 release 为准;不加则使用已有 build/OhMyAgent.app)
 # 阈值见 `perf-report.py ui`;可用环境变量覆盖:UI_PANEL_AVG_MS UI_PANEL_HITCHES UI_PANEL_MAX_MS UI_FIRST_FRAME_MS
 #   UI_COLD_OPEN_MS UI_WARM_SWITCH_MS UI_HITCH_MS UI_RUN_CPU
 set -uo pipefail
 source "${0:A:h}/lib-kill.sh"
 cd "$(dirname "$0")/.."
-MODE="all"; BUILD=""; SESSIONS=6; TOGGLES=12; CPU_SECONDS=45; SCENARIO="states-frozen"; HEAVY=""
+MODE="all"; BUILD=""; SWEEPS=3; SESSIONS=6; TOGGLES=12; CPU_SECONDS=45; SCENARIO="states-frozen"; HEAVY=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    interact|cpu|all) MODE="$1" ;;
+    interact|cpu|resize|drag|scroll|stream|all) MODE="$1" ;;
+    --sweeps) SWEEPS="${2:-3}"; shift ;;
     --build) BUILD="1" ;;
     --sessions) SESSIONS="${2:-6}"; shift ;;
     --toggles) TOGGLES="${2:-12}"; shift ;;
@@ -72,6 +78,37 @@ if [[ "$MODE" == cpu || "$MODE" == all ]]; then
   kill -0 "$PID" 2>/dev/null || { echo "应用已退出(崩溃?)" >&2; exit 1; }
   python3 -I Scripts/perf-report.py ui --pid "$PID" --cpu-only $(thresholds) 2>&1 | sed -n '/== CPU ==/,$p' || true
   python3 -I Scripts/perf-report.py ui --pid "$PID" --cpu-only $(thresholds) >/dev/null 2>&1 || STATUS=1
+  killDemoApp
+fi
+# 流畅度基准:启动演示版跑指定场景(长会话)与扫描钩子,等日志出现「基准阶段 … 结束」后汇总(只记录,不设门槛)
+sweep_run() {
+  local label="$1"; shift
+  echo; echo "== 流畅度基准:$label =="
+  local pid; pid="$(launch --env OMA_DEMO_SCENARIO="${SCENARIO_LONG:-legacy-showcase}" --env OMA_AUTOALLOW=1 "$@")"
+  [[ -n "$pid" ]] || { echo "应用没有启动" >&2; STATUS=1; return; }
+  # 场景运行 + 1.5s 稳定 + 扫描耗时(每帧约 16ms),最多等 120 秒
+  for ((i = 0; i < 120; i++)); do
+    kill -0 "$pid" 2>/dev/null || { echo "应用已退出(崩溃?)" >&2; STATUS=1; return; }
+    sleep 1
+    [[ $i -ge 12 ]] && python3 -I Scripts/perf-report.py ui --pid "$pid" --sweep-only 2>/dev/null | grep -q "帧数" && break
+  done
+  python3 -I Scripts/perf-report.py ui --pid "$pid" --sweep-only
+  killDemoApp
+}
+
+[[ "$MODE" == resize ]] && sweep_run "窗口缩放 ${SWEEPS} 个来回" --env OMA_RESIZE_SWEEP="$SWEEPS"
+if [[ "$MODE" == drag ]]; then
+  for kind in sidebar tools bottom; do sweep_run "拖分栏 $kind" --env OMA_DRAG_SWEEP="$kind"; done
+  sweep_run "拖分栏 dock(编辑区分屏)" --env OMA_DRAG_SWEEP=dock --env OMA_OPEN_FILE="$PWD/README.md" --env OMA_SPLIT=right
+fi
+[[ "$MODE" == scroll ]] && sweep_run "会话流滚动 ${SWEEPS} 个来回" --env OMA_SCROLL_SWEEP="$SWEEPS"
+if [[ "$MODE" == stream ]]; then
+  echo; echo "== 流式输出:运行场景 ${SCENARIO_LONG:-legacy-showcase} =="
+  PID="$(launch --env OMA_DEMO_SCENARIO="${SCENARIO_LONG:-legacy-showcase}" --env OMA_AUTOALLOW=1)"
+  [[ -n "$PID" ]] || { echo "应用没有启动" >&2; exit 1; }
+  sleep 30
+  kill -0 "$PID" 2>/dev/null || { echo "应用已退出(崩溃?)" >&2; exit 1; }
+  python3 -I Scripts/perf-report.py ui --pid "$PID" | sed -n '/== 主线程卡顿/,$p'
   killDemoApp
 fi
 exit $STATUS
