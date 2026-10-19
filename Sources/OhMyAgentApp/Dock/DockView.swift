@@ -90,7 +90,7 @@ struct DockSplitView: View {
                         DragGesture(minimumDistance: 1, coordinateSpace: .global)
                             .onChanged { value in
                                 let base = dragBase ?? split.ratios
-                                if dragBase == nil { dragBase = base }
+                                if dragBase == nil { dragBase = base; PanelDragState.shared.beginHold() }
                                 guard base.indices.contains(index + 1) else { return }
                                 let delta = Double((horizontal ? value.translation.width : value.translation.height) / usable)
                                 var next = base
@@ -99,6 +99,7 @@ struct DockSplitView: View {
                                 liveRatios = DockLayout.normalizedRatios(next)
                             }
                             .onEnded { _ in
+                                if dragBase != nil { PanelDragState.shared.endHold() }
                                 dragBase = nil
                                 if let committed = liveRatios { workbench.dock.setRatios(committed, forSplit: split.id) }
                                 liveRatios = nil

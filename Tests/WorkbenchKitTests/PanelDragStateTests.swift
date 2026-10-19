@@ -145,3 +145,22 @@ struct PanelDragStateTests {
         #expect(abs(result.ratios.reduce(0, +) - 1) < 1e-9)
     }
 }
+
+@MainActor
+@Suite("面板拖动占位")
+struct PanelDragHoldTests {
+    @Test("外部拖动占位参与 isDragging,计数成对且不会为负")
+    func holdCounting() {
+        let state = PanelDragState()
+        #expect(!state.isDragging)
+        state.beginHold()
+        state.beginHold()
+        #expect(state.isDragging)
+        state.endHold()
+        #expect(state.isDragging)
+        state.endHold()
+        #expect(!state.isDragging)
+        state.endHold()
+        #expect(state.holdCount == 0)
+    }
+}

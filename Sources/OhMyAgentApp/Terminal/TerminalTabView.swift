@@ -53,6 +53,8 @@ struct TerminalTabView: View {
         let controller = TerminalStore.shared.controller(for: id, fallbackDirectory: fallbackDirectory)
         VStack(spacing: 0) {
             TerminalHostView(controller: controller, focusOnAppear: focusOnAppear)
+                // 实时缩放期间终端保持原尺寸,由这里裁剪到当前布局范围(见 LiveResizeGate)
+                .clipped()
                 .padding(.leading, 6)
                 .background(Color(nsColor: OMTerminalPalette.background))
             if !controller.isRunning { exitedBar(controller) }

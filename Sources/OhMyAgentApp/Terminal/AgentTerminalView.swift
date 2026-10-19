@@ -138,6 +138,7 @@ struct AgentTerminalContentView: View {
             .background(OMColors.surface)
             Divider()
             AgentTerminalHost(session: session, revision: session.output.utf8.count &+ session.discontinuity &* 1_000_003)
+                .clipped()  // 实时缩放期间终端保持原尺寸,由这里裁剪(见 LiveResizeGate)
                 .padding(.leading, 6)
                 .background(Color(nsColor: OMTerminalPalette.background))
                 .overlay(alignment: .topLeading) {

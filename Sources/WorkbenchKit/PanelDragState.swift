@@ -103,8 +103,17 @@ public final class PanelDragState {
     /// 正在拖动的维度(不参与观察,供 AppKit 侧的实时缩放门控读取)。
     @ObservationIgnored public private(set) var activeDimensions: Set<PanelDimension> = []
 
+    /// 外部拖动占位计数(编辑区分屏等不走临时尺寸的分隔条拖动,用于让终端等重排昂贵的视图也进入门控)。
+    @ObservationIgnored public private(set) var holdCount = 0
+
     /// 当前是否有任何分隔条处于拖动中。
-    public var isDragging: Bool { !activeDimensions.isEmpty }
+    public var isDragging: Bool { !activeDimensions.isEmpty || holdCount > 0 }
+
+    /// 外部拖动开始(与 `endHold()` 成对;重复调用按计数累计)。
+    public func beginHold() { holdCount += 1 }
+
+    /// 外部拖动结束。
+    public func endHold() { holdCount = max(holdCount - 1, 0) }
 
     /// 读取某维度的拖动中临时值;只订阅该维度。
     /// - Parameter dimension: 尺寸维度
