@@ -163,7 +163,8 @@ final class UpdateModel {
                 // 长时间不退出的用户:每 6 小时重新检查一次
                 if ticks % 360 == 0, let self, UserDefaults.standard.object(forKey: ClientPrefs.Key.autoUpdate) as? Bool ?? true { self.checkNow() }
                 guard let self, self.mode == .auto, self.canSelfInstall, case .ready = self.phase else { continue }
-                let idle = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!)
+                guard let anyInput = CGEventType(rawValue: ~0) else { continue }
+                let idle = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: anyInput)
                 let center = AttentionCenter.shared
                 let busy = center.count(of: .running) + center.count(of: .needsInput)
                 if UpdateTiming.canInstallNow(idleSeconds: idle, busySessions: busy) {

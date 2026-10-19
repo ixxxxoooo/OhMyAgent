@@ -117,9 +117,9 @@ public enum UpdateInstaller {
     ///   - relaunch: 替换后是否重新打开
     public static func launchReplacer(staged: StagedUpdate, targetApp: String, relaunch: Bool) throws {
         let script = stagingRoot.appendingPathComponent("replace.sh")
+        // 脚本逻辑:等旧进程退出(最多 60 秒,仍在运行说明退出被取消,放弃本次);替换失败时恢复原应用
         let body = """
         #!/bin/sh
-        # 等待旧进程退出(最多 60 秒,仍在运行说明退出被取消,放弃本次);替换失败时保留原应用
         i=0; while kill -0 \(ProcessInfo.processInfo.processIdentifier) 2>/dev/null && [ $i -lt 120 ]; do sleep 0.5; i=$((i+1)); done
         if kill -0 \(ProcessInfo.processInfo.processIdentifier) 2>/dev/null; then exit 0; fi
         BACKUP="\(targetApp).old"
