@@ -227,24 +227,8 @@ struct CodeBlockView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
             Divider()
-            if wrapLines {
-                // 自动换行:代码块宽度固定为容器宽度,长行折行显示
-                Text(CodeHighlighter.attributed(code, fence: language))
-                    .font(OMFonts.readingMono)
-                    .lineSpacing(OMFonts.readingMonoLineSpacing)
-                    .padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .textSelection(.enabled)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    Text(CodeHighlighter.attributed(code, fence: language))
-                        .font(OMFonts.readingMono)
-                        .lineSpacing(OMFonts.readingMonoLineSpacing)
-                        .padding(12)
-                        .fixedSize(horizontal: true, vertical: true)
-                }
-            }
+            // 正文由 AppKit 文本叶子渲染(原生选择、整块一个文本视图、按需折行或叶子内水平滚动)
+            CodeTextLeaf(language: language, code: code, wrap: wrapLines)
         }
         .omSolidCard()
     }
