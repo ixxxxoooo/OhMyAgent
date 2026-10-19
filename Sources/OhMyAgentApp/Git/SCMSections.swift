@@ -44,7 +44,7 @@ private struct CollapsibleHeader<Actions: View>: View {
     }
 }
 
-/// 「提交图谱」分区:最近 30 个提交(含所有分支)的泳道图;
+/// 「提交图谱」分区:最近提交(含所有分支)的泳道图,滚动到底自动加载更早的提交;
 /// 点击一行在原地展开该提交的文件列表,点文件再展开内联差异(对标 VS Code 的 Source Control Graph);
 /// 右上角按钮才打开完整历史标签。
 struct GitGraphSection: View {
@@ -55,7 +55,13 @@ struct GitGraphSection: View {
     @State private var failed = false
     /// 当前展开的提交(同一时间只展开一个)
     @State private var expandedHash: String?
-    private static let limit = 30
+    /// 首次与每次滚动到底追加的提交数
+    private static let pageSize = 30
+    /// 当前请求的提交条数(滚动到底时递增)
+    @State private var limit = 30
+    /// 是否可能还有更早的提交
+    @State private var hasMore = false
+    @State private var loadingMore = false
 
     /// 状态变化(分支切换、提交/推送/拉取、工作区变干净)时重新取数。
     private var reloadKey: String {
@@ -84,7 +90,7 @@ struct GitGraphSection: View {
                         .padding(.vertical, 6)
                 } else {
                     let laneWidth = CGFloat(max(1, rows.map(\.laneCount).max() ?? 1)) * 14 + 10
-                    VStack(spacing: 0) {
+                    LazyVStack(spacing: 0) {
                         ForEach(rows) { row in
                             let isOpen = expandedHash == row.commit.hash
                             CommitRow(row: row, laneWidth: laneWidth, isSelected: isOpen, compact: true)
@@ -104,6 +110,13 @@ struct GitGraphSection: View {
                                     .id(row.commit.hash)
                             }
                         }
+                        if hasMore {
+                            // 滚动到底部哨兵时自动加载下一页
+                            OMSpinner(.mini)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .onAppear { Task { await loadMore() } }
+                        }
                     }
                 }
             }
@@ -112,14 +125,25 @@ struct GitGraphSection: View {
         .task(id: reloadKey) { await load() }
     }
 
+    /// 滚动到底时多取一页(重新取前 N 条并整体布局,保证泳道连续)。
+    private func loadMore() async {
+        guard hasMore, !loadingMore else { return }
+        loadingMore = true
+        limit += Self.pageSize
+        await load()
+        loadingMore = false
+    }
+
     private func load() async {
         guard let repo = await GitRepository.discover(from: model.projectPath) else {
             rows = []
+            hasMore = false
             return
         }
         do {
-            let commits = try await repo.log(limit: Self.limit, path: nil, all: true)
+            let commits = try await repo.log(limit: limit, path: nil, all: true)
             rows = GitGraph.layout(commits)
+            hasMore = commits.count >= limit && limit < 5000
             failed = false
         } catch {
             failed = true

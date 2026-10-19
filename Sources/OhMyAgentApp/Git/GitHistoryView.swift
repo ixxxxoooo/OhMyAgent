@@ -23,6 +23,11 @@ struct GitHistoryTabView: View {
     @State private var errorMessage: String?
     @State private var selected: String?
     @State private var allBranches = true
+    /// 当前请求的提交条数(滚动到底时递增)
+    @State private var limit = 200
+    /// 是否可能还有更早的提交
+    @State private var hasMore = false
+    @State private var loadingMore = false
 
     var body: some View {
         Group {
@@ -46,7 +51,19 @@ struct GitHistoryTabView: View {
                 }
             }
         }
-        .task(id: "\(projectID)#\(path ?? "")#\(allBranches)") { await load() }
+        .task(id: "\(projectID)#\(path ?? "")#\(allBranches)") {
+            limit = 200
+            await load()
+        }
+    }
+
+    /// 滚动到底时多取一页(重新取前 N 条并整体布局)。
+    private func loadMore() async {
+        guard hasMore, !loadingMore else { return }
+        loadingMore = true
+        limit += 200
+        await load()
+        loadingMore = false
     }
 
     private func load() async {
@@ -63,7 +80,8 @@ struct GitHistoryTabView: View {
                 guard let rel = found.relativePath(of: path) else { throw GitError.invalidArgument(String(localized: "文件不在仓库内")) }
                 relative = rel
             }
-            let commits = try await found.log(limit: 400, path: relative, all: allBranches)
+            let commits = try await found.log(limit: limit, path: relative, all: allBranches)
+            hasMore = commits.count >= limit && limit < 5000
             // 文件历史是被过滤的子序列,不画泳道;整库历史才画图
             rows = relative == nil ? GitGraph.layout(commits) : commits.map {
                 GitGraphRow(commit: $0, column: 0, color: 0, top: [], bottom: [], incoming: [], outgoing: [])
@@ -104,6 +122,12 @@ struct GitHistoryTabView: View {
                                     NSPasteboard.general.setString(row.commit.hash, forType: .string)
                                 }
                             }
+                    }
+                    if hasMore {
+                        OMSpinner(.mini)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .onAppear { Task { await loadMore() } }
                     }
                 }
             }
