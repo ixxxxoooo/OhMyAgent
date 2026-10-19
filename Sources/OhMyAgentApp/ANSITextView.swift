@@ -6,19 +6,18 @@ import DesignSystem
 import SwiftUI
 
 /// 渲染含 ANSI 颜色的终端输出。
+/// 正文由 AppKit 文本叶子(`OutputTextLeaf`)绘制:原生选择、流式只替换尾部;
+/// 本类型保留 ANSI 调色板与 `attributed`(供测试与旧调用方复用)。
 struct ANSITextView: View {
     let raw: String
     var fontSize: CGFloat = 12
     /// 最多渲染的末尾行数(默认沿用解析器上限 400)
     var maxLines = 400
-
-    /// 上一次的解析结果:输出、字号、行数上限、主题都没变时直接复用(悬停/滚动触发的 body 重算不再重新解析 ANSI)
-    @State private var cache = ANSIRenderCache()
+    /// 默认文字色(ANSI 显式着色的片段不受影响)
+    var tint: Color = OMColors.primaryText
 
     var body: some View {
-        Text(cache.attributed(raw, fontSize: fontSize, maxLines: maxLines))
-            .textSelection(.enabled)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        OutputTextLeaf(raw: raw, fontSize: fontSize, maxLines: maxLines, ansi: true, tint: tint)
     }
 
     /// 构造富文本(静态方法便于测试)。

@@ -74,16 +74,7 @@ struct CollapsibleOutput: View {
     @ViewBuilder
     private func textBody(_ text: String) -> some View {
         // 输出默认用次要色(与上方高亮的命令区分,对齐 Cursor);ANSI 显式着色的片段仍保持原色
-        if ansi {
-            ANSITextView(raw: text, fontSize: fontSize, maxLines: Self.renderLimit)
-                .foregroundStyle(tint)
-        } else {
-            Text(text)
-                .font(OMFonts.custom(fontSize, design: .monospaced))
-                .foregroundStyle(tint)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
+        OutputTextLeaf(raw: text, fontSize: fontSize, maxLines: Self.renderLimit, ansi: ansi, tint: tint)
     }
 
     /// 限高滚动区域:内容矮于上限时贴合内容,高于上限时滚动;收起态由底部「展开 · 共 N 行」条提示还有更多(不做淡出)。

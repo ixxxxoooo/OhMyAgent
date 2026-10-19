@@ -564,12 +564,8 @@ struct ToolErrorBox: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Image.om("circle-alert", size: 11).foregroundStyle(OMColors.danger)
-            Text(verbatim: text)
-                .font(OMFonts.monoSmall)
-                .foregroundStyle(OMColors.danger)
-                .textSelection(.enabled)
-                .lineLimit(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            // 失败原因只渲染末尾 40 行(AppKit 叶子,可选中复制)
+            OutputTextLeaf(raw: ToolOutputText.tail(text, maxLines: 40).text, fontSize: 11.5, maxLines: 40, ansi: false, tint: OMColors.danger)
         }
         .padding(8)
         .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
