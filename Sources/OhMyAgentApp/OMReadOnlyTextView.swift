@@ -166,6 +166,8 @@ class OMReadOnlyTextView: NSTextView {
     var copyTransform: ((String) -> String)?
     /// 无选区的单击回调(拖选、双击、三击不触发):用户气泡据此「单击进入编辑」。
     var onPlainClick: (() -> Void)?
+    /// 选择中枢(`SelectionHub`)当前画在本叶子上的高亮范围。
+    var hubRange: NSRange?
 
     required override init(frame frameRect: NSRect, textContainer container: NSTextContainer?) {
         super.init(frame: frameRect, textContainer: container)
@@ -200,6 +202,8 @@ class OMReadOnlyTextView: NSTextView {
     }
 
     override func copy(_ sender: Any?) {
+        // 中枢选择(可能跨多个叶子,含已滚出屏幕的)优先:文本取自模型,不依赖视图是否还在
+        if SelectionHub.shared.hasSelection, SelectionHub.shared.copySelection() { return }
         let selected = selectedRange()
         guard selected.length > 0 else { return }
         var plain = (string as NSString).substring(with: selected)
@@ -208,16 +212,57 @@ class OMReadOnlyTextView: NSTextView {
         NSPasteboard.general.setString(plain, forType: .string)
     }
 
+    /// 全选:在会话流里选中全部已挂载的文本(不在滚动视图里时退回原生行为)。
+    override func selectAll(_ sender: Any?) {
+        if SelectionHub.scopeScrollView(of: self) != nil { SelectionHub.shared.selectAll(from: self) } else { super.selectAll(sender) }
+    }
+
+    override func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
+        if item.action == #selector(copy(_:)), SelectionHub.shared.hasSelection { return true }
+        return super.validateUserInterfaceItem(item)
+    }
+
+    /// 右键菜单:有中枢选择时只给「复制所选」(原生菜单针对的是本叶子自己的选区)。
+    override func menu(for event: NSEvent) -> NSMenu? {
+        guard SelectionHub.shared.hasSelection else { return super.menu(for: event) }
+        let menu = NSMenu()
+        let item = NSMenuItem(title: String(localized: "复制所选"), action: #selector(copy(_:)), keyEquivalent: "")
+        item.target = self
+        menu.addItem(item)
+        return menu
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window != nil { SelectionHub.shared.leafDidMount(self) } else { SelectionHub.shared.leafDidLeave(self) }
+    }
+
     /// 滚轮交给外层滚动视图(叶子自身不滚动)。
     override func scrollWheel(with event: NSEvent) {
         nextResponder?.scrollWheel(with: event)
     }
 
     override func mouseDown(with event: NSEvent) {
+        // 双击选词、三击选段仍走 NSTextView 原生行为(先清掉中枢选择)
+        guard event.clickCount == 1 else {
+            SelectionHub.shared.clearSelection()
+            super.mouseDown(with: event)
+            return
+        }
+        window?.makeFirstResponder(self)
+        // 单击与拖动都由中枢接管:拖出本叶子时可以连续选到别的叶子
+        guard let dragged = SelectionHub.shared.track(from: self, with: event) else {
+            nativeMouseDown(event)
+            return
+        }
+        if !dragged { onPlainClick?() }
+    }
+
+    /// 无法由中枢接管时的原生行为:NSTextView 自带跟踪;原地单击且没有选区才算「单击」。
+    private func nativeMouseDown(_ event: NSEvent) {
         let start = event.locationInWindow
         super.mouseDown(with: event)
-        // super 返回时鼠标已抬起:原地单击且没有产生选区,才算「单击」
-        guard let onPlainClick, event.clickCount == 1, selectedRange().length == 0, let window else { return }
+        guard let onPlainClick, selectedRange().length == 0, let window else { return }
         let end = window.mouseLocationOutsideOfEventStream
         if hypot(end.x - start.x, end.y - start.y) < 4 { onPlainClick() }
     }

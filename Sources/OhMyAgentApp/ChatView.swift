@@ -186,6 +186,8 @@ struct ChatView: View {
         .clipped()
         .scrollPosition($position)
         .onScrollPhaseChange { _, phase in scrollPhase = phase }
+        // 拖选到视口边缘时中枢会自动滚动:按「用户主动滚动」处理,别被贴底跟随拽回去
+        .onAppear { SelectionHub.shared.onAutoScroll = { [sticky] in sticky.followSuspended = true } }
         .onScrollGeometryChange(for: ScrollMetrics.self) { geometry in
             ScrollMetrics(offsetY: geometry.contentOffset.y, contentHeight: geometry.contentSize.height, containerHeight: geometry.containerSize.height)
         } action: { old, metrics in

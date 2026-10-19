@@ -1663,6 +1663,7 @@
 "回到最新消息" = "Back to latest message";
 "在工具调用前后、会话开始或结束等事件上自动运行命令。来源:用户 / 项目 / 本地设置与已启用的插件。" = "Automatically run commands on events such as before/after tool calls and session start/end. Sources: user / project / local settings and enabled plugins.";
 "复制代码" = "Copy code";
+"复制所选" = "Copy selection";
 "复制当前筛选的日志" = "Copy filtered logs";
 "复制日志" = "Copy logs";
 "安装、启停与更新 Claude Code 插件,插件可携带技能、子 Agent、Hooks 与 MCP 服务器。需要本机已安装 claude 命令。" = "Install, enable and update Claude Code plugins. Plugins can ship skills, subagents, hooks and MCP servers. Requires the claude command on this Mac.";
@@ -2633,3 +2634,4 @@
 "Agent 进程退出,%lld 个后台命令可能已被中断" = "Agent process exited. %lld background command(s) may have been interrupted.";
 "显示更早的 %lld 轮对话" = "Show %lld earlier turns";
 "显示更早的对话" = "Show earlier conversation";
+"表格" = "Table";
