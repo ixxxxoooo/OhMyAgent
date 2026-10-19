@@ -225,24 +225,9 @@ final class MarkdownLayoutManager: NSLayoutManager {
     }
 }
 
-/// 只读可选的 Markdown 文本视图:复制时把软换行占位还原为 `\n`。
-final class MarkdownTextView: NSTextView {
-    /// 文本存储由外部创建(NSTextView 不持有它),这里强引用以防被释放。
-    var retainedStorage: NSTextStorage?
-
-    override func copy(_ sender: Any?) {
-        let selected = selectedRange()
-        guard selected.length > 0 else { return }
-        let plain = (string as NSString).substring(with: selected).replacingOccurrences(of: softBreak, with: "\n")
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(plain, forType: .string)
-    }
-
-    /// 鼠标在视图外松开前仍由本视图接管拖选;滚轮交给外层 SwiftUI 滚动视图。
-    override func scrollWheel(with event: NSEvent) {
-        nextResponder?.scrollWheel(with: event)
-    }
-}
+/// 只读可选的 Markdown 文本视图:复制时把软换行占位还原为 `\n`(见 `makeTextView` 设置的 `copyTransform`)。
+/// 选择、滚轮转发等公共行为来自 `OMReadOnlyTextView`。
+final class MarkdownTextView: OMReadOnlyTextView {}
 
 /// 把一段文字块渲染进 `MarkdownTextView` 的渲染器(每个文本视图一个,作为 `NSViewRepresentable` 的协调器)。
 /// 抽出来是为了让「更新文本存储」的策略可以脱离 SwiftUI 单独测试与基准。
@@ -488,23 +473,8 @@ struct MarkdownTextRepresentable: NSViewRepresentable {
     /// 创建 TextKit 1 文本视图(自定义布局管理器画行内代码底与引用条)。
     /// - Returns: 只读可选的文本视图
     static func makeTextView() -> MarkdownTextView {
-        let storage = NSTextStorage()
-        let layout = MarkdownLayoutManager()
-        let container = NSTextContainer(size: NSSize(width: 400, height: CGFloat.greatestFiniteMagnitude))
-        container.lineFragmentPadding = 0
-        container.widthTracksTextView = false
-        storage.addLayoutManager(layout)
-        layout.addTextContainer(container)
-        let view = MarkdownTextView(frame: .zero, textContainer: container)
-        view.retainedStorage = storage
-        view.isEditable = false
-        view.isSelectable = true
-        view.drawsBackground = false
-        view.isRichText = true
-        view.textContainerInset = .zero
-        view.focusRingType = .none
-        view.isVerticallyResizable = false
-        view.isHorizontallyResizable = false
+        let view = OMReadOnlyTextView.make(MarkdownTextView.self, layout: MarkdownLayoutManager())
+        view.copyTransform = { $0.replacingOccurrences(of: softBreak, with: "\n") }
         view.setAccessibilityLabel(String(localized: "消息正文"))
         return view
     }
