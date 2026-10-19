@@ -83,3 +83,32 @@ struct SubagentStatusTests {
         #expect(SubagentStatus.make(entry: TimelineEntry(kind: .assistant, text: "hi")) == nil)
     }
 }
+
+@Suite("子代理当前活动行提取")
+struct SubagentLastLineTests {
+    @Test("取最后一个非空行并去首尾空白")
+    func lastNonEmpty() {
+        #expect(SubagentStatus.lastLine("第一行\n第二行\n  末行  \n\n \n") == "末行")
+        #expect(SubagentStatus.lastLine("只有一行") == "只有一行")
+        #expect(SubagentStatus.lastLine("a\n") == "a")
+    }
+
+    @Test("全空白或空串返回 nil")
+    func blank() {
+        #expect(SubagentStatus.lastLine("") == nil)
+        #expect(SubagentStatus.lastLine("\n  \n\t\n") == nil)
+    }
+
+    @Test("超过 80 字符截断并加省略号")
+    func truncates() {
+        let long = String(repeating: "长", count: 100)
+        let line = SubagentStatus.lastLine("前文\n\(long)")
+        #expect(line == String(repeating: "长", count: 80) + "…")
+    }
+
+    @Test("超长文本只扫描尾部也能正确返回")
+    func hugeText() {
+        let big = (0..<20000).map { "行\($0)" }.joined(separator: "\n") + "\n\n"
+        #expect(SubagentStatus.lastLine(big) == "行19999")
+    }
+}

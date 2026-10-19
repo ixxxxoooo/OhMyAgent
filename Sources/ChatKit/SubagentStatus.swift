@@ -97,10 +97,17 @@ public struct SubagentStatus: Sendable, Equatable {
     }
 
     /// 取文本最后一个非空行并截断。
-    private static func lastLine(_ text: String) -> String? {
-        let line = text.components(separatedBy: "\n").last { !$0.trimmingCharacters(in: .whitespaces).isEmpty }?.trimmingCharacters(in: .whitespaces)
-        guard let line, !line.isEmpty else { return nil }
-        return line.count > 80 ? String(line.prefix(80)) + "…" : line
+    /// 从尾部逐行向前找,只扫描末尾几行(流式长文本不再全文切分,避免 O(n²))。
+    static func lastLine(_ text: String) -> String? {
+        var end = text.endIndex
+        while end > text.startIndex {
+            let lineStart = text[text.startIndex..<end].lastIndex(of: "\n").map { text.index(after: $0) } ?? text.startIndex
+            let line = text[lineStart..<end].trimmingCharacters(in: .whitespaces)
+            if !line.isEmpty { return line.count > 80 ? String(line.prefix(80)) + "…" : line }
+            guard lineStart > text.startIndex else { break }
+            end = text.index(before: lineStart)
+        }
+        return nil
     }
 }
 
