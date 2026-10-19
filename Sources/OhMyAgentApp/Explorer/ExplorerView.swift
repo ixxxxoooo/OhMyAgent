@@ -13,6 +13,8 @@ import WorkbenchKit
 struct ExplorerView: View {
     let workbench: WorkbenchModel
     private let model = ExplorerModel.shared
+    /// 拖入的文件悬停在空白处(落点为项目根目录)
+    @State private var rootDropTargeted = false
 
     /// 某根目录的 Git 装饰(随状态轮询更新;非仓库时为空)
     fileprivate static func decorations(forRoot root: String) -> GitDecorationIndex {
@@ -42,6 +44,14 @@ struct ExplorerView: View {
                         ExtraRootSection(folder: folder, project: project.id, workbench: workbench)
                     }
                 }
+                // 拖到行之间或列表下方的空白处 = 放进项目根目录(行上的放置区优先)
+                .explorerDropTarget(project.id, workbench: workbench, targeted: $rootDropTargeted)
+                .overlay {
+                    if rootDropTargeted {
+                        RoundedRectangle(cornerRadius: OMRadius.control).strokeBorder(OMColors.accent, lineWidth: 1.5)
+                            .padding(2).allowsHitTesting(false)
+                    }
+                }
             }
         } else {
             OMEmptyState { Label("没有项目", om: "folder", size: 28) } description: { Text("添加一个项目后,这里会显示它的文件。") }
@@ -60,13 +70,15 @@ private struct ExtraRootSection: View {
     let project: String
     let workbench: WorkbenchModel
     @State private var expanded = true
+    @State private var dropTargeted = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ExplorerRow(depth: 0, name: (folder as NSString).lastPathComponent, isDirectory: true, expanded: expanded,
-                        chevron: expanded ? "chevron-down" : "chevron-right", isActive: false, decoration: nil) {
+                        chevron: expanded ? "chevron-down" : "chevron-right", isActive: false, decoration: nil, isDropTarget: dropTargeted) {
                 expanded.toggle()
             }
+            .explorerDropTarget(folder, workbench: workbench, targeted: $dropTargeted)
             .omContextMenu {
                 OMMenuItem("在 Finder 中显示", icon: "folder-search") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: folder)]) }
                 OMMenuItem("从工作区移除", icon: "x", isDestructive: true) {
@@ -115,15 +127,24 @@ private struct FolderRow: View {
     let workbench: WorkbenchModel
     let root: String
     @State private var expanded = false
+    /// 拖入的文件正悬停在本文件夹上
+    @State private var dropTargeted = false
     @Environment(\.gitDecorations) private var decorations
     private let model = ExplorerModel.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ExplorerRow(depth: depth, name: entry.name, isDirectory: true, expanded: expanded, chevron: expanded ? "chevron-down" : "chevron-right", isActive: false, decoration: decorations.kind(for: entry.path)) {
+            ExplorerRow(depth: depth, name: entry.name, isDirectory: true, expanded: expanded, chevron: expanded ? "chevron-down" : "chevron-right", isActive: false, decoration: decorations.kind(for: entry.path), isDropTarget: dropTargeted) {
                 expanded.toggle()
             }
             .onDrag { NSItemProvider(object: URL(fileURLWithPath: entry.path) as NSURL) }
+            // 拖到文件夹上 = 放进该文件夹;悬停片刻自动展开,便于继续往深层拖
+            .explorerDropTarget(entry.path, workbench: workbench, targeted: $dropTargeted)
+            .task(id: dropTargeted) {
+                guard dropTargeted, !expanded else { return }
+                try? await Task.sleep(for: .milliseconds(700))
+                if dropTargeted, !Task.isCancelled { expanded = true }
+            }
             .omContextMenu { ExplorerMenu.entries(entry: entry, root: root, workbench: workbench) }
             if expanded {
                 DirectoryChildren(path: entry.path, depth: depth + 1, workbench: workbench, root: root)
@@ -138,16 +159,19 @@ private struct FileRow: View {
     let depth: Int
     let workbench: WorkbenchModel
     let root: String
+    @State private var dropTargeted = false
     @Environment(\.gitDecorations) private var decorations
 
     var body: some View {
         let active = isActive
-        ExplorerRow(depth: depth, name: entry.name, isDirectory: false, expanded: false, chevron: nil, isActive: active, decoration: decorations.kind(for: entry.path)) {
+        ExplorerRow(depth: depth, name: entry.name, isDirectory: false, expanded: false, chevron: nil, isActive: active, decoration: decorations.kind(for: entry.path), isDropTarget: dropTargeted) {
             workbench.openFile(entry.path, preview: true)
         }
         .simultaneousGesture(TapGesture(count: 2).onEnded { workbench.openFile(entry.path, preview: false) })
-        // 拖到输入框 = 引用 @路径;拖到标签栏/内容区 = 打开
+        // 拖到输入框 = 引用 @路径;拖到标签栏/内容区 = 打开;拖到资源管理器的文件夹 = 移动
         .onDrag { NSItemProvider(object: URL(fileURLWithPath: entry.path) as NSURL) }
+        // 拖到文件上 = 放进它所在的文件夹
+        .explorerDropTarget((entry.path as NSString).deletingLastPathComponent, workbench: workbench, targeted: $dropTargeted)
         .omContextMenu { ExplorerMenu.entries(entry: entry, root: root, workbench: workbench) }
     }
 
@@ -166,6 +190,8 @@ private struct ExplorerRow: View {
     let isActive: Bool
     /// Git 装饰(有未提交变化时文字着色并在右侧显示字母/圆点)
     let decoration: GitDecorationKind?
+    /// 拖入的文件正悬停在本行(放置目标高亮)
+    var isDropTarget = false
     let action: () -> Void
     @State private var hovering = false
 
@@ -192,7 +218,12 @@ private struct ExplorerRow: View {
             .padding(.vertical, 3)
             .padding(.trailing, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: OMRadius.tag).fill(isActive ? OMColors.selectedFill : (hovering ? OMColors.hoverFill : .clear)).padding(.horizontal, 4))
+            .background(RoundedRectangle(cornerRadius: OMRadius.tag).fill(isActive || isDropTarget ? OMColors.selectedFill : (hovering ? OMColors.hoverFill : .clear)).padding(.horizontal, 4))
+            .overlay {
+                if isDropTarget {
+                    RoundedRectangle(cornerRadius: OMRadius.tag).strokeBorder(OMColors.accent, lineWidth: 1).padding(.horizontal, 4)
+                }
+            }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -351,5 +382,111 @@ enum ExplorerActions {
 
     private static func report(_ message: String) {
         OMDialog.alert(title: String(localized: "操作失败"), message: message, isError: true)
+    }
+
+    // MARK: 拖放
+
+    /// 处理拖到资源管理器某文件夹上的文件:工作区内的为移动,外部(Finder 等)拖入的为复制。
+    /// 同名项目先询问是否替换(被替换的移到废纸篓);有未保存修改的文件不移动。
+    /// - Parameters:
+    ///   - providers: 拖放内容
+    ///   - directory: 落点文件夹
+    ///   - workbench: 工作台
+    static func drop(_ providers: [NSItemProvider], into directory: String, workbench: WorkbenchModel) {
+        Task { @MainActor in
+            var sources: [String] = []
+            for provider in providers where provider.canLoadObject(ofClass: URL.self) {
+                if let url = await loadURL(provider), url.isFileURL { sources.append(url.path) }
+            }
+            perform(sources: sources, into: directory, workbench: workbench)
+        }
+    }
+
+    /// 执行拖放规划(见 `drop`;调试钩子 `OMA_EXPLORER_DROP` 也走这里)。
+    static func perform(sources: [String], into directory: String, workbench: WorkbenchModel) {
+        guard !sources.isEmpty else { return }
+        let roots = workbench.selectedProject.map { [$0.id] + $0.extraFolders } ?? []
+        let plan = ExplorerDropPlan.make(sources: sources, into: directory, workspaceRoots: roots)
+        if !plan.rejected.isEmpty {
+            report(String(localized: "不能把文件夹移到它自身或它的子文件夹里。"))
+        }
+        let dirty = plan.transfers.filter { transfer in
+            transfer.kind == .move && FileDocumentStore.shared.dirtyDocuments.contains { $0.path == transfer.source || $0.path.hasPrefix(transfer.source + "/") }
+        }
+        if !dirty.isEmpty {
+            report(String(localized: "「\(dirty.map { ($0.source as NSString).lastPathComponent }.joined(separator: "、"))」有未保存的修改,请先保存再移动。"))
+        }
+        var transfers = plan.transfers.filter { transfer in !dirty.contains(transfer) }
+        let conflicts = transfers.filter { FileManager.default.fileExists(atPath: $0.destination) }
+        if !conflicts.isEmpty {
+            let names = conflicts.map { ($0.destination as NSString).lastPathComponent }.joined(separator: "、")
+            let replace = OMDialog.confirm(title: String(localized: "目标文件夹中已有同名项目"),
+                                           message: String(localized: "「\(names)」已存在。要替换吗?被替换的项目会移到废纸篓。"),
+                                           confirmTitle: String(localized: "替换"), destructive: true)
+            if !replace { transfers.removeAll { conflicts.contains($0) } }
+        }
+        guard !transfers.isEmpty else { return }
+        let jobs = transfers
+        Task {
+            let failures = await Task.detached { () -> [String] in
+                let fm = FileManager.default
+                var failures: [String] = []
+                for job in jobs {
+                    do {
+                        if fm.fileExists(atPath: job.destination) {
+                            try fm.trashItem(at: URL(fileURLWithPath: job.destination), resultingItemURL: nil)
+                        }
+                        switch job.kind {
+                        case .move: try fm.moveItem(atPath: job.source, toPath: job.destination)
+                        case .copy: try fm.copyItem(atPath: job.source, toPath: job.destination)
+                        }
+                    } catch {
+                        failures.append("\((job.source as NSString).lastPathComponent):\(error.localizedDescription)")
+                    }
+                }
+                return failures
+            }.value
+            for job in jobs where job.kind == .move && FileManager.default.fileExists(atPath: job.destination) {
+                // 已打开的标签改指新位置;旧路径的(未修改)内存文档丢弃,打开时按新路径重新读取
+                workbench.dock.retargetFiles(from: job.source, to: job.destination)
+                for path in FileDocumentStore.shared.documents.keys where path == job.source || path.hasPrefix(job.source + "/") {
+                    FileDocumentStore.shared.discard(path)
+                }
+            }
+            Log.editor.info("资源管理器拖放", ["into": directory, "moved": "\(jobs.filter { $0.kind == .move }.count)", "copied": "\(jobs.filter { $0.kind == .copy }.count)", "failed": "\(failures.count)"])
+            if !failures.isEmpty {
+                Log.editor.error("资源管理器拖放部分失败", ["details": failures.joined(separator: "; ")])
+                report(failures.joined(separator: "\n"))
+            }
+            ExplorerModel.shared.bump()
+            WorkspaceIndexModel.shared.refresh(root: workbench.selectedProjectID)
+        }
+    }
+
+    private static func loadURL(_ provider: NSItemProvider) async -> URL? {
+        await withCheckedContinuation { continuation in
+            _ = provider.loadObject(ofClass: URL.self) { url, _ in continuation.resume(returning: url) }
+        }
+    }
+}
+
+/// 资源管理器的放置区:接收文件拖放,落点为指定文件夹,悬停时高亮。
+private struct ExplorerDropTarget: ViewModifier {
+    let directory: String
+    let workbench: WorkbenchModel
+    @Binding var targeted: Bool
+
+    func body(content: Content) -> some View {
+        content.onDrop(of: [.fileURL], isTargeted: $targeted) { providers in
+            ExplorerActions.drop(providers, into: directory, workbench: workbench)
+            return true
+        }
+    }
+}
+
+private extension View {
+    /// 让该视图成为资源管理器的放置区(落点为 `directory`)。
+    func explorerDropTarget(_ directory: String, workbench: WorkbenchModel, targeted: Binding<Bool>) -> some View {
+        modifier(ExplorerDropTarget(directory: directory, workbench: workbench, targeted: targeted))
     }
 }

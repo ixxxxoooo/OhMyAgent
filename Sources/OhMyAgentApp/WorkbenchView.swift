@@ -296,6 +296,14 @@ struct WorkbenchView: View {
                 workbench.dock.drop(id, onGroup: group, zone: zone)
             }
         }
+        // 调试:资源管理器拖放(OMA_EXPLORER_DROP=<目标文件夹>|<源1>|<源2>…,走与真实拖放相同的移动/复制流程)
+        if let spec = env["OMA_EXPLORER_DROP"], !spec.isEmpty {
+            let parts = spec.split(separator: "|").map(String.init)
+            if parts.count >= 2 {
+                try? await Task.sleep(for: .milliseconds(1500))
+                ExplorerActions.perform(sources: Array(parts.dropFirst()), into: parts[0], workbench: workbench)
+            }
+        }
         // 调试:面板摆放(OMA_TERMINAL_PLACEMENT=bottom|right|left|editor、OMA_SIDEBAR_SIDE/OMA_TOOLS_SIDE=left|right、OMA_SHOW_TERMINAL=1)
         if let value = env["OMA_TERMINAL_PLACEMENT"].flatMap(TerminalPlacement.init(rawValue:)) { workbench.setTerminalPlacement(value) }
         if let value = env["OMA_SIDEBAR_SIDE"].flatMap(PanelSide.init(rawValue:)) { workbench.setSidebarSide(value) }

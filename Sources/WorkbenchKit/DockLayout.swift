@@ -286,6 +286,18 @@ public struct DockLayout: Codable, Equatable, Sendable {
 
     public mutating func setTitle(_ title: String, for tabID: UUID) { update(tabID) { $0.title = title } }
 
+    /// 改变标签指向的内容(文件被移动后改指新路径),标签位置与状态不变。
+    /// - Parameters:
+    ///   - tabID: 标签
+    ///   - kind: 新内容
+    ///   - title: 新标题
+    public mutating func retarget(_ tabID: UUID, kind: TabKind, title: String) {
+        update(tabID) { tab in
+            tab.kind = kind
+            tab.title = title
+        }
+    }
+
     public mutating func setDirty(_ dirty: Bool, for tabID: UUID) {
         update(tabID) { tab in
             tab.isDirty = dirty
