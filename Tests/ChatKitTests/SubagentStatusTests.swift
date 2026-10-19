@@ -75,6 +75,7 @@ struct SubagentStatusTests {
         _ = launch(store, id: "done", status: .completed)
         #expect(SubagentStatus.make(entry: bg)?.phase == .backgroundRunning)
         #expect(store.runningForegroundSubagentCount() == 2)
+        #expect(store.runningBackgroundSubagents().map(\.entry.id) == [bg.id], "任务坞只含运行中的后台子代理")
     }
 
     @Test("非工具条目没有子代理状态")

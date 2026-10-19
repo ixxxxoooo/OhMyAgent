@@ -15,9 +15,9 @@ struct ComposerDockView: View {
     let model: SessionModel
     let workbench: WorkbenchModel
 
-    /// 运行中的子 Agent 条目(含嵌套深度)。
+    /// 运行中的后台子 Agent 条目(含嵌套深度);前台子 Agent 不进任务坞。
     private var runningSubagents: [(entry: TimelineEntry, depth: Int)] {
-        model.timeline.subagentEntries().filter { $0.entry.tool.map { !$0.status.isTerminal } ?? false }
+        model.timeline.runningBackgroundSubagents()
     }
 
     /// 任务坞里的终端(后台命令与内置终端,按开始时间排序);Agent 的前台一次性命令不在此列。

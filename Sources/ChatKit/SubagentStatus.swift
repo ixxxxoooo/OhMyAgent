@@ -113,4 +113,13 @@ extension TimelineStore {
             return tool.rawInput?["run_in_background"]?.boolValue == true ? total : total + 1
         }
     }
+
+    /// 任务坞展示的子代理:仍在运行的**后台**子代理(含嵌套);前台子代理由时间线上的卡片展示,不进任务坞。
+    /// - Returns: 条目与嵌套深度
+    public func runningBackgroundSubagents() -> [(entry: TimelineEntry, depth: Int)] {
+        subagentEntries().filter { item in
+            guard let tool = item.entry.tool, !tool.status.isTerminal else { return false }
+            return tool.rawInput?["run_in_background"]?.boolValue == true
+        }
+    }
 }
