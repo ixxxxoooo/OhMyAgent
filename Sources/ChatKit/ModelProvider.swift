@@ -289,18 +289,40 @@ public enum ProviderStorage {
     }
 
     /// 写入或删除密钥(权限 0600)。
+    /// 已有密钥文件读取或解析失败时直接抛错、不写盘,避免把其他提供商的密钥一并抹掉。
     /// - Parameters:
     ///   - key: 密钥,空串表示删除
     ///   - id: 提供商 ID
-    /// - Throws: 写盘错误
+    /// - Throws: 读取/解析已有密钥文件或写盘错误
     public static func setKey(_ key: String, for id: String, directory: URL = defaultDirectory) throws {
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let fm = FileManager.default
+        try fm.createDirectory(at: directory, withIntermediateDirectories: true)
         let url = keysURL(directory)
-        var map = (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode([String: String].self, from: $0) } ?? [:]
+        var map: [String: String] = [:]
+        if fm.fileExists(atPath: url.path) {
+            map = try JSONDecoder().decode([String: String].self, from: Data(contentsOf: url))
+        }
         let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { map.removeValue(forKey: id) } else { map[id] = trimmed }
-        try JSONEncoder().encode(map).write(to: url, options: .atomic)
-        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        try writePrivately(JSONEncoder().encode(map), to: url)
+    }
+
+    /// 以 0600 权限原子写入:先在同目录创建 0600 临时文件再改名替换,密钥不会有对其他用户可读的窗口期。
+    /// - Parameters:
+    ///   - data: 内容
+    ///   - url: 目标文件
+    /// - Throws: 创建或改名失败
+    static func writePrivately(_ data: Data, to url: URL) throws {
+        let fm = FileManager.default
+        let temp = url.deletingLastPathComponent().appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString).tmp")
+        guard fm.createFile(atPath: temp.path, contents: data, attributes: [.posixPermissions: 0o600]) else {
+            throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: temp.path])
+        }
+        guard rename(temp.path, url.path) == 0 else {
+            let code = errno
+            try? fm.removeItem(at: temp)
+            throw POSIXError(POSIXErrorCode(rawValue: code) ?? .EIO)
+        }
     }
 
     /// 解析当前的模型映射。
@@ -578,8 +600,13 @@ public final class ProviderSettingsModel {
         next.providers.removeAll { $0.id == id }
         next.mapping.removeTargets(of: id)
         persist(next)
-        try? ProviderStorage.setKey("", for: id, directory: directory)
-        keyedIds.remove(id)
+        do {
+            try ProviderStorage.setKey("", for: id, directory: directory)
+            keyedIds.remove(id)
+        } catch {
+            lastError = error.localizedDescription
+            Log.agent.error("删除提供商密钥失败", error: error, ["provider": id])
+        }
     }
 
     /// 启用或停用某个提供商(停用后不能被选为映射目标;已有的映射在会话启动时会给出提示)。

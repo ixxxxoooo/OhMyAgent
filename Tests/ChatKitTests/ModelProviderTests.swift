@@ -98,6 +98,25 @@ struct ModelProviderTests {
         #expect(ProviderStorage.key(for: "deepseek", directory: dir, environment: [:]) == nil)
     }
 
+    @Test("密钥文件损坏时写入抛错且保留原文件,不抹掉其他提供商的密钥")
+    func corruptKeyFileIsNotOverwritten() throws {
+        let dir = try Self.tempDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appendingPathComponent("provider-keys.json")
+        let corrupt = Data("{\"deepseek\": \"sk-a".utf8)
+        try corrupt.write(to: url)
+        #expect(throws: (any Error).self) { try ProviderStorage.setKey("sk-new", for: "glm", directory: dir) }
+        #expect(try Data(contentsOf: url) == corrupt)
+        // 正常文件:写入新提供商不影响已有密钥,临时文件不残留
+        try FileManager.default.removeItem(at: url)
+        try ProviderStorage.setKey("sk-a", for: "deepseek", directory: dir)
+        try ProviderStorage.setKey("sk-b", for: "glm", directory: dir)
+        #expect(ProviderStorage.key(for: "deepseek", directory: dir, environment: [:]) == "sk-a")
+        #expect(ProviderStorage.key(for: "glm", directory: dir, environment: [:]) == "sk-b")
+        let leftovers = try FileManager.default.contentsOfDirectory(atPath: dir.path).filter { $0.hasSuffix(".tmp") }
+        #expect(leftovers.isEmpty)
+    }
+
     @Test("环境变量 OMA_PROVIDER_KEY 优先;损坏文件回退为空")
     func envOverrideAndCorruption() throws {
         let dir = try Self.tempDirectory()
