@@ -21,6 +21,8 @@ struct ChatView: View {
     @State private var sticky = StickyUserState()
     /// 分组结果缓存(输入区等无关状态变化时不重复分组)
     @State private var itemsCache = TimelineItemsCache()
+    /// 贴底滚动的帧内合并:内容高度变化与时间线修订号变化在同一回合触发时只 scrollTo 一次
+    @State private var followScroll = FrameCoalescedAction()
     @AppStorage(ClientPrefs.Key.toolDensity) private var toolDensityRaw = ToolDensity.standard.rawValue
     /// 上下文用量面板是否展开
     @State private var usageOpen = ProcessInfo.processInfo.environment["OMA_USAGE_PANEL"] != nil   // 调试钩子:启动即展开
@@ -203,7 +205,11 @@ struct ChatView: View {
     /// 内容变化后:贴底且用户没在滚动时才自动滚到底;否则只累计「新消息」。
     private func autoFollow() {
         let shouldScroll = follow.contentChanged(entryCount: model.timeline.entries.count, userScrolling: scrollPhase != .idle)
-        if shouldScroll, !sticky.followSuspended { position.scrollTo(edge: .bottom) }
+        guard shouldScroll, !sticky.followSuspended else { return }
+        // 状态记账(上面)必须每次触发都做;真正的 scrollTo 每帧至多一次
+        followScroll.schedule { [sticky] in
+            if !sticky.followSuspended { position.scrollTo(edge: .bottom) }
+        }
     }
 
     /// 离开底部时的悬浮按钮:回到最新;有新内容时显示条数。
