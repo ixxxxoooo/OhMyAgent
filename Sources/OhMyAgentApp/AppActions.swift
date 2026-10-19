@@ -206,7 +206,6 @@ final class AppActions {
     /// 新建终端(⌃⇧`):终端在编辑区时新开一个终端标签;在底部/左右栏时显示面板并新增一个终端实例。
     func newTerminal() {
         let workbench = AppEnvironment.shared.workbench
-        if workbench.layout.placement.terminal == .editor { openTerminal(); return }
         let root = workbench.selectedProjectID ?? NSHomeDirectory()
         workbench.showTerminal()
         if TerminalPanelStore.shared.addTerminal(root: root) == nil {
@@ -219,7 +218,6 @@ final class AppActions {
     /// - Parameter step: 1 下一个,-1 上一个
     func cycleTerminal(_ step: Int) {
         let workbench = AppEnvironment.shared.workbench
-        guard workbench.layout.placement.terminal != .editor else { return }
         workbench.showTerminal()
         TerminalPanelStore.shared.cycle(step, root: workbench.selectedProjectID ?? NSHomeDirectory())
     }
