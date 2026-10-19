@@ -27,6 +27,16 @@ struct PerfSourceGuardTests {
         #expect(lines.contains { $0.code.contains(".animation(Self.panelToggleAnimation)") }, "面板过渡应自带动画")
     }
 
+    @Test("资源管理器逐行不得注册放置区(onDrop),放置统一由列表层单个 DropDelegate 处理")
+    func explorerRowsHaveNoPerRowDropTargets() throws {
+        let lines = try Self.codeLines("Explorer/ExplorerView.swift")
+        let drops = lines.filter { $0.code.contains(".onDrop(") }
+        #expect(drops.count == 1, "ExplorerView 只应在列表层注册一次 onDrop,当前第 \(drops.map(\.line)) 行;逐行 onDrop 会让滚动时焦点响应者遍历随行数暴涨")
+        #expect(lines.contains { $0.code.contains("ExplorerListDropDelegate(") }, "列表层应使用 ExplorerListDropDelegate")
+        #expect(lines.contains { $0.code.contains("ExplorerFlatten.window(") }, "文件树应按窗口只挂载可见行")
+        #expect(!lines.contains { $0.code.contains("DirectoryChildren") }, "不得再回到整树递归挂载")
+    }
+
     @Test("保活的隐藏标签必须冻结布局尺寸")
     func inactiveTabsAreFrozen() throws {
         let lines = try Self.codeLines("Dock/TabGroupView.swift")
