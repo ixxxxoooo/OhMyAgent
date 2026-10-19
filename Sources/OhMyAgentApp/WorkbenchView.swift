@@ -112,20 +112,11 @@ struct WorkbenchView: View {
     /// 一列面板 + 它与中栏之间的分隔条(分隔条总在靠近中栏的一侧)。
     @ViewBuilder
     private func panelColumn(_ column: PanelColumn, side: PanelSide) -> some View {
-        let width = Binding<Double>(
-            get: { workbench.layout.width(of: column) },
-            set: { value in
-                switch column {
-                case .sidebar: workbench.layout.leftWidth = value
-                case .tools: workbench.layout.rightWidth = value
-                case .terminal: workbench.layout.terminalWidth = value
-                case .output: workbench.layout.outputWidth = value
-                }
-            }
-        )
-        let range = column == .sidebar ? PanelMetrics.leftRange : (column == .tools ? PanelMetrics.rightRange : PanelMetrics.terminalRange)
+        // 宽度取「拖动中临时值,否则已提交值」:拖动期间 layout 不变,只有被拖动的这一列重新布局
+        let dimension = PanelDimension(column: column)
+        let width = workbench.panelDrag.effective(dimension, committed: workbench.layout)
         let defaultWidth = column == .sidebar ? PanelMetrics.leftDefault : (column == .tools ? PanelMetrics.rightDefault : PanelMetrics.terminalDefault)
-        if side == .right { PanelResizer(width: width, side: side, range: range, defaultWidth: defaultWidth).zIndex(1).transition(panelTransition(side)) }
+        if side == .right { PanelResizer(workbench: workbench, dimension: dimension, side: side, defaultWidth: defaultWidth).zIndex(1).transition(panelTransition(side)) }
         Group {
             switch column {
             case .sidebar:
@@ -143,12 +134,12 @@ struct WorkbenchView: View {
         }
         .panelDropZone(side == .left ? .left : .right, workbench: workbench)
         // 窗口放不下「面板 + 中栏最小宽度」时面板让出宽度(而不是把整个工作区撑出窗口、右上角开关被挤出可视区)
-        .frame(minWidth: 0, idealWidth: CGFloat(width.wrappedValue), maxWidth: CGFloat(width.wrappedValue))
+        .frame(minWidth: 0, idealWidth: CGFloat(width), maxWidth: CGFloat(width))
         .clipped()
         // 滑出时面板仍盖在(已一次性扩宽的)中栏之上,否则会被后绘制的中栏遮住而「瞬间消失」
         .zIndex(1)
         .transition(panelTransition(side))
-        if side == .left { PanelResizer(width: width, side: side, range: range, defaultWidth: defaultWidth).zIndex(1).transition(panelTransition(side)) }
+        if side == .left { PanelResizer(workbench: workbench, dimension: dimension, side: side, defaultWidth: defaultWidth).zIndex(1).transition(panelTransition(side)) }
     }
 
     /// 导航历史的触发信号:聚焦组的激活标签与标签总数(关闭标签时需要清理历史)。

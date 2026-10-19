@@ -40,6 +40,9 @@ struct DockSplitView: View {
     let split: DockSplit
     var edges = DockEdges()
     @State private var dragBase: [Double]?
+    /// 拖动中暂存的比例:拖动期间只改这个本地状态(仅本分屏重排),松手才写回 `dock`,
+    /// 避免每个 tick 都让整个停靠布局(及所有观察 dock 的视图)失效。
+    @State private var liveRatios: [Double]?
 
     private var horizontal: Bool { split.axis == .horizontal }
 
@@ -67,7 +70,8 @@ struct DockSplitView: View {
     private static let handle: CGFloat = 1
 
     private func ratio(_ index: Int) -> Double {
-        split.ratios.indices.contains(index) ? split.ratios[index] : 1.0 / Double(max(split.children.count, 1))
+        let ratios = liveRatios ?? split.ratios
+        return ratios.indices.contains(index) ? ratios[index] : 1.0 / Double(max(split.children.count, 1))
     }
 
     /// 1pt 可见线 + 8pt 命中区的分隔条。
@@ -87,13 +91,18 @@ struct DockSplitView: View {
                             .onChanged { value in
                                 let base = dragBase ?? split.ratios
                                 if dragBase == nil { dragBase = base }
+                                guard base.indices.contains(index + 1) else { return }
                                 let delta = Double((horizontal ? value.translation.width : value.translation.height) / usable)
                                 var next = base
                                 next[index] = base[index] + delta
                                 next[index + 1] = base[index + 1] - delta
-                                workbench.dock.setRatios(next, forSplit: split.id)
+                                liveRatios = DockLayout.normalizedRatios(next)
                             }
-                            .onEnded { _ in dragBase = nil }
+                            .onEnded { _ in
+                                dragBase = nil
+                                if let committed = liveRatios { workbench.dock.setRatios(committed, forSplit: split.id) }
+                                liveRatios = nil
+                            }
                     )
             }
             .accessibilityHidden(true)

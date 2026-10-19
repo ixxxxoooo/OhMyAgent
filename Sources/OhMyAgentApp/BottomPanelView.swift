@@ -10,6 +10,8 @@ import WorkbenchKit
 struct BottomPanelView: View {
     @Bindable var workbench: WorkbenchModel
     @State private var dragStartHeight: Double?
+    /// 拖动中的临时高度(松手才提交到布局)。
+    private var panelHeight: Double { workbench.panelDrag.effective(.bottomHeight, committed: workbench.layout) }
 
     /// 底部面板可用的视图:只列出摆放在底部的面板(终端、输出)。
     private var panes: [BottomPane] {
@@ -78,7 +80,7 @@ struct BottomPanelView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(height: CGFloat(workbench.layout.bottomHeight))
+        .frame(height: CGFloat(panelHeight))
         .background(OMColors.surface)
         .panelDropZone(.bottom, workbench: workbench)
     }
@@ -95,11 +97,14 @@ struct BottomPanelView: View {
                     }
                     .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .global)
                         .onChanged { value in
-                            let start = dragStartHeight ?? workbench.layout.bottomHeight
+                            let start = dragStartHeight ?? panelHeight
                             dragStartHeight = start
-                            workbench.layout.bottomHeight = min(max(start - value.translation.height, 120), 600)
+                            workbench.panelDrag.update(start - value.translation.height, for: .bottomHeight)
                         }
-                        .onEnded { _ in dragStartHeight = nil })
+                        .onEnded { _ in
+                            dragStartHeight = nil
+                            workbench.commitPanelDrag(.bottomHeight)
+                        })
             }
     }
 

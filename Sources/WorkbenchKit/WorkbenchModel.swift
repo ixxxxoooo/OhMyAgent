@@ -32,7 +32,34 @@ public final class WorkbenchModel {
     /// 主窗口当前显示的内容:工作台或设置整页(不持久化,启动时总是工作台)。
     public var mode: WorkbenchMode = .workspace
     /// 停靠布局:标签组与分屏(持久化)。
-    public var dock: DockLayout { didSet { if dock != oldValue { reapConversations(); recordNavigation(); scheduleSave() } } }
+    public var dock: DockLayout {
+        didSet {
+            guard dock != oldValue else { return }
+            // 仅分屏比例变化(拖分隔条)不影响标签集合与导航历史,跳过回收与导航记录,只落盘
+            if !dock.differsOnlyInRatios(from: oldValue) { reapConversations(); recordNavigation() }
+            scheduleSave()
+        }
+    }
+
+    /// 面板拖动中的临时尺寸(拖分栏期间只写它,松手才经 `commitPanelDrag` 提交到 `layout`)。
+    @ObservationIgnored public let panelDrag = PanelDragState.shared
+
+    /// 提交某个面板维度的拖动结果到布局(一次写入;无变化不写)。
+    /// - Parameter dimension: 尺寸维度
+    public func commitPanelDrag(_ dimension: PanelDimension) {
+        var copy = layout
+        if panelDrag.commit(dimension, to: &copy) { layout = copy }
+    }
+
+    /// 立即设置某个面板维度(双击恢复默认、无障碍调节等非拖动入口);钳制到范围,无变化不写。
+    /// - Parameters:
+    ///   - dimension: 尺寸维度
+    ///   - value: 新值
+    public func setPanelDimension(_ dimension: PanelDimension, to value: Double) {
+        var copy = layout
+        dimension.write(value, to: &copy)
+        if copy != layout { layout = copy }
+    }
 
     /// 最近关闭的标签(⌘⇧T 恢复,不持久化)。
     @ObservationIgnored private var closedTabs = ClosedTabStack()

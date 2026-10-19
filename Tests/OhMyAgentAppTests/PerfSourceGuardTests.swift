@@ -52,4 +52,29 @@ struct PerfSourceGuardTests {
         }
         #expect(offenders.isEmpty, "出现逐帧/SwiftUI 驱动的循环动画(应改用 DesignSystem/LoopLayers.swift):\(offenders.joined(separator: ", "))")
     }
+
+    @Test("onGeometryChange 里禁止 inout 传 &workbench.layout(会无条件通知所有观察者),只能对副本更新后比较再写回")
+    func geometryChangeDoesNotPassLayoutInout() throws {
+        let lines = try Self.codeLines("WorkbenchView.swift")
+        let offenders = lines.filter { $0.code.contains("&workbench.layout") }
+        #expect(offenders.isEmpty, "WorkbenchView 第 \(offenders.map(\.line)) 行:inout 写 layout 会让全局视图逐帧失效")
+        #expect(lines.contains { $0.code.contains("CompactLayout.Bucket.self") }, "窗口宽度应只按档位观察")
+    }
+
+    @Test("DragGesture.onChanged 里禁止直接写 workbench.layout / workbench.dock(拖动中只能写临时状态,松手再提交)")
+    func dragGestureDoesNotWriteLayout() throws {
+        for name in ["PanelResizer.swift", "BottomPanelView.swift", "Dock/DockView.swift", "Terminal/TerminalPanelView.swift"] {
+            let lines = try Self.codeLines(name)
+            var inChanged = false
+            var offenders: [Int] = []
+            for (line, code) in lines {
+                if code.contains(".onChanged") { inChanged = true }
+                if code.contains(".onEnded") { inChanged = false }
+                if inChanged, code.contains("workbench.layout.") && code.contains("=") && !code.contains("==") || (inChanged && code.contains("workbench.dock.setRatios")) {
+                    offenders.append(line)
+                }
+            }
+            #expect(offenders.isEmpty, "\(name) 第 \(offenders) 行:拖动中直接写布局会让所有观察者逐 tick 重算")
+        }
+    }
 }

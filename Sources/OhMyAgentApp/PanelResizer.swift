@@ -7,17 +7,23 @@ import SwiftUI
 import WorkbenchKit
 
 /// 侧栏分隔条。
+/// 拖动中只写 `PanelDragState` 的临时值(不触碰整个 `WorkbenchLayout`,避免逐 tick 全局失效),
+/// 松手、双击、无障碍调节时才一次性提交到布局。
 struct PanelResizer: View {
-    /// 被调整的宽度(绑定到 `WorkbenchLayout`)
-    @Binding var width: Double
+    let workbench: WorkbenchModel
+    /// 被调整的尺寸维度
+    let dimension: PanelDimension
     /// 该列所在的物理一侧(决定拖动方向)
     let side: PanelSide
-    /// 允许的宽度范围
-    let range: ClosedRange<Double>
     /// 双击恢复的默认宽度
     let defaultWidth: Double
     /// 开始拖动时的宽度(拖动期间面板自身在移动,所以用全局坐标计算位移)
     @State private var base: Double?
+
+    /// 当前有效宽度(只在手势/无障碍回调里读取,body 不订阅布局)。
+    private var currentWidth: Double {
+        workbench.panelDrag.effective(dimension, committed: workbench.layout)
+    }
 
     var body: some View {
         Rectangle()
@@ -31,20 +37,24 @@ struct PanelResizer: View {
                     .gesture(
                         DragGesture(minimumDistance: 1, coordinateSpace: .global)
                             .onChanged { value in
-                                let start = base ?? width
+                                let start = base ?? currentWidth
                                 if base == nil { base = start }
-                                width = PanelMetrics.resized(base: start, translation: Double(value.translation.width), side: side, range: range)
+                                let next = PanelMetrics.resized(base: start, translation: Double(value.translation.width), side: side, range: dimension.range)
+                                workbench.panelDrag.update(next, for: dimension)
                             }
-                            .onEnded { _ in base = nil }
+                            .onEnded { _ in
+                                base = nil
+                                workbench.commitPanelDrag(dimension)
+                            }
                     )
-                    .onTapGesture(count: 2) { width = defaultWidth }
+                    .onTapGesture(count: 2) { workbench.setPanelDimension(dimension, to: defaultWidth) }
             }
             .accessibilityLabel(side == .left ? String(localized: "调整左栏宽度") : String(localized: "调整右栏宽度"))
             .accessibilityAdjustableAction { direction in
                 let step: Double = 20
                 switch direction {
-                case .increment: width = min(max(width + step, range.lowerBound), range.upperBound)
-                case .decrement: width = min(max(width - step, range.lowerBound), range.upperBound)
+                case .increment: workbench.setPanelDimension(dimension, to: currentWidth + step)
+                case .decrement: workbench.setPanelDimension(dimension, to: currentWidth - step)
                 @unknown default: break
                 }
             }

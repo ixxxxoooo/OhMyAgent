@@ -367,6 +367,36 @@ public struct DockLayout: Codable, Equatable, Sendable {
         collapseEmptyGroups()
     }
 
+    /// 与另一份布局相比,是否只有分屏比例不同(组、标签、聚焦与最大化状态、分屏结构均相同)。
+    /// 用于拖分隔条时跳过会话回收与导航记录。
+    /// - Parameter other: 另一份布局
+    public func differsOnlyInRatios(from other: DockLayout) -> Bool {
+        focusedGroupID == other.focusedGroupID
+            && maximizedGroupID == other.maximizedGroupID
+            && Self.sameStructure(root, other.root)
+    }
+
+    /// 忽略分屏比例的结构相等。
+    private static func sameStructure(_ lhs: DockNode, _ rhs: DockNode) -> Bool {
+        switch (lhs, rhs) {
+        case (.group(let a), .group(let b)):
+            return a == b
+        case (.split(let a), .split(let b)):
+            return a.id == b.id && a.axis == b.axis && a.children.count == b.children.count
+                && zip(a.children, b.children).allSatisfy { sameStructure($0, $1) }
+        default:
+            return false
+        }
+    }
+
+    /// 归一化分屏比例(拖动中暂存比例时用,与 `setRatios` 规则一致)。
+    /// - Parameters:
+    ///   - ratios: 原始比例
+    ///   - minimum: 每项最小占比
+    public static func normalizedRatios(_ ratios: [Double], minimum: Double = 0.1) -> [Double] {
+        normalize(ratios, minimum: minimum)
+    }
+
     /// 设置分屏比例(拖动分隔条时调用),自动归一化并限制最小占比。
     public mutating func setRatios(_ ratios: [Double], forSplit splitID: UUID, minimum: Double = 0.1) {
         root = Self.mapSplit(root, id: splitID) { split in

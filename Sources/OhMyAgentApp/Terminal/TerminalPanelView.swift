@@ -37,8 +37,7 @@ struct TerminalPanelView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 if showsList {
-                    PanelResizer(width: $workbench.layout.terminalListWidth, side: .right,
-                                 range: PanelMetrics.terminalListRange, defaultWidth: PanelMetrics.terminalListDefault)
+                    PanelResizer(workbench: workbench, dimension: .terminalListWidth, side: .right, defaultWidth: PanelMetrics.terminalListDefault)
                     TerminalListView(
                         state: state,
                         agents: agents.map { AgentListRowModel(id: $0.id, title: $0.session.command.isEmpty ? String(localized: "Agent 终端") : $0.session.command, isRunning: $0.session.isRunning) },
@@ -54,7 +53,7 @@ struct TerminalPanelView: View {
                         onAdd: { AppActions.shared.newTerminal() },
                         onCollapse: { omWithAnimation { workbench.layout.terminalListCollapsed = true } }
                     )
-                    .frame(width: workbench.layout.terminalListWidth)
+                    .frame(width: workbench.panelDrag.effective(.terminalListWidth, committed: workbench.layout))
                 }
             }
         }
