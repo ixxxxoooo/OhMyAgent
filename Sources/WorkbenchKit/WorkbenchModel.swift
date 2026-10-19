@@ -1095,7 +1095,7 @@ public final class WorkbenchModel {
     public var residentTerminalID: String { "bottom:" + (selectedProjectID ?? NSHomeDirectory()) }
 
     /// 编辑区中的常驻终端标签(终端放在编辑区时存在)。
-    private var residentTerminalTabs: [WorkbenchTab] {
+    var residentTerminalTabs: [WorkbenchTab] {
         dock.allTabs.filter { if case .terminal(let id) = $0.kind { return id.hasPrefix("bottom:") } else { return false } }
     }
 
@@ -1370,7 +1370,7 @@ public final class WorkbenchModel {
     public nonisolated static let outputTabID = "oma-output"
 
     /// 编辑区中的输出标签。
-    private var outputTabs: [WorkbenchTab] {
+    var outputTabs: [WorkbenchTab] {
         dock.allTabs.filter { $0.kind == .preview(id: Self.outputTabID) }
     }
 

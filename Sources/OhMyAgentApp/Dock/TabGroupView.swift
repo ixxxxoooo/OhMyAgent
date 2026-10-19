@@ -34,6 +34,7 @@ final class DockDrag {
             self?.tabID = nil
             self?.toolsPane = nil
             self?.session = nil
+            self?.panel = nil
         }
     }
     nonisolated static let prefix = "oma-tab:"
@@ -63,7 +64,17 @@ final class DockDrag {
     }
 
     /// 是否有可落下的拖拽(标签、右栏视图或侧栏会话)。
-    var hasPayload: Bool { tabID != nil || toolsPane != nil || session != nil }
+    var hasPayload: Bool { tabID != nil || toolsPane != nil || session != nil || panel != nil }
+
+    /// 正在被拖拽的面板标签(底部/侧栏的终端、输出);落到编辑区时转成对应的编辑区标签再放入落点
+    var panel: PanelItem?
+
+    /// 开始拖拽面板标签;沿用标签拖拽的复位逻辑。
+    /// - Parameter item: 被拖拽的面板
+    func beginPanel(_ item: PanelItem) {
+        panel = item
+        begin(UUID())
+    }
 
     /// 把拖拽载荷解析成编辑区里的标签 ID:标签载荷直接解析,右栏视图载荷则打开对应的工具面板标签。
     /// - Parameters:
@@ -82,6 +93,9 @@ final class DockDrag {
                 workbench.select(project: item.projectID)
             }
             return workbench.dock.focusedGroup?.activeID
+        }
+        if let item = PanelItem.parse(payload: text), item == .terminal || item == .output {
+            return workbench.openPanelTab(item)
         }
         guard text.hasPrefix(toolsPrefix), let pane = RightPane(rawValue: String(text.dropFirst(toolsPrefix.count))),
               RightPane.available.contains(pane) else { return nil }

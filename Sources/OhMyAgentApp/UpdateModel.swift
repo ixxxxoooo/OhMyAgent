@@ -40,7 +40,7 @@ final class UpdateModel {
 
     /// 当前更新方式。
     var mode: UpdateMode { UpdateMode(rawValue: UserDefaults.standard.string(forKey: ClientPrefs.Key.updateMode) ?? "") ?? .download }
-    /// 开发版与演示模式不做自替换(避免用正式包覆盖开发版)。
+    /// 开发版与演示模式只下载、不做自替换(避免用正式包覆盖开发版)。
     var canSelfInstall: Bool { !AppEnv.isDev() && !DemoLaunch.isActive }
 
     /// 启动时恢复上次已下载好的更新,并按需启动空闲自动安装。
@@ -93,7 +93,7 @@ final class UpdateModel {
 
     /// 自动下载:更新方式不是「仅提醒」且网络不计费、未开启低数据模式时才下载。
     private func autoDownloadIfAllowed(_ info: UpdateInfo) {
-        guard mode != .remind, canSelfInstall else { return }
+        guard mode != .remind else { return }
         Task {
             let path = await Self.currentPath()
             guard UpdateTiming.canDownloadNow(isExpensive: path.isExpensive, isConstrained: path.isConstrained) else {
@@ -124,7 +124,6 @@ final class UpdateModel {
         case .downloading: break
         case .none, .failed:
             guard let info = availableInfo else { return }
-            guard canSelfInstall else { openDownload(info); return }
             startDownload(info)
         }
     }

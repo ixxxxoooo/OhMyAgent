@@ -10,8 +10,6 @@ import WorkbenchKit
 struct BottomPanelView: View {
     @Bindable var workbench: WorkbenchModel
     @State private var dragStartHeight: Double?
-    /// 各标签在全局坐标中的范围(用于判断松手时是否落在某个标签上以换顺序)
-    @State private var tabFrames: [BottomPane: CGRect] = [:]
 
     /// 底部面板可用的视图:只列出摆放在底部的面板(终端、输出)。
     private var panes: [BottomPane] {
@@ -40,13 +38,16 @@ struct BottomPanelView: View {
                         .foregroundStyle(isPaneActive(pane) ? OMColors.primaryText : OMColors.secondaryText)
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(isPaneActive(pane) ? OMColors.selectedFill : .clear, in: OMPillShape())
-                        // 标签可拖动:在标签条内松手 = 换顺序;拖到工作区边缘/中心 = 换面板位置
-                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { tabFrames[pane] = $0 }
-                        .simultaneousGesture(
-                            DragGesture(minimumDistance: 6, coordinateSpace: .global)
-                                .onChanged { TerminalDragState.shared.update($0.location, panel: Self.panelItem(pane)) }
-                                .onEnded { finishTabDrag(pane, at: $0.location) }
-                        )
+                        // 与编辑区标签同一套拖拽:拖到编辑区五区分屏、侧栏;放到其它底部标签上换顺序
+                        .panelDragSource(Self.panelItem(pane))
+                        .dropDestination(for: String.self) { payloads, _ in
+                            guard let text = payloads.first, let item = PanelItem.parse(payload: text),
+                                  let dragged = BottomPane(rawValue: item.rawValue), panes.contains(dragged) else {
+                                return dropPanelOrChat(payloads)
+                            }
+                            omWithAnimation { workbench.moveBottomPane(dragged, onto: pane) }
+                            return true
+                        }
                 }
                 ForEach(workbench.dockedChats(in: .bottom)) { chat in
                     DockedChatTab(workbench: workbench, chat: chat)
@@ -59,9 +60,8 @@ struct BottomPanelView: View {
             }
             .padding(.horizontal, 10).padding(.vertical, 4)
             .dropDestination(for: String.self) { payloads, _ in
-                return dropChat(payloads, host: .bottom, in: workbench)
+                return dropPanelOrChat(payloads)
             }
-            .background { Color.clear.terminalDragHandle(workbench, panel: currentPane == .terminal ? .terminal : .output) }
             Divider()
             Group {
                 if let chat = workbench.activeChat(in: .bottom) {
@@ -80,6 +80,7 @@ struct BottomPanelView: View {
         }
         .frame(height: CGFloat(workbench.layout.bottomHeight))
         .background(OMColors.surface)
+        .panelDropZone(.bottom, workbench: workbench)
     }
 
     /// 顶部 1pt 分隔线 + 5pt 高的拖拽热区。
@@ -110,17 +111,15 @@ struct BottomPanelView: View {
     /// 底部标签对应的可拖动面板。
     private static func panelItem(_ pane: BottomPane) -> PanelItem { pane == .terminal ? .terminal : .output }
 
-    /// 结束标签拖动:落在其他底部标签上则换顺序,落在工作区其他位置则换面板摆放。
-    /// - Parameters:
-    ///   - pane: 被拖动的标签
-    ///   - location: 松手位置(全局坐标)
-    private func finishTabDrag(_ pane: BottomPane, at location: CGPoint) {
-        let placement = TerminalDragState.shared.finish(at: location)
-        if let onto = tabFrames.first(where: { $0.key != pane && $0.value.contains(location) })?.key {
-            omWithAnimation { workbench.moveBottomPane(pane, onto: onto) }
-        } else if let placement, placement != .bottom, let zone = PanelZone(rawValue: placement.rawValue) {
-            omWithAnimation { workbench.place(Self.panelItem(pane), in: zone) }
+    /// 放到标签条上的载荷:终端/输出标签(含编辑区里的)移入底部,其余按停靠会话处理。
+    /// - Parameter payloads: 拖拽载荷
+    /// - Returns: 是否接收
+    private func dropPanelOrChat(_ payloads: [String]) -> Bool {
+        if let text = payloads.first, let item = draggedPanelItem(text, in: workbench) {
+            omWithAnimation { workbench.movePanel(item, to: .bottom) }
+            return true
         }
+        return dropChat(payloads, host: .bottom, in: workbench)
     }
 
     private static func title(_ pane: BottomPane) -> String {
