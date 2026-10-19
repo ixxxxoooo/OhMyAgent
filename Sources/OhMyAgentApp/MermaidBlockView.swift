@@ -13,12 +13,21 @@ import SwiftUI
 @Observable
 final class MermaidPreviewStore {
     static let shared = MermaidPreviewStore()
+    /// 最多保留的源码条数:按最近登记/使用淘汰最旧的,避免长期使用后无限增长(预览标签上限远小于此值)
+    static let capacity = 64
     private(set) var sources: [String: String] = [:]
+    /// 登记顺序(最近登记的在末尾),用于淘汰
+    private var order: [String] = []
 
-    /// 登记源码并返回稳定标识(同源码同标识)。
+    /// 登记源码并返回稳定标识(同源码同标识)。超出容量时淘汰最久未登记的源码。
     func register(_ source: String) -> String {
         let id = "mermaid-\(abs(source.hashValue))"
         sources[id] = source
+        order.removeAll { $0 == id }
+        order.append(id)
+        while order.count > Self.capacity {
+            sources.removeValue(forKey: order.removeFirst())
+        }
         return id
     }
 }
