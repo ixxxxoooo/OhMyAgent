@@ -12,8 +12,11 @@ struct ANSITextView: View {
     /// 最多渲染的末尾行数(默认沿用解析器上限 400)
     var maxLines = 400
 
+    /// 上一次的解析结果:输出、字号、行数上限、主题都没变时直接复用(悬停/滚动触发的 body 重算不再重新解析 ANSI)
+    @State private var cache = ANSIRenderCache()
+
     var body: some View {
-        Text(Self.attributed(raw, fontSize: fontSize, maxLines: maxLines))
+        Text(cache.attributed(raw, fontSize: fontSize, maxLines: maxLines))
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -69,5 +72,25 @@ struct ANSITextView: View {
             let gray = Double(8 + 10 * (index - 232)) / 255
             return ThemeRGB(red: gray, green: gray, blue: gray).color
         }
+    }
+}
+
+/// ANSI 渲染的单项缓存(引用类型,放在 `@State` 里跨 body 保留)。
+/// 主题切换会让 `ThemeRuntime.generation` 变化,据此失效。
+@MainActor
+final class ANSIRenderCache {
+    private var key: (raw: String, fontSize: CGFloat, maxLines: Int, generation: Int)?
+    private var value = AttributedString()
+    /// 实际构造次数(测试用)
+    private(set) var buildCount = 0
+
+    /// 取富文本:参数与上次一致则复用。
+    func attributed(_ raw: String, fontSize: CGFloat, maxLines: Int) -> AttributedString {
+        let generation = ThemeRuntime.generation
+        if let key, key.raw == raw, key.fontSize == fontSize, key.maxLines == maxLines, key.generation == generation { return value }
+        value = ANSITextView.attributed(raw, fontSize: fontSize, maxLines: maxLines)
+        key = (raw, fontSize, maxLines, generation)
+        buildCount += 1
+        return value
     }
 }
