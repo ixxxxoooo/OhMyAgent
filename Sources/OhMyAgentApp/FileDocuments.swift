@@ -25,6 +25,8 @@ final class FileDocument {
     var isReadOnly = false
     /// 最近一次已知的磁盘修改时间
     fileprivate(set) var diskModified: Date?
+    /// 读入时识别出的文本编码(保存时沿用,GBK/GB18030 文件不会被改写成 UTF-8)
+    fileprivate(set) var encoding: String.Encoding = .utf8
 
     init(path: String) { self.path = path }
 
@@ -59,8 +61,12 @@ final class FileDocumentStore {
     private(set) var documents: [String: FileDocument] = [:]
 
     /// 取得(必要时创建)文档,并触发首次读取。
+    /// 之前读取失败的文档(如打开时文件还没写出来)再次打开时重新读取,不沿用失败结果。
     func document(for path: String) -> FileDocument {
-        if let doc = documents[path] { return doc }
+        if let doc = documents[path] {
+            if doc.text == nil, doc.loadError != nil { Task { await load(doc) } }
+            return doc
+        }
         let doc = FileDocument(path: path)
         documents[path] = doc
         Task { await load(doc) }
@@ -75,14 +81,34 @@ final class FileDocumentStore {
 
     // MARK: 读取
 
-    private struct DiskState: Sendable { var text: String?; var modified: Date?; var size: Int }
+    private struct DiskState: Sendable { var text: String?; var encoding: String.Encoding; var exists: Bool; var modified: Date?; var size: Int }
 
     private nonisolated static func readDisk(_ path: String) -> DiskState {
         let attrs = try? FileManager.default.attributesOfItem(atPath: path)
         let modified = attrs?[.modificationDate] as? Date
         let size = (attrs?[.size] as? NSNumber)?.intValue ?? 0
-        guard let data = FileManager.default.contents(atPath: path) else { return DiskState(text: nil, modified: modified, size: size) }
-        return DiskState(text: String(data: data, encoding: .utf8), modified: modified, size: size)
+        guard let data = FileManager.default.contents(atPath: path) else {
+            return DiskState(text: nil, encoding: .utf8, exists: attrs != nil, modified: modified, size: size)
+        }
+        let decoded = decodeText(data)
+        return DiskState(text: decoded?.text, encoding: decoded?.encoding ?? .utf8, exists: true, modified: modified, size: size)
+    }
+
+    /// GB18030(兼容 GBK/GB2312)编码。
+    nonisolated static let gb18030 = String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.GB_18030_2000.rawValue)))
+
+    /// 识别文本编码并解码:UTF-8 → 带 BOM 的 UTF-16 → GB18030(中文 Windows 常见的 GBK 文件)。
+    /// 含 NUL 字节的内容视为二进制,不做猜测。
+    /// - Parameter data: 文件内容
+    /// - Returns: 文本与编码;无法作为文本读取为 nil
+    nonisolated static func decodeText(_ data: Data) -> (text: String, encoding: String.Encoding)? {
+        if let text = String(data: data, encoding: .utf8) { return (text, .utf8) }
+        // UTF-16 必须带 BOM 且字节数为偶数(奇数长度说明是二进制)
+        if data.count.isMultiple(of: 2), data.starts(with: [0xFF, 0xFE]) || data.starts(with: [0xFE, 0xFF]),
+           let text = String(data: data, encoding: .utf16) { return (text, .utf16) }
+        guard !data.prefix(8192).contains(0) else { return nil }
+        if let text = String(data: data, encoding: gb18030) { return (text, gb18030) }
+        return nil
     }
 
     private func load(_ doc: FileDocument) async {
@@ -90,21 +116,33 @@ final class FileDocumentStore {
         let started = ContinuousClock.now
         let state = await Task.detached(priority: .userInitiated) { Self.readDisk(path) }.value
         guard let text = state.text else {
-            doc.loadError = String(localized: "无法读取文件(可能已被删除或不是文本文件)")
-            Log.editor.warning("文件读取失败", ["path": path])
+            doc.loadError = state.exists
+                ? String(localized: "无法以文本方式读取该文件(可能是二进制文件或编码无法识别)")
+                : String(localized: "文件不存在(可能尚未写入或已被删除),文件出现后会自动载入")
+            Log.editor.warning("文件读取失败", ["path": path, "exists": "\(state.exists)", "bytes": "\(state.size)"])
             return
         }
         doc.isReadOnly = state.size > Self.editableLimit
+        doc.encoding = state.encoding
         doc.apply(loaded: text, modified: state.modified)
-        Log.editor.info("文件已加载", ["path": path, "bytes": "\(state.size)", "ms": "\(Int((ContinuousClock.now - started).seconds * 1000))"])
+        Log.editor.info("文件已加载", ["path": path, "bytes": "\(state.size)", "encoding": "\(state.encoding.rawValue)", "ms": "\(Int((ContinuousClock.now - started).seconds * 1000))"])
     }
 
     // MARK: 外部修改
 
     /// 对比磁盘修改时间:无本地编辑则静默刷新,有编辑则标记冲突。
     func checkExternalChange(_ path: String) async {
-        guard let doc = documents[path], doc.text != nil else { return }
+        guard let doc = documents[path] else { return }
         let state = await Task.detached(priority: .utility) { Self.readDisk(path) }.value
+        if doc.text == nil {
+            // 之前读取失败(文件当时还不存在或正在写入):现在能读了就载入,仍读不了保持原错误不重复记日志
+            guard doc.loadError != nil, let text = state.text else { return }
+            doc.isReadOnly = state.size > Self.editableLimit
+            doc.encoding = state.encoding
+            doc.apply(loaded: text, modified: state.modified)
+            Log.editor.info("文件已可读取,已载入", ["path": path, "bytes": "\(state.size)"])
+            return
+        }
         guard let modified = state.modified, let known = doc.diskModified, modified > known else { return }
         guard let text = state.text, text != doc.savedText else {
             doc.diskModified = modified
@@ -133,10 +171,11 @@ final class FileDocumentStore {
     func save(_ path: String) async -> Bool {
         guard let doc = documents[path], let text = doc.text, !doc.isReadOnly else { return false }
         guard doc.isDirty else { return true }
+        let encoding = doc.encoding
         let started = ContinuousClock.now
         let outcome = await Task.detached(priority: .userInitiated) { () -> Result<Date?, any Error> in
             do {
-                try text.write(toFile: path, atomically: true, encoding: .utf8)
+                try text.write(toFile: path, atomically: true, encoding: encoding)
                 let modified = (try? FileManager.default.attributesOfItem(atPath: path))?[.modificationDate] as? Date
                 return .success(modified)
             } catch { return .failure(error) }

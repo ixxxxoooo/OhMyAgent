@@ -37,6 +37,50 @@ struct FileDocumentTests {
         #expect(try String(contentsOfFile: path, encoding: .utf8) == "hello world\n")
     }
 
+    @Test("中文文件名:打开时文件还不存在,写出后自动载入;再次打开会重新读取")
+    func chineseNameAppearsLater() async throws {
+        let dir = NSTemporaryDirectory() + "oma-doc-\(UUID().uuidString)"
+        try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: dir) }
+        let path = dir + "/大数据知识库技术方案.md"
+        let store = FileDocumentStore()
+        let doc = store.document(for: path)
+        await loaded(doc)
+        #expect(doc.text == nil && doc.loadError != nil)
+        try "# 技术方案\n".write(toFile: path, atomically: true, encoding: .utf8)
+        await store.checkExternalChange(path)
+        #expect(doc.text == "# 技术方案\n" && doc.loadError == nil)
+
+        // 另一个文档:失败后重新打开(而不是等文件事件)也会重新读取
+        let other = dir + "/说明 文档.txt"
+        let failed = store.document(for: other)
+        await loaded(failed)
+        #expect(failed.loadError != nil)
+        try "内容".write(toFile: other, atomically: true, encoding: .utf8)
+        let reopened = store.document(for: other)
+        for _ in 0..<100 where reopened.text == nil { try? await Task.sleep(for: .milliseconds(20)) }
+        #expect(reopened.text == "内容")
+    }
+
+    @Test("GBK/GB18030 编码的中文文件可读取,保存后仍是原编码")
+    func gb18030RoundTrip() async throws {
+        let path = NSTemporaryDirectory() + "oma-doc-\(UUID().uuidString)-中文.txt"
+        let gbk = try #require("你好,世界".data(using: FileDocumentStore.gb18030))
+        try gbk.write(to: URL(fileURLWithPath: path))
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let store = FileDocumentStore()
+        let doc = store.document(for: path)
+        await loaded(doc)
+        #expect(doc.text == "你好,世界")
+        doc.text = "你好,中国"
+        #expect(await store.save(path))
+        let saved = try Data(contentsOf: URL(fileURLWithPath: path))
+        #expect(String(data: saved, encoding: FileDocumentStore.gb18030) == "你好,中国")
+        #expect(String(data: saved, encoding: .utf8) == nil)
+        // 二进制内容不猜编码
+        #expect(FileDocumentStore.decodeText(Data([0x89, 0x50, 0x4E, 0x47, 0x00, 0x01, 0xFF])) == nil)
+    }
+
     @Test("撤回到原文后不再算脏")
     func revertClean() async throws {
         let path = try tempFile("a")
