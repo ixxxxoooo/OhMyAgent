@@ -152,7 +152,8 @@ struct UserMessageView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .padding(.trailing, 44)
-        .omGlass(in: RoundedRectangle(cornerRadius: OMRadius.modal, style: .continuous))
+        // 时间线里的用户气泡用不透明铬面(纸感下与原先玻璃回退完全一致),避免玻璃主题下每个气泡都实时采样背景拖慢滚动
+        .omSolidChrome(in: RoundedRectangle(cornerRadius: OMRadius.modal, style: .continuous))
         .overlay(alignment: .bottomTrailing) {
             // 悬停时右下角出现:复制图标 + 编辑图标(运行中引导的消息只有复制)
             HStack(spacing: 0) {

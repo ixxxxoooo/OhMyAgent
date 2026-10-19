@@ -36,6 +36,15 @@ public extension View {
         omGlass(in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous), tint: tint)
     }
 
+    /// 不透明「铬面」:与玻璃回退(纸感/减少透明度)时的外观完全一致,但任何主题下都不用玻璃。
+    /// 用于会话流里数量多、随滚动反复挂载的行(如用户气泡):每个 `glassEffect` 都要实时采样背景,
+    /// 滚动时代价很高;纸感主题下与 `omGlass` 视觉相同,仅玻璃主题的外观由半透明变为不透明。
+    /// - Parameter shape: 形状
+    func omSolidChrome<S: Shape>(in shape: S) -> some View {
+        background { shape.fill(OMColors.opaqueChrome) }
+            .overlay { shape.stroke(OMColors.hairline, lineWidth: 0.5) }
+    }
+
     /// 纯色卡片:用于时间线里的工具卡片、代码块等正文信息,不使用玻璃。
     /// - Parameter cornerRadius: 圆角
     func omSolidCard(cornerRadius: CGFloat = OMMetrics.cardRadius) -> some View {
