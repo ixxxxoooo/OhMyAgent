@@ -24,7 +24,7 @@ export OMA_CHANNEL=stable
 PREV="$(git describe --tags --abbrev=0 2>/dev/null || true)"
 if [[ -z "${OMA_NOTES:-}" ]]; then
   RANGE="${PREV:+$PREV..}HEAD"
-  OMA_NOTES="$(git log "$RANGE" --pretty='%s' | head -20 | sed 's/"/\\"/g' | paste -sd ';' -)"
+  OMA_NOTES="$(git log "$RANGE" -n 20 --pretty='%s' | sed 's/"/\\"/g' | paste -sd ';' -)"
   export OMA_NOTES
 fi
 
