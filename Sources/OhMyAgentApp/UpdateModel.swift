@@ -140,7 +140,14 @@ final class UpdateModel {
         }
         restartRequested = true
         NSApp.terminate(nil)
-        Task { try? await Task.sleep(for: .seconds(10)); restartRequested = false }
+    }
+
+    /// 退出被取消(未保存文件对话框里点了取消,或保存失败):撤销「重启更新」请求。
+    /// 不能按固定时长复位——用户可能在对话框上停留很久,复位早了会导致更新没装或装了不重启。
+    func terminationCancelled() {
+        guard restartRequested else { return }
+        restartRequested = false
+        Log.update.info("退出已取消,撤销重启更新")
     }
 
     /// 应用退出时调用:用户点了重启更新,或「自动」模式下有已下载的更新,则交给替换脚本完成安装。
@@ -172,7 +179,8 @@ final class UpdateModel {
                 let busy = center.count(of: .running) + center.count(of: .needsInput)
                 if UpdateTiming.canInstallNow(idleSeconds: idle, busySessions: busy) {
                     Log.update.info("空闲且无运行会话,自动重启安装更新", ["idle": "\(Int(idle))"])
-                    self.installAndRestart(); return
+                    // 退出被取消时继续监视,下次满足条件再试
+                    self.installAndRestart()
                 }
             }
         }

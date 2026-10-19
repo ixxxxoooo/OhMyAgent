@@ -127,11 +127,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case 2:
             Task {
                 let ok = await FileDocumentStore.shared.saveAll()
+                if !ok { UpdateModel.shared.terminationCancelled() }
                 NSApp.reply(toApplicationShouldTerminate: ok)
             }
             return .terminateLater
         case 1: return .terminateNow
-        default: return .terminateCancel
+        default:
+            UpdateModel.shared.terminationCancelled()
+            return .terminateCancel
         }
     }
 
