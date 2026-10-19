@@ -57,6 +57,9 @@ struct FileDocumentTests {
         await loaded(failed)
         #expect(failed.loadError != nil)
         try "内容".write(toFile: other, atomically: true, encoding: .utf8)
+        // 1 秒内反复调用不重试(视图每次求值都会调用),之后再打开才重读
+        #expect(store.document(for: other).text == nil)
+        try await Task.sleep(for: .milliseconds(1100))
         let reopened = store.document(for: other)
         for _ in 0..<100 where reopened.text == nil { try? await Task.sleep(for: .milliseconds(20)) }
         #expect(reopened.text == "内容")

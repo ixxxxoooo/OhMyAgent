@@ -27,6 +27,10 @@ final class FileDocument {
     fileprivate(set) var diskModified: Date?
     /// 读入时识别出的文本编码(保存时沿用,GBK/GB18030 文件不会被改写成 UTF-8)
     fileprivate(set) var encoding: String.Encoding = .utf8
+    /// 读取进行中(避免重复发起)
+    @ObservationIgnored fileprivate var isLoading = false
+    /// 最近一次读取开始时间(失败后重试的节流依据)
+    @ObservationIgnored fileprivate var lastLoadAttempt: ContinuousClock.Instant?
 
     init(path: String) { self.path = path }
 
@@ -64,7 +68,11 @@ final class FileDocumentStore {
     /// 之前读取失败的文档(如打开时文件还没写出来)再次打开时重新读取,不沿用失败结果。
     func document(for path: String) -> FileDocument {
         if let doc = documents[path] {
-            if doc.text == nil, doc.loadError != nil { Task { await load(doc) } }
+            // 视图每次求值都会调用这里:读取中或 1 秒内刚试过就不再重试
+            if doc.text == nil, doc.loadError != nil, !doc.isLoading,
+               doc.lastLoadAttempt.map({ ContinuousClock.now - $0 > .seconds(1) }) ?? true {
+                Task { await load(doc) }
+            }
             return doc
         }
         let doc = FileDocument(path: path)
@@ -114,6 +122,9 @@ final class FileDocumentStore {
     private func load(_ doc: FileDocument) async {
         let path = doc.path
         let started = ContinuousClock.now
+        doc.isLoading = true
+        doc.lastLoadAttempt = started
+        defer { doc.isLoading = false }
         let state = await Task.detached(priority: .userInitiated) { Self.readDisk(path) }.value
         guard let text = state.text else {
             doc.loadError = state.exists
