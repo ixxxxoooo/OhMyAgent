@@ -273,12 +273,88 @@ final class MarkdownTextRunRenderer {
     private var renderedLengths: [Int] = []
     /// 已渲染内容对应的样式
     private var renderedStyle: Style?
+    /// 上次应用的外观签名(颜色解析为 sRGB 分量,避免每次新建的 NSColor 因身份不同而被当作变化)
+    private var appliedAppearance: AppearanceSignature?
+    /// 上次测量的宽度、高度与对应的内容修订(`edits`)
+    private var measuredWidth: CGFloat?
+    private var measuredHeight: CGFloat = 0
+    private var measuredEdits = -1
+    /// 实际执行排版测量的次数(测试与诊断用)
+    private(set) var measurePasses = 0
+    /// 实际应用外观的次数(测试与诊断用)
+    private(set) var appearanceApplications = 0
     /// 实际改动文本存储的次数(测试用)
     private(set) var edits = 0
     /// 只替换尾部的增量更新次数(测试与诊断用)
     private(set) var incrementalUpdates = 0
     /// 整体重建次数(测试与诊断用)
     private(set) var fullRebuilds = 0
+
+    /// 外观签名:四种颜色在视图当前外观下的 sRGB 分量。
+    struct AppearanceSignature: Equatable {
+        var codeFill: [CGFloat]
+        var quoteBar: [CGFloat]
+        var link: [CGFloat]
+        var selection: [CGFloat]
+
+        /// 把颜色在给定外观下解析成 RGBA 分量。
+        @MainActor
+        static func components(_ color: NSColor, appearance: NSAppearance) -> [CGFloat] {
+            var result: [CGFloat] = [0, 0, 0, 0]
+            appearance.performAsCurrentDrawingAppearance {
+                let resolved = color.usingColorSpace(.sRGB) ?? color
+                result = [resolved.redComponent, resolved.greenComponent, resolved.blueComponent, resolved.alphaComponent]
+            }
+            return result
+        }
+    }
+
+    /// 应用外观(行内代码底色、引用条、链接、选区颜色);颜色没变时什么都不做。
+    /// - Parameters:
+    ///   - view: 目标文本视图
+    ///   - codeFill: 行内代码底色
+    ///   - quoteBar: 引用竖条颜色
+    ///   - linkColor: 链接颜色
+    ///   - selectionColor: 选区背景色
+    /// - Returns: 是否真正改动了外观(并触发了重绘)
+    @discardableResult
+    func applyAppearance(to view: MarkdownTextView, codeFill: NSColor, quoteBar: NSColor, linkColor: NSColor, selectionColor: NSColor) -> Bool {
+        let appearance = view.effectiveAppearance
+        let signature = AppearanceSignature(
+            codeFill: AppearanceSignature.components(codeFill, appearance: appearance),
+            quoteBar: AppearanceSignature.components(quoteBar, appearance: appearance),
+            link: AppearanceSignature.components(linkColor, appearance: appearance),
+            selection: AppearanceSignature.components(selectionColor, appearance: appearance)
+        )
+        guard signature != appliedAppearance else { return false }
+        appliedAppearance = signature
+        appearanceApplications += 1
+        if let layout = view.layoutManager as? MarkdownLayoutManager {
+            layout.codeFill = codeFill
+            layout.quoteBar = quoteBar
+        }
+        view.linkTextAttributes = [.foregroundColor: linkColor, .cursor: NSCursor.pointingHand]
+        view.selectedTextAttributes = [.backgroundColor: selectionColor]
+        view.needsDisplay = true
+        return true
+    }
+
+    /// 测量所需尺寸,按 (宽度, 内容修订) 缓存。
+    /// - Parameters:
+    ///   - view: 文本视图
+    ///   - proposedWidth: SwiftUI 提议的宽度;nil、0 或非有限值时沿用上次宽度(没有则用容器当前宽度),不改容器宽度
+    /// - Returns: 宽度与向上取整后的高度
+    func measuredSize(_ view: MarkdownTextView, proposedWidth: CGFloat?) -> CGSize {
+        let proposed = proposedWidth.flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
+        let width = proposed ?? measuredWidth ?? view.textContainer?.size.width ?? 480
+        if measuredEdits == edits, measuredWidth == width { return CGSize(width: width, height: measuredHeight) }
+        let size = MarkdownTextRepresentable.measure(view, width: width)
+        measurePasses += 1
+        measuredWidth = width
+        measuredHeight = size.height
+        measuredEdits = edits
+        return size
+    }
 
     /// 把 `blocks` 渲染进 `view`;内容没变时什么都不做。
     /// - Parameters:
@@ -434,19 +510,16 @@ struct MarkdownTextRepresentable: NSViewRepresentable {
     }
 
     func updateNSView(_ view: MarkdownTextView, context: Context) {
-        if let layout = view.layoutManager as? MarkdownLayoutManager {
-            layout.codeFill = codeFill
-            layout.quoteBar = quoteBar
-        }
-        view.linkTextAttributes = [.foregroundColor: linkColor, .cursor: NSCursor.pointingHand]
-        view.selectedTextAttributes = [.backgroundColor: selectionColor]
+        // 外观(颜色)与内容分开处理:颜色没变就不重设链接/选区属性,也不整块重绘;
+        // 内容变化时文本存储的 replaceCharacters 已让 TextKit 自行失效脏区,不需要额外 needsDisplay
+        context.coordinator.applyAppearance(
+            to: view, codeFill: codeFill, quoteBar: quoteBar, linkColor: linkColor, selectionColor: selectionColor)
         context.coordinator.apply(blocks, to: view)
-        view.needsDisplay = true
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView view: MarkdownTextView, context: Context) -> CGSize? {
-        let width = proposal.width.flatMap { $0.isFinite && $0 > 0 ? $0 : nil } ?? 480
-        return Self.measure(view, width: width)
+        // 按 (宽度, 内容修订) 缓存;nil/0 提议沿用上次宽度,不改容器宽度(避免宽度来回翻转导致整段重排)
+        context.coordinator.measuredSize(view, proposedWidth: proposal.width)
     }
 
     /// 按给定宽度排版并返回所需尺寸。
