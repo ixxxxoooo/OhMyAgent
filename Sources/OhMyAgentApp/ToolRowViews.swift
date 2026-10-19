@@ -66,7 +66,6 @@ struct ToolRowView: View {
     @Environment(SessionModel.self) private var model
     @Environment(\.stickyUser) private var scrollState
     @State private var expanded: Bool?
-    @State private var hovering = false
     @State private var stats: DiffStats?
     @AppStorage(ClientPrefs.Key.toolDensity) private var densityRaw = ToolDensity.standard.rawValue
 
@@ -150,7 +149,15 @@ struct ToolRowView: View {
 
     // MARK: 行
 
+    /// 工具行:悬停状态放进 `HoverStateReader` 叶子视图,悬停只重绘这一行,
+    /// 不会让整个 `ToolRowView.body`(工具展示模型、详情块、分组等)重新计算。
     private func row(_ tool: ToolCall, _ p: ToolPresentation, canExpand: Bool, isExpanded: Bool) -> some View {
+        HoverStateReader { hovering in
+            rowContent(tool, p, canExpand: canExpand, isExpanded: isExpanded, hovering: hovering)
+        }
+    }
+
+    private func rowContent(_ tool: ToolCall, _ p: ToolPresentation, canExpand: Bool, isExpanded: Bool, hovering: Bool) -> some View {
         HStack(spacing: 7) {
             leadingIcon(tool, p)
             if let server = p.mcpServer { OMTag(server, tint: OMColors.accent) }
@@ -224,7 +231,6 @@ struct ToolRowView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
         .contentShape(Rectangle())
-        .onHover { hovering = $0 }
         .onTapGesture { handleTap(tool, p, canExpand: canExpand, isExpanded: isExpanded) }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(p.plainText),\(Self.statusText(tool.status))")
@@ -617,13 +623,30 @@ struct CommandBox: View {
 
 /// 复制按钮:点击后短暂显示“已复制”。
 struct CopyButton: View {
-    let text: String
+    /// 按需取得要复制的文本(点击时才计算,body 里不做全量文本处理)
+    private let provider: () -> String
     @Binding var copied: Bool
+
+    /// - Parameters:
+    ///   - text: 要复制的文本
+    ///   - copied: 复制成功标记
+    init(text: String, copied: Binding<Bool>) {
+        provider = { text }
+        _copied = copied
+    }
+
+    /// - Parameters:
+    ///   - textProvider: 点击时才调用,返回要复制的文本
+    ///   - copied: 复制成功标记
+    init(textProvider: @escaping () -> String, copied: Binding<Bool>) {
+        provider = textProvider
+        _copied = copied
+    }
 
     var body: some View {
         Button {
             NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(text, forType: .string)
+            NSPasteboard.general.setString(provider(), forType: .string)
             copied = true
             Task {
                 try? await Task.sleep(for: .seconds(1.5))
@@ -771,7 +794,6 @@ struct ExploreGroupView: View {
     let group: ExploreGroup
     @Environment(\.stickyUser) private var scrollState
     @State private var expanded: Bool?
-    @State private var hovering = false
     /// 分组是否是进行中会话的最后一项:是则后面还会有下一步,「最新一步」行保持占位(工具之间不收起,界面不跳)
     @Environment(\.liveTail) private var liveTail
 
@@ -785,23 +807,25 @@ struct ExploreGroupView: View {
         let isExpanded = expanded ?? DebugFlags.expandAll
         VStack(alignment: .leading, spacing: 0) {
             // 贴合内容宽度的文字行(无底色长条):悬停时文字加深、箭头显现,点击区域只在文字与箭头上
-            HStack(spacing: 7) {
-                Image.om(group.style == .activity ? "layers" : "text.magnifyingglass", size: 11.5)
-                    .frame(width: 16)
-                    .foregroundStyle(OMColors.secondaryText)
-                Text(group.summary)
-                    .font(OMFonts.small)
-                    .foregroundStyle(hovering || isExpanded ? OMColors.primaryText : OMColors.secondaryText)
-                    .flowingText(group.isRunning)
-                Image.om("chevron.right", size: 9, weight: .bold)
-                    .foregroundStyle(OMColors.tertiaryText)
-                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                    .opacity(hovering || isExpanded ? 1 : 0)
+            // 悬停状态在 HoverStateReader 叶子里,悬停不会重算整个分组 body
+            HoverStateReader { hovering in
+                HStack(spacing: 7) {
+                    Image.om(group.style == .activity ? "layers" : "text.magnifyingglass", size: 11.5)
+                        .frame(width: 16)
+                        .foregroundStyle(OMColors.secondaryText)
+                    Text(group.summary)
+                        .font(OMFonts.small)
+                        .foregroundStyle(hovering || isExpanded ? OMColors.primaryText : OMColors.secondaryText)
+                        .flowingText(group.isRunning)
+                    Image.om("chevron.right", size: 9, weight: .bold)
+                        .foregroundStyle(OMColors.tertiaryText)
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        .opacity(hovering || isExpanded ? 1 : 0)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .contentShape(Rectangle())
-            .onHover { hovering = $0 }
             .onTapGesture(perform: toggle)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(group.summary)
@@ -832,24 +856,24 @@ struct TurnDigestView: View {
     @Environment(\.stickyUser) private var scrollState
     @AppStorage(ClientPrefs.Key.toolDensity) private var densityRaw = ToolDensity.standard.rawValue
     @State private var expanded: Bool?
-    @State private var hovering = false
 
     var body: some View {
         let isExpanded = expanded ?? DebugFlags.expandAll
         VStack(alignment: .leading, spacing: 0) {
             // 纯文字样式(贴合内容宽度,无底色长条):悬停时文字加深、箭头显现;点击区域只在文字与箭头上
-            HStack(spacing: 4) {
-                Text("已工作 \(digest.durationText)")
-                    .font(OMFonts.small)
-                    .foregroundStyle(hovering || isExpanded ? OMColors.primaryText : OMColors.secondaryText)
-                Image.om("chevron.right", size: 9, weight: .bold)
-                    .foregroundStyle(OMColors.tertiaryText)
-                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                    .opacity(hovering || isExpanded ? 1 : 0)
+            HoverStateReader { hovering in
+                HStack(spacing: 4) {
+                    Text("已工作 \(digest.durationText)")
+                        .font(OMFonts.small)
+                        .foregroundStyle(hovering || isExpanded ? OMColors.primaryText : OMColors.secondaryText)
+                    Image.om("chevron.right", size: 9, weight: .bold)
+                        .foregroundStyle(OMColors.tertiaryText)
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        .opacity(hovering || isExpanded ? 1 : 0)
+                }
+                .padding(.vertical, 4)
+                .contentShape(Rectangle())
             }
-            .padding(.vertical, 4)
-            .contentShape(Rectangle())
-            .onHover { hovering = $0 }
             .onTapGesture {
                 scrollState?.followSuspended = true
                 expanded = !isExpanded
@@ -915,7 +939,8 @@ struct TerminalOutputView: View {
                         .omTooltip("在终端面板查看")
                         .accessibilityLabel("在终端面板查看")
                 }
-                CopyButton(text: ANSIParser.plainText(session.output), copied: $copied)
+                // 纯文本在点击复制时才计算(流式输出时 body 每次重算都全量解析 ANSI 会很贵)
+                CopyButton(textProvider: { ANSIParser.plainText(session.output) }, copied: $copied)
             }
             .font(OMFonts.monoSmall)
             .foregroundStyle(OMColors.secondaryText)
@@ -928,7 +953,7 @@ struct TerminalOutputView: View {
                         .id("tail")
                 }
                 .frame(maxHeight: fillHeight ? .infinity : 240)
-                .onChange(of: session.output) { proxy.scrollTo("tail", anchor: .bottom) }
+                .onChange(of: session.output.utf8.count) { proxy.scrollTo("tail", anchor: .bottom) } // 比较长度而非整串,避免每次 diff 全文
             }
             if session.sandboxBlocked, let onRetryUnsandboxed {
                 HStack(spacing: 8) {
@@ -943,5 +968,19 @@ struct TerminalOutputView: View {
         .padding(10)
         .frame(maxHeight: fillHeight ? .infinity : nil, alignment: .top)
         .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
+    }
+}
+
+/// 悬停状态读取器:把 `@State hovering` 下沉到叶子视图,悬停变化只重算 `content` 这一小段,
+/// 而不是持有它的大行视图的整个 `body`。
+struct HoverStateReader<Content: View>: View {
+    @State private var hovering = false
+    private let content: (Bool) -> Content
+
+    /// - Parameter content: 以当前是否悬停构造内容
+    init(@ViewBuilder content: @escaping (Bool) -> Content) { self.content = content }
+
+    var body: some View {
+        content(hovering).onHover { hovering = $0 }
     }
 }

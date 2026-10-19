@@ -107,7 +107,6 @@ struct TurnSummaryView: View {
 struct UserMessageView: View {
     let entry: TimelineEntry
     @Environment(\.stickyUser) private var sticky
-    @State private var hovering = false
 
     var body: some View {
         if let sticky, let model = sticky.model, sticky.editing?.id == entry.id, !sticky.isEditorFloating(for: entry.id) {
@@ -129,6 +128,29 @@ struct UserMessageView: View {
     }
 
     private var messageCard: some View {
+        // 悬停状态放在 HoverStateReader 叶子里:悬停只重算气泡与右下角操作按钮,不重算本视图读取的吸顶/编辑状态
+        HoverStateReader { hovering in
+            messageCardBody(hovering: hovering)
+        }
+        .onTapGesture { if !entry.isSteered { sticky?.beginEditing(entry, pinned: false) } }
+        .accessibilityAddTraits(entry.isSteered ? [] : .isButton)
+        .omContextMenu {
+            OMMenuItem("复制", icon: "copy") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(entry.text, forType: .string)
+            }
+            if !entry.isSteered { OMMenuItem("编辑并重新发送…", icon: "pencil") { sticky?.beginEditing(entry, pinned: false) } }
+        }
+        // 被吸顶卡接管时隐藏原行(保留布局,位置继续上报)
+        .opacity(sticky?.target?.stickyID == entry.id && !(sticky?.editing?.id == entry.id && sticky?.editorPinned != true) ? 0 : 1)
+        .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(chatScrollSpace)).minY } action: { sticky?.report(entry.id, minY: $0) }
+        .onDisappear { sticky?.forget(entry.id) }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("你:\(entry.text)")
+        .accessibilityHint(entry.isSteered ? "" : String(localized: "点击放大编辑"))
+    }
+
+    private func messageCardBody(hovering: Bool) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             if entry.isSteered {
                 Label("运行中引导", om: "corner-down-right")
@@ -180,24 +202,6 @@ struct UserMessageView: View {
             .padding(8)
         }
         .contentShape(RoundedRectangle(cornerRadius: OMRadius.modal, style: .continuous))
-        .onHover { hovering = $0 }
-        // 单击进入编辑(运行中引导的消息不可编辑);拖动选字不会触发点击
-        .onTapGesture { if !entry.isSteered { sticky?.beginEditing(entry, pinned: false) } }
-        .accessibilityAddTraits(entry.isSteered ? [] : .isButton)
-        .omContextMenu {
-            OMMenuItem("复制", icon: "copy") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(entry.text, forType: .string)
-            }
-            if !entry.isSteered { OMMenuItem("编辑并重新发送…", icon: "pencil") { sticky?.beginEditing(entry, pinned: false) } }
-        }
-        // 被吸顶卡接管时隐藏原行(保留布局,位置继续上报)
-        .opacity(sticky?.target?.stickyID == entry.id && !(sticky?.editing?.id == entry.id && sticky?.editorPinned != true) ? 0 : 1)
-        .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(chatScrollSpace)).minY } action: { sticky?.report(entry.id, minY: $0) }
-        .onDisappear { sticky?.forget(entry.id) }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("你:\(entry.text)")
-        .accessibilityHint(entry.isSteered ? "" : String(localized: "点击放大编辑"))
     }
 }
 
