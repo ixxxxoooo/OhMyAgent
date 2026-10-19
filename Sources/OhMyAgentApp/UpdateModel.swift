@@ -132,7 +132,10 @@ final class UpdateModel {
     func installAndRestart() {
         guard case .ready = phase else { return }
         guard canSelfInstall else {
-            OMDialog.alert(title: String(localized: "开发版不支持自动更新"), message: String(localized: "请用 Scripts/promote.sh 更新稳定版。"))
+            // 不能在按钮点击的同一次事件里 runModal(事件循环嵌套会让弹窗收不到点击),推迟到下一轮主线程
+            Task { @MainActor in
+                OMDialog.alert(title: String(localized: "开发版不支持自动更新"), message: String(localized: "请用 Scripts/promote.sh 更新稳定版。"))
+            }
             return
         }
         restartRequested = true

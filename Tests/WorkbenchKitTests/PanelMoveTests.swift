@@ -52,4 +52,17 @@ struct PanelMoveTests {
         #expect(model.dock.groups.count >= 2)
         #expect(model.panelItem(forTab: id) == .output)
     }
+
+    @Test("终端/输出拖到与工具栏同侧:并入标签条,不另起一列")
+    func mergeIntoTools() {
+        let model = makeModel()
+        model.layout.rightVisible = false
+        #expect(model.movePanel(.output, to: .right))
+        #expect(model.layout.rightVisible)
+        #expect(model.layout.toolsPanel == .output)
+        #expect(model.layout.isMergedIntoTools(.output))
+        #expect(!model.layout.visibleColumns(on: .right).contains(.output))
+        model.hideOutput()
+        #expect(!model.layout.outputVisible)
+    }
 }

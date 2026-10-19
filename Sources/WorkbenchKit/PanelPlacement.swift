@@ -131,9 +131,17 @@ public extension WorkbenchLayout {
         switch column {
         case .sidebar: return leftVisible
         case .tools: return rightVisible
-        case .terminal: return terminalVisible && placement.terminal.isSide
-        case .output: return outputVisible && placement.output.isSide
+        case .terminal: return terminalVisible && placement.terminal.isSide && !isMergedIntoTools(.terminal)
+        case .output: return outputVisible && placement.output.isSide && !isMergedIntoTools(.output)
         }
+    }
+
+    /// 终端/输出是否并入工具栏(与工具栏在同一侧时不另起一列,而是作为工具栏标签条里的标签)。
+    /// - Parameter column: 终端或输出列
+    /// - Returns: 是否并入
+    func isMergedIntoTools(_ column: PanelColumn) -> Bool {
+        guard column == .terminal || column == .output, let side = side(of: column) else { return false }
+        return side == placement.toolsSide
     }
 
     /// 某一侧的全部列(不论是否可见),由外向内:项目栏、工具栏、终端。

@@ -14,12 +14,57 @@ struct RightPaneView: View {
     /// 当前项目的 Git 模型(只读状态,用于图标圆点)
     private var gitModel: GitModel? { workbench.selectedProjectID.map { GitStore.shared.model(for: $0) } }
 
+    /// 并入工具栏、且当前被选中的终端/输出。
+    private var activePanel: PanelItem? {
+        guard let item = workbench.layout.toolsPanel, mergedPanels.contains(item) else { return nil }
+        return item
+    }
+
+    /// 并入工具栏标签条的终端/输出(按当前是否显示)。
+    private var mergedPanels: [PanelItem] {
+        var items: [PanelItem] = []
+        if workbench.layout.terminalVisible, workbench.layout.isMergedIntoTools(.terminal) { items.append(.terminal) }
+        if workbench.layout.outputVisible, workbench.layout.isMergedIntoTools(.output) { items.append(.output) }
+        return items
+    }
+
+    /// 并入的终端/输出图标标签:可点击切换、可拖出到别处、右键关闭。
+    /// - Parameter item: 终端或输出
+    /// - Returns: 图标按钮
+    private func panelTab(_ item: PanelItem) -> some View {
+        let selected = activePanel == item && workbench.activeChat(in: .tools) == nil && !workbench.layout.sidebarBrowserActive
+        return Button {
+            workbench.layout.toolsPanel = item; workbench.layout.activeToolsChat = nil; workbench.layout.sidebarBrowserActive = false
+        } label: {
+            Image.om(item == .terminal ? "square-terminal" : "file-text", size: 14)
+                .frame(width: 28, height: 24)
+                .background(selected ? OMColors.selectedFill : .clear, in: RoundedRectangle(cornerRadius: OMRadius.tag))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .panelDragSource(item)
+        .foregroundStyle(selected ? OMColors.accent : OMColors.secondaryText)
+        .omTooltip(item.title)
+        .accessibilityLabel(item.title)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .omContextMenu {
+            OMMenuItem("关闭", icon: "x") { omWithAnimation { item == .terminal ? workbench.hideTerminal() : workbench.hideOutput() } }
+        }
+    }
+
     var body: some View {
         let _ = PanelToggleProbe.count("rightPane")
         VStack(spacing: 0) {
             paneBar
             if let chat = workbench.activeChat(in: .tools) {
                 ChatPane(workbench: workbench, projectID: chat.projectID, slot: chat.slot)
+            } else if let item = activePanel, !workbench.layout.sidebarBrowserActive {
+                // 并入工具栏的终端/输出:和文件/搜索/Git、会话标签同一条标签条
+                if item == .terminal {
+                    TerminalPanelView(workbench: workbench, root: workbench.selectedProjectID ?? NSHomeDirectory())
+                } else {
+                    LogViewerView()
+                }
             } else if workbench.layout.sidebarBrowserActive, let browserID = workbench.layout.sidebarBrowserID {
                 BrowserTabView(browserID: browserID, workspace: workbench.selectedProjectID ?? NSHomeDirectory()).id(browserID)
             } else {
@@ -40,8 +85,8 @@ struct RightPaneView: View {
     private var paneBar: some View {
         HStack(spacing: 2) {
             ForEach(workbench.layout.rightPaneOrder, id: \.self) { pane in
-                let selected = workbench.layout.rightPane == pane && workbench.activeChat(in: .tools) == nil && !workbench.layout.sidebarBrowserActive
-                Button { workbench.layout.rightPane = pane; workbench.layout.activeToolsChat = nil; workbench.layout.sidebarBrowserActive = false } label: {
+                let selected = workbench.layout.rightPane == pane && workbench.activeChat(in: .tools) == nil && !workbench.layout.sidebarBrowserActive && activePanel == nil
+                Button { workbench.layout.rightPane = pane; workbench.layout.activeToolsChat = nil; workbench.layout.sidebarBrowserActive = false; workbench.layout.toolsPanel = nil } label: {
                     Image.om(Self.icon(pane), size: 14)
                         .frame(width: 28, height: 24)
                         .background(selected ? OMColors.selectedFill : .clear, in: RoundedRectangle(cornerRadius: OMRadius.tag))
@@ -66,6 +111,7 @@ struct RightPaneView: View {
                 .accessibilityLabel(Self.title(pane))
                 .accessibilityAddTraits(selected ? .isSelected : [])
             }
+            ForEach(mergedPanels) { panelTab($0) }
             if workbench.layout.sidebarBrowserID != nil { sidebarBrowserButton }
             ForEach(workbench.dockedChats(in: .tools)) { chat in
                 DockedChatTab(workbench: workbench, chat: chat, iconOnly: true)

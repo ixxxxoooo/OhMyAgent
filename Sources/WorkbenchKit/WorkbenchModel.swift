@@ -1112,7 +1112,7 @@ public final class WorkbenchModel {
     public func showTerminal() {
         switch layout.placement.terminal {
         case .bottom: showBottom(.terminal)
-        case .left, .right: layout.terminalVisible = true
+        case .left, .right: layout.terminalVisible = true; revealInTools(.terminal)
         case .editor:
             let id = residentTerminalID
             let tab = dock.open(.terminal(id: id), title: String(localized: "终端"))
@@ -1387,7 +1387,7 @@ public final class WorkbenchModel {
     public func showOutput() {
         switch layout.placement.output {
         case .bottom: showBottom(.output)
-        case .left, .right: layout.outputVisible = true
+        case .left, .right: layout.outputVisible = true; revealInTools(.output)
         case .editor:
             let tab = dock.open(.preview(id: Self.outputTabID), title: String(localized: "输出"))
             mode = .workspace

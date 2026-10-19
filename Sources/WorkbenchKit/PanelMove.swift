@@ -43,4 +43,15 @@ public extension WorkbenchModel {
         }
         return true
     }
+
+    /// 终端/输出并入工具栏时:展开工具栏并选中该标签(未并入时无操作)。
+    /// - Parameter item: 终端或输出
+    func revealInTools(_ item: PanelItem) {
+        let column: PanelColumn = item == .terminal ? .terminal : .output
+        guard layout.isMergedIntoTools(column) else { return }
+        layout.rightVisible = true
+        layout.toolsPanel = item
+        layout.activeToolsChat = nil
+        layout.sidebarBrowserActive = false
+    }
 }
