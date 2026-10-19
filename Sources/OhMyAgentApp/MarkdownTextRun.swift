@@ -36,34 +36,46 @@ enum MarkdownTextRunBuilder {
     /// - Returns: 富文本
     static func build(_ blocks: [MarkdownBlock]) -> NSAttributedString {
         let result = NSMutableAttributedString()
-        let scale = OMScale.ui * OMScale.timeline
-        let bodySize = 13 * scale
         for (index, block) in blocks.enumerated() {
-            if index > 0 { result.append(NSAttributedString(string: "\n")) }
-            switch block {
-            case .heading(let level, let text):
-                let size = headingSize(level) * scale
-                let style = paragraphStyle(size: size, before: level <= 2 ? 6 : 2, after: 10)
-                result.append(inline(text, size: size, weight: .medium, color: NSColor(OMColors.primaryText), style: style))
-            case .paragraph(let text):
-                let style = paragraphStyle(size: bodySize, before: 0, after: 10)
-                result.append(inline(text, size: bodySize, weight: .regular, color: NSColor(OMColors.primaryText), style: style))
-            case .quote(let text):
-                let style = paragraphStyle(size: bodySize, before: 0, after: 10, indent: 13)
-                let quote = NSMutableAttributedString(attributedString: inline(
-                    text, size: bodySize, weight: .regular, color: NSColor(OMColors.secondaryText), style: style))
-                quote.addAttribute(omQuoteKey, value: true, range: NSRange(location: 0, length: quote.length))
-                result.append(quote)
-            case .list(let items):
-                for (itemIndex, item) in items.enumerated() {
-                    if itemIndex > 0 { result.append(NSAttributedString(string: "\n")) }
-                    result.append(listItem(item, size: bodySize, last: itemIndex == items.count - 1))
-                }
-            case .code, .table, .rule:
-                break
-            }
+            if index > 0 { result.append(blockSeparator) }
+            result.append(piece(block))
         }
         return result
+    }
+
+    /// 块与块之间的分隔符(一个换行,不带属性)。
+    static var blockSeparator: NSAttributedString { NSAttributedString(string: "\n") }
+
+    /// 单个块的富文本(不含块间分隔符);代码、表格、分隔线不属于文字段,返回空。
+    /// - Parameter block: 文字块
+    /// - Returns: 该块的富文本
+    static func piece(_ block: MarkdownBlock) -> NSAttributedString {
+        let scale = OMScale.ui * OMScale.timeline
+        let bodySize = 13 * scale
+        switch block {
+        case .heading(let level, let text):
+            let size = headingSize(level) * scale
+            let style = paragraphStyle(size: size, before: level <= 2 ? 6 : 2, after: 10)
+            return inline(text, size: size, weight: .medium, color: NSColor(OMColors.primaryText), style: style)
+        case .paragraph(let text):
+            let style = paragraphStyle(size: bodySize, before: 0, after: 10)
+            return inline(text, size: bodySize, weight: .regular, color: NSColor(OMColors.primaryText), style: style)
+        case .quote(let text):
+            let style = paragraphStyle(size: bodySize, before: 0, after: 10, indent: 13)
+            let quote = NSMutableAttributedString(attributedString: inline(
+                text, size: bodySize, weight: .regular, color: NSColor(OMColors.secondaryText), style: style))
+            quote.addAttribute(omQuoteKey, value: true, range: NSRange(location: 0, length: quote.length))
+            return quote
+        case .list(let items):
+            let result = NSMutableAttributedString()
+            for (itemIndex, item) in items.enumerated() {
+                if itemIndex > 0 { result.append(blockSeparator) }
+                result.append(listItem(item, size: bodySize, last: itemIndex == items.count - 1))
+            }
+            return result
+        case .code, .table, .rule:
+            return NSAttributedString()
+        }
     }
 
     /// 标题字号(基准,未缩放)。
@@ -234,19 +246,154 @@ final class MarkdownTextView: NSTextView {
 
 /// 把一段文字块渲染进 `MarkdownTextView` 的渲染器(每个文本视图一个,作为 `NSViewRepresentable` 的协调器)。
 /// 抽出来是为了让「更新文本存储」的策略可以脱离 SwiftUI 单独测试与基准。
+///
+/// 流式输出时每一批只会改动最后一个块(或在末尾新增块),所以:
+/// 1. **按块缓存富文本**:已完成的块不再重新解析行内 Markdown、不再生成属性(`MarkdownPieceCache`);
+/// 2. **尾部增量替换**:找出与上次内容相同的最长块前缀,只对文本存储里后面那部分 `replaceCharacters`,
+///    TextKit 只让尾部段落失效,排版测量只重排尾部,不再整段 `setAttributedString` + 全量排版。
+/// 样式(字号缩放、主题)变化时整体重建。
 @MainActor
 final class MarkdownTextRunRenderer {
+    /// 影响富文本外观的全局样式;任一变化都使缓存与已渲染内容失效。
+    struct Style: Hashable {
+        var ui: CGFloat
+        var timeline: CGFloat
+        var themeRevision: Int
+        var systemIsDark: Bool
+
+        /// 当前样式快照。
+        static var current: Style {
+            Style(ui: OMScale.ui, timeline: OMScale.timeline, themeRevision: ThemeTracker.shared.revision, systemIsDark: ThemeRuntime.systemIsDark)
+        }
+    }
+
+    /// 已渲染进文本存储的块(与存储内容一一对应)
+    private var renderedBlocks: [MarkdownBlock] = []
+    /// 各块富文本的 UTF-16 长度(不含块间分隔符)
+    private var renderedLengths: [Int] = []
+    /// 已渲染内容对应的样式
+    private var renderedStyle: Style?
+    /// 实际改动文本存储的次数(测试用)
+    private(set) var edits = 0
+    /// 只替换尾部的增量更新次数(测试与诊断用)
+    private(set) var incrementalUpdates = 0
+    /// 整体重建次数(测试与诊断用)
+    private(set) var fullRebuilds = 0
+
     /// 把 `blocks` 渲染进 `view`;内容没变时什么都不做。
     /// - Parameters:
     ///   - blocks: 连续的文字块
     ///   - view: 目标文本视图
     func apply(_ blocks: [MarkdownBlock], to view: MarkdownTextView) {
         guard let storage = view.textStorage else { return }
-        let content = MarkdownTextRunBuilder.build(blocks)
-        guard !storage.isEqual(to: content) else { return }
+        let style = Style.current
+        let separators = max(renderedBlocks.count - 1, 0)
+        // 文本存储与记录对不上(被外部改过)时放弃增量,整体重建
+        let consistent = renderedStyle == style && storage.length == renderedLengths.reduce(0, +) + separators
+        let keep = consistent ? Self.commonPrefix(renderedBlocks, blocks) : 0
+        if consistent, keep == blocks.count, keep == renderedBlocks.count { return }
+
+        // 保留前缀占去的字符数:各块长度 + 块间分隔符(替换从保留前缀的末尾开始,分隔符属于被替换的部分)
+        let start = renderedLengths.prefix(keep).reduce(0, +) + max(keep - 1, 0)
+        let tail = NSMutableAttributedString()
+        var lengths = Array(renderedLengths.prefix(keep))
+        for index in keep..<blocks.count {
+            if index > 0 { tail.append(MarkdownTextRunBuilder.blockSeparator) }
+            // 最后一个块在流式时每批都变,缓存它只会挤掉有用的条目;其余块缓存
+            let piece = index == blocks.count - 1
+                ? MarkdownTextRunBuilder.piece(blocks[index])
+                : MarkdownPieceCache.piece(for: blocks[index], style: style)
+            tail.append(piece)
+            lengths.append(piece.length)
+        }
+
         let selected = view.selectedRange()
-        storage.setAttributedString(content)
-        if selected.length > 0, NSMaxRange(selected) <= storage.length { view.setSelectedRange(selected) }
+        storage.beginEditing()
+        storage.replaceCharacters(in: NSRange(location: start, length: storage.length - start), with: tail)
+        storage.endEditing()
+        if selected.length > 0, NSMaxRange(selected) <= storage.length, view.selectedRange() != selected {
+            view.setSelectedRange(selected)
+        }
+        edits += 1
+        if keep == 0 { fullRebuilds += 1 } else { incrementalUpdates += 1 }
+        renderedBlocks = blocks
+        renderedLengths = lengths
+        renderedStyle = style
+    }
+
+    /// 两个块序列开头相同的块数。
+    /// - Parameters:
+    ///   - old: 上次渲染的块
+    ///   - new: 本次的块
+    /// - Returns: 公共前缀的块数
+    static func commonPrefix(_ old: [MarkdownBlock], _ new: [MarkdownBlock]) -> Int {
+        var count = 0
+        let limit = min(old.count, new.count)
+        while count < limit, old[count] == new[count] { count += 1 }
+        return count
+    }
+}
+
+/// 单个块富文本的缓存:同一个块在样式不变时只生成一次(标签切换、行被重新挂载时直接命中)。
+@MainActor
+enum MarkdownPieceCache {
+    /// NSCache 的键:块内容 + 样式。
+    private final class Key: NSObject {
+        let block: MarkdownBlock
+        let style: MarkdownTextRunRenderer.Style
+        init(_ block: MarkdownBlock, _ style: MarkdownTextRunRenderer.Style) {
+            self.block = block
+            self.style = style
+        }
+        override var hash: Int {
+            var hasher = Hasher()
+            hasher.combine(block)
+            hasher.combine(style)
+            return hasher.finalize()
+        }
+        override func isEqual(_ object: Any?) -> Bool {
+            guard let other = object as? Key else { return false }
+            return other.style == style && other.block == block
+        }
+    }
+
+    private final class Value: NSObject {
+        let string: NSAttributedString
+        init(_ string: NSAttributedString) { self.string = string }
+    }
+
+    private static let cache: NSCache<Key, Value> = {
+        let cache = NSCache<Key, Value>()
+        cache.countLimit = 1200
+        cache.totalCostLimit = 24 * 1024 * 1024
+        return cache
+    }()
+    /// 命中/未命中统计(测试与诊断用)
+    private(set) static var hits = 0
+    private(set) static var misses = 0
+
+    /// 取块的富文本;未命中时生成并写入。
+    /// - Parameters:
+    ///   - block: 文字块
+    ///   - style: 当前样式
+    /// - Returns: 富文本(不可变,调用方只读取/追加拷贝)
+    static func piece(for block: MarkdownBlock, style: MarkdownTextRunRenderer.Style) -> NSAttributedString {
+        let key = Key(block, style)
+        if let hit = cache.object(forKey: key) {
+            hits += 1
+            return hit.string
+        }
+        misses += 1
+        let built = MarkdownTextRunBuilder.piece(block)
+        cache.setObject(Value(built), forKey: key, cost: built.length * 64)
+        return built
+    }
+
+    /// 清空(测试用)。
+    static func reset() {
+        cache.removeAllObjects()
+        hits = 0
+        misses = 0
     }
 }
 
