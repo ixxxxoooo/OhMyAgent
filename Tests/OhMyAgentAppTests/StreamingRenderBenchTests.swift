@@ -7,6 +7,7 @@ import AppKit
 import ChatKit
 import Foundation
 import SwiftUI
+import EditorKit
 import Testing
 
 @testable import OhMyAgentApp
@@ -108,5 +109,36 @@ struct StreamingRenderBenchTests {
         StreamingBench.report("20KB 流式 · 最后 25%", tail)
         #expect(stats.total > 0)
         #expect(pipeline.view.string.contains("流式渲染"))
+    }
+}
+
+@MainActor
+@Suite("流式代码块高亮基准", .serialized)
+struct StreamingHighlightBenchTests {
+    /// 约 `kilobytes` KB 的 Swift 代码。
+    private func sampleCode(kilobytes: Int) -> String {
+        var code = ""
+        var index = 0
+        while code.utf8.count < kilobytes * 1024 {
+            index += 1
+            code += "/// 第 \(index) 个函数的说明\nfunc handler\(index)(value: Int, name: String) -> String {\n"
+            code += "    let result = \"item-\\(value)\" + name // 行尾注释\n    if value > \(index) { return result.uppercased() }\n    return String(repeating: \"x\", count: \(index))\n}\n\n"
+        }
+        return code
+    }
+
+    @Test("6KB 流式代码块:每批高亮耗时(基线/优化后对比用)")
+    func streamingSixKilobytes() {
+        CodeHighlighter.clearCache()
+        let pieces = StreamingBench.chunks(of: sampleCode(kilobytes: 6), size: 24)
+        var prefix = ""
+        var samples: [Double] = []
+        for piece in pieces {
+            prefix += piece
+            samples.append(StreamingBench.timeMs { _ = CodeHighlighter.attributed(prefix, language: .swift) })
+        }
+        StreamingBench.report("6KB 代码块流式高亮(24 字/批)", StreamingBench.Stats(samples: samples))
+        StreamingBench.report("6KB 代码块流式高亮 · 最后 25%", StreamingBench.Stats(samples: Array(samples.suffix(samples.count / 4))))
+        #expect(!samples.isEmpty)
     }
 }
