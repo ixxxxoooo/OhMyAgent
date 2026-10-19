@@ -44,7 +44,7 @@ launch() {
   local extra=(); [[ -n "$HEAVY" ]] && extra=(--env OMA_DEMO_EXTRA_SKILLS="$HEAVY")
   open -g -n "$APP" "${extra[@]}" --env OMA_DEMO=1 --env OMA_DEMO_RESET=1 --env OMA_PROJECT_ROOT="$PWD" --env OMA_PERF_SAMPLE_SECONDS=5 --env OMA_HITCH_SAMPLE=1 "$@"
   local pid=""
-  for _ in {1..40}; do pid="$(pgrep -x OhMyAgent | head -1 || true)"; [[ -n "$pid" ]] && break; sleep 0.5; done
+  for _ in {1..40}; do pid="$(pgrep -f "$PWD/$APP/Contents/MacOS/OhMyAgent" | head -1 || true)"; [[ -n "$pid" ]] && break; sleep 0.5; done
   echo "$pid"
 }
 
@@ -84,7 +84,7 @@ fi
 sweep_run() {
   local label="$1"; shift
   echo; echo "== 流畅度基准:$label =="
-  local pid; pid="$(launch --env OMA_DEMO_SCENARIO="${SCENARIO_LONG:-legacy-showcase}" --env OMA_AUTOALLOW=1 "$@")"
+  local pid; pid="$(launch --env OMA_DEMO_SCENARIO="${SCENARIO_LONG:-markdown-edge}" --env OMA_AUTOALLOW=1 "$@")"
   [[ -n "$pid" ]] || { echo "应用没有启动" >&2; STATUS=1; return; }
   # 场景运行 + 1.5s 稳定 + 扫描耗时(每帧约 16ms),最多等 120 秒
   for ((i = 0; i < 120; i++)); do
@@ -103,8 +103,8 @@ if [[ "$MODE" == drag ]]; then
 fi
 [[ "$MODE" == scroll ]] && sweep_run "会话流滚动 ${SWEEPS} 个来回" --env OMA_SCROLL_SWEEP="$SWEEPS"
 if [[ "$MODE" == stream ]]; then
-  echo; echo "== 流式输出:运行场景 ${SCENARIO_LONG:-legacy-showcase} =="
-  PID="$(launch --env OMA_DEMO_SCENARIO="${SCENARIO_LONG:-legacy-showcase}" --env OMA_AUTOALLOW=1)"
+  echo; echo "== 流式输出:运行场景 ${SCENARIO_LONG:-markdown-edge} =="
+  PID="$(launch --env OMA_DEMO_SCENARIO="${SCENARIO_LONG:-markdown-edge}" --env OMA_AUTOALLOW=1)"
   [[ -n "$PID" ]] || { echo "应用没有启动" >&2; exit 1; }
   sleep 30
   kill -0 "$PID" 2>/dev/null || { echo "应用已退出(崩溃?)" >&2; exit 1; }

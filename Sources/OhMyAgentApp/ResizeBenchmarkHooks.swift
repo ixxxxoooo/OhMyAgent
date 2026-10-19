@@ -142,14 +142,16 @@ enum ResizeBenchmarkHooks {
             Log.perf.warning("拖分栏基准:没有可用的主窗口")
             return
         }
+        // 先把要拖的面板显示出来并等布局稳定,再开始采样(面板首次挂载的开销不计入拖动)
+        if kind == "bottom" { workbench.layout.bottomVisible = true }
+        if kind == "tools" { workbench.layout.rightVisible = true }
+        try? await Task.sleep(for: .seconds(1))
         Log.perf.info("基准阶段", ["phase": "拖分栏开始", "kind": kind])
         let start = ContinuousClock.now
         let sampler = SweepSampler(view: view)
         switch kind {
         case "sidebar", "tools", "bottom":
             let dimension: PanelDimension = kind == "sidebar" ? .leftWidth : (kind == "tools" ? .rightWidth : .bottomHeight)
-            if kind == "bottom" { workbench.layout.bottomVisible = true }
-            if kind == "tools" { workbench.layout.rightVisible = true }
             let base = dimension.committed(in: workbench.layout)
             let values = SweepPlan.zigzag(low: dimension.clamp(base - 120), high: dimension.clamp(base + 120), steps: 30, cycles: 3)
             for value in values {
@@ -175,14 +177,22 @@ enum ResizeBenchmarkHooks {
 
     /// 会话流滚动扫描:找到内容最高的 `NSScrollView` 逐帧上下滚动。
     private static func scrollSweep(cycles: Int) async {
-        guard let root = mainWindow?.contentView, let scroll = tallestScrollView(in: root) else {
-            Log.perf.warning("滚动基准:没有找到可滚动的会话流")
+        guard let root = mainWindow?.contentView else {
+            Log.perf.warning("滚动基准:没有可用的主窗口")
             return
         }
-        guard let document = scroll.documentView else { return }
-        let travel = max(document.frame.height - scroll.contentView.bounds.height, 0)
-        guard travel > 0 else {
-            Log.perf.warning("滚动基准:内容不足以滚动", ["contentHeight": String(format: "%.0f", document.frame.height)])
+        // 内容可能还在渲染:最多等 20 秒,直到会话流出现可滚动的高度
+        var found: (scroll: NSScrollView, travel: CGFloat)?
+        for _ in 0..<40 {
+            if let scroll = tallestScrollView(in: root), let document = scroll.documentView {
+                let travel = document.frame.height - scroll.contentView.bounds.height
+                if travel > 200 { found = (scroll, travel); break }
+            }
+            try? await Task.sleep(for: .milliseconds(500))
+        }
+        guard let (scroll, travel) = found else {
+            let height = tallestScrollView(in: root)?.documentView?.frame.height ?? 0
+            Log.perf.warning("滚动基准:内容不足以滚动", ["contentHeight": String(format: "%.0f", height)])
             return
         }
         Log.perf.info("基准阶段", ["phase": "滚动开始"])
