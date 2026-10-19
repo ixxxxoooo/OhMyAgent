@@ -232,13 +232,33 @@ final class MarkdownTextView: NSTextView {
     }
 }
 
-/// 把富文本放进 `MarkdownTextView`,按建议宽度自适应高度。
+/// 把一段文字块渲染进 `MarkdownTextView` 的渲染器(每个文本视图一个,作为 `NSViewRepresentable` 的协调器)。
+/// 抽出来是为了让「更新文本存储」的策略可以脱离 SwiftUI 单独测试与基准。
+@MainActor
+final class MarkdownTextRunRenderer {
+    /// 把 `blocks` 渲染进 `view`;内容没变时什么都不做。
+    /// - Parameters:
+    ///   - blocks: 连续的文字块
+    ///   - view: 目标文本视图
+    func apply(_ blocks: [MarkdownBlock], to view: MarkdownTextView) {
+        guard let storage = view.textStorage else { return }
+        let content = MarkdownTextRunBuilder.build(blocks)
+        guard !storage.isEqual(to: content) else { return }
+        let selected = view.selectedRange()
+        storage.setAttributedString(content)
+        if selected.length > 0, NSMaxRange(selected) <= storage.length { view.setSelectedRange(selected) }
+    }
+}
+
+/// 把文字块放进 `MarkdownTextView`,按建议宽度自适应高度。
 struct MarkdownTextRepresentable: NSViewRepresentable {
-    let content: NSAttributedString
+    let blocks: [MarkdownBlock]
     let codeFill: NSColor
     let quoteBar: NSColor
     let linkColor: NSColor
     let selectionColor: NSColor
+
+    func makeCoordinator() -> MarkdownTextRunRenderer { MarkdownTextRunRenderer() }
 
     func makeNSView(context: Context) -> MarkdownTextView { Self.makeTextView() }
 
@@ -273,13 +293,7 @@ struct MarkdownTextRepresentable: NSViewRepresentable {
         }
         view.linkTextAttributes = [.foregroundColor: linkColor, .cursor: NSCursor.pointingHand]
         view.selectedTextAttributes = [.backgroundColor: selectionColor]
-        guard let storage = view.textStorage, !storage.isEqual(to: content) else {
-            view.needsDisplay = true
-            return
-        }
-        let selected = view.selectedRange()
-        storage.setAttributedString(content)
-        if selected.length > 0, NSMaxRange(selected) <= storage.length { view.setSelectedRange(selected) }
+        context.coordinator.apply(blocks, to: view)
         view.needsDisplay = true
     }
 
@@ -307,7 +321,7 @@ struct MarkdownTextRunView: View, Equatable {
 
     var body: some View {
         MarkdownTextRepresentable(
-            content: MarkdownTextRunBuilder.build(blocks),
+            blocks: blocks,
             codeFill: NSColor(OMColors.accent.opacity(0.1)),
             quoteBar: NSColor(OMColors.hairline),
             linkColor: NSColor(OMColors.link),
