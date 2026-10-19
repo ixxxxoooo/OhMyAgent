@@ -154,7 +154,7 @@ struct ChatView: View {
         }
         .coordinateSpace(.named(chatScrollSpace))
         .onScrollTargetVisibilityChange(idType: UUID.self, threshold: 0.01) { ids in sticky.updateVisible(ids) }
-        .mask(TimelineEdgeFade(edges: fadeEdges))
+        .overlay { TimelineEdgeFade(edges: fadeEdges) }
         .overlay(alignment: .top) { StickyUserOverlay(model: model, state: sticky, maxWidth: contentMaxWidth) }
         .clipped()
         .scrollPosition($position)
@@ -294,12 +294,15 @@ struct TimelineEdgeFade: View {
     let edges: Edges
 
     var body: some View {
+        // 不再用 .mask 套整个滚动区:遮罩会让整块滚动内容走离屏渲染,滚动/流式时每帧多一次合成。
+        // 改为在上下边缘各叠一条「内容区底色 → 透明」的渐变条,视觉等价,只多画两个小矩形。
         VStack(spacing: 0) {
-            LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: edges.top ? Self.topHeight : 0) // ui-lint:allow 仅作遮罩/淡出,非装饰
-            Rectangle().fill(OMColors.maskInk)
-            LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: edges.bottom ? Self.bottomHeight : 0) // ui-lint:allow 仅作遮罩/淡出,非装饰
+            LinearGradient(colors: [OMColors.surface, OMColors.surface.opacity(0)], startPoint: .top, endPoint: .bottom).frame(height: edges.top ? Self.topHeight : 0) // ui-lint:allow 仅作淡出遮盖,非装饰
+            Spacer(minLength: 0)
+            LinearGradient(colors: [OMColors.surface.opacity(0), OMColors.surface], startPoint: .top, endPoint: .bottom).frame(height: edges.bottom ? Self.bottomHeight : 0) // ui-lint:allow 仅作淡出遮盖,非装饰
         }
         .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 
