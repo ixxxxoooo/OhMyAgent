@@ -233,6 +233,7 @@ struct ProjectTreeView: View {
             .accessibilityLabel("设置")
             if DemoLaunch.isActive { DemoBadgeView() } else if AppEnv.isDev() { DevBadgeView() }
             Spacer()
+            UpdateFooterButton()
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)

@@ -283,3 +283,40 @@ struct SessionParityTests {
         model.shutdown()
     }
 }
+
+@MainActor
+@Suite("排队消息:立即发送")
+struct FollowUpNowTests {
+    private func model() async throws -> SessionModel {
+        let ws = try M3ScenarioTests.tempWorkspace()
+        return try await M3ScenarioTests.readyModel(workspace: ws)
+    }
+
+    /// 注:偏好为「排队」时同样应注入(已手动验证);全局偏好会污染并行测试,故此处不改它。
+    @Test("运行中点「引导」:排队消息立刻注入当前轮次并出队")
+    func sendNowSteers() async throws {
+        let model = try await model()
+        model.send("slow #long 请持续输出")
+        #expect(await SessionModelTests.wait { model.isRunning })
+        model.send("补充一句", afterTurn: true)
+        let id = try #require(model.followUps.first?.id)
+        model.sendFollowUpNow(id)
+        #expect(await SessionModelTests.wait { model.timeline.entries.contains { $0.kind == .user && $0.isSteered } })
+        #expect(model.followUps.isEmpty)
+        model.cancel()
+        #expect(await SessionModelTests.wait { !model.isRunning })
+        model.shutdown()
+    }
+
+    @Test("空闲时点「发送」:排队消息直接发出并出队")
+    func sendNowWhenIdle() async throws {
+        let model = try await model()
+        model.enqueueFollowUp("单独发送")
+        let id = try #require(model.followUps.first?.id)
+        model.sendFollowUpNow(id)
+        #expect(model.followUps.isEmpty)
+        #expect(await SessionModelTests.wait { model.timeline.entries.contains { $0.kind == .user && $0.text == "单独发送" } })
+        #expect(await SessionModelTests.wait { !model.isRunning })
+        model.shutdown()
+    }
+}

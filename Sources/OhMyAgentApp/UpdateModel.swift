@@ -4,8 +4,10 @@
 import AppKit
 import ChatKit
 import Foundation
+import Network
 import OMLog
 import Observation
+import os
 
 /// 更新状态(设置页与菜单共享)。
 @MainActor
@@ -20,7 +22,32 @@ final class UpdateModel {
         case result(UpdateResult)
     }
 
+    /// 下载与安装阶段(侧栏按钮与设置页共享)。
+    enum Phase: Equatable {
+        case none
+        case downloading(Double)
+        case ready(StagedUpdate)
+        case failed(String)
+    }
+
     private(set) var state: State = .idle
+    private(set) var phase: Phase = .none
+    /// 最近一次检查发现的可用版本。
+    private(set) var availableInfo: UpdateInfo?
+    @ObservationIgnored private var downloadTask: Task<Void, Never>?
+    @ObservationIgnored private var restartRequested = false
+    @ObservationIgnored private var idleTask: Task<Void, Never>?
+
+    /// 当前更新方式。
+    var mode: UpdateMode { UpdateMode(rawValue: UserDefaults.standard.string(forKey: ClientPrefs.Key.updateMode) ?? "") ?? .download }
+    /// 开发版与演示模式不做自替换(避免用正式包覆盖开发版)。
+    var canSelfInstall: Bool { !AppEnv.isDev() && !DemoLaunch.isActive }
+
+    /// 启动时恢复上次已下载好的更新,并按需启动空闲自动安装。
+    func restoreStaged() {
+        if let staged = UpdateInstaller.loadStaged(currentVersion: currentVersion, currentBuild: currentBuild) { phase = .ready(staged) }
+        startIdleWatcher()
+    }
 
     /// 当前短版本号。
     var currentVersion: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0" }
@@ -40,6 +67,110 @@ final class UpdateModel {
             defaults.set(Date(), forKey: ClientPrefs.Key.updateLastCheck)
             Log.update.info("更新检查完成", ["feed": feed.isEmpty ? "-" : feed, "channel": channel, "result": "\(result)"])
             state = .result(result)
+            if case .available(let info) = result { availableInfo = info; autoDownloadIfAllowed(info) } else { availableInfo = nil }
+        }
+    }
+
+    /// 开始下载并暂存更新(已在下载或已就绪时忽略)。
+    /// - Parameter info: 要下载的版本
+    func startDownload(_ info: UpdateInfo) {
+        if case .downloading = phase { return }
+        if case .ready(let staged) = phase, staged.version == info.version { return }
+        phase = .downloading(0)
+        downloadTask = Task {
+            do {
+                let staged = try await UpdateInstaller.download(info) { value in
+                    Task { @MainActor in if case .downloading = UpdateModel.shared.phase { UpdateModel.shared.phase = .downloading(value) } }
+                }
+                phase = .ready(staged)
+                if mode != .auto { AppNotifier.send(title: String(localized: "新版本已下载"), message: String(localized: "点击侧栏「重启更新」即可完成更新 \(info.version)")) }
+            } catch {
+                Log.update.error("下载更新失败", ["error": error.localizedDescription])
+                phase = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    /// 自动下载:更新方式不是「仅提醒」且网络不计费、未开启低数据模式时才下载。
+    private func autoDownloadIfAllowed(_ info: UpdateInfo) {
+        guard mode != .remind, canSelfInstall else { return }
+        Task {
+            let path = await Self.currentPath()
+            guard UpdateTiming.canDownloadNow(isExpensive: path.isExpensive, isConstrained: path.isConstrained) else {
+                Log.update.info("网络计费或受限,推迟下载更新"); return
+            }
+            startDownload(info)
+        }
+    }
+
+    /// 取一次当前网络路径。
+    private static func currentPath() async -> NWPath {
+        await withCheckedContinuation { continuation in
+            let monitor = NWPathMonitor()
+            let resumed = OSAllocatedUnfairLock(initialState: false)
+            monitor.pathUpdateHandler = { path in
+                let first = resumed.withLock { done -> Bool in defer { done = true }; return !done }
+                guard first else { return }
+                monitor.cancel(); continuation.resume(returning: path)
+            }
+            monitor.start(queue: DispatchQueue(label: "oma.update.path"))
+        }
+    }
+
+    /// 侧栏按钮点击:已就绪则重启更新;否则开始下载(下载完成后再点重启)。
+    func performPrimaryAction() {
+        switch phase {
+        case .ready: installAndRestart()
+        case .downloading: break
+        case .none, .failed:
+            guard let info = availableInfo else { return }
+            guard canSelfInstall else { openDownload(info); return }
+            startDownload(info)
+        }
+    }
+
+    /// 重启并安装已下载的更新。
+    func installAndRestart() {
+        guard case .ready = phase else { return }
+        guard canSelfInstall else {
+            OMDialog.alert(title: String(localized: "开发版不支持自动更新"), message: String(localized: "请用 Scripts/promote.sh 更新稳定版。"))
+            return
+        }
+        restartRequested = true
+        NSApp.terminate(nil)
+        Task { try? await Task.sleep(for: .seconds(10)); restartRequested = false }
+    }
+
+    /// 应用退出时调用:用户点了重启更新,或「自动」模式下有已下载的更新,则交给替换脚本完成安装。
+    func applyOnQuitIfNeeded() {
+        guard case .ready(let staged) = phase, canSelfInstall, restartRequested || mode == .auto else { return }
+        do {
+            try UpdateInstaller.launchReplacer(staged: staged, targetApp: Bundle.main.bundlePath, relaunch: restartRequested)
+            Log.update.info("已交给替换脚本安装更新", ["version": staged.version, "relaunch": "\(restartRequested)"])
+        } catch {
+            Log.update.error("启动更新替换脚本失败", ["error": error.localizedDescription])
+        }
+    }
+
+    /// 「自动」模式的最佳时间:电脑空闲 15 分钟以上且没有会话在运行/等待输入时,自动重启更新。
+    private func startIdleWatcher() {
+        idleTask?.cancel()
+        idleTask = Task { [weak self] in
+            var ticks = 0
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(60))
+                ticks += 1
+                // 长时间不退出的用户:每 6 小时重新检查一次
+                if ticks % 360 == 0, let self, UserDefaults.standard.object(forKey: ClientPrefs.Key.autoUpdate) as? Bool ?? true { self.checkNow() }
+                guard let self, self.mode == .auto, self.canSelfInstall, case .ready = self.phase else { continue }
+                let idle = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!)
+                let center = AttentionCenter.shared
+                let busy = center.count(of: .running) + center.count(of: .needsInput)
+                if UpdateTiming.canInstallNow(idleSeconds: idle, busySessions: busy) {
+                    Log.update.info("空闲且无运行会话,自动重启安装更新", ["idle": "\(Int(idle))"])
+                    self.installAndRestart(); return
+                }
+            }
         }
     }
 
@@ -65,11 +196,20 @@ final class UpdateModel {
         }
     }
 
-    /// 启动后的自动检查:开启自动更新且距上次超过 24 小时才执行;发现新版本时发系统通知。
+    /// 一分钟内刚检查过(避免启动与定时检查重叠)。
+    private var checkedRecently: Bool {
+        (UserDefaults.standard.object(forKey: ClientPrefs.Key.updateLastCheck) as? Date).map { Date().timeIntervalSince($0) < 60 } ?? false
+    }
+
+    /// 只恢复一次暂存状态。
+    private func restoreStagedOnce() { if idleTask == nil { restoreStaged() } }
+
+    /// 启动后的自动检查:开启自动更新才执行(请求很小,每次启动都查,发现的新版本才能在侧栏出现按钮);发现新版本时发系统通知。
     func autoCheckIfNeeded() {
         let defaults = UserDefaults.standard
+        restoreStagedOnce()
         guard defaults.object(forKey: ClientPrefs.Key.autoUpdate) as? Bool ?? true,
-              UpdateChecker.shouldAutoCheck(last: defaults.object(forKey: ClientPrefs.Key.updateLastCheck) as? Date) else { return }
+              !checkedRecently else { return }
         checkNow()
         Task {
             // 等待检查结束后提示

@@ -19,6 +19,7 @@ struct GeneralPage: View {
     @AppStorage(ClientPrefs.Key.idleHibernateMinutes) private var idleHibernate = 10
     @AppStorage(ClientPrefs.Key.maxLiveSessions) private var maxLive = 3
     @AppStorage(ClientPrefs.Key.autoUpdate) private var autoUpdate = true
+    @AppStorage(ClientPrefs.Key.updateMode) private var updateMode = UpdateMode.download.rawValue
     @AppStorage(ClientPrefs.Key.updateChannel) private var channel = "stable"
     @AppStorage(ClientPrefs.Key.updateFeedURL) private var feedURL = ""
     @State private var updates = UpdateModel.shared
@@ -34,7 +35,11 @@ struct GeneralPage: View {
         case .checking: OMSpinner(.small)
         case .result(.upToDate): Text("已是最新版本").foregroundStyle(OMColors.secondaryText)
         case .result(.available(let info)):
-            Button("下载 \(info.version)") { updates.openDownload(info) }
+            switch updates.phase {
+            case .ready: Button("重启更新") { updates.installAndRestart() }
+            case .downloading(let value): Text("下载中 \(Int(value * 100))%").foregroundStyle(OMColors.secondaryText)
+            default: Button("下载并更新 \(info.version)") { updates.performPrimaryAction() }
+            }
             if let notes = info.notes { Text(notes).foregroundStyle(OMColors.secondaryText).lineLimit(1) }
         case .result(.unsupportedSystem(let info)): Text("\(info.version) 需要 macOS \(info.minimumSystemVersion ?? "")").foregroundStyle(OMColors.warning)
         case .result(.failed(let message)): Text(message).foregroundStyle(OMColors.danger).lineLimit(2)
@@ -89,6 +94,12 @@ struct GeneralPage: View {
             }
             Section("更新") {
                 Toggle("自动检查更新", isOn: $autoUpdate)
+                Picker("更新方式", selection: $updateMode) {
+                    Text("仅提醒").tag(UpdateMode.remind.rawValue)
+                    Text("自动下载").tag(UpdateMode.download.rawValue)
+                    Text("自动下载并在最佳时间安装").tag(UpdateMode.auto.rawValue)
+                }
+                Note("自动下载只在网络不计费(非热点/低数据模式)时进行;最佳安装时间:电脑空闲 15 分钟以上且没有会话在运行,或下次退出应用时。侧栏的「更新/重启更新」按钮可随时手动触发。")
                 Picker("更新通道", selection: $channel) {
                     Text("稳定").tag("stable")
                     Text("预览").tag("preview")
@@ -100,7 +111,7 @@ struct GeneralPage: View {
                     Button("立即检查") { updates.checkNow() }.disabled(updates.state == .checking)
                     updateStatus
                 }
-                Note("留空使用 GitHub 最新正式版;发现新版本后在浏览器中下载安装包。发布源格式见 开发进度.md。")
+                Note("留空使用 GitHub 最新正式版。发布源格式见 开发进度.md。开发版只下载不替换自身。")
             }
             Section("重置") {
                 Button("重置所有客户端设置…", role: .destructive) { confirmReset = true }

@@ -13,6 +13,8 @@ public enum ClientPrefs {
         public static let showMenuBar = "general.showMenuBar"
         public static let notifyFinished = "notify.finished"
         public static let autoUpdate = "update.auto"
+        /// 更新方式(`UpdateMode` 原始值)
+        public static let updateMode = "update.mode"
         public static let updateChannel = "update.channel"
         public static let updateFeedURL = "update.feedURL"
         public static let updateLastCheck = "update.lastCheck"

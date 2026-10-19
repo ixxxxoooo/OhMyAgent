@@ -137,6 +137,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @MainActor
     func applicationWillTerminate(_ notification: Notification) {
+        UpdateModel.shared.applyOnQuitIfNeeded()
         Log.app.info("应用即将退出", ["sessions": "\(AppEnvironment.shared.workbench.conversations.count)"])
         PerfSession.logSummary()
         AppEnvironment.shared.workbench.shutdownAll()

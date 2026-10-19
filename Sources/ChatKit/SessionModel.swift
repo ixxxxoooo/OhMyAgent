@@ -739,6 +739,13 @@ public final class SessionModel {
     /// - Parameter id: 排队消息 ID
     public func sendFollowUpNow(_ id: UUID) {
         guard let item = followUps.first(where: { $0.id == id }) else { return }
+        if isRunning {
+            // 用户明确点了「引导」:不受「运行中发送方式」偏好影响;Agent 不支持引导时保留在队列里
+            guard canSteer else { return }
+            followUps.removeAll { $0.id == id }
+            steer(item.text, images: item.images)
+            return
+        }
         followUps.removeAll { $0.id == id }
         send(item.text, images: item.images)
     }
