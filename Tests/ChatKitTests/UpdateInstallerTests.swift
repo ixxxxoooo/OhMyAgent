@@ -27,6 +27,20 @@ struct UpdateInstallerTests {
         #expect(try UpdateInstaller.sha256(of: file) == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
     }
 
+    @Test("更新地址:正式版只允许 https,本机回环与 file 仅开发版放行")
+    func sourcePolicy() throws {
+        let https = try #require(URL(string: "https://github.com/a/b/releases/latest/download/appcast.json"))
+        let loopback = try #require(URL(string: "http://127.0.0.1:8000/appcast.json"))
+        let file = URL(fileURLWithPath: "/tmp/appcast.json")
+        let plain = try #require(URL(string: "http://example.com/appcast.json"))
+        #expect(UpdateChecker.isAllowedSource(https, allowLocal: false))
+        #expect(!UpdateChecker.isAllowedSource(loopback, allowLocal: false))
+        #expect(!UpdateChecker.isAllowedSource(file, allowLocal: false))
+        #expect(UpdateChecker.isAllowedSource(loopback, allowLocal: true))
+        #expect(UpdateChecker.isAllowedSource(file, allowLocal: true))
+        #expect(!UpdateChecker.isAllowedSource(plain, allowLocal: true))
+    }
+
     @Test("更新方式原始值稳定")
     func modes() {
         #expect(UpdateMode(rawValue: "auto") == .auto)

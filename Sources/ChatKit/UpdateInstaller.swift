@@ -48,10 +48,11 @@ public enum UpdateTiming {
 
 /// 安装错误。
 public enum UpdateInstallError: Error, LocalizedError, Sendable {
-    case badURL, checksumMismatch, mountFailed(String), appMissing, signatureInvalid
+    case badURL, checksumMissing, checksumMismatch, mountFailed(String), appMissing, signatureInvalid
     public var errorDescription: String? {
         switch self {
         case .badURL: return String(localized: "下载地址无效")
+        case .checksumMissing: return String(localized: "发布源缺少安装包校验值(sha256),已拒绝安装")
         case .checksumMismatch: return String(localized: "安装包校验失败(sha256 不一致)")
         case .mountFailed(let m): return String(localized: "无法打开安装包:\(m)")
         case .appMissing: return String(localized: "安装包中没有应用")
@@ -65,6 +66,8 @@ public enum UpdateInstaller {
     /// 暂存根目录(`Application Support/OhMyAgent[-Dev]/updates`)。
     public static var stagingRoot: URL { AppEnv.supportDirectory.appendingPathComponent("updates", isDirectory: true) }
     private static var readyFile: URL { stagingRoot.appendingPathComponent("ready.json") }
+    /// 正式版的 Bundle ID:安装包签名的标识符必须与之一致(ad-hoc 签名没有团队 ID 可钉,至少钉住标识符)
+    static let expectedIdentifier = "com.ixxxxoooo.OhMyAgent"
 
     /// 读取已暂存且比当前版本新的更新;过期的暂存会被清理。
     /// - Parameters:
@@ -88,7 +91,10 @@ public enum UpdateInstaller {
     ///   - progress: 进度回调 0…1(任意线程)
     /// - Returns: 暂存结果
     public static func download(_ info: UpdateInfo, progress: @escaping @Sendable (Double) -> Void) async throws -> StagedUpdate {
-        guard let url = URL(string: info.url), url.scheme == "https" || url.host == "127.0.0.1" || url.host == "localhost" else { throw UpdateInstallError.badURL }
+        guard let url = URL(string: info.url), !url.isFileURL, UpdateChecker.isAllowedSource(url) else { throw UpdateInstallError.badURL }
+        // 正式版必须带校验值;开发版的本地假发布源可以省略
+        let expectedSHA = info.sha256?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+        if expectedSHA.isEmpty, !AppEnv.isDev() { throw UpdateInstallError.checksumMissing }
         let started = Date()
         let fm = FileManager.default
         clearStaged()
@@ -98,12 +104,12 @@ public enum UpdateInstaller {
         let observer = ProgressObserver(progress)
         let (tmp, _) = try await URLSession.shared.download(from: url, delegate: observer)
         try fm.moveItem(at: tmp, to: dmg)
-        if let expected = info.sha256, !expected.isEmpty, try sha256(of: dmg) != expected.lowercased() {
+        if !expectedSHA.isEmpty, try sha256(of: dmg) != expectedSHA {
             clearStaged(); throw UpdateInstallError.checksumMismatch
         }
         let app = try extractApp(from: dmg, into: dir)
         try? fm.removeItem(at: dmg)
-        guard run("/usr/bin/codesign", ["--verify", "--deep", "--strict", app.path]).status == 0 else {
+        guard run("/usr/bin/codesign", ["--verify", "--deep", "--strict", "-R=identifier \"\(expectedIdentifier)\"", app.path]).status == 0 else {
             clearStaged(); throw UpdateInstallError.signatureInvalid
         }
         let staged = StagedUpdate(version: info.version, build: info.build ?? 0, appPath: app.path, notes: info.notes)

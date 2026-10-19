@@ -4,9 +4,10 @@
 //   { "stable": { "version": "0.2.0", "build": 12, "url": "https://…/OhMyAgent-0.2.0.dmg",
 //                 "sha256": "…", "notes": "更新说明", "minimumSystemVersion": "27.0" },
 //     "preview": { … } }
-// 本模块只负责发现更新与提示;下载由浏览器完成(应用为 Developer ID 公证分发,未内置自替换安装器)。
+// 本模块只负责发现更新与提示;下载、校验与自替换安装见 `UpdateInstaller`。
 
 import Foundation
+import OMLog
 
 /// 一个可用版本的描述。
 public struct UpdateInfo: Codable, Sendable, Hashable {
@@ -104,7 +105,7 @@ public enum UpdateChecker {
         guard !trimmed.isEmpty, let url = URL(string: trimmed), let scheme = url.scheme?.lowercased() else {
             return .failed(String(localized: "尚未配置更新源地址"))
         }
-        guard scheme == "https" || url.isFileURL || url.host == "localhost" || url.host == "127.0.0.1" else {
+        guard scheme == "https" || isAllowedSource(url) else {
             return .failed(String(localized: "更新源必须使用 https"))
         }
         do {
@@ -113,6 +114,17 @@ public enum UpdateChecker {
         } catch {
             return .failed(String(localized: "获取更新信息失败:\(error.localizedDescription)"))
         }
+    }
+
+    /// 更新源/下载地址是否可信:一律要求 https;本机回环 http 与 file 地址只在开发版放行(测试用的本地假发布源)。
+    /// - Parameters:
+    ///   - url: 地址
+    ///   - allowLocal: 是否放行本机地址(默认仅开发版)
+    /// - Returns: 可信为 true
+    public static func isAllowedSource(_ url: URL, allowLocal: Bool = AppEnv.isDev()) -> Bool {
+        if url.scheme?.lowercased() == "https" { return true }
+        guard allowLocal else { return false }
+        return url.isFileURL || url.host == "localhost" || url.host == "127.0.0.1"
     }
 
     /// 自动检查的节流:距上次检查不足 24 小时则跳过。
