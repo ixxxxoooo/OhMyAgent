@@ -83,7 +83,7 @@ final class UpdateModel {
                     Task { @MainActor in if case .downloading = UpdateModel.shared.phase { UpdateModel.shared.phase = .downloading(value) } }
                 }
                 phase = .ready(staged)
-                if mode != .auto { AppNotifier.send(title: String(localized: "新版本已下载"), message: String(localized: "点击侧栏「重启更新」即可完成更新 \(info.version)")) }
+                if mode != .auto { AppNotifier.send(title: String(localized: "新版本已下载"), message: String(localized: "点击侧栏「更新」即可完成更新 \(info.version)")) }
             } catch {
                 Log.update.error("下载更新失败", ["error": error.localizedDescription])
                 phase = .failed(error.localizedDescription)
@@ -143,6 +143,7 @@ final class UpdateModel {
     /// 应用退出时调用:用户点了重启更新,或「自动」模式下有已下载的更新,则交给替换脚本完成安装。
     func applyOnQuitIfNeeded() {
         guard case .ready(let staged) = phase, canSelfInstall, restartRequested || mode == .auto else { return }
+        WhatsNew.remember(version: staged.version, notes: staged.notes)
         do {
             try UpdateInstaller.launchReplacer(staged: staged, targetApp: Bundle.main.bundlePath, relaunch: restartRequested)
             Log.update.info("已交给替换脚本安装更新", ["version": staged.version, "relaunch": "\(restartRequested)"])
@@ -196,6 +197,14 @@ final class UpdateModel {
         }
     }
 
+    /// 更新完成后首次启动:弹窗展示新版本说明(只展示一次)。
+    private func showWhatsNewIfNeeded() {
+        guard let news = WhatsNew.takePending(currentVersion: currentVersion) else { return }
+        let body = WhatsNew.bulletList(news.notes)
+        NSApp.activate()
+        OMDialog.alert(title: String(localized: "已更新到 \(news.version)"), message: body.isEmpty ? String(localized: "感谢使用 OhMyAgent。") : body)
+    }
+
     /// 一分钟内刚检查过(避免启动与定时检查重叠)。
     private var checkedRecently: Bool {
         (UserDefaults.standard.object(forKey: ClientPrefs.Key.updateLastCheck) as? Date).map { Date().timeIntervalSince($0) < 60 } ?? false
@@ -206,6 +215,7 @@ final class UpdateModel {
 
     /// 启动后的自动检查:开启自动更新才执行(请求很小,每次启动都查,发现的新版本才能在侧栏出现按钮);发现新版本时发系统通知。
     func autoCheckIfNeeded() {
+        showWhatsNewIfNeeded()
         let defaults = UserDefaults.standard
         restoreStagedOnce()
         guard defaults.object(forKey: ClientPrefs.Key.autoUpdate) as? Bool ?? true,

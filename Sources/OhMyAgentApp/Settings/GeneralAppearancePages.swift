@@ -34,7 +34,7 @@ struct GeneralPage: View {
         case .result(.upToDate): Text("已是最新版本").foregroundStyle(OMColors.secondaryText)
         case .result(.available(let info)):
             switch updates.phase {
-            case .ready: Button("重启更新") { updates.installAndRestart() }
+            case .ready: Button("更新") { updates.installAndRestart() }
             case .downloading(let value): Text("下载中 \(Int(value * 100))%").foregroundStyle(OMColors.secondaryText)
             default: Button("下载并更新 \(info.version)") { updates.performPrimaryAction() }
             }
@@ -97,7 +97,7 @@ struct GeneralPage: View {
                     Text("自动下载").tag(UpdateMode.download.rawValue)
                     Text("自动下载并在最佳时间安装").tag(UpdateMode.auto.rawValue)
                 }
-                Note("自动下载只在网络不计费(非热点/低数据模式)时进行;最佳安装时间:电脑空闲 15 分钟以上且没有会话在运行,或下次退出应用时。侧栏的「更新/重启更新」按钮可随时手动触发。")
+                Note("自动下载只在网络不计费(非热点/低数据模式)时进行;最佳安装时间:电脑空闲 15 分钟以上且没有会话在运行,或下次退出应用时。侧栏的「更新」按钮可随时手动触发。")
                 LabeledContent("当前版本", value: "\(updates.currentVersion) (\(updates.currentBuild))")
                 HStack {
                     Button("立即检查") { updates.checkNow() }.disabled(updates.state == .checking)

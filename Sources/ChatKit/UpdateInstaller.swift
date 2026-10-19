@@ -22,6 +22,8 @@ public struct StagedUpdate: Codable, Sendable, Equatable {
     public var build: Int
     /// 暂存的 app 路径
     public var appPath: String
+    /// 发布说明(旧版本暂存文件没有该字段)
+    public var notes: String?
 }
 
 /// 更新时机判断(纯函数,便于测试)。
@@ -104,7 +106,7 @@ public enum UpdateInstaller {
         guard run("/usr/bin/codesign", ["--verify", "--deep", "--strict", app.path]).status == 0 else {
             clearStaged(); throw UpdateInstallError.signatureInvalid
         }
-        let staged = StagedUpdate(version: info.version, build: info.build ?? 0, appPath: app.path)
+        let staged = StagedUpdate(version: info.version, build: info.build ?? 0, appPath: app.path, notes: info.notes)
         try JSONEncoder().encode(staged).write(to: readyFile)
         Log.update.info("更新已下载并校验", ["version": info.version, "seconds": String(format: "%.1f", Date().timeIntervalSince(started))])
         return staged

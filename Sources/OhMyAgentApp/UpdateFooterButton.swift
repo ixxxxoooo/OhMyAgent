@@ -1,5 +1,5 @@
 // @author ixxxxoooo
-// 侧栏底部的更新按钮:检测到新版本时显示「更新」,下载中显示进度,下载完成显示「重启更新」。
+// 侧栏底部的更新按钮:检测到新版本时显示「更新」,下载中显示进度,下载完成同样显示「更新」(点击即重启安装)。
 
 import ChatKit
 import DesignSystem
@@ -41,7 +41,7 @@ struct UpdateFooterButton: View {
     static func spec(phase: UpdateModel.Phase, available: UpdateInfo?) -> Spec? {
         switch phase {
         case .ready(let staged):
-            return Spec(title: String(localized: "重启更新"), icon: "refresh-cw", help: String(localized: "新版本 \(staged.version) 已下载,点击重启并完成更新"), busy: false)
+            return Spec(title: String(localized: "更新"), icon: "refresh-cw", help: String(localized: "新版本 \(staged.version) 已下载,点击重启并完成更新"), busy: false)
         case .downloading(let value):
             return Spec(title: "\(Int(value * 100))%", icon: "download", help: String(localized: "正在下载新版本…"), busy: true)
         case .none, .failed:

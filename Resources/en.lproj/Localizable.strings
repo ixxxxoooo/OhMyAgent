@@ -2593,13 +2593,12 @@
 "仅提醒" = "Remind only";
 "自动下载" = "Download automatically";
 "自动下载并在最佳时间安装" = "Download and install at the best time";
-"自动下载只在网络不计费(非热点/低数据模式)时进行;最佳安装时间:电脑空闲 15 分钟以上且没有会话在运行,或下次退出应用时。侧栏的「更新/重启更新」按钮可随时手动触发。" = "Downloads happen only on unmetered networks (not hotspot / Low Data Mode). Best install time: the Mac has been idle for 15+ minutes with no running sessions, or the next time you quit. The sidebar Update / Restart to update button can trigger it any time.";
+"自动下载只在网络不计费(非热点/低数据模式)时进行;最佳安装时间:电脑空闲 15 分钟以上且没有会话在运行,或下次退出应用时。侧栏的「更新」按钮可随时手动触发。" = "Downloads happen only on unmetered networks (not hotspot / Low Data Mode). Best install time: the Mac has been idle for 15+ minutes with no running sessions, or the next time you quit. The sidebar Update button can trigger it any time.";
 "更新来自 GitHub 最新正式版。开发版只下载、不替换自身。" = "Updates come from the latest GitHub release. Dev builds only download and never replace themselves.";
-"重启更新" = "Restart to update";
 "下载并更新 %@" = "Download and update %@";
 "下载中 %lld%%" = "Downloading %lld%%";
 "新版本已下载" = "New version downloaded";
-"点击侧栏「重启更新」即可完成更新 %@" = "Click Restart to update in the sidebar to finish updating to %@";
+"点击侧栏「更新」即可完成更新 %@" = "Click Update in the sidebar to finish updating to %@";
 "开发版不支持自动更新" = "Dev builds do not support auto-update";
 "请用 Scripts/promote.sh 更新稳定版。" = "Use Scripts/promote.sh to update the stable build.";
 "下载地址无效" = "Invalid download URL";
@@ -2611,3 +2610,5 @@
 "正在下载新版本…" = "Downloading the new version…";
 "发现新版本 %@,点击下载并更新" = "Version %@ found; click to download and update";
 "放到此处,移到底部面板" = "Drop here to move to the bottom panel";
+"已更新到 %@" = "Updated to %@";
+"感谢使用 OhMyAgent。" = "Thanks for using OhMyAgent.";

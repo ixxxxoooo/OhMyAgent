@@ -33,3 +33,22 @@ struct UpdateInstallerTests {
         #expect(UpdateMode(rawValue: "x") == nil)
     }
 }
+
+@Suite("更新说明")
+struct WhatsNewTests {
+    @Test("更新后展示一次,未追上版本时保留")
+    func pending() {
+        let defaults = UserDefaults(suiteName: "oma-whatsnew-\(UUID().uuidString)")!
+        WhatsNew.remember(version: "1.1.0", notes: "a;b", defaults: defaults)
+        #expect(WhatsNew.takePending(currentVersion: "1.0.0", defaults: defaults) == nil)
+        #expect(WhatsNew.takePending(currentVersion: "1.1.0", defaults: defaults)?.notes == "a;b")
+        #expect(WhatsNew.takePending(currentVersion: "1.1.0", defaults: defaults) == nil)
+    }
+
+    @Test("说明整理为项目符号并限制条数")
+    func bullets() {
+        #expect(WhatsNew.bulletList("a; b;;c") == "• a\n• b\n• c")
+        #expect(WhatsNew.bulletList("1;2;3", limit: 2) == "• 1\n• 2\n…")
+        #expect(WhatsNew.bulletList(nil) == "")
+    }
+}
