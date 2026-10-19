@@ -63,6 +63,8 @@ struct GitGraphSection: View {
     /// 是否可能还有更早的提交
     @State private var hasMore = false
     @State private var loadingMore = false
+    /// 底部加载哨兵是否在可见区域
+    @State private var sentinelVisible = false
 
     /// 状态变化(分支切换、提交/推送/拉取、工作区变干净)时重新取数。
     private var reloadKey: String {
@@ -116,7 +118,10 @@ struct GitGraphSection: View {
                             OMSpinner(.mini)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 8)
-                                .task(id: rows.count) { await loadMore() }
+                                // 非结构化任务:行数变化会使视图任务被取消,不能把加载放在 .task 里
+                            .onAppear { sentinelVisible = true; Task { await loadMore() } }
+                            .onDisappear { sentinelVisible = false }
+                            .onChange(of: rows.count) { if sentinelVisible { Task { await loadMore() } } }
                         }
                     }
                 }
