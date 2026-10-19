@@ -33,6 +33,17 @@ public enum UpdateResult: Sendable, Equatable {
 
 /// 更新检查器。
 public enum UpdateChecker {
+    /// 默认发布源:GitHub 最新正式版 Release 附带的 appcast.json(由 Scripts/publish.sh 上传)。
+    public static let defaultFeedURL = "https://github.com/ixxxxoooo/OhMyAgent/releases/latest/download/appcast.json"
+
+    /// 解析实际使用的发布源:用户未填写时回退默认源。
+    /// - Parameter configured: 设置里填写的地址(可为空)
+    /// - Returns: 非空的发布源地址
+    public static func resolvedFeedURL(_ configured: String?) -> String {
+        let trimmed = (configured ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? defaultFeedURL : trimmed
+    }
+
     /// 当前系统版本字符串(如 27.0.0)。
     public static var currentSystemVersion: String {
         let v = ProcessInfo.processInfo.operatingSystemVersion

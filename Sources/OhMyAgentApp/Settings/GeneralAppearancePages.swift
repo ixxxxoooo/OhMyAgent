@@ -93,14 +93,14 @@ struct GeneralPage: View {
                     Text("稳定").tag("stable")
                     Text("预览").tag("preview")
                 }
-                TextField("更新源地址 (https)", text: $feedURL, prompt: Text("https://example.com/oma/appcast.json"))
+                TextField("更新源地址 (https)", text: $feedURL, prompt: Text(UpdateChecker.defaultFeedURL))
                     .textFieldStyle(.roundedBorder)
                 LabeledContent("当前版本", value: "\(updates.currentVersion) (\(updates.currentBuild))")
                 HStack {
                     Button("立即检查") { updates.checkNow() }.disabled(updates.state == .checking)
                     updateStatus
                 }
-                Note("发现新版本后在浏览器中下载 Developer ID 公证的安装包;发布源格式见 开发进度.md。")
+                Note("留空使用 GitHub 最新正式版;发现新版本后在浏览器中下载安装包。发布源格式见 开发进度.md。")
             }
             Section("重置") {
                 Button("重置所有客户端设置…", role: .destructive) { confirmReset = true }

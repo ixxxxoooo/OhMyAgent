@@ -32,7 +32,7 @@ final class UpdateModel {
         guard state != .checking else { return }
         state = .checking
         let defaults = UserDefaults.standard
-        let feed = defaults.string(forKey: ClientPrefs.Key.updateFeedURL) ?? ""
+        let feed = UpdateChecker.resolvedFeedURL(defaults.string(forKey: ClientPrefs.Key.updateFeedURL))
         let channel = defaults.string(forKey: ClientPrefs.Key.updateChannel) ?? "stable"
         let version = currentVersion, build = currentBuild
         Task {
@@ -65,11 +65,10 @@ final class UpdateModel {
         }
     }
 
-    /// 启动后的自动检查:开启自动更新、已配置发布源且距上次超过 24 小时才执行;发现新版本时发系统通知。
+    /// 启动后的自动检查:开启自动更新且距上次超过 24 小时才执行;发现新版本时发系统通知。
     func autoCheckIfNeeded() {
         let defaults = UserDefaults.standard
         guard defaults.object(forKey: ClientPrefs.Key.autoUpdate) as? Bool ?? true,
-              !(defaults.string(forKey: ClientPrefs.Key.updateFeedURL) ?? "").isEmpty,
               UpdateChecker.shouldAutoCheck(last: defaults.object(forKey: ClientPrefs.Key.updateLastCheck) as? Date) else { return }
         checkNow()
         Task {

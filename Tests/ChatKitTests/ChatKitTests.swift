@@ -710,6 +710,13 @@ struct RenderPerformanceTests {
 
 @Suite("更新检查")
 struct UpdateCheckerTests {
+    @Test func emptyFeedFallsBackToGitHubRelease() {
+        #expect(UpdateChecker.resolvedFeedURL(nil) == UpdateChecker.defaultFeedURL)
+        #expect(UpdateChecker.resolvedFeedURL("  ") == UpdateChecker.defaultFeedURL)
+        #expect(UpdateChecker.resolvedFeedURL(" https://a.b/c.json ") == "https://a.b/c.json")
+        #expect(UpdateChecker.defaultFeedURL.hasPrefix("https://github.com/ixxxxoooo/OhMyAgent/releases/latest/download/"))
+    }
+
     private func feed(_ version: String, build: Int? = nil, minimum: String? = nil, url: String = "https://example.com/a.dmg") -> Data {
         var info: [String: Any] = ["version": version, "url": url]
         if let build { info["build"] = build }

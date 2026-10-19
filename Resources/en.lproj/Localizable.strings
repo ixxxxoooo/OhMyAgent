@@ -634,7 +634,7 @@
 "语言在重新启动 OhMyAgent 后生效。" = "The language change takes effect after restarting OhMyAgent.";
 "隐藏 Dock 图标时会自动开启菜单栏图标,以便仍可打开窗口。关闭最后一个窗口后,应用会继续在菜单栏中运行(⌘Q 退出)。" = "Hiding the Dock icon turns on the menu bar icon so you can still open windows. After the last window closes, the app keeps running in the menu bar (⌘Q to quit).";
 "运行中的会话在菜单栏图标上显示闪烁的点;完成后点常亮,打开对应会话或点击通知后消失。" = "A running conversation shows a blinking dot on the menu bar icon; when finished the dot stays lit until you open it or click the notification.";
-"发现新版本后在浏览器中下载 Developer ID 公证的安装包;发布源格式见 开发进度.md。" = "When a new version is found, download the notarized Developer ID package in your browser; see 开发进度.md for the feed format.";
+"留空使用 GitHub 最新正式版;发现新版本后在浏览器中下载安装包。发布源格式见 开发进度.md。" = "Leave empty to use the latest GitHub release; when a new version is found, download the package in your browser. See 开发进度.md for the feed format.";
 "只重置 OhMyAgent 自身的偏好;Claude Code 的 settings.json 不受影响。" = "Only OhMyAgent's own preferences are reset; Claude Code's settings.json is untouched.";
 "系统「减少透明度」「减少动态效果」始终优先。代码、Diff、编辑器等阅读区域恒为纯色,不受影响。" = "The system's \"Reduce Transparency\" and \"Reduce Motion\" always take precedence. Reading areas such as code, diffs and the editor are always solid and unaffected.";
 "以上开关写入 settings.json 的 env,对新建会话生效。OhMyAgent 自身不包含任何遥测。" = "The switches above are written to the env of settings.json and apply to new sessions. OhMyAgent itself contains no telemetry.";
