@@ -34,6 +34,20 @@ struct TerminalPanelStoreTests {
         #expect(store.state(for: root).instances.count == 1)
     }
 
+    @Test("激活已激活的终端不写偏好(避免广播偏好变化);移除项目后丢弃其状态")
+    func noOpActivateAndDiscard() {
+        let defaults = makeDefaults()
+        let root = "/tmp/oma-noop-\(UUID().uuidString)"
+        let store = TerminalPanelStore(defaults: defaults)
+        store.rename(TerminalPanelState.baseID(root), to: "构建", root: root)
+        defaults.removeObject(forKey: TerminalPanelStore.defaultsKey)
+        store.activate(TerminalPanelState.baseID(root), root: root)
+        #expect(defaults.data(forKey: TerminalPanelStore.defaultsKey) == nil)
+        store.discard(root: root)
+        #expect(store.states[root] == nil)
+        #expect(defaults.data(forKey: TerminalPanelStore.defaultsKey) != nil)
+    }
+
     @Test("实例列表持久化:重新创建仓库后保留实例、激活项与自定义名称")
     func persistence() {
         let defaults = makeDefaults()

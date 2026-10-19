@@ -32,6 +32,8 @@ final class TerminalController: Identifiable {
     /// 自己的子进程退出监听。SwiftTerm 1.11.x 在读到 EOF 时会取消它内部的退出监听,
     /// 导致 `processTerminated` 回调丢失(被 SIGHUP 的 shell 会一直显示为运行中),所以这里独立兜底并收尸。
     @ObservationIgnored private var exitMonitor: DispatchSourceProcess?
+    /// 偏好/主题通知的观察者(控制器丢弃时移除,避免每关一个终端就留下两条注册)
+    @ObservationIgnored private var observers: [NSObjectProtocol] = []
     @ObservationIgnored private let executable: String
     @ObservationIgnored private let arguments: [String]
     @ObservationIgnored private let extraEnvironment: [String: String]
@@ -64,13 +66,13 @@ final class TerminalController: Identifiable {
         applyPrefs(prefs, initial: true)
         applyTheme()
         // 设置页修改偏好:字体/光标/Option 键热更新(Shell 与回滚仅对新终端生效)
-        NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
+        observers.append(NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.reloadPrefs() }
-        }
+        })
         // 主题切换/系统明暗变化:热更新终端配色(弱引用,控制器释放后回调为空操作)
-        NotificationCenter.default.addObserver(forName: ThemeRuntime.didChange, object: nil, queue: .main) { [weak self] _ in
+        observers.append(NotificationCenter.default.addObserver(forName: ThemeRuntime.didChange, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.applyTheme() }
-        }
+        })
         start()
     }
 
@@ -158,6 +160,13 @@ final class TerminalController: Identifiable {
         registeredPID = nil
         exitCode = status.flatMap(Self.decodeWaitStatus)
         Log.ui.info("终端进程已退出", ["id": id, "code": exitCode.map { String($0) } ?? "signal"])
+    }
+
+    /// 丢弃控制器:移除通知观察者并终止进程(从终端仓库移除时调用,之后不再使用)。
+    func dispose() {
+        observers.forEach { NotificationCenter.default.removeObserver($0) }
+        observers = []
+        terminate()
     }
 
     /// 终止进程(关闭标签时调用)。交互式 shell 会忽略 SIGTERM,所以先发 SIGHUP(与关闭终端窗口一致),

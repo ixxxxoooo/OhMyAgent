@@ -33,7 +33,7 @@ final class TerminalStore {
     /// - Parameter keeping: 仍然存在的终端标识
     func prune(keeping: Set<String>) {
         for (id, controller) in controllers where !keeping.contains(id) && !id.hasPrefix("bottom:") {
-            controller.terminate()
+            controller.dispose()
             controllers[id] = nil
             pendingDirectories[id] = nil
         }
@@ -41,7 +41,7 @@ final class TerminalStore {
 
     /// 终止并移除指定终端。
     func remove(_ id: String) {
-        controllers[id]?.terminate()
+        controllers[id]?.dispose()
         controllers[id] = nil
         pendingDirectories[id] = nil
     }

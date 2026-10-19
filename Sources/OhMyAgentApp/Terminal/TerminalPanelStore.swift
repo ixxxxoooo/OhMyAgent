@@ -133,6 +133,8 @@ final class TerminalPanelStore {
 
     /// 写回状态并持久化(只有一个初始实例且未改动的状态不落盘)。
     private func commit(_ state: TerminalPanelState, for root: String) {
+        // 没有变化(如点了已激活的终端)不写偏好:每次写都会广播 UserDefaults 变化,让所有终端控制器重读偏好
+        guard states[root] != state else { return }
         states[root] = state
         if states.count > Self.maxRoots, let stale = states.keys.first(where: { $0 != root }), let evicted = states.removeValue(forKey: stale) {
             // 被挤出的项目不再出现在任何列表里,其进程也一并结束,避免成为看不见的孤儿进程
