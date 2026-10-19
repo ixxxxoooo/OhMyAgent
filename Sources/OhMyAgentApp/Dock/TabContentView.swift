@@ -206,12 +206,14 @@ struct FileTabView: View {
 
     /// 根据时间线里该文件最近一次 Agent 改动刷新行标记(已回退的改动不标记)。
     private func refreshAgentMarks() {
+        // 任一会话的改动修订号变化都会触发这里;结果没变时不重新赋值,避免无谓地重算行标记并刷新编辑器
+        func assign(_ marks: AgentMarks?) { if agentMarks != marks { agentMarks = marks } }
         guard let found = latestChange(for: path, in: workbench), found.change.status == .pending || found.change.status == .partiallyReverted else {
-            agentMarks = nil
+            assign(nil)
             return
         }
         let lines = found.change.diff.hunks.flatMap(\.lines).filter { $0.kind == .added }.compactMap(\.newNumber)
-        agentMarks = lines.isEmpty ? nil : AgentMarks(text: found.change.current, lines: Set(lines))
+        assign(lines.isEmpty ? nil : AgentMarks(text: found.change.current, lines: Set(lines)))
     }
 
     /// 把选区引用(`@文件:行范围`)追加到所属项目的输入框并切到对话标签。
