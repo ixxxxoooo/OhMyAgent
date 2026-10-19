@@ -74,7 +74,7 @@ enum MarkdownSegment: Hashable {
 /// 行内代码仅保留系统标记(`inlinePresentationIntent`),圆角底与等宽字体由 `InlineMarkdownText` 绘制。
 /// - Parameter source: 原文
 func inlineMarkdown(_ source: String) -> AttributedString {
-    guard var result = InlineMarkdownCache.parsed(source) else { return AttributedString(source) }
+    guard var result = InlineMarkdownCache.shared.parsed(source) else { return AttributedString(source) }
     // 链接使用第二强调色(与主强调色区分)
     let linkColor = OMColors.link
     for run in result.runs where run.link != nil {

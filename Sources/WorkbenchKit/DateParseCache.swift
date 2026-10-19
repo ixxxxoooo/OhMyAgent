@@ -6,21 +6,27 @@ import Foundation
 import os
 
 /// 线程安全、容量有界的 ISO8601 解析缓存(含解析失败的结果,避免对非法串反复重试)。
-enum DateParseCache {
-    /// 缓存条目上限:超过后整体清空重建(会话数量级为几百到几千,足够)。
-    static let capacity = 8192
+/// 生产代码用全局 `shared`;测试各自创建实例,互不干扰(并行测试不会污染计数)。
+final class DateParseCache: Sendable {
+    /// 全局实例。
+    static let shared = DateParseCache()
 
     private struct Storage {
         var table: [String: Date?] = [:]
         var parses = 0
     }
 
-    private static let storage = OSAllocatedUnfairLock(initialState: Storage())
+    /// 缓存条目上限:超过后整体清空重建(会话数量级为几百到几千,足够)。
+    let capacity: Int
+    private let storage = OSAllocatedUnfairLock(initialState: Storage())
+
+    /// - Parameter capacity: 条目上限(≥1)
+    init(capacity: Int = 8192) { self.capacity = max(capacity, 1) }
 
     /// 解析并记忆。
     /// - Parameter text: ISO8601 字符串(含/不含毫秒)
     /// - Returns: 日期;无法解析返回 nil
-    static func date(for text: String) -> Date? {
+    func date(for text: String) -> Date? {
         if let cached = storage.withLock({ $0.table[text] }) { return cached }
         let parsed = (try? Date(text, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)))
             ?? (try? Date(text, strategy: Date.ISO8601FormatStyle()))
@@ -33,8 +39,5 @@ enum DateParseCache {
     }
 
     /// 实际解析次数(测试用:验证重复读取命中缓存)。
-    static var parseCount: Int { storage.withLock { $0.parses } }
-
-    /// 清空(测试用)。
-    static func reset() { storage.withLock { $0 = Storage() } }
+    var parseCount: Int { storage.withLock { $0.parses } }
 }
