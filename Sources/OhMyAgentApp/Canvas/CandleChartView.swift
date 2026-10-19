@@ -57,7 +57,7 @@ struct CandleChartView: View {
         let change = base == 0 ? 0 : (candle.close - base) / base * 100
         return HStack(spacing: 10) {
             Text(verbatim: chart.labels[shown]).foregroundStyle(OMColors.secondaryText)
-            Text(verbatim: "开 \(Self.fmt(candle.open))  高 \(Self.fmt(candle.high))  低 \(Self.fmt(candle.low))  收 \(Self.fmt(candle.close))")
+            Text("开 \(Self.fmt(candle.open))  高 \(Self.fmt(candle.high))  低 \(Self.fmt(candle.low))  收 \(Self.fmt(candle.close))")
             Text(verbatim: String(format: "%+.2f%%", change)).foregroundStyle(color(candle))
             ForEach(Array(averages.enumerated()), id: \.offset) { index, item in
                 if let value = item.values[shown] {
