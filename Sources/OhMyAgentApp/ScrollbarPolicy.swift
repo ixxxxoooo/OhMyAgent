@@ -13,39 +13,52 @@ enum ScrollbarPolicy {
     /// - Parameters:
     ///   - root: 起点视图(一般为窗口内容视图)
     ///   - visibility: 目标设置;`.system` 不做任何修改(沿用系统)
-    static func apply(to root: NSView, visibility: ScrollbarVisibility) {
+    /// - Returns: 本次实际改动了多少个滚动视图(0 表示视图树已处于目标状态)
+    @discardableResult
+    static func apply(to root: NSView, visibility: ScrollbarVisibility) -> Int {
+        var changed = 0
         switch visibility {
         case .custom:
-            walk(root) { installCustomScrollers(in: $0) }
+            walk(root) { if installCustomScrollers(in: $0) { changed += 1 } }
         case .system:
             // 跟随系统:只在之前装过自绘滚动条时还原成系统滚动条
-            walk(root) { restoreSystemScrollers(in: $0) }
+            walk(root) { if restoreSystemScrollers(in: $0) { changed += 1 } }
         case .autoHide, .always:
             let style: NSScroller.Style = visibility == .autoHide ? .overlay : .legacy
             walk(root) { scrollView in
-                restoreSystemScrollers(in: scrollView)
-                if scrollView.scrollerStyle != style { scrollView.scrollerStyle = style }
-                scrollView.autohidesScrollers = visibility == .autoHide
+                var touched = restoreSystemScrollers(in: scrollView)
+                if scrollView.scrollerStyle != style { scrollView.scrollerStyle = style; touched = true }
+                if scrollView.autohidesScrollers != (visibility == .autoHide) { scrollView.autohidesScrollers = visibility == .autoHide; touched = true }
+                if touched { changed += 1 }
             }
         }
+        return changed
     }
 
     /// 给滚动视图装上自绘滚动条(已装过则不重复设置)。
-    private static func installCustomScrollers(in scrollView: NSScrollView) {
-        if scrollView.scrollerStyle != .overlay { scrollView.scrollerStyle = .overlay }
-        scrollView.autohidesScrollers = true
+    /// - Returns: 是否做了改动
+    private static func installCustomScrollers(in scrollView: NSScrollView) -> Bool {
+        var changed = false
+        if scrollView.scrollerStyle != .overlay { scrollView.scrollerStyle = .overlay; changed = true }
+        if !scrollView.autohidesScrollers { scrollView.autohidesScrollers = true; changed = true }
         if scrollView.hasVerticalScroller, !(scrollView.verticalScroller is OMScroller) {
             scrollView.verticalScroller = OMScroller()
+            changed = true
         }
         if scrollView.hasHorizontalScroller, !(scrollView.horizontalScroller is OMScroller) {
             scrollView.horizontalScroller = OMScroller()
+            changed = true
         }
+        return changed
     }
 
     /// 把自绘滚动条换回系统滚动条。
-    private static func restoreSystemScrollers(in scrollView: NSScrollView) {
-        if scrollView.verticalScroller is OMScroller { scrollView.verticalScroller = NSScroller() }
-        if scrollView.horizontalScroller is OMScroller { scrollView.horizontalScroller = NSScroller() }
+    /// - Returns: 是否做了改动
+    private static func restoreSystemScrollers(in scrollView: NSScrollView) -> Bool {
+        var changed = false
+        if scrollView.verticalScroller is OMScroller { scrollView.verticalScroller = NSScroller(); changed = true }
+        if scrollView.horizontalScroller is OMScroller { scrollView.horizontalScroller = NSScroller(); changed = true }
+        return changed
     }
 
     /// 对单个滚动视图应用设置(AppKit 自绘视图创建时调用)。
@@ -60,7 +73,8 @@ enum ScrollbarPolicy {
     }
 }
 
-/// 放在窗口根部的执行器:设置变化或视图重绘时重新应用,并在非「跟随系统」时低频巡检新建的滚动视图。
+/// 放在窗口根部的执行器:设置变化或视图重绘时重新应用;非「跟随系统」时,新出现的滚动视图(切换标签、打开面板)
+/// 由用户操作(鼠标抬起/按键)触发的去抖检查纳入,另有指数退避的低频兜底巡检(视图树稳定后最长 30 秒一次,不再固定 1.5 秒遍历)。
 private struct ScrollbarPolicyEnforcer: NSViewRepresentable {
     let visibility: ScrollbarVisibility
 
@@ -71,34 +85,81 @@ private struct ScrollbarPolicyEnforcer: NSViewRepresentable {
         context.coordinator.attach(to: view)
     }
 
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        coordinator.stop()
+    }
+
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     @MainActor
     final class Coordinator {
         var visibility: ScrollbarVisibility = .custom
         private weak var anchor: NSView?
-        private var task: Task<Void, Never>?
+        private var patrol: Task<Void, Never>?
+        private var settle: Task<Void, Never>?
+        private var monitor: Any?
+        /// 兜底巡检当前间隔(秒);发现需要改动的滚动视图时回到最短,否则逐步放大
+        private var interval = Coordinator.minInterval
+        private static let minInterval = 1.5
+        private static let maxInterval = 30.0
 
         func attach(to view: NSView) {
             anchor = view
+            interval = Self.minInterval
             enforce()
-            task?.cancel()
-            // 跟随系统不需要巡检;其余档位让新出现的滚动视图(切换标签、打开面板)在下一次巡检时被纳入
+            stop()
+            // 跟随系统不需要巡检
             guard visibility != .system else { return }
-            task = Task { [weak self] in
+            monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseUp, .keyUp]) { [weak self] event in
+                self?.userActed()
+                return event
+            }
+            startPatrol()
+        }
+
+        /// 停止巡检与事件监听(设置切到跟随系统或视图销毁时)。
+        func stop() {
+            patrol?.cancel()
+            patrol = nil
+            settle?.cancel()
+            settle = nil
+            if let monitor { NSEvent.removeMonitor(monitor) }
+            monitor = nil
+        }
+
+        /// 用户操作后稍等视图树落定再检查一次;连续操作合并为一次,并让兜底巡检回到较短间隔。
+        private func userActed() {
+            settle?.cancel()
+            settle = Task { [weak self] in
+                try? await Task.sleep(for: .milliseconds(200))
+                guard !Task.isCancelled, let self else { return }
+                self.enforce()
+                self.interval = Self.minInterval
+            }
+        }
+
+        private func startPatrol() {
+            patrol = Task { [weak self] in
                 while !Task.isCancelled {
-                    try? await Task.sleep(for: .seconds(1.5))
-                    self?.enforce()
+                    guard let self else { return }
+                    try? await Task.sleep(for: .seconds(self.interval))
+                    guard !Task.isCancelled else { return }
+                    self.interval = self.enforce() > 0 ? Self.minInterval : min(self.interval * 2, Self.maxInterval)
                 }
             }
         }
 
-        private func enforce() {
-            guard let root = anchor?.window?.contentView else { return }
-            ScrollbarPolicy.apply(to: root, visibility: visibility)
+        /// 应用设置到整个窗口;返回改动的滚动视图数。
+        @discardableResult
+        private func enforce() -> Int {
+            guard let root = anchor?.window?.contentView else { return 0 }
+            return ScrollbarPolicy.apply(to: root, visibility: visibility)
         }
 
-        deinit { task?.cancel() }
+        deinit {
+            patrol?.cancel()
+            settle?.cancel()
+        }
     }
 }
 
