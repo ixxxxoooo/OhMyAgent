@@ -654,13 +654,16 @@ public final class ThemeTracker: @unchecked Sendable {
 
 /// 当前主题与强调色覆盖(由 `AppearanceModel` 写入;只在主线程的界面刷新周期读取)。
 public enum ThemeRuntime {
-    nonisolated(unsafe) public static var package: ThemePackage = .system
+    /// 运行时配置代号:主题包或强调色覆盖被直接改写时自增,令 `ResolvedTokens` 缓存失效
+    /// (正常路径经 `bump()` 递增修订号;测试与启动期直接赋值时靠它保证不读到旧令牌)。
+    nonisolated(unsafe) public private(set) static var generation = 0
+    nonisolated(unsafe) public static var package: ThemePackage = .system { didSet { generation &+= 1 } }
     /// 用户自定义主题(由 `CustomThemeStore` 加载后写入,只在主线程变更)
     nonisolated(unsafe) public static var customThemes: [ThemePackage] = []
     /// 用户选择的主强调色(nil = 跟随主题默认)
-    nonisolated(unsafe) public static var accentOverride: ThemeRGB?
+    nonisolated(unsafe) public static var accentOverride: ThemeRGB? { didSet { generation &+= 1 } }
     /// 用户选择的第二强调色(nil = 跟随主题默认)
-    nonisolated(unsafe) public static var accent2Override: ThemeRGB?
+    nonisolated(unsafe) public static var accent2Override: ThemeRGB? { didSet { generation &+= 1 } }
 
     /// 系统主题下当前是否深色(由 `AppearanceModel` 在外观变化时更新;供非主线程的令牌读取)。
     nonisolated(unsafe) public static var systemIsDark = false

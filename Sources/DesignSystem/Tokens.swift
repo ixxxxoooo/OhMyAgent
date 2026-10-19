@@ -59,7 +59,112 @@ public enum OMMotion {
 }
 
 /// 颜色令牌。系统主题下使用系统语义色;选择主题包后,**所有**颜色按调色板取色(无公共例外)。
+///
+/// 读取走 `ResolvedTokens.current`:每次读取只做一次 Observation 登记 + 字段读取;
+/// 主题/强调色变化时才整体重建一次(不再每次读取都复制 `ThemePalette`、新建 `NSColor`/`Color`、重算混色)。
 public enum OMColors {
+    /// 时间线与编辑区背景(纯色)。系统主题:浅色 #F6F6F7(见 AGENTS.md「界面配色」)。
+    public static var surface: Color { ResolvedTokens.current.surface }
+    /// 左侧栏(含设置页左栏)背景:仅「跟随系统」与 Cursor 浅色主题为 #EFEFEF;其余主题取各自调色板的 `sidebarBackground`(未指定则由内容色推导)。
+    public static var sidebar: Color { ResolvedTokens.current.sidebar }
+    /// 卡片背景(纯色)。
+    public static var card: Color { ResolvedTokens.current.card }
+    /// 玻璃回退时的不透明 chrome 背景(主题包取卡片色,系统主题取窗口背景)。
+    public static var opaqueChrome: Color { ResolvedTokens.current.opaqueChrome }
+    /// 正文前景(主文字、悬停/选中时的文字):主题包取前景色,系统取 labelColor。
+    public static var primaryText: Color { ResolvedTokens.current.primaryText }
+    /// 分隔线(描边强度随主题风格)。
+    public static var hairline: Color { ResolvedTokens.current.hairline }
+    /// 次级文字。
+    public static var secondaryText: Color { ResolvedTokens.current.secondaryText }
+    /// 三级文字。
+    public static var tertiaryText: Color { ResolvedTokens.current.tertiaryText }
+    /// 新增(绿 / 色盲主题为蓝)。
+    public static var diffAdded: Color { ResolvedTokens.current.diffAdded }
+    /// 删除(红 / 色盲主题为橙)。
+    public static var diffRemoved: Color { ResolvedTokens.current.diffRemoved }
+    /// 警告色。
+    public static var warning: Color { ResolvedTokens.current.warning }
+    /// 成功色。
+    public static var success: Color { ResolvedTokens.current.success }
+    /// 警示/危险色(负向语义:删除、报错)。
+    public static var danger: Color { ResolvedTokens.current.danger }
+    /// 强调色实底上的前景(按钮文字、选中徽标):主题未指定时为白色(纸感用 Parchment,禁用纯白)。
+    public static var onAccent: Color { ResolvedTokens.current.onAccent }
+    /// 小字号链接/强调文字用的强调色:纸感取加深的 Ember(≥ 4.5:1),其他主题即 `accent`。
+    public static var accentText: Color { ResolvedTokens.current.accentText }
+    /// 内联链接色:纸感为加深的 Ember,其他主题为第二强调色。
+    public static var link: Color { ResolvedTokens.current.link }
+    /// 主按钮与控件「开」态的填充:一律跟随主题强调色。
+    public static var actionFill: Color { ResolvedTokens.current.actionFill }
+    /// `actionFill` 之上的前景。
+    public static var onAction: Color { ResolvedTokens.current.onAction }
+    /// 暖色动作按钮填充(继续、执行计划)。
+    public static var actionWarm: Color { ResolvedTokens.current.actionWarm }
+    /// 暖色动作按钮上的前景:按填充色自动取 Parchment / Ink 中对比度更高者。
+    public static var onWarm: Color { ResolvedTokens.current.onWarm }
+    /// 正向动作按钮填充(提交、创建 PR)。
+    public static var actionPositive: Color { ResolvedTokens.current.actionPositive }
+    /// 正向动作按钮上的前景(同 `onWarm` 的取色规则)。
+    public static var onPositive: Color { ResolvedTokens.current.onPositive }
+    /// 输入框、次按钮等的描边(纸感为 Stone);未指定时同分隔线。
+    public static var outline: Color { ResolvedTokens.current.outline }
+    /// 主强调色:用户选择 > 主题默认 > 系统强调色。
+    public static var accent: Color { ResolvedTokens.current.accent }
+    /// 第二强调色:链接、次要徽标;未指定时回退主强调色。
+    public static var accent2: Color { ResolvedTokens.current.accent2 }
+    /// 自绘滚动条滑块色:三级文字色 70%。
+    public static var scrollThumb: Color { ResolvedTokens.current.scrollThumb }
+    /// 自绘滚动条悬停/拖动时的滑块色:次级文字色 80%。
+    public static var scrollThumbActive: Color { ResolvedTokens.current.scrollThumbActive }
+    /// 极轻填充(斑马纹、代码框底):随主题前景 4%。
+    public static var subtleFill: Color { ResolvedTokens.current.subtleFill }
+    /// 悬停填充:随主题前景 7%。
+    public static var hoverFill: Color { ResolvedTokens.current.hoverFill }
+    /// 选中填充:默认强调色 14%;纸感为中性墨色 8%。
+    public static var selectedFill: Color { ResolvedTokens.current.selectedFill }
+    /// 按压/强悬停填充:随主题前景 12%。
+    public static var pressedFill: Color { ResolvedTokens.current.pressedFill }
+    /// 进行中:运行、加载、呼吸点、进度——统一取主题强调色。
+    public static var statusActive: Color { ResolvedTokens.current.statusActive }
+    /// 运行中。
+    public static var statusRunning: Color { ResolvedTokens.current.statusRunning }
+    /// 等待处理(权限/提问):与运行同色相,靠空心环形与节奏区分。
+    public static var statusWaiting: Color { ResolvedTokens.current.statusWaiting }
+    /// 已完成未读:同色相的静止实心点。
+    public static var statusUnread: Color { ResolvedTokens.current.statusUnread }
+    /// 空闲。
+    public static var statusIdle: Color { ResolvedTokens.current.statusIdle }
+    /// 全窗遮罩(搜索窗等模态浮层背后):随主题明暗。
+    public static var scrim: Color { ResolvedTokens.current.scrim }
+    /// 系统主题的内容区背景:浅色 #F6F6F7、深色 #1E1F22。
+    public static var contentBackground: Color { systemContentBackground }
+    /// 系统主题的内容区背景(与是否选了主题包无关;主题卡片预览取样用)。
+    public static let systemContentBackground = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            ? NSColor(srgbRed: 0.118, green: 0.122, blue: 0.133, alpha: 1)
+            : NSColor(srgbRed: 0xF6 / 255, green: 0xF6 / 255, blue: 0xF7 / 255, alpha: 1)
+    })
+    /// 系统主题的侧栏背景(与是否选了主题包无关;主题卡片预览取样用)。
+    public static let systemSidebar = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            ? NSColor(srgbRed: 0.094, green: 0.098, blue: 0.110, alpha: 1)
+            : NSColor(srgbRed: 0xEF / 255, green: 0xEF / 255, blue: 0xEF / 255, alpha: 1)
+    })
+    /// 分类色板(图表、Git 图谱泳道、用量分类):取自主题语义色与语法色,系统主题用系统色。
+    public static func chart(_ index: Int) -> Color {
+        let count = ResolvedTokens.chartCount
+        return ResolvedTokens.current.chart[((index % count) + count) % count]
+    }
+    /// 阴影基色(不透明度由 `omShadow` 按档位与主题风格决定)。
+    public static let shadowInk = Color.black
+    /// 蒙版用不透明色(渐变淡出、`mask`):只看 alpha,颜色无意义。
+    public static let maskInk = Color.black
+}
+
+/// 颜色令牌的「未缓存」参考实现:每次读取都按当前主题现算。
+/// 仅供 `ResolvedTokens` 在主题变化时重建缓存使用,以及测试中与缓存值逐项对照;界面代码一律走 `OMColors`。
+enum OMColorsUncached {
     /// 按当前明暗在两组颜色间切换的动态颜色(系统主题回退用)。
     private static func dynamic(light: NSColor, dark: NSColor) -> Color {
         Color(nsColor: NSColor(name: nil) { appearance in
@@ -72,144 +177,134 @@ public enum OMColors {
 
     /// 时间线与编辑区背景(纯色)
     /// 系统主题:浅色 #F6F6F7(见 AGENTS.md「界面配色」)。
-    public static var surface: Color {
+    static var surface: Color {
         ThemeRuntime.palette.map { $0.surface.color } ?? contentBackground
     }
     /// 系统主题的内容区背景:浅色 #F6F6F7、深色 #1E1F22。
-    public static var contentBackground: Color { systemContentBackground }
-    /// 系统主题的内容区背景(与是否选了主题包无关;主题卡片预览取样用)。
-    public static let systemContentBackground = Color(nsColor: NSColor(name: nil) { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            ? NSColor(srgbRed: 0.118, green: 0.122, blue: 0.133, alpha: 1)
-            : NSColor(srgbRed: 0xF6 / 255, green: 0xF6 / 255, blue: 0xF7 / 255, alpha: 1)
-    })
+    static var contentBackground: Color { systemContentBackground }
+    static var systemContentBackground: Color { OMColors.systemContentBackground }
     /// 左侧栏(含设置页左栏)背景:仅「跟随系统」与 Cursor 浅色主题为 #EFEFEF;其余主题取各自调色板的 `sidebarBackground`(未指定则由内容色推导)。
-    public static var sidebar: Color {
+    static var sidebar: Color {
         if let palette = ThemeRuntime.palette {
             return (palette.sidebarBackground
                 ?? palette.surface.mixed(with: palette.editorForeground, palette.isDark ? 0.045 : 0.035)).color
         }
         return systemSidebar
     }
-    /// 系统主题的侧栏背景(与是否选了主题包无关;主题卡片预览取样用)。
-    public static let systemSidebar = Color(nsColor: NSColor(name: nil) { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            ? NSColor(srgbRed: 0.094, green: 0.098, blue: 0.110, alpha: 1)
-            : NSColor(srgbRed: 0xEF / 255, green: 0xEF / 255, blue: 0xEF / 255, alpha: 1)
-    })
+    static var systemSidebar: Color { OMColors.systemSidebar }
     /// 卡片背景(纯色)
-    public static var card: Color {
+    static var card: Color {
         if let palette = ThemeRuntime.palette { return palette.card.color }
         return dynamic(light: NSColor(srgbRed: 0.975, green: 0.977, blue: 0.985, alpha: 1),
                        dark: NSColor(srgbRed: 0.145, green: 0.150, blue: 0.165, alpha: 1))
     }
     /// 玻璃回退时的不透明 chrome 背景(主题包取卡片色,系统主题取窗口背景)
-    public static var opaqueChrome: Color {
+    static var opaqueChrome: Color {
         ThemeRuntime.palette.map { $0.card.color } ?? Color(nsColor: .windowBackgroundColor)
     }
     /// 正文前景(主文字、悬停/选中时的文字):主题包取前景色,系统取 labelColor。
-    public static var primaryText: Color {
+    static var primaryText: Color {
         ThemeRuntime.palette.map { $0.foreground.color } ?? Color(nsColor: .labelColor)
     }
     /// 分隔线(描边强度随主题风格)
-    public static var hairline: Color {
+    static var hairline: Color {
         ThemeRuntime.palette.map { $0.hairline.color } ?? Color(nsColor: .separatorColor)
     }
-    public static var secondaryText: Color {
+    static var secondaryText: Color {
         ThemeRuntime.palette.map { $0.secondaryText.color } ?? Color(nsColor: .secondaryLabelColor)
     }
-    public static var tertiaryText: Color {
+    static var tertiaryText: Color {
         ThemeRuntime.palette.map { $0.tertiaryText.color } ?? Color(nsColor: .tertiaryLabelColor)
     }
     /// 新增(绿 / 色盲主题为蓝)
-    public static var diffAdded: Color { ThemeRuntime.palette.map { $0.success.color } ?? Color(nsColor: .systemGreen) }
+    static var diffAdded: Color { ThemeRuntime.palette.map { $0.success.color } ?? Color(nsColor: .systemGreen) }
     /// 删除(红 / 色盲主题为橙)
-    public static var diffRemoved: Color { ThemeRuntime.palette.map { $0.danger.color } ?? Color(nsColor: .systemRed) }
-    public static var warning: Color { ThemeRuntime.palette.map { $0.warning.color } ?? Color(nsColor: .systemOrange) }
+    static var diffRemoved: Color { ThemeRuntime.palette.map { $0.danger.color } ?? Color(nsColor: .systemRed) }
+    static var warning: Color { ThemeRuntime.palette.map { $0.warning.color } ?? Color(nsColor: .systemOrange) }
     /// 成功色。
-    public static var success: Color { diffAdded }
+    static var success: Color { diffAdded }
     /// 警示/危险色(负向语义:删除、报错)。
-    public static var danger: Color { diffRemoved }
+    static var danger: Color { diffRemoved }
     /// 强调色实底上的前景(按钮文字、选中徽标):主题未指定时为白色(纸感用 Parchment,禁用纯白)。
-    public static var onAccent: Color { ThemeRuntime.palette?.onAccent?.color ?? Color.white }
+    static var onAccent: Color { ThemeRuntime.palette?.onAccent?.color ?? Color.white }
     /// 小字号链接/强调文字用的强调色:纸感取加深的 Ember(≥ 4.5:1),其他主题即 `accent`。
-    public static var accentText: Color { ThemeRuntime.palette?.accentText?.color ?? accent }
+    static var accentText: Color { ThemeRuntime.palette?.accentText?.color ?? accent }
     /// 内联链接色:纸感为加深的 Ember(链接是 Ember 的本职),其他主题为第二强调色。
-    public static var link: Color { ThemeRuntime.palette?.accentText?.color ?? accent2 }
+    static var link: Color { ThemeRuntime.palette?.accentText?.color ?? accent2 }
     /// 主按钮与控件「开」态的填充:一律跟随主题强调色。
     /// 纸感的 Ember 在小字号上对比度不足,主题提供加深版 `accentText` 时填充取加深版(同一色相);
     /// 用户在外观里自选了强调色时直接用所选色。
-    public static var actionFill: Color {
+    static var actionFill: Color {
         if ThemeRuntime.style.primaryButton == .ink { return primaryText }
         return ThemeRuntime.accentOverride == nil ? accentText : accent
     }
     /// `actionFill` 之上的前景。
-    public static var onAction: Color {
+    static var onAction: Color {
         ThemeRuntime.style.primaryButton == .ink ? surface : onAccent
     }
     /// 暖色动作按钮填充(继续、执行计划)。
-    public static var actionWarm: Color { ThemeRuntime.palette?.actionWarm?.color ?? warning }
+    static var actionWarm: Color { ThemeRuntime.palette?.actionWarm?.color ?? warning }
     /// 暖色动作按钮上的前景:按填充色自动取 Parchment / Ink 中对比度更高者(保证 ≥ 4.5:1)。
-    public static var onWarm: Color {
+    static var onWarm: Color {
         guard let palette = ThemeRuntime.palette else { return onAccent }
         return palette.readableForeground(on: palette.actionWarm ?? palette.warning).color
     }
     /// 正向动作按钮填充(提交、创建 PR)。
-    public static var actionPositive: Color { ThemeRuntime.palette?.actionPositive?.color ?? success }
+    static var actionPositive: Color { ThemeRuntime.palette?.actionPositive?.color ?? success }
     /// 正向动作按钮上的前景(同 `onWarm` 的取色规则)。
-    public static var onPositive: Color {
+    static var onPositive: Color {
         guard let palette = ThemeRuntime.palette else { return onAccent }
         return palette.readableForeground(on: palette.actionPositive ?? palette.success).color
     }
     /// 输入框、次按钮等的描边(纸感为 Stone);未指定时同分隔线。
-    public static var outline: Color { ThemeRuntime.palette?.outline?.color ?? hairline }
+    static var outline: Color { ThemeRuntime.palette?.outline?.color ?? hairline }
     /// 主强调色:用户选择 > 主题默认 > 系统强调色。
-    public static var accent: Color { ThemeRuntime.accent?.color ?? Color.accentColor }
+    static var accent: Color { ThemeRuntime.accent?.color ?? Color.accentColor }
     /// 第二强调色:链接、次要徽标;未指定时回退主强调色。
-    public static var accent2: Color { ThemeRuntime.accent2?.color ?? accent }
+    static var accent2: Color { ThemeRuntime.accent2?.color ?? accent }
 
     // MARK: 交互填充
 
     /// 自绘滚动条滑块色:三级文字色 70%,浅深主题都有足够对比又不抢眼。
-    public static var scrollThumb: Color { tertiaryText.opacity(0.7) }
+    static var scrollThumb: Color { tertiaryText.opacity(0.7) }
     /// 自绘滚动条悬停/拖动时的滑块色:次级文字色 80%。
-    public static var scrollThumbActive: Color { secondaryText.opacity(0.8) }
+    static var scrollThumbActive: Color { secondaryText.opacity(0.8) }
 
     /// 极轻填充(斑马纹、代码框底):随主题前景 4%。
-    public static var subtleFill: Color { primaryText.opacity(0.04 * ThemeRuntime.style.fillScale) }
+    static var subtleFill: Color { primaryText.opacity(0.04 * ThemeRuntime.style.fillScale) }
     /// 悬停填充:随主题前景 7%。
-    public static var hoverFill: Color { primaryText.opacity(0.07 * ThemeRuntime.style.fillScale) }
+    static var hoverFill: Color { primaryText.opacity(0.07 * ThemeRuntime.style.fillScale) }
     /// 选中填充:默认强调色 14%(让每个主题的选中态有自己的色相);纸感为中性墨色 8%(不洗色)。
-    public static var selectedFill: Color {
+    static var selectedFill: Color {
         if ThemeRuntime.style.selectionTint == .neutral { return primaryText.opacity(0.08 * ThemeRuntime.style.fillScale) }
         return accent.opacity(0.14 * ThemeRuntime.style.fillScale)
     }
     /// 按压/强悬停填充:随主题前景 12%。
-    public static var pressedFill: Color { primaryText.opacity(0.12 * ThemeRuntime.style.fillScale) }
+    static var pressedFill: Color { primaryText.opacity(0.12 * ThemeRuntime.style.fillScale) }
 
     // MARK: 状态色(运行星芒、托盘闪烁点、会话状态点、项目状态标识共用)
 
     /// 进行中:运行、加载、呼吸点、进度——统一取主题强调色。
-    public static var statusActive: Color { accent }
+    static var statusActive: Color { accent }
     /// 运行中。
-    public static var statusRunning: Color { statusActive }
+    static var statusRunning: Color { statusActive }
     /// 等待处理(权限/提问):与运行同色相,靠空心环形与节奏区分。
-    public static var statusWaiting: Color { accent }
+    static var statusWaiting: Color { accent }
     /// 已完成未读:同色相的静止实心点。
-    public static var statusUnread: Color { accent }
+    static var statusUnread: Color { accent }
     /// 空闲。
-    public static var statusIdle: Color { tertiaryText }
+    static var statusIdle: Color { tertiaryText }
 
     // MARK: 遮罩与阴影
 
     /// 全窗遮罩(搜索窗等模态浮层背后):随主题明暗。
-    public static var scrim: Color {
+    static var scrim: Color {
         let dark = paletteIsDark
         if let dark { return Color.black.opacity(dark ? 0.46 : 0.26) }
         return dynamic(light: NSColor(white: 0, alpha: 0.26), dark: NSColor(white: 0, alpha: 0.46))
     }
     /// 分类色板(图表、Git 图谱泳道、用量分类):取自主题语义色与语法色,系统主题用系统色。
-    public static func chart(_ index: Int) -> Color {
+    static func chart(_ index: Int) -> Color {
         let count = 8
         let i = ((index % count) + count) % count
         if let palette = ThemeRuntime.palette {
@@ -220,9 +315,9 @@ public enum OMColors {
         return Color(nsColor: list[i])
     }
     /// 阴影基色(不透明度由 `omShadow` 按档位与主题风格决定)。
-    public static var shadowInk: Color { Color.black }
+    static var shadowInk: Color { Color.black }
     /// 蒙版用不透明色(渐变淡出、`mask`):只看 alpha,颜色无意义。
-    public static var maskInk: Color { Color.black }
+    static var maskInk: Color { Color.black }
 }
 
 /// 终端配色:全部取自主题调色板(系统主题取系统语义色),与编辑器/界面保持一致。
