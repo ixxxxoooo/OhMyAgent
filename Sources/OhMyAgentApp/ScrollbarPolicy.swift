@@ -81,6 +81,9 @@ private struct ScrollbarPolicyEnforcer: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView { NSView(frame: .zero) }
 
     func updateNSView(_ view: NSView, context: Context) {
+        // 锚点与设置都没变就不重新 attach:attach 会遍历整个窗口视图树,而 updateNSView 随根视图每次重算都会调用;
+        // 新出现的滚动视图由鼠标抬起/按键触发的去抖检查与低频巡检纳入
+        guard !context.coordinator.isAttached(to: view, visibility: visibility) else { return }
         context.coordinator.visibility = visibility
         context.coordinator.attach(to: view)
     }
@@ -102,6 +105,11 @@ private struct ScrollbarPolicyEnforcer: NSViewRepresentable {
         private var interval = Coordinator.minInterval
         private static let minInterval = 1.5
         private static let maxInterval = 30.0
+
+        /// 是否已经以相同的锚点与设置装好(此时无需再 attach)。
+        func isAttached(to view: NSView, visibility: ScrollbarVisibility) -> Bool {
+            anchor === view && self.visibility == visibility && (visibility == .system || monitor != nil)
+        }
 
         func attach(to view: NSView) {
             anchor = view

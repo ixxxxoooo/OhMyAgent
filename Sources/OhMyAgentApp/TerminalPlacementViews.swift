@@ -43,8 +43,9 @@ final class TerminalDragState {
     private(set) var panel: DraggablePanel = .terminal
     /// 当前指针(全局坐标)
     private(set) var pointer: CGPoint = .zero
-    /// 工作区在全局坐标中的范围(由工作台视图上报)
-    var workspaceFrame: CGRect = .zero
+    /// 工作区在全局坐标中的范围(由工作台视图上报)。
+    /// 不参与观察:窗口缩放时每帧都会写它,而只有拖动中才会读取(`target` 同时依赖会触发刷新的 `pointer`)。
+    @ObservationIgnored var workspaceFrame: CGRect = .zero
 
     /// 当前落点;指针在工作区之外为 nil。
     var target: TerminalPlacement? {
