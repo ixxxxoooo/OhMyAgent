@@ -4,6 +4,7 @@
 // Subagent:`<scope>/.claude/agents/<name>.md`;插件内的同名目录只读展示。
 
 import Foundation
+import OMLog
 
 /// 条目来源。
 public enum ItemSource: Sendable, Hashable {
@@ -196,14 +197,22 @@ public struct SkillStore: Sendable {
     }
 
     /// 删除条目(移入废纸篓;不可用时直接删除)。
+    /// - Throws: 移入废纸篓与直接删除都失败时抛出
     public func delete(_ item: MarkdownItem) throws {
         guard !item.source.isReadOnly else { throw ConfigError.invalidValue(String(localized: "插件内的条目请通过插件管理卸载")) }
-        Self.trash(item.directoryURL ?? item.fileURL)
+        try Self.trash(item.directoryURL ?? item.fileURL)
     }
 
-    static func trash(_ url: URL) {
-        do { try FileManager.default.trashItem(at: url, resultingItemURL: nil) }
-        catch { try? FileManager.default.removeItem(at: url) }
+    /// 移入废纸篓;废纸篓不可用(如网络卷)时退回直接删除,并记录日志。
+    /// - Parameter url: 文件或目录
+    /// - Throws: 直接删除也失败时抛出
+    static func trash(_ url: URL) throws {
+        do {
+            try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+        } catch {
+            Log.config.warning("移入废纸篓失败,改为直接删除", ["path": url.lastPathComponent, "error": "\(error)"])
+            try FileManager.default.removeItem(at: url)
+        }
     }
 }
 
@@ -280,6 +289,6 @@ public struct AgentStore: Sendable {
     /// 删除。
     public func delete(_ item: MarkdownItem) throws {
         guard !item.source.isReadOnly else { throw ConfigError.invalidValue(String(localized: "插件内的 Subagent 请通过插件管理卸载")) }
-        SkillStore.trash(item.fileURL)
+        try SkillStore.trash(item.fileURL)
     }
 }

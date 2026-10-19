@@ -2079,7 +2079,9 @@ public final class SessionModel {
                 }
             case .conflict: change.status = .conflict
             case .notFound: change.status = .failed(String(localized: "没有可用的检查点"))
-            case .failed(let message): change.status = .failed(message)
+            case .failed(let message):
+                Log.tool.error("回退文件改动失败", ["path": change.path, "hunks": hunks.map { "\($0.count)" } ?? "all", "error": message])
+                change.status = .failed(message)
             }
             self?.changesRevision += 1
         }

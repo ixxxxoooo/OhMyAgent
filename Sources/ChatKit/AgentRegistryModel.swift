@@ -4,6 +4,7 @@
 import AgentHost
 import Foundation
 import Observation
+import OMLog
 
 /// 注册表模型(主线程)。
 @MainActor
@@ -35,10 +36,12 @@ public final class AgentRegistryModel {
         do {
             try store.save(next)
             lastError = nil
+            data = next
         } catch {
+            // 保存失败时不改内存:界面保持与磁盘一致,避免看起来已生效、重启后却丢失
+            Log.agent.error("保存 agents.json 失败", error: error)
             lastError = String(localized: "保存 agents.json 失败:\(error.localizedDescription)")
         }
-        data = next
     }
 
     /// 新增或替换自定义 Agent(按 id)。内置 id 会被拒绝。

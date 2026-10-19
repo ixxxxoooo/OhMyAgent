@@ -121,6 +121,6 @@ public struct MemoryStore: Sendable {
     /// 删除规则文件。
     public func deleteRule(_ file: MemoryFile) throws {
         guard file.kind == .userRule || file.kind == .projectRule else { throw ConfigError.invalidValue(String(localized: "只能删除规则文件")) }
-        SkillStore.trash(file.url)
+        try SkillStore.trash(file.url)
     }
 }
