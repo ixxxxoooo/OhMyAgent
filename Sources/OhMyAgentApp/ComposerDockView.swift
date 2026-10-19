@@ -20,9 +20,9 @@ struct ComposerDockView: View {
         model.timeline.subagentEntries().filter { $0.entry.tool.map { !$0.status.isTerminal } ?? false }
     }
 
-    /// 运行中的终端(按开始时间排序)。
+    /// 任务坞里的终端(后台命令与内置终端,按开始时间排序);Agent 的前台一次性命令不在此列。
     private var runningTerminals: [TerminalSession] {
-        model.terminals.values.filter(\.isRunning).sorted { $0.startedAt < $1.startedAt }
+        model.terminals.values.filter(\.showsInDock).sorted { $0.startedAt < $1.startedAt }
     }
 
     var body: some View {

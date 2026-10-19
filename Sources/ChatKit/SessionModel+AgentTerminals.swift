@@ -33,6 +33,7 @@ extension SessionModel {
             Log.session.info("Agent 终端已登记", ["terminalId": event.terminalId])
         }
         if let command = rawInput?["command"]?.stringValue { session.updateCommand(command) }
+        if rawInput?["run_in_background"]?.boolValue == true { session.declaredBackground = true }
         if let text = event.output {
             if event.outputIsDelta {
                 session.appendExternal(text)
@@ -53,6 +54,7 @@ extension SessionModel {
     func syncExternalTerminal(for call: ToolCall) {
         guard let session = terminals[call.toolCallId], session.isExternal else { return }
         if let command = call.rawInput?["command"]?.stringValue { session.updateCommand(command) }
+        if call.rawInput?["run_in_background"]?.boolValue == true { session.declaredBackground = true }
         if call.status.isTerminal, session.isRunning, !session.isBackground {
             session.finishExternal(exitCode: nil, signal: nil)
         }

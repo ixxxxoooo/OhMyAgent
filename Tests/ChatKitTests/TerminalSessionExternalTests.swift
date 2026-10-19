@@ -37,6 +37,18 @@ struct TerminalSessionExternalTests {
         #expect(!session.isRunning && session.exitCode == 0)
     }
 
+    @Test("任务坞只展示后台命令:前台外部命令不显示,声明 run_in_background 即显示,内置终端沿用运行中")
+    func dockVisibility() {
+        let fg = TerminalSession(id: "fg", command: "ls", isExternal: true)
+        #expect(!fg.showsInDock)
+        let bg = TerminalSession(id: "bg", command: "npm run dev", isExternal: true)
+        bg.declaredBackground = true
+        #expect(bg.isBackground && bg.showsInDock)
+        bg.finishExternal(exitCode: 0, signal: nil)
+        #expect(!bg.showsInDock)
+        #expect(TerminalSession(id: "in", command: "ls").showsInDock)
+    }
+
     @Test("输出超过上限时丢弃头部并标记截断")
     func truncation() {
         let session = TerminalSession(id: "t", command: "x", isExternal: true)

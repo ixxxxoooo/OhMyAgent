@@ -33,8 +33,13 @@ public final class TerminalSession: Identifiable {
     public let isExternal: Bool
     /// 正在跟读的输出文件(后台命令);非 nil 表示这是后台命令
     public private(set) var followedPath: String?
-    /// 是否后台命令
-    public var isBackground: Bool { followedPath != nil }
+    /// 工具入参声明了 `run_in_background`(结果文字到达前就能判定为后台命令)
+    public internal(set) var declaredBackground = false
+    /// 是否后台命令(入参声明或已在跟读输出文件)
+    public var isBackground: Bool { declaredBackground || followedPath != nil }
+    /// 是否应出现在任务坞:外部终端(Agent 自己执行的 Bash)只有后台命令才算「挂着」的任务,
+    /// 前台的一次性命令随工具卡展示即可;内置终端(`terminal/*`)沿用运行中即显示
+    public var showsInDock: Bool { isRunning && (!isExternal || isBackground) }
     @ObservationIgnored private var tailTask: Task<Void, Never>?
     @ObservationIgnored private var tailOffset: UInt64 = 0
     /// 跟读时尚未凑成完整 UTF-8 字符的尾部字节
