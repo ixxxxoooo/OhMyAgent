@@ -94,15 +94,22 @@ enum ResizeBenchmarkHooks {
     /// 等待下一个显示帧(~16ms)。
     private static func nextFrame() async { try? await Task.sleep(for: .milliseconds(16)) }
 
+    /// 基准种类(日志名固定为中文,perf-report.py 按名汇总)。
+    private enum SweepKind { case resize, drag, scroll }
+
     /// 输出汇总日志。
-    private static func report(_ name: String, _ r: (frames: Int, avgMs: Double, maxMs: Double, hitches: Int), since: ContinuousClock.Instant, extra: [String: String] = [:]) {
+    private static func report(_ kind: SweepKind, _ r: (frames: Int, avgMs: Double, maxMs: Double, hitches: Int), since: ContinuousClock.Instant, extra: [String: String] = [:]) {
         let counts = PanelToggleProbe.bodyCounts(since: since).sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: ",")
         var fields: [String: String] = [
             "frames": "\(r.frames)", "avgMs": String(format: "%.1f", r.avgMs),
             "maxMs": String(format: "%.1f", r.maxMs), "hitches": "\(r.hitches)", "bodies": counts,
         ]
         fields.merge(extra) { _, new in new }
-        Log.perf.info(name, fields)
+        switch kind {
+        case .resize: Log.perf.info("缩放基准", fields)
+        case .drag: Log.perf.info("拖分栏基准", fields)
+        case .scroll: Log.perf.info("滚动基准", fields)
+        }
     }
 
     /// 窗口宽度往返扫描。
@@ -124,7 +131,7 @@ enum ResizeBenchmarkHooks {
             window.setFrame(frame, display: true)
             await nextFrame()
         }
-        report("缩放基准", sampler.stop(), since: start, extra: ["cycles": "\(cycles)"])
+        report(.resize, sampler.stop(), since: start, extra: ["cycles": "\(cycles)"])
         window.setFrame(origin, display: true)
         Log.perf.info("基准阶段", ["phase": "窗口缩放结束"])
     }
@@ -162,7 +169,7 @@ enum ResizeBenchmarkHooks {
         default:
             Log.perf.warning("拖分栏基准:未知类型", ["kind": kind])
         }
-        report("拖分栏基准", sampler.stop(), since: start, extra: ["kind": kind])
+        report(.drag, sampler.stop(), since: start, extra: ["kind": kind])
         Log.perf.info("基准阶段", ["phase": "拖分栏结束"])
     }
 
@@ -186,7 +193,7 @@ enum ResizeBenchmarkHooks {
             scroll.reflectScrolledClipView(scroll.contentView)
             await nextFrame()
         }
-        report("滚动基准", sampler.stop(), since: start, extra: ["cycles": "\(cycles)", "travel": String(format: "%.0f", travel)])
+        report(.scroll, sampler.stop(), since: start, extra: ["cycles": "\(cycles)", "travel": String(format: "%.0f", travel)])
         Log.perf.info("基准阶段", ["phase": "滚动结束"])
     }
 
