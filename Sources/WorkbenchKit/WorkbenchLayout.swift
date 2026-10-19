@@ -283,14 +283,36 @@ public struct WorkbenchStore: Sendable {
         AppEnv.supportDirectory.appendingPathComponent("workbench.json")
     }
 
+    /// 损坏状态文件的备份位置(`workbench.json.corrupt`)。
+    public var corruptBackupURL: URL { fileURL.appendingPathExtension("corrupt") }
+
     /// 读取状态;文件不存在或损坏时返回 nil。
+    /// 损坏(读取或解码失败)时先把原文件复制为 `corruptBackupURL` 并记录日志,避免随后的保存把唯一一份数据覆盖掉。
     public func load() -> WorkbenchState? {
-        guard let data = try? Data(contentsOf: fileURL) else { return nil }
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        guard var state = try? decoder.decode(WorkbenchState.self, from: data) else { return nil }
-        state.layout.clamp()
-        return state
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return nil }
+        do {
+            let data = try Data(contentsOf: fileURL)
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            var state = try decoder.decode(WorkbenchState.self, from: data)
+            state.layout.clamp()
+            return state
+        } catch {
+            Log.app.error("工作台状态读取失败,已备份并使用默认状态", error: error, ["file": fileURL.lastPathComponent, "backup": corruptBackupURL.lastPathComponent])
+            backupCorruptFile()
+            return nil
+        }
+    }
+
+    /// 把损坏的状态文件复制为 `corruptBackupURL`(覆盖旧备份),失败只记日志。
+    private func backupCorruptFile() {
+        let fm = FileManager.default
+        do {
+            if fm.fileExists(atPath: corruptBackupURL.path) { try fm.removeItem(at: corruptBackupURL) }
+            try fm.copyItem(at: fileURL, to: corruptBackupURL)
+        } catch {
+            Log.app.error("备份损坏的工作台状态失败", error: error, ["backup": corruptBackupURL.lastPathComponent])
+        }
     }
 
     /// 写入状态。
