@@ -43,19 +43,8 @@ struct GitFileDiffView: View {
             // 保存/暂存后差异自动更新;后台标签暂停。工作区内由文件与 Git 状态事件驱动(空闲零开销),工作区外低频轮询
             guard isActive else { return }
             await load()
-            if WorkspaceWatchCenter.shared.covers(path) {
-                for await _ in WorkspaceWatchCenter.shared.changes() {
-                    // 再等 0.3 秒合并连续写入(编译、批量改写),期间的新信号折叠为一次重算
-                    try? await Task.sleep(for: .milliseconds(300))
-                    guard !Task.isCancelled else { return }
-                    await load()
-                }
-            } else {
-                while !Task.isCancelled {
-                    try? await Task.sleep(for: .seconds(3))
-                    await load()
-                }
-            }
+            // 收到事件后再等 0.3 秒合并连续写入(编译、批量改写),期间的新信号折叠为一次重算
+            await WorkspaceWatchCenter.shared.follow(path, poll: .seconds(3), debounce: .milliseconds(300)) { await load() }
         }
     }
 

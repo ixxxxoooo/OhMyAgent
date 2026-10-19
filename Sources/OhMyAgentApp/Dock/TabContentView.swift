@@ -198,16 +198,8 @@ struct FileTabView: View {
             // Agent 或其它程序改动文件后,未编辑的标签自动刷新;后台标签暂停,切回时立即补一次
             guard isActive else { return }
             await store.checkExternalChange(path)
-            if WorkspaceWatchCenter.shared.covers(path) {
-                // 在被监听的工作区内:由文件系统事件驱动,空闲时零开销
-                for await _ in WorkspaceWatchCenter.shared.changes() { await store.checkExternalChange(path) }
-            } else {
-                // 工作区之外的文件没有事件源,低频轮询磁盘修改时间
-                while !Task.isCancelled {
-                    try? await Task.sleep(for: .seconds(2))
-                    await store.checkExternalChange(path)
-                }
-            }
+            // 工作区内由文件系统事件驱动;工作区之外(含切换项目后的旧项目文件)低频轮询磁盘修改时间
+            await WorkspaceWatchCenter.shared.follow(path, poll: .seconds(2)) { await store.checkExternalChange(path) }
         }
     }
 

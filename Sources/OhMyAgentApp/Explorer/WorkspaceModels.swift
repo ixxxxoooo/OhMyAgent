@@ -139,6 +139,9 @@ final class WorkspaceWatchCenter {
         guard newRoot != root || extras != extraRoots else { return }
         watchers.forEach { $0.stop() }
         watchers = []
+        // 监听范围变了:结束现有订阅,订阅方(`follow`)据此重新判断自己的路径是否仍被覆盖
+        subscribers.values.forEach { $0.finish() }
+        subscribers = [:]
         indexTask?.cancel()
         root = newRoot
         extraRoots = newRoot == nil ? [] : extras
@@ -161,6 +164,32 @@ final class WorkspaceWatchCenter {
             subscribers[id] = continuation
             continuation.onTermination = { _ in
                 Task { @MainActor in WorkspaceWatchCenter.shared.subscribers[id] = nil }
+            }
+        }
+    }
+
+    /// 跟随某个路径的变化直到任务取消:被监听覆盖时由文件系统事件驱动(空闲零开销),否则按 `poll` 间隔低频轮询;
+    /// 切换项目导致监听范围变化时自动在两种方式之间切换,不会因为订阅失效而再也收不到变化。
+    /// - Parameters:
+    ///   - path: 文件路径
+    ///   - poll: 未被覆盖时的轮询间隔
+    ///   - debounce: 收到事件后再等多久(合并连续写入)
+    ///   - onChange: 可能有变化时的回调
+    func follow(_ path: String, poll: Duration, debounce: Duration = .zero, _ onChange: () async -> Void) async {
+        while !Task.isCancelled {
+            if covers(path) {
+                for await _ in changes() {
+                    if debounce > .zero { try? await Task.sleep(for: debounce) }
+                    guard !Task.isCancelled else { return }
+                    await onChange()
+                }
+                // 订阅被结束(监听范围已切换):补查一次再重新判断
+                guard !Task.isCancelled else { return }
+                await onChange()
+            } else {
+                try? await Task.sleep(for: poll)
+                guard !Task.isCancelled else { return }
+                await onChange()
             }
         }
     }
