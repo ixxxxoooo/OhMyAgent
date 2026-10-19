@@ -45,7 +45,7 @@ public struct AdaptiveWindow: Sendable, Equatable {
 /// 事件合并器。
 public final class EventCoalescer: Sendable {
     /// 事件积压(生产:`push`;消费:`SessionModel` 的批处理循环)。所有会话共用,反映整体是否来得及应用。
-    public static let backlog = StreamBacklog(name: "backlog.events")
+    public static let backlog = StreamBacklog(name: "backlog.events", warnDepth: 5000)
     private struct State {
         var buffer: [ClientEvent] = []
         var scheduled = false

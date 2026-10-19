@@ -112,36 +112,52 @@ public final class GaugeRegistry: @unchecked Sendable {
 /// 无界 AsyncStream 的积压计数器:生产端 `produced()`、消费端 `consumed()`,
 /// 积压深度 = 已生产 − 已消费。深度持续增长说明消费者跟不上,是内存增长的前兆。
 public final class StreamBacklog: Sendable {
-    private struct State { var produced = 0; var consumed = 0; var peak = 0 }
+    private struct State { var produced = 0; var consumed = 0; var peak = 0; var warned = false }
     private let state = Mutex(State())
     /// 指标名前缀,如 `backlog.acpLines`。
     public let name: String
+    /// 积压深度超过它时记一条警告(降回一半以下后才会再次告警);nil 不告警。
+    public let warnDepth: Int?
 
     /// 创建计数器。
     /// - Parameters:
     ///   - name: 指标名前缀
+    ///   - warnDepth: 告警阈值(积压深度);nil 不告警
     ///   - registry: 注册到的指标表(缺省为全局;传 nil 不注册,便于测试)
-    public init(name: String, registry: GaugeRegistry? = .shared) {
+    public init(name: String, warnDepth: Int? = nil, registry: GaugeRegistry? = .shared) {
         self.name = name
+        self.warnDepth = warnDepth
         registry?.register("\(name).depth") { [weak self] in self?.depth ?? 0 }
         registry?.register("\(name).peak") { [weak self] in self?.peak ?? 0 }
     }
 
     /// 生产了 `count` 个元素。
     public func produced(_ count: Int = 1) {
-        state.withLock { state in
+        let crossed = state.withLock { state -> Int? in
             state.produced += count
-            state.peak = max(state.peak, state.produced - state.consumed)
+            let depth = state.produced - state.consumed
+            state.peak = max(state.peak, depth)
+            guard let limit = warnDepth, depth > limit, !state.warned else { return nil }
+            state.warned = true
+            return depth
+        }
+        if let depth = crossed {
+            Log.perf.warning("流积压超过阈值,消费者跟不上", ["name": name, "depth": "\(depth)", "limit": "\(warnDepth ?? 0)"])
         }
     }
 
     /// 消费了 `count` 个元素。
     public func consumed(_ count: Int = 1) {
-        state.withLock { $0.consumed += count }
+        state.withLock { state in
+            state.consumed += count
+            if let limit = warnDepth, state.warned, state.produced - state.consumed <= limit / 2 { state.warned = false }
+        }
     }
 
     /// 当前积压深度。
     public var depth: Int { state.withLock { max($0.produced - $0.consumed, 0) } }
     /// 历史最大积压深度。
     public var peak: Int { state.withLock { $0.peak } }
+    /// 是否处于「已越过告警阈值、尚未回落」的状态(测试与诊断用)。
+    public var isWarning: Bool { state.withLock { $0.warned } }
 }

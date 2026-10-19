@@ -253,6 +253,29 @@ struct BacklogTests {
         #expect(backlog.peak == 13)
     }
 
+    @Test("积压越过阈值进入告警状态,回落到一半以下才解除")
+    func warnThreshold() {
+        let backlog = StreamBacklog(name: "t.warn", warnDepth: 100, registry: nil)
+        backlog.produced(100)
+        #expect(!backlog.isWarning)  // 等于阈值不告警
+        backlog.produced(1)
+        #expect(backlog.isWarning)
+        backlog.produced(50)         // 已在告警状态,不重复进入
+        backlog.consumed(60)         // 深度 91,仍高于一半
+        #expect(backlog.isWarning)
+        backlog.consumed(45)         // 深度 46 ≤ 50
+        #expect(!backlog.isWarning)
+        backlog.produced(100)        // 再次越过阈值,可以再次告警
+        #expect(backlog.isWarning)
+    }
+
+    @Test("没有设置阈值时从不告警")
+    func noThresholdNeverWarns() {
+        let backlog = StreamBacklog(name: "t.nowarn", registry: nil)
+        backlog.produced(1_000_000)
+        #expect(!backlog.isWarning)
+    }
+
     @Test("积压计数自动注册为深度与峰值两个指标")
     func registered() {
         let gauges = GaugeRegistry()
