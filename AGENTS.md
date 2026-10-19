@@ -11,7 +11,7 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit;**唯一例外**:内置
 
 ### 模块地图(`Sources/`)
 - `ACPKit`:JSON-RPC、ACP v1 模型、连接 actor、脚本化 Agent(测试用)与声明式场景引擎(`ScenarioEngine`、演示场景目录 `DemoScenarios`(53 个场景,分组与清单见 `.specstory/history/docs/20261018_演示场景目录.md`)、场景示意图 `ScenarioImages`、演示历史会话 `DemoHistory`)。
-- `AgentHost`:子进程、工具链定位、Agent 注册表、Bridge(进程内 HTTP MCP,挂在 `LocalGateway` 上,无辅助进程);终端沙箱 `TerminalSandbox`;Bridge 工具含 `canvas_*`、`search_code`、`browser_*`(可返回 image 内容块)。
+- `AgentHost`:子进程、工具链定位、Agent 注册表、Bridge(进程内 HTTP MCP,挂在 `LocalGateway` 上,无辅助进程);终端沙箱 `TerminalSandbox`;Bridge 工具含 `open_file`、`show_diff`、`get_selection`、`notify`、`ask_user_question`、`chart_guide`、`canvas_*`、`search_code`、`browser_*`(可返回 image 内容块)。
 - `ChatKit`:会话模型(含运行中引导/排队/图片/目标)、时间线、补全(来源徽标、@子 Agent)、等待文案(`WorkingStatus`)、AskUserQuestion 向导模型(`ElicitationQuestions`)、客户端斜杠命令(`LocalCommands`)、Markdown 解析、更新检查、AttentionCenter(运行/未读状态)、RecentStore(无视图);计划文件 `PlanDocument`/`PlanStore`(`*.plan.md`,Plan 卡与标签页的数据层)、子代理卡片状态 `SubagentStatus`;提供商模型 `ProviderModels`、模型映射 `ModelMapping`(Claude Code 槽位 → 任意提供商模型)/`ProviderBridge`(注册到网关)、模式色调 `ModeTone`、`OpenCodeImporter`(两阶段导入,确认前不读密钥);Claude Code 内置命令清单 `ClaudeBuiltinCommands`、自动跟随状态机 `FollowState`、会话标题生成 `TitleGenerator`、草稿文件提及解析 `FileMentions`、输入框内联 chip 布局 `ComposerMentionLayout`、回合提前结束启发式 `TurnEndHeuristics`、设置页宽度 `SettingsContentWidth`、MCP 按需加载 `McpToolSearch`、上下文优化建议 `ContextAdvisor`、辅助任务模型 `UtilityModels`(标题/提示词优化可单独指定模型)、套餐限额与提示缓存 `PlanUsage`(`get_usage` 探测 `PlanUsageProbe`)。
 - `WorkbenchKit`:工作台模型(含项目图标 `ProjectIcon`、多文件夹工作区 `WorkspaceFolders`、引擎待命池 `EngineWarmPool`、会话驻留策略 `SessionResidencyPolicy`(闲置/超限休眠 Agent 进程);多项目、项目→会话树、布局与状态持久化、标签页 LRU 保活 `TabKeepAlive`、标签导航历史 `NavHistory`、侧栏尺寸 `PanelMetrics`、标签快捷操作 `TabShortcuts`、多终端面板状态 `TerminalPanelState`、面板摆放 `PanelPlacement`(终端与输出放底部/左右栏/编辑区,项目栏与工具栏可换边;含拖动落点几何与拖拽布局编辑器用的 `PanelItem`/`PanelZone`)、每会话一标签的会话表 `conversations`、工作区搜索索引 `SearchIndex`、Git 工作树管理 `WorktreeManager`(受管工作树作为带 `WorktreeLink` 的项目),无视图)。
 - `ClaudeConfigKit`:读写 `~/.claude`、`.mcp.json` 等配置。
@@ -37,7 +37,7 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit;**唯一例外**:内置
 - 本地签名证书(一次性,免费):`Scripts/make-signing-cert.sh` 创建自签 `OhMyAgent Local Dev`,`bundle.sh` 自动使用,TCC 权限不再因重编译失效;勿删该证书(可导出备份)
 - 稳定版/开发版隔离:数据目录 `Application Support/OhMyAgent[-Dev]`、日志 `Logs/OhMyAgent[-Dev]` 由 `AppEnv`(`OMLog`)统一提供,**新增落盘路径必须经 `AppEnv.supportDirectory`,禁止再硬编码 `"OhMyAgent"`**;开发版首次启动从稳定版复制数据与偏好(只复制不回写)
 - 演示模式(隔离沙盒 + 脚本化 Agent,测试会话流/工具卡/子 Agent/Git 的首选方式):`Scripts/demo.sh [--reset] [--scenario <名>]`(自动转发全部 `OMA_*` 变量);无人值守导览截图:`Scripts/demo-tour.sh [步骤前缀...]`;完整指南 `.specstory/history/docs/20261016_演示模式自动化演示指南.md`
-- 本地 CI(本地化扫描 + UI 规范扫描 + 零警告构建 + 全部测试 + plist/strings 校验):`Scripts/ci.sh`
+- 本地 CI(本地化扫描 + 中文资源同步检查 + UI 规范扫描 + 零警告构建 + 全部测试 + plist/strings 校验;`OMA_CI_PERF=1` 时追加 release 构建与性能浸泡,结束清理测试临时目录):`Scripts/ci.sh`
 - 运行单元测试:`Scripts/test.sh [参数]`(结束后自动清理测试遗留在系统临时目录的目录;勿直接长期使用 `swift test`,macOS 的 `NSTemporaryDirectory()` 不读 `TMPDIR`,无法隔离)。清理历史遗留:`Scripts/clean-test-tmp.sh [--dry-run]`;新增测试若使用新的临时目录前缀,请加到该脚本的 `PREFIXES`
 - 性能门槛:`Scripts/perf.sh`;发布:`Scripts/release.sh`
 - 日志:`Scripts/logs.sh`(P1 之后可用)
@@ -78,7 +78,7 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit;**唯一例外**:内置
 - 深色与主题包由令牌派生,禁止在视图里写死色值或另起背景材质。
 - 设置页左栏宽度必须与工作台左栏一致(取 `WorkbenchModel.layout.leftWidth`),切换设置页时侧栏不跳动。
 - 搜索入口统一为中央搜索窗(⌘K,`HubSearch`):新增可搜索的内容类型时,在 `HubCandidateBuilder` 里加候选并补 `HubSearchEngineTests`。
-- 复制按钮一律只用图标(`copy`,复制成功短暂变为 `check`),不出现「复制」文字,必须带 `.help` 与 `accessibilityLabel`;右键菜单项因需要文字可保留。
+- 复制按钮一律只用图标(`copy`,复制成功短暂变为 `check`),不出现「复制」文字,必须带 `omTooltip` 与 `accessibilityLabel`;右键菜单项因需要文字可保留。
 - 文件与文件夹的展示(chip、工具行、搜索结果、改动列表、补全)统一使用彩色文件类型图标 `OMFileIcon`,不要用通用文档图标。
 - 悬浮在输入区附近的新卡片/弹窗(吸附消息、消息编辑窗等)沿用底部输入框的样式(`omGlassCard`、圆角、内边距),不要另起一套。
 
@@ -94,7 +94,7 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit;**唯一例外**:内置
 
 **颜色**:一律 `OMColors`(`accent`、`danger`、`success`、`warning`、`secondaryText`、`tertiaryText`、`hairline`、`card`、`surface`、`sidebar`、`onAccent`),禁止 `Color.red/.green/.orange/.white`、写死 RGB、`foregroundStyle(.red)`。
 
-**图标**:只用 `Image.om`/`Label(_:om:)`(Lucide),禁止 SF Symbol;三档尺寸 12(行内)/14(工具条)/16(标题);颜色走 `OMColors`;仅图标控件必须 `.help` 与 `accessibilityLabel`。复制一律 `copy`,成功后短暂变 `check`(统一用 `OMCopyButton`),禁止 `doc.on.doc`/`checkmark` 作为复制图标。
+**图标**:只用 `Image.om`/`Label(_:om:)`(Lucide),禁止 SF Symbol;三档尺寸 12(行内)/14(工具条)/16(标题);颜色走 `OMColors`;仅图标控件必须 `omTooltip` 与 `accessibilityLabel`(系统 `.help` 禁用,见下方「悬浮提示」)。复制一律 `copy`,成功后短暂变 `check`(统一用 `OMCopyButton`),禁止 `doc.on.doc`/`checkmark` 作为复制图标。
 
 **按钮**(`OMButtonStyle`,`DesignSystem/UIControls.swift`):`.omPrimary`(主操作,每个区域至多一个)、`.omSecondary`(次操作)、`.omPlain`(文字按钮)、`.omDestructive`(破坏性)、`.omIcon`(仅图标);默认紧凑 24pt,大表单底部主按钮可用 `OMButtonStyle(.primary, size: .regular)`(28pt)。禁止 `.bordered/.borderedProminent/.borderless` 与 `.controlSize(.large)`。
 
