@@ -126,6 +126,8 @@ final class WorkspaceWatchCenter {
     static let shared = WorkspaceWatchCenter()
     private var watchers: [WorkspaceWatcher] = []
     private var indexTask: Task<Void, Never>?
+    /// 变化订阅者(打开的文件、Diff 视图):文件内容或 Git 状态变化时收到信号,取代按固定间隔轮询磁盘/`git diff`
+    private var subscribers: [UUID: AsyncStream<Void>.Continuation] = [:]
     private(set) var root: String?
     private(set) var extraRoots: [String] = []
 
@@ -151,9 +153,30 @@ final class WorkspaceWatchCenter {
         Log.editor.info("开始监听工作区文件变化", ["root": newRoot, "extraRoots": "\(extraRoots.count)"])
     }
 
+    /// 订阅文件内容/Git 状态变化(已在监听器内去抖 0.12 秒);任务取消即自动退订。
+    /// - Returns: 变化信号流(只保留最新一次,慢消费者不会积压)
+    func changes() -> AsyncStream<Void> {
+        let id = UUID()
+        return AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
+            subscribers[id] = continuation
+            continuation.onTermination = { _ in
+                Task { @MainActor in WorkspaceWatchCenter.shared.subscribers[id] = nil }
+            }
+        }
+    }
+
+    /// 该路径的变化是否由监听覆盖(在被监听的目录内,且不属于 `.git`/构建产物等噪声);未覆盖的调用方需自行低频轮询。
+    func covers(_ path: String) -> Bool {
+        ((root.map { [$0] } ?? []) + extraRoots).contains { folder in
+            path.hasPrefix(folder + "/") && !WorkspaceWatchFilter.isNoise(path, root: folder)
+        }
+    }
+
     /// 应用一批变化:刷新受影响目录;文件集合变化时节流重建索引(快速打开/搜索用)。
     private func apply(_ batch: WorkspaceChangeBatch, root watched: String) {
         guard watched == root || extraRoots.contains(watched), let primary = root else { return }
+        if batch.touched || batch.gitChanged { subscribers.values.forEach { $0.yield() } }
+        guard !batch.directories.isEmpty || batch.needsFullRefresh else { return }
         if batch.needsFullRefresh {
             ExplorerModel.shared.bump()
         } else {

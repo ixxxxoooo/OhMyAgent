@@ -26,8 +26,12 @@ public struct WorkspaceChangeBatch: Equatable, Sendable {
     public var directories: Set<String> = []
     /// 无法精确到目录(事件过多/需要整树重扫):调用方应刷新所有已展开的目录
     public var needsFullRefresh = false
+    /// 有文件内容或目录项变化(不含 `.git`、构建产物等噪声),打开的文件与 Diff 据此重新检查磁盘
+    public var touched = false
+    /// Git 状态变化(`.git` 下的 index、HEAD、refs 等),Diff 与源代码管理据此重算
+    public var gitChanged = false
 
-    public var isEmpty: Bool { directories.isEmpty && !needsFullRefresh }
+    public var isEmpty: Bool { directories.isEmpty && !needsFullRefresh && !touched && !gitChanged }
 }
 
 /// 事件过滤与折算规则(纯函数,便于测试)。
@@ -52,6 +56,18 @@ public enum WorkspaceWatchFilter {
         return false
     }
 
+    /// 是否为影响 Git 状态的 `.git` 内部路径(index、HEAD、refs、合并/变基状态;对象库与锁文件不算)。
+    /// - Parameters:
+    ///   - path: 事件路径
+    ///   - root: 项目根目录(与 `path` 同一种写法)
+    public static func isGitStateChange(_ path: String, root: String) -> Bool {
+        guard path.hasPrefix(root + "/.git/") else { return false }
+        let inner = path.dropFirst(root.count + "/.git/".count)
+        if inner.hasSuffix(".lock") { return false }
+        let head = inner.split(separator: "/").first.map(String.init) ?? ""
+        return ["index", "HEAD", "refs", "MERGE_HEAD", "REBASE_HEAD", "CHERRY_PICK_HEAD", "rebase-merge", "rebase-apply"].contains(head)
+    }
+
     /// 把事件折算为需要刷新的目录集合。
     /// - Parameters:
     ///   - events: 原始事件(路径已映射到项目根的写法)
@@ -60,7 +76,9 @@ public enum WorkspaceWatchFilter {
     public static func fold(_ events: [WorkspaceFSEvent], root: String) -> WorkspaceChangeBatch {
         var batch = WorkspaceChangeBatch()
         for event in events {
-            if event.mustRescan { batch.needsFullRefresh = true; continue }
+            if event.mustRescan { batch.needsFullRefresh = true; batch.touched = true; continue }
+            if isGitStateChange(event.path, root: root) { batch.gitChanged = true; continue }
+            if !isNoise(event.path, root: root) { batch.touched = true }
             guard event.changesListing, !isNoise(event.path, root: root) else { continue }
             batch.directories.insert((event.path as NSString).deletingLastPathComponent)
             if batch.directories.count > maxDirectories {
