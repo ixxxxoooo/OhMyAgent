@@ -140,7 +140,7 @@ public enum UpdateInstaller {
     static var replaceScript: String {
         """
         #!/bin/sh
-        # 参数:$1 旧进程 PID  $2 要替换的应用  $3 暂存的新应用  $4 暂存根目录  $5 是否重新打开(1/0)
+        # args: $1 old pid, $2 target app, $3 staged app, $4 staging root, $5 relaunch (1/0)
         PID="$1"; TARGET="$2"; STAGED="$3"; ROOT="$4"; RELAUNCH="$5"
         LOG="$ROOT/\(replaceLogName)"
         i=0; while kill -0 "$PID" 2>/dev/null && [ $i -lt 120 ]; do sleep 0.5; i=$((i+1)); done
