@@ -388,6 +388,8 @@ public final class SessionModel {
     @ObservationIgnored private var wakeActions: [@MainActor () -> Void] = []
 
     private var supervisor: AgentSupervisor?
+    /// Agent 进程号(attach 时缓存,供同步的休眠判断检查进程树)
+    private var agentPID: Int32?
     private var client: ACPClient?
     private var coalescer: EventCoalescer?
     @ObservationIgnored private let eventBarrier = EventBarrier()
@@ -587,6 +589,11 @@ public final class SessionModel {
     private func attach(supervisor: AgentSupervisor, client: ACPClient, result: InitializeResult) {
         self.supervisor = supervisor
         self.client = client
+        agentPID = nil
+        Task { [weak self] in
+            let pid = await supervisor.processIdentifier
+            self?.agentPID = pid
+        }
         agentName = result.agentTitle ?? result.agentName
         capabilities = result.capabilities
         let coalescer = EventCoalescer()
@@ -2182,6 +2189,12 @@ public final class SessionModel {
         cancelPendingPrompts()
         timeline.finishStreaming()
         isRunning = false
+        // Agent 进程没了,它启动的后台命令通常随之终止:收尾仍显示「运行中」的终端并提示
+        let interrupted = terminals.values.filter { $0.isExternal && $0.isRunning }
+        for terminal in interrupted { terminal.finishExternal(exitCode: nil, signal: "SIGTERM") }
+        if !interrupted.isEmpty {
+            timeline.appendNotice(String(localized: "Agent 进程退出,\(interrupted.count) 个后台命令可能已被中断"), severity: "warning")
+        }
         let detail = diagnostics.suffix(3).joined(separator: "\n")
         phase = .failed(String(localized: "Agent 进程已退出(代码 \(code.map(String.init) ?? String(localized: "未知")))。\(detail)"))
         client = nil
@@ -2198,6 +2211,8 @@ public final class SessionModel {
         guard activeDescriptor.kind == .claudeACP, connectTask == nil else { return false }
         guard pendingPermissions.isEmpty, pendingElicitations.isEmpty, queuedPrompt == nil, followUps.isEmpty else { return false }
         if terminals.values.contains(where: \.isRunning) { return false }
+        // 终端状态可能漏判(命令被转入后台等):Agent 进程下只要还挂着 shell 命令,就不能结束进程
+        if let pid = agentPID, ProcessTree.hasShellDescendant(of: pid) { return false }
         if timeline.entries.contains(where: { $0.kind == .tool && ($0.tool?.status == .pending || $0.tool?.status == .inProgress) }) { return false }
         // 有对话内容时必须能用 session/resume 接回;空白会话直接丢弃进程,唤醒时新建
         return timeline.entries.isEmpty || capabilities.canResume
@@ -2325,6 +2340,7 @@ public final class SessionModel {
         Task { await ProviderBridge.deactivate(sessionKey: key) }
         let supervisor = supervisor
         self.supervisor = nil
+        agentPID = nil
         client = nil
         coalescer = nil
         if !keepingSession { sessionId = nil }
