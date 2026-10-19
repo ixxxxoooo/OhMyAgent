@@ -138,13 +138,14 @@ struct GitGraphSection: View {
         let previous = limit
         limit += Self.pageSize
         Log.git.info("提交图谱加载更多", ["from": "\(previous)", "to": "\(limit)", "rows": "\(rows.count)"])
-        if !(await load()) { limit = previous; hasMore = false }
+        if !(await load()), limit == previous + Self.pageSize { limit = previous; hasMore = false }
         loadingMore = false
     }
 
-    /// 取数并布局;返回是否成功。
+    /// 取数并布局;返回是否成功。取数期间仓库状态或条数又变了(提交/拉取、并发的加载更多),结果作废不覆盖新数据。
     @discardableResult
     private func load() async -> Bool {
+        let key = reloadKey, requested = limit
         guard let repo = await GitRepository.discover(from: model.projectPath) else {
             rows = []
             hasMore = false
@@ -152,11 +153,15 @@ struct GitGraphSection: View {
         }
         do {
             let started = ContinuousClock.now
-            let commits = try await repo.log(limit: limit, path: nil, all: true)
+            let commits = try await repo.log(limit: requested, path: nil, all: true)
+            guard reloadKey == key, limit == requested else {
+                Log.git.debug("提交图谱结果已过期,丢弃", ["limit": "\(requested)"])
+                return true
+            }
             let fetched = OMLogger.milliseconds(since: started)
             rows = GitGraph.layout(commits)
             Log.git.info("提交图谱已加载", ["limit": "\(limit)", "commits": "\(commits.count)", "fetchMs": "\(fetched)"])
-            hasMore = commits.count >= limit && limit < 5000
+            hasMore = commits.count >= requested && requested < 5000
             failed = false
             return true
         } catch {

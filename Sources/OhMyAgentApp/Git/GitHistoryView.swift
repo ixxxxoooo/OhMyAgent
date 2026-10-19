@@ -6,6 +6,7 @@ import DesignSystem
 import DiffKit
 import GitKit
 import IconKit
+import OMLog
 import SwiftUI
 import WorkbenchKit
 
@@ -59,21 +60,35 @@ struct GitHistoryTabView: View {
         }
     }
 
-    /// 滚动到底时多取一页(重新取前 N 条并整体布局)。
+    /// 当前取数范围(项目/文件/是否所有分支);异步结果返回时据此判断是否已过期。
+    private var scopeKey: String { "\(projectID)#\(path ?? "")#\(allBranches)" }
+
+    /// 一次取数的结果。
+    private enum LoadOutcome { case loaded, failed, stale }
+
+    /// 滚动到底时多取一页(重新取前 N 条并整体布局);失败时保留已有列表并回滚条数,不整页变成错误态。
     private func loadMore() async {
         guard hasMore, !loadingMore else { return }
         loadingMore = true
+        defer { loadingMore = false }
+        let previous = limit
         limit += 200
-        await load()
-        loadingMore = false
+        if await load(keepRowsOnFailure: true) == .failed, limit == previous + 200 { limit = previous; hasMore = false }
     }
 
-    private func load() async {
+    /// 取数并布局。取数期间范围或条数变了(切换「所有分支」、刷新、换项目),结果作废不覆盖新数据。
+    /// - Parameter keepRowsOnFailure: 失败时已有列表是否保留(加载更多时)
+    /// - Returns: 结果
+    @discardableResult
+    private func load(keepRowsOnFailure: Bool = false) async -> LoadOutcome {
+        let key = scopeKey, requested = limit
         let start = path ?? projectID
-        guard let found = await GitRepository.discover(from: start) else {
+        let discovered = await GitRepository.discover(from: start)
+        guard scopeKey == key else { return .stale }
+        guard let found = discovered else {
             repo = nil
             loaded = true
-            return
+            return .failed
         }
         repo = found
         do {
@@ -82,8 +97,9 @@ struct GitHistoryTabView: View {
                 guard let rel = found.relativePath(of: path) else { throw GitError.invalidArgument(String(localized: "文件不在仓库内")) }
                 relative = rel
             }
-            let commits = try await found.log(limit: limit, path: relative, all: allBranches)
-            hasMore = commits.count >= limit && limit < 5000
+            let commits = try await found.log(limit: requested, path: relative, all: allBranches)
+            guard scopeKey == key, limit == requested else { return .stale }
+            hasMore = commits.count >= requested && requested < 5000
             // 文件历史是被过滤的子序列,不画泳道;整库历史才画图
             rows = relative == nil ? GitGraph.layout(commits) : commits.map {
                 GitGraphRow(commit: $0, column: 0, color: 0, top: [], bottom: [], incoming: [], outgoing: [])
@@ -91,9 +107,14 @@ struct GitHistoryTabView: View {
             errorMessage = nil
             if selected == nil || !rows.contains(where: { $0.commit.hash == selected }) { selected = rows.first?.commit.hash }
         } catch {
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "\(error)"
+            guard scopeKey == key else { return .stale }
+            Log.git.warning("读取提交历史失败", ["limit": "\(requested)", "error": "\(error)"])
+            if !(keepRowsOnFailure && !rows.isEmpty) { errorMessage = (error as? LocalizedError)?.errorDescription ?? "\(error)" }
+            loaded = true
+            return .failed
         }
         loaded = true
+        return .loaded
     }
 
     // MARK: 提交列表
