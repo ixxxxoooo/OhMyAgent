@@ -20,6 +20,10 @@ public enum LogRedactor {
         return sources.compactMap { try? NSRegularExpression(pattern: $0) }
     }()
 
+    /// HTTP 头形式 `x-api-key: …`、`Authorization: Basic …`(如命令行里的 `curl -H`);值可带一个方案前缀。
+    private static let header = try? NSRegularExpression(
+        pattern: #"(?i)\b((?:x-)?api-key|x-auth-token|(?:proxy-)?authorization)\s*:\s*(?:[A-Za-z]+\s+)?[^\s"',;]+"#)
+
     /// KEY=VALUE 形式(环境变量、命令行参数)。
     private static let assignment = try? NSRegularExpression(
         pattern: #"(?i)\b([A-Z0-9_]*(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD|PASSWD|AUTH(?:ORIZATION)?|CREDENTIAL)[A-Z0-9_]*)\s*=\s*("[^"]*"|'[^']*'|\S+)"#)
@@ -37,6 +41,9 @@ public enum LogRedactor {
         var result = text
         for regex in patterns {
             result = regex.stringByReplacingMatches(in: result, range: NSRange(result.startIndex..., in: result), withTemplate: "‹已脱敏›")
+        }
+        if let header {
+            result = header.stringByReplacingMatches(in: result, range: NSRange(result.startIndex..., in: result), withTemplate: "$1: ‹已脱敏›")
         }
         if let assignment {
             result = assignment.stringByReplacingMatches(in: result, range: NSRange(result.startIndex..., in: result), withTemplate: "$1=‹已脱敏›")

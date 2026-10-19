@@ -31,6 +31,17 @@ struct RedactorTests {
         #expect(!result.contains("a b"))
     }
 
+    @Test("HTTP 头形式的密钥被替换(curl -H 等命令参数),普通头保留")
+    func headers() {
+        let text = #"curl -H "x-api-key: zz-plain-key-001" -H 'Authorization: Basic dXNlcjpwYXNz' -H "api-key: k2" -H "Content-Type: application/json""#
+        let result = LogRedactor.redact(text)
+        #expect(!result.contains("zz-plain-key-001"))
+        #expect(!result.contains("dXNlcjpwYXNz"))
+        #expect(!result.contains("k2\""))
+        #expect(result.contains("x-api-key: ‹已脱敏›"))
+        #expect(result.contains("Content-Type: application/json"))
+    }
+
     @Test("家目录可选替换为 ~,长文本截断")
     func homeAndTruncate() {
         let text = "\(NSHomeDirectory())/proj"
