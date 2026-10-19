@@ -203,7 +203,7 @@ final class UpdateModel {
             case .upToDate:
                 OMDialog.alert(title: String(localized: "已是最新版本"), message: "OhMyAgent \(currentVersion) (\(currentBuild))")
             case .available(let info):
-                let choice = OMDialog.show(title: String(localized: "发现新版本 \(info.version)"), message: info.notes ?? "",
+                let choice = OMDialog.show(title: String(localized: "发现新版本 \(info.version)"), message: WhatsNew.bulletList(info.notes, limit: 50),
                                            buttons: [.cancel(String(localized: "稍后")), .primary(String(localized: "前往下载"))]).index
                 if choice == 1 { openDownload(info) }
             case .unsupportedSystem(let info):

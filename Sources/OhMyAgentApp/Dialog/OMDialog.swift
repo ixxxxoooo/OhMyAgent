@@ -198,6 +198,25 @@ private struct OMDialogCard: View {
     let finish: (Int) -> Void
     @FocusState private var fieldFocused: Bool
 
+    /// 说明区可用宽度(卡片宽 400 减左右内边距)
+    private static let messageWidth: CGFloat = 360
+    /// 说明区最大高度,超出后上下滚动
+    private static let messageMaxHeight: CGFloat = 260
+
+    /// 说明正文:以「• 」开头的行渲染为悬挂缩进的列表项;内容过长时限高并可滚动。
+    @ViewBuilder
+    private var messageBody: some View {
+        let list = OMDialogMessageList(message: message)
+        let natural = NSHostingView(rootView: list.frame(width: Self.messageWidth, alignment: .leading)).fittingSize.height
+        if natural > Self.messageMaxHeight {
+            ScrollView(.vertical) { list }
+                .scrollBounceBehavior(.basedOnSize)
+                .frame(height: Self.messageMaxHeight)
+        } else {
+            list
+        }
+    }
+
     private var error: String? { field?.validate?(state.text.trimmingCharacters(in: .whitespacesAndNewlines)) }
     private var isEmptyInput: Bool { field != nil && state.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     private var defaultIndex: Int? { buttons.firstIndex { $0.role == .primary || $0.role == .destructive } }
@@ -209,7 +228,7 @@ private struct OMDialogCard: View {
                 Text(verbatim: title).font(OMFonts.title).foregroundStyle(OMColors.primaryText).fixedSize(horizontal: false, vertical: true)
             }
             if !message.isEmpty {
-                Text(verbatim: message).font(OMFonts.small).foregroundStyle(OMColors.secondaryText).fixedSize(horizontal: false, vertical: true)
+                messageBody
             }
             if let field {
                 VStack(alignment: .leading, spacing: 4) {
@@ -266,5 +285,29 @@ private struct OMDialogCard: View {
     private func submitDefault() {
         guard let index = defaultIndex, !isEmptyInput, error == nil else { return }
         finish(index)
+    }
+}
+
+/// 对话框说明的逐行排版:「• 」开头的行用悬挂缩进,其余行为普通段落。
+private struct OMDialogMessageList: View {
+    let message: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(Array(message.split(separator: "\n", omittingEmptySubsequences: false).enumerated()), id: \.offset) { _, line in
+                if line.hasPrefix("• ") {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(verbatim: "•")
+                        Text(verbatim: String(line.dropFirst(2))).fixedSize(horizontal: false, vertical: true)
+                    }
+                } else {
+                    Text(verbatim: String(line)).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .font(OMFonts.small)
+        .foregroundStyle(OMColors.secondaryText)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .textSelection(.enabled)
     }
 }
