@@ -53,6 +53,16 @@ public final class WorkbenchModel {
     @ObservationIgnored private var pendingRestores: [ConversationKey: ChatSlotRecord] = [:]
     @ObservationIgnored private let log = Log.session
     @ObservationIgnored private let autoConnect: Bool
+    /// 会话驻留监视任务(定时检查并休眠闲置会话)
+    @ObservationIgnored var residencyTask: Task<Void, Never>?
+    /// 系统内存压力监听
+    @ObservationIgnored var memoryPressureSource: (any DispatchSourceMemoryPressure)?
+    /// 系统内存紧张中:驻留策略改用收紧的上限
+    @ObservationIgnored var underMemoryPressure = false
+    /// 驻留上限读取(应用层可替换;默认读偏好,测试可注入)
+    @ObservationIgnored public var residencyLimits: @MainActor () -> ResidencyLimits = {
+        ResidencyLimits(idleSeconds: TimeInterval(ClientPrefs.idleHibernateMinutes()) * 60, maxLive: ClientPrefs.maxLiveSessions())
+    }
 
     /// - Parameters:
     ///   - store: 状态存取
@@ -1034,6 +1044,7 @@ public final class WorkbenchModel {
     public func shutdownAll() {
         // 先落盘再关闭会话:shutdown 会清空 sessionId,晚存就丢了「标签 → 会话」的恢复记录
         saveNow()
+        stopResidencyMonitor()
         for model in conversations.values { model.shutdown() }
     }
 

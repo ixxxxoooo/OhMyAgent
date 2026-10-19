@@ -16,6 +16,8 @@ struct GeneralPage: View {
     @AppStorage(ClientPrefs.Key.notifySound) private var notifySound = true
     @AppStorage(ClientPrefs.Key.sendKey) private var sendKey = SendKey.enter.rawValue
     @AppStorage(ClientPrefs.Key.runningSend) private var runningSend = RunningSendMode.steer.rawValue
+    @AppStorage(ClientPrefs.Key.idleHibernateMinutes) private var idleHibernate = 10
+    @AppStorage(ClientPrefs.Key.maxLiveSessions) private var maxLive = 3
     @AppStorage(ClientPrefs.Key.autoUpdate) private var autoUpdate = true
     @AppStorage(ClientPrefs.Key.updateChannel) private var channel = "stable"
     @AppStorage(ClientPrefs.Key.updateFeedURL) private var feedURL = ""
@@ -66,6 +68,11 @@ struct GeneralPage: View {
                     Text("排到本轮结束后").tag(RunningSendMode.queue.rawValue)
                 }
                 Note("「引导」会把消息立刻注入正在进行的轮次(Agent 不支持时自动排队);「排队」等本轮结束后再发送。")
+            }
+            Section("内存") {
+                SettingsNumericField(title: "闲置休眠", value: $idleHibernate, format: IntegerFormatStyle<Int>(), unit: "分钟", prompt: "0 表示从不")
+                SettingsNumericField(title: "同时运行的会话上限", value: $maxLive, format: IntegerFormatStyle<Int>(), unit: "个", prompt: "0 表示不限")
+                Note("每个运行中的会话各占一个 Agent 进程(约 0.3~0.4 GB)。闲置过久或超出上限时,最久未用的空闲会话会休眠:对话记录保留,发送消息或开始输入时自动恢复(约 1~2 秒)。正在运行、等待确认或有后台任务的会话不会休眠。")
             }
             Section("Dock 与菜单栏") {
                 Toggle("在 Dock 中显示图标", isOn: $showDock)

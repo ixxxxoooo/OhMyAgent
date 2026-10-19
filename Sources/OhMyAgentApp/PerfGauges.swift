@@ -49,6 +49,8 @@ enum PerfGauges {
         let gauges = GaugeRegistry.shared
         gauges.registerMain("sessions.count") { workbench.conversations.count }
         gauges.registerMain("sessions.busy") { workbench.allSessions.filter { $0.isRunning }.count }
+        gauges.registerMain("sessions.live") { workbench.allSessions.filter { $0.phase == .ready || $0.phase == .connecting }.count }
+        gauges.registerMain("sessions.hibernated") { workbench.allSessions.filter { $0.isHibernated }.count }
         gauges.registerMain("timeline.entries") { workbench.allSessions.reduce(0) { $0 + size(of: $1.timeline).entries } }
         gauges.registerMain("timeline.textKB") { workbench.allSessions.reduce(0) { $0 + size(of: $1.timeline).textBytes } / 1024 }
         gauges.registerMain("timeline.imageKB") { workbench.allSessions.reduce(0) { $0 + size(of: $1.timeline).imageBytes } / 1024 }

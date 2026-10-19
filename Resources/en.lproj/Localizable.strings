@@ -2578,3 +2578,12 @@
 "关闭浏览器" = "Close Browser";
 "全部终止" = "Stop All";
 "终止所有后台终端" = "Stop all background terminals";
+"无法接回之前的会话上下文,已开始新会话(上方对话记录仍保留)。" = "Couldn't restore the previous session context; started a new session (the transcript above is kept).";
+"唤醒会话失败:%@" = "Failed to wake the session: %@";
+"内存" = "Memory";
+"闲置休眠" = "Idle hibernation";
+"同时运行的会话上限" = "Max concurrent sessions";
+"0 表示从不" = "0 means never";
+"0 表示不限" = "0 means unlimited";
+"每个运行中的会话各占一个 Agent 进程(约 0.3~0.4 GB)。闲置过久或超出上限时,最久未用的空闲会话会休眠:对话记录保留,发送消息或开始输入时自动恢复(约 1~2 秒)。正在运行、等待确认或有后台任务的会话不会休眠。" = "Each running session holds one Agent process (about 0.3–0.4 GB). When idle for too long or over the limit, the least recently used idle sessions hibernate: the transcript is kept and the session resumes when you send a message or start typing (about 1–2 s). Sessions that are running, waiting for confirmation or have background tasks never hibernate.";
+"分钟" = "min";

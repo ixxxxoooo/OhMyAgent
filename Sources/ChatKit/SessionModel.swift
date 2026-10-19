@@ -305,8 +305,10 @@ public final class SessionModel {
     public private(set) var queuedPrompt: String?
     /// 连接完成后随排队消息一起发送的图片
     @ObservationIgnored private var queuedImages: [ImageAttachment] = []
-    /// 输入框草稿
-    public var draft = ""
+    /// 输入框草稿(休眠中的会话一开始输入就预唤醒,发送时多半已就绪)
+    public var draft = "" {
+        didSet { if isHibernated, oldValue.isEmpty, !draft.isEmpty { wake() } }
+    }
     /// 输入框中待发送的图片附件
     public var attachments: [ImageAttachment] = []
     /// 本轮结束后依次发送的排队消息
@@ -337,6 +339,17 @@ public final class SessionModel {
     @ObservationIgnored public var canvasStore = CanvasStore(directory: CanvasStore.defaultDirectory())
     /// 计划文件的全局目录(默认 `~/.claude/plans`;测试可替换)
     @ObservationIgnored public var planDirectory = PlanStore.globalDirectory
+
+    /// 已休眠:Agent 进程已结束以释放内存,时间线/草稿/标题仍在;再次使用时自动唤醒(见 `hibernate()`/`wake()`)
+    public private(set) var isHibernated = false
+    /// 最近一次使用时间(发送、轮次结束、被切到前台),驻留策略据此决定休眠顺序
+    public private(set) var lastUsedAt = Date()
+    /// 休眠时记下的会话 ID:唤醒时用 `session/resume` 接回(没有对话内容的会话不记,唤醒即新建)
+    @ObservationIgnored private var dormantSessionId: String?
+    /// 休眠时记下的配置项取值(权限模式、思考强度等),唤醒后与恢复出的取值不同则重新应用
+    @ObservationIgnored private var dormantConfig: [String: String] = [:]
+    /// 唤醒就绪后依次执行的动作(休眠期间收到的设置、打开会话等请求)
+    @ObservationIgnored private var wakeActions: [@MainActor () -> Void] = []
 
     private var supervisor: AgentSupervisor?
     private var client: ACPClient?
@@ -437,19 +450,28 @@ public final class SessionModel {
                 self.bridge = prepared.bridge
                 // 恢复模式:目标是打开一个已有会话时跳过 session/new(不创建空会话),握手后直接 session/load
                 let restoring = self.restoreTarget
+                var wokeFrom: String?
                 if restoring == nil {
-                    let setup = try await self.newSessionAuthenticating(client: client, methods: result.authMethods, servers: prepared.servers)
-                    self.sessionId = setup.sessionId
-                    self.configOptions = setup.configOptions
-                    self.applyPreferredMode()
+                    if let dormant = self.dormantSessionId {
+                        wokeFrom = await self.resumeDormant(dormant, client: client, methods: result.authMethods, servers: prepared.servers)
+                    } else {
+                        let setup = try await self.newSessionAuthenticating(client: client, methods: result.authMethods, servers: prepared.servers)
+                        self.sessionId = setup.sessionId
+                        self.configOptions = setup.configOptions
+                        self.applyPreferredMode()
+                    }
                 }
                 self.restoreTarget = nil
+                self.isHibernated = false
+                self.dormantSessionId = nil
                 self.phase = .ready
                 self.startMappingObserver()
                 self.connectDuration = connectStart.duration(to: .now)
                 self.log.info("Agent 已就绪", ["agent": result.agentName, "ms": "\(OMLogger.milliseconds(since: connectStart))", "mcpServers": "\(prepared.servers.count)", "bridge": prepared.bridge == nil ? "off" : "on", "restore": restoring == nil ? "no" : "yes"])
                 self.connectTask = nil
                 self.refreshHistory()
+                if wokeFrom != nil { self.reapplyDormantConfig() }
+                self.runWakeActions()
                 if let restoring {
                     // 排队消息等会话回放完成后再发(openSession 末尾会 flush)
                     self.openSession(restoring, force: true)
@@ -513,7 +535,7 @@ public final class SessionModel {
 
     /// 重新连接(失败后重试)。
     public func reconnect() {
-        shutdownProcess()
+        shutdownProcess(keepingSession: isHibernated)
         phase = .idle
         connect()
     }
@@ -1082,6 +1104,7 @@ public final class SessionModel {
         turnChunks = 0
         turnToolCalls = 0
         turnStartedAt = Date()
+        lastUsedAt = Date()
         lastActivity = .now
         log.info("发送提示", ["turn": "\(turnNumber)", "chars": "\(prompt.count)", "blocks": "\(blocks.count)", "images": "\(images.count)"])
         turnChanges.removeAll()
@@ -1164,6 +1187,7 @@ public final class SessionModel {
         // 先把已合并但尚未应用的事件落入时间线,再结束轮次
         watchdogTask?.cancel()
         watchdogTask = nil
+        lastUsedAt = Date()
         let turnMs = turnStart.map { OMLogger.milliseconds(since: $0) } ?? 0
         if let usage, error == nil { promptCache = PromptCacheStats.recording(usage, onto: promptCache) }
         let summaryModel = currentMappedModel?.displayName ?? option(category: "model")?.currentDisplayName ?? ""
@@ -1246,6 +1270,7 @@ public final class SessionModel {
 
     /// 开始新对话:复用同一 Agent 进程创建新的 ACP 会话,并清空时间线。
     public func newConversation() {
+        if isHibernated { whenAwake { [weak self] in self?.newConversation() }; return }
         guard let client, phase == .ready else { return }
         cancel()
         let cwd = workspace.path
@@ -1331,6 +1356,7 @@ public final class SessionModel {
     ///   - summary: 会话摘要
     ///   - force: 恢复模式下 sessionId 已提前设为目标,需跳过「已是当前会话」的判断
     public func openSession(_ summary: SessionSummary, force: Bool = false) {
+        if isHibernated { whenAwake { [weak self] in self?.openSession(summary, force: force) }; return }
         guard let client, phase == .ready, force || summary.sessionId != sessionId, capabilities.loadSession || capabilities.canResume else {
             if force { isReplaying = false; flushQueuedPrompt() }
             return
@@ -1452,6 +1478,7 @@ public final class SessionModel {
 
     /// 分叉当前会话,并切换到分叉出的新会话。
     public func forkCurrentSession() {
+        if isHibernated { whenAwake { [weak self] in self?.forkCurrentSession() }; return }
         guard let client, let sessionId, capabilities.canFork, !isRunning else { return }
         let cwd = workspace.path
         let servers = mcpServers
@@ -1475,6 +1502,7 @@ public final class SessionModel {
     /// 删除历史会话。
     /// - Parameter summary: 会话摘要
     public func deleteSession(_ summary: SessionSummary) {
+        if isHibernated { whenAwake { [weak self] in self?.deleteSession(summary) }; return }
         guard let client, capabilities.canDelete, summary.sessionId != sessionId else { return }
         Task { [weak self] in
             try? await client.deleteSession(sessionId: summary.sessionId)
@@ -1686,6 +1714,7 @@ public final class SessionModel {
     ///   - value: 新值
     ///   - remember: 权限模式是否记为偏好(自动化、沿用偏好本身传 false,避免覆盖用户的选择)
     public func setConfigOption(_ optionId: String, value: String, remember: Bool = true) {
+        if isHibernated { whenAwake { [weak self] in self?.setConfigOption(optionId, value: value, remember: remember) }; return }
         guard let client, let sessionId else { return }
         // 切换模型时记录切换前的显示名,成功后在时间线插入分割线
         let isModel = configOptions.first { $0.id == optionId }?.category == "model"
@@ -2105,9 +2134,105 @@ public final class SessionModel {
         sessionId = nil
     }
 
+    // MARK: - 休眠与唤醒
+
+    /// 当前是否可以休眠:空闲、没有任何进行中的工作,且结束进程后能无损接回。
+    /// 运行中、待处理的权限/提问、排队消息、仍在跑的终端或工具(含后台子代理)、回放中一律不休眠。
+    public var canHibernate: Bool {
+        guard phase == .ready, !isHibernated, !isRunning, !isReplaying, !isShuttingDown else { return false }
+        guard activeDescriptor.kind == .claudeACP, connectTask == nil else { return false }
+        guard pendingPermissions.isEmpty, pendingElicitations.isEmpty, queuedPrompt == nil, followUps.isEmpty else { return false }
+        if terminals.values.contains(where: \.isRunning) { return false }
+        if timeline.entries.contains(where: { $0.kind == .tool && ($0.tool?.status == .pending || $0.tool?.status == .inProgress) }) { return false }
+        // 有对话内容时必须能用 session/resume 接回;空白会话直接丢弃进程,唤醒时新建
+        return timeline.entries.isEmpty || capabilities.canResume
+    }
+
+    /// 标记会话刚被使用(切到前台等),让它排在休眠顺序的后面。
+    public func touch() {
+        lastUsedAt = Date()
+    }
+
+    /// 休眠:结束 Agent 进程释放内存,保留时间线、草稿、标题与会话 ID;下次发送或开始输入时自动唤醒。
+    /// - Returns: 是否真的进入了休眠(不满足 `canHibernate` 时为 false)
+    @discardableResult
+    public func hibernate() -> Bool {
+        guard canHibernate else { return false }
+        let hasConversation = !timeline.entries.isEmpty
+        dormantSessionId = hasConversation ? sessionId : nil
+        dormantConfig = Dictionary(configOptions.compactMap { option in
+            option.category == "model" ? nil : option.currentValue.stringValue.map { (option.id, $0) }
+        }, uniquingKeysWith: { first, _ in first })
+        log.info("会话休眠", ["entries": "\(timeline.entries.count)", "resume": hasConversation ? "yes" : "no"])
+        if let manager = terminalManager { Task { await manager.shutdown() } }
+        terminalManager = nil
+        shutdownProcess(keepingSession: hasConversation)
+        isHibernated = true
+        phase = .idle
+        return true
+    }
+
+    /// 唤醒休眠的会话(幂等;已在连接中则无动作)。
+    public func wake() {
+        guard isHibernated else { return }
+        lastUsedAt = Date()
+        log.info("唤醒会话")
+        connect()
+    }
+
+    /// 需要 Agent 进程的操作:休眠中先唤醒,就绪后再执行;否则立即执行。
+    /// - Parameter action: 要执行的动作
+    private func whenAwake(_ action: @escaping @MainActor () -> Void) {
+        guard isHibernated else { action(); return }
+        wakeActions.append(action)
+        wake()
+    }
+
+    private func runWakeActions() {
+        let actions = wakeActions
+        wakeActions = []
+        for action in actions { action() }
+    }
+
+    /// 用 `session/resume` 接回休眠前的会话;失败(如记录已被清理)则新建会话并在时间线提示,对话文本仍保留。
+    /// - Returns: 成功接回的会话 ID;退回新建时为 nil
+    private func resumeDormant(_ dormant: String, client: ACPClient, methods: [AuthMethod], servers: [MCPServerConfig]) async -> String? {
+        let started = ContinuousClock.now
+        do {
+            let setup = try await client.resumeSession(sessionId: dormant, cwd: workspace.path, mcpServers: servers, additionalDirectories: additionalDirectories, meta: effectiveMeta())
+            sessionId = dormant
+            if !setup.configOptions.isEmpty { configOptions = setup.configOptions }
+            log.info("休眠会话已接回", ["ms": "\(OMLogger.milliseconds(since: started))"])
+            return dormant
+        } catch {
+            log.warning("接回休眠会话失败,改为新建会话", ["error": "\(error)"])
+            do {
+                let setup = try await newSessionAuthenticating(client: client, methods: methods, servers: servers)
+                sessionId = setup.sessionId
+                configOptions = setup.configOptions
+                applyPreferredMode()
+                timeline.appendNotice(String(localized: "无法接回之前的会话上下文,已开始新会话(上方对话记录仍保留)。"), severity: "warning")
+            } catch {
+                log.error("休眠唤醒后新建会话失败", error: error)
+                timeline.appendNotice(String(localized: "唤醒会话失败:\(error.localizedDescription)"), isError: true)
+            }
+            return nil
+        }
+    }
+
+    /// 把休眠前的权限模式、思考强度等恢复出来(模型由会话记录自带,不处理)。
+    private func reapplyDormantConfig() {
+        let saved = dormantConfig
+        dormantConfig = [:]
+        for option in configOptions where option.category != "model" {
+            guard let wanted = saved[option.id], option.currentValue.stringValue != wanted else { continue }
+            setConfigOption(option.id, value: wanted, remember: false)
+        }
+    }
+
     // MARK: - 关闭
 
-    private func shutdownProcess() {
+    private func shutdownProcess(keepingSession: Bool = false) {
         for task in pumpTasks { task.cancel() }
         pumpTasks = []
         connectTask?.cancel()
@@ -2124,7 +2249,8 @@ public final class SessionModel {
         let supervisor = supervisor
         self.supervisor = nil
         client = nil
-        sessionId = nil
+        coalescer = nil
+        if !keepingSession { sessionId = nil }
         if let supervisor { Task { await supervisor.stop() } }
     }
 

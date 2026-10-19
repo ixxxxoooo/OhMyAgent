@@ -68,6 +68,10 @@ public enum ClientPrefs {
         public static let sendKey = "chat.sendKey"
         /// 运行中再发送的默认行为(steer / queue)
         public static let runningSend = "chat.runningSend"
+        /// 会话闲置多少分钟后休眠 Agent 进程释放内存(0 = 从不)
+        public static let idleHibernateMinutes = "session.idleHibernateMinutes"
+        /// 同时保持运行的 Agent 进程上限(0 = 不限);超出时最久未用的空闲会话先休眠
+        public static let maxLiveSessions = "session.maxLive"
         /// 任务完成通知是否带提示音
         public static let notifySound = "notify.sound"
         public static let proxyMode = "network.proxyMode"
@@ -121,6 +125,18 @@ public enum ClientPrefs {
     /// 运行中再发送的默认行为,默认引导。
     public static func runningSendMode(_ defaults: UserDefaults = .standard) -> RunningSendMode {
         RunningSendMode(rawValue: defaults.string(forKey: Key.runningSend) ?? "") ?? .steer
+    }
+
+    /// 会话闲置休眠时间(分钟,0 = 从不);缺省 10 分钟,范围 0...240。
+    public static func idleHibernateMinutes(_ defaults: UserDefaults = .standard) -> Int {
+        guard let value = defaults.object(forKey: Key.idleHibernateMinutes) as? Int else { return 10 }
+        return min(max(value, 0), 240)
+    }
+
+    /// 同时保持运行的 Agent 进程上限(0 = 不限);缺省 3,范围 0...32。
+    public static func maxLiveSessions(_ defaults: UserDefaults = .standard) -> Int {
+        guard let value = defaults.object(forKey: Key.maxLiveSessions) as? Int else { return 3 }
+        return min(max(value, 0), 32)
     }
 
     /// 是否显示第三方 Agent 的扩展通知行(info 级别),默认开启;warning / error 级别始终显示。

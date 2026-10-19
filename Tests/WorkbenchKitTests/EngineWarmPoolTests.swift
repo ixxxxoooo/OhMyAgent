@@ -28,7 +28,7 @@ struct EngineWarmPoolTests {
         let smart = EngineWarmPlanner.plan(mode: .smart, currentEngineID: "claude", recentEngineIDs: ["claude", "codex", "codex", "gone", "gemini", "pi"], enabledEngineIDs: enabled)
         #expect(smart == ["codex", "gemini"])
         let all = EngineWarmPlanner.plan(mode: .all, currentEngineID: "claude", recentEngineIDs: [], enabledEngineIDs: enabled)
-        #expect(all == ["codex", "gemini", "pi", "opencode"])
+        #expect(all == ["codex", "gemini"])
         #expect(EngineWarmPlanner.planForPicker(mode: .off, currentEngineID: nil, enabledEngineIDs: enabled).isEmpty)
         #expect(EngineWarmPlanner.planForPicker(mode: .smart, currentEngineID: "codex", enabledEngineIDs: enabled).first == "claude")
     }

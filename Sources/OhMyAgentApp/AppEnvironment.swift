@@ -104,6 +104,8 @@ final class AppEnvironment {
         // 性能观测:注册容量指标,并启动资源采样(采样前先在主线程刷新指标)
         PerfGauges.register(workbench: workbench)
         ResourceSampler.shared.start(intervalSeconds: ResourceSampler.configuredInterval()) { await PerfGauges.refresh() }
+        // 会话驻留:闲置/超限的会话休眠 Agent 进程,系统内存紧张时收紧(演示与脚本化 Agent 的会话不是 claudeACP,不受影响)
+        workbench.startResidencyMonitor()
         if let list = env["OMA_OPEN_PROJECTS"], !list.isEmpty {
             for path in list.split(separator: ":") { workbench.openProject(URL(fileURLWithPath: String(path))) }
         } else if DemoLaunch.isActive {

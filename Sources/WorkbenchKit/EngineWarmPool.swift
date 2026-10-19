@@ -28,8 +28,8 @@ public enum WarmMode: String, CaseIterable, Sendable {
 public enum EngineWarmPlanner {
     /// 智能模式单次预热上限。
     public static let smartLimit = 2
-    /// 全部模式 / 选择器打开时的预热上限。
-    public static let allLimit = 4
+    /// 全部模式 / 选择器打开时的预热上限(每个待命进程约占 0.3~0.4 GB,保持克制)。
+    public static let allLimit = 2
 
     /// 计算需要预热的引擎 ID(按优先级)。
     /// - Parameters:
@@ -75,7 +75,7 @@ public final class EngineWarmPool {
     /// 创建待命会话的工厂(应用层注入,接入通知等能力)。
     @ObservationIgnored public var factory: (@MainActor (URL, AgentDescriptor) -> SessionModel)?
     /// 同时保留的待命会话上限。
-    public var capacity = 4
+    public var capacity = 2
     /// 失败后的冷却时间:期间不再为同一键重试,避免重试风暴。
     public var failureCooldown: TimeInterval = 300
 
