@@ -212,6 +212,22 @@ final class SubmitTextView: NSTextView {
         return false
     }
 
+    /// 是否已注册为拖放目标。
+    private var dragIntakeEnabled = false
+
+    /// 开关拖放接收。保活标签只是 `opacity(0)` 仍在视图层级里,AppKit 的拖放命中不认 SwiftUI 的 `allowsHitTesting(false)`,
+    /// 隐藏会话的输入框会抢走落在当前会话上的文件;失活时注销拖放类型,让落点回到可见的输入卡片。
+    /// - Parameter enabled: 所在标签是否处于激活状态
+    func setDragIntakeEnabled(_ enabled: Bool) {
+        guard enabled != dragIntakeEnabled else { return }
+        dragIntakeEnabled = enabled
+        if enabled {
+            registerForDraggedTypes([.fileURL] + ImageIntake.acceptedTypes.map { NSPasteboard.PasteboardType($0.identifier) })
+        } else {
+            unregisterDraggedTypes()
+        }
+    }
+
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
         let board = sender.draggingPasteboard
         if acceptsImages(), ImageIntake.hasImage(board) { return .copy }
@@ -363,7 +379,7 @@ struct ComposerTextView: NSViewRepresentable {
         textView.acceptsImages = { [coordinator = context.coordinator] in coordinator.parent.acceptsImages() }
         textView.onFileURLs = { [coordinator = context.coordinator] urls in coordinator.parent.onFileURLs?(urls) }
         textView.onWidthChange = { [coordinator = context.coordinator] in coordinator.updateHeight(immediate: true) }
-        textView.registerForDraggedTypes([.fileURL] + ImageIntake.acceptedTypes.map { NSPasteboard.PasteboardType($0.identifier) })
+        textView.setDragIntakeEnabled(context.environment.tabIsActive)
         textView.setAccessibilityLabel(String(localized: "消息输入框"))
         controller?.textView = textView
 
@@ -380,6 +396,7 @@ struct ComposerTextView: NSViewRepresentable {
         context.coordinator.parent = self
         guard let textView = context.coordinator.textView else { return }
         scrollView.syncTabActive(context.environment.tabIsActive)
+        textView.setDragIntakeEnabled(context.environment.tabIsActive)
         textView.mentionWorkspace = mentionWorkspace
         if textView.plainText != text, !textView.hasMarkedText() {
             // 外部整体赋值(发送清空、补全、引用选区、重新编辑):按纯文本重建,光标落到末尾
