@@ -132,6 +132,7 @@ struct GitGraphSection: View {
         loadingMore = true
         let previous = limit
         limit += Self.pageSize
+        Log.git.info("提交图谱加载更多", ["from": "\(previous)", "to": "\(limit)", "rows": "\(rows.count)"])
         if !(await load()) { limit = previous; hasMore = false }
         loadingMore = false
     }
@@ -145,8 +146,11 @@ struct GitGraphSection: View {
             return false
         }
         do {
+            let started = ContinuousClock.now
             let commits = try await repo.log(limit: limit, path: nil, all: true)
+            let fetched = OMLogger.milliseconds(since: started)
             rows = GitGraph.layout(commits)
+            Log.git.info("提交图谱已加载", ["limit": "\(limit)", "commits": "\(commits.count)", "fetchMs": "\(fetched)"])
             hasMore = commits.count >= limit && limit < 5000
             failed = false
             return true
