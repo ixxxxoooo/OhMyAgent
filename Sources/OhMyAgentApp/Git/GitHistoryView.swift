@@ -127,7 +127,7 @@ struct GitHistoryTabView: View {
                         OMSpinner(.mini)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 8)
-                            .onAppear { Task { await loadMore() } }
+                            .task(id: rows.count) { await loadMore() }
                     }
                 }
             }

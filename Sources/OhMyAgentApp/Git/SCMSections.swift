@@ -9,6 +9,7 @@ import DesignSystem
 import DiffKit
 import GitKit
 import IconKit
+import OMLog
 import SwiftUI
 import WorkbenchKit
 
@@ -115,7 +116,7 @@ struct GitGraphSection: View {
                             OMSpinner(.mini)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 8)
-                                .onAppear { Task { await loadMore() } }
+                                .task(id: rows.count) { await loadMore() }
                         }
                     }
                 }
@@ -129,24 +130,30 @@ struct GitGraphSection: View {
     private func loadMore() async {
         guard hasMore, !loadingMore else { return }
         loadingMore = true
+        let previous = limit
         limit += Self.pageSize
-        await load()
+        if !(await load()) { limit = previous; hasMore = false }
         loadingMore = false
     }
 
-    private func load() async {
+    /// 取数并布局;返回是否成功。
+    @discardableResult
+    private func load() async -> Bool {
         guard let repo = await GitRepository.discover(from: model.projectPath) else {
             rows = []
             hasMore = false
-            return
+            return false
         }
         do {
             let commits = try await repo.log(limit: limit, path: nil, all: true)
             rows = GitGraph.layout(commits)
             hasMore = commits.count >= limit && limit < 5000
             failed = false
+            return true
         } catch {
+            Log.git.warning("提交图谱加载失败", ["limit": "\(limit)", "error": "\(error)"])
             failed = true
+            return false
         }
     }
 }
