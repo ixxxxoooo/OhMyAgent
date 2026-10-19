@@ -135,11 +135,45 @@ struct SessionDelegate: ACPClientDelegate {
         return lines[start..<end].joined(separator: "\n")
     }
 
+    /// 路径解析符号链接后是否位于工作区内。尚不存在的部分沿用最近的已存在祖先目录的真实路径。
+    /// - Parameters:
+    ///   - path: 要写入的路径
+    ///   - root: 工作区根目录
+    /// - Returns: 在工作区内(或就是工作区本身)时为 true
+    static func isInsideWorkspace(_ path: String, root: String) -> Bool {
+        let realRoot = realPath(root)
+        let realTarget = realPath(path)
+        return realTarget == realRoot || realTarget.hasPrefix(realRoot + "/")
+    }
+
+    /// 解析符号链接后的真实路径:从最近的已存在祖先开始解析,再拼回尚不存在的尾部。
+    /// 该祖先本身是悬空软链时(`resolvingSymlinksInPath` 不处理),按链接目标继续解析。
+    /// - Parameters:
+    ///   - path: 路径
+    ///   - depth: 已跟随的悬空软链层数(防循环)
+    private static func realPath(_ path: String, depth: Int = 0) -> String {
+        let fm = FileManager.default
+        var existing = URL(fileURLWithPath: path).standardizedFileURL
+        var tail: [String] = []
+        // 用 lstat 语义判断存在(悬空的软链也算存在,这样会被解析而不是被当作普通的新文件名)
+        while (try? fm.attributesOfItem(atPath: existing.path)) == nil, existing.path != "/" {
+            tail.insert(existing.lastPathComponent, at: 0)
+            existing.deleteLastPathComponent()
+        }
+        if !fm.fileExists(atPath: existing.path), depth < 32, let destination = try? fm.destinationOfSymbolicLink(atPath: existing.path) {
+            let target = URL(fileURLWithPath: destination, relativeTo: existing.deletingLastPathComponent())
+            return realPath(([target.path] + tail).joined(separator: "/"), depth: depth + 1)
+        }
+        var resolved = existing.resolvingSymlinksInPath()
+        for component in tail { resolved.appendPathComponent(component) }
+        return resolved.standardizedFileURL.path
+    }
+
     func writeTextFile(sessionId: String, path: String, content: String) async throws {
-        // 只允许写入工作区内,防止越权覆盖
+        // 只允许写入工作区内,防止越权覆盖(按解析符号链接后的真实路径判断,工作区里的软链不能把写入带到外面)
         let root = URL(fileURLWithPath: workspace).standardizedFileURL.path
         let target = URL(fileURLWithPath: path).standardizedFileURL
-        guard target.path == root || target.path.hasPrefix(root + "/") else {
+        guard Self.isInsideWorkspace(path, root: workspace) else {
             Log.tool.warning("fs/write_text_file 被拒绝:不在工作区内", ["path": path, "workspace": root])
             throw JSONRPCError(code: JSONRPCError.invalidParams, message: "仅允许写入工作区内的文件: \(path)")
         }
