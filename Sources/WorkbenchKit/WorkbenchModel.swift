@@ -51,6 +51,8 @@ public final class WorkbenchModel {
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     /// 启动时从状态文件读到、尚未创建会话的标签记录:首次显示该标签时据此恢复原会话
     @ObservationIgnored private var pendingRestores: [ConversationKey: ChatSlotRecord] = [:]
+    /// 启动时目录不存在的项目(外接盘/网络盘未挂载等):不显示,但保存时原样写回,目录恢复后下次启动重新出现
+    @ObservationIgnored private var unavailableProjects: [ProjectEntry] = []
     @ObservationIgnored private let log = Log.session
     @ObservationIgnored private let autoConnect: Bool
     /// 会话驻留监视任务(定时检查并休眠闲置会话)
@@ -80,11 +82,15 @@ public final class WorkbenchModel {
         selectedProjectID = selected
         layout = state.layout
         let aliveIDs = Set(alive.map(\.id))
+        unavailableProjects = state.projects.filter { !aliveIDs.contains($0.id) }
         let records = (state.chatSlots ?? []).filter { aliveIDs.contains($0.projectID) && !$0.sessionId.isEmpty }
         pendingRestores = Dictionary(records.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
         dock = (state.dock ?? DockLayout()).restoredForLaunch(projectIDs: aliveIDs, keepChats: Set(pendingRestores.keys))
         self.healSessionCreationDates()
         log.info("工作台状态已加载", ["projects": "\(alive.count)", "selected": selected ?? "-"])
+        if !unavailableProjects.isEmpty {
+            log.warning("部分项目目录不存在,暂不显示(保留在状态文件中)", ["count": "\(unavailableProjects.count)"])
+        }
     }
 
     // MARK: 查询
@@ -1474,7 +1480,8 @@ public final class WorkbenchModel {
         saveTask?.cancel()
         var state = WorkbenchState()
         state.layout = layout
-        state.projects = projects
+        let shownIDs = Set(projects.map(\.id))
+        state.projects = projects + unavailableProjects.filter { !shownIDs.contains($0.id) }
         state.selectedProjectID = selectedProjectID
         state.dock = dock
         state.chatSlots = chatSlotRecords()

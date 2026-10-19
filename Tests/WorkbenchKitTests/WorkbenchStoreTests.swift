@@ -1,6 +1,7 @@
 // @author ixxxxoooo
 // 工作台状态文件:损坏时先备份,不能被随后的保存直接覆盖。
 
+import ChatKit
 import Foundation
 import Testing
 
@@ -45,5 +46,24 @@ struct WorkbenchStoreTests {
         try store.save(state)
         #expect(store.load()?.selectedProjectID == "/tmp/demo")
         #expect(!FileManager.default.fileExists(atPath: store.corruptBackupURL.path))
+    }
+
+    @Test("目录暂时不存在的项目不显示,但保存后仍保留在状态文件中")
+    @MainActor
+    func unavailableProjectsSurviveSave() throws {
+        let (store, root) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let present = root.appendingPathComponent("present", isDirectory: true)
+        try FileManager.default.createDirectory(at: present, withIntermediateDirectories: true)
+        let missing = root.appendingPathComponent("unmounted-volume", isDirectory: true)
+        var state = WorkbenchState()
+        state.projects = [ProjectEntry(url: present), ProjectEntry(url: missing)]
+        try store.save(state)
+
+        let model = WorkbenchModel(store: store, autoConnect: false) { url in SessionModel(workspace: url) }
+        #expect(model.projects.map(\.id) == [ProjectEntry(url: present).id])
+        model.saveNow()
+        let saved = try #require(store.load())
+        #expect(Set(saved.projects.map(\.id)) == [ProjectEntry(url: present).id, ProjectEntry(url: missing).id])
     }
 }
