@@ -41,6 +41,53 @@ struct UpdateInstallerTests {
         #expect(!UpdateChecker.isAllowedSource(plain, allowLocal: true))
     }
 
+    /// 用一个已退出进程的 PID 运行替换脚本。
+    private func runReplaceScript(target: String, staged: String, root: String) throws {
+        let done = Process()
+        done.executableURL = URL(fileURLWithPath: "/usr/bin/true")
+        try done.run()
+        done.waitUntilExit()
+        let script = URL(fileURLWithPath: root).deletingLastPathComponent().appendingPathComponent("replace-\(UUID().uuidString).sh")
+        try UpdateInstaller.replaceScript.write(to: script, atomically: true, encoding: .utf8)
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = [script.path, "\(done.processIdentifier)", target, staged, root, "0"]
+        try process.run()
+        process.waitUntilExit()
+    }
+
+    @Test("替换脚本:路径含引号与 $ 也能替换成功,并清理备份与暂存")
+    func replaceScriptWithSpecialPaths() throws {
+        let fm = FileManager.default
+        let base = fm.temporaryDirectory.appendingPathComponent("oma-update-replace-\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: base) }
+        let target = base.appendingPathComponent("Apps \"q\" $HOME `x`/OhMyAgent.app")
+        let root = base.appendingPathComponent("updates")
+        let staged = root.appendingPathComponent("1.0.2/OhMyAgent.app")
+        try fm.createDirectory(at: target, withIntermediateDirectories: true)
+        try fm.createDirectory(at: staged, withIntermediateDirectories: true)
+        try Data("old".utf8).write(to: target.appendingPathComponent("v"))
+        try Data("new".utf8).write(to: staged.appendingPathComponent("v"))
+        try runReplaceScript(target: target.path, staged: staged.path, root: root.path)
+        #expect(try String(contentsOf: target.appendingPathComponent("v"), encoding: .utf8) == "new")
+        #expect(!fm.fileExists(atPath: target.path + ".old"))
+        #expect(!fm.fileExists(atPath: root.path))
+    }
+
+    @Test("替换脚本:无法移动原应用时写下失败标记并保留暂存")
+    func replaceScriptFailureMarker() throws {
+        let fm = FileManager.default
+        let base = fm.temporaryDirectory.appendingPathComponent("oma-update-replace-\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: base) }
+        let root = base.appendingPathComponent("updates")
+        let staged = root.appendingPathComponent("1.0.2/OhMyAgent.app")
+        try fm.createDirectory(at: staged, withIntermediateDirectories: true)
+        try runReplaceScript(target: base.appendingPathComponent("missing/OhMyAgent.app").path, staged: staged.path, root: root.path)
+        let marker = root.appendingPathComponent(UpdateInstaller.failureMarkerName)
+        #expect(try String(contentsOf: marker, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines) == "move")
+        #expect(fm.fileExists(atPath: staged.path))
+    }
+
     @Test("更新方式原始值稳定")
     func modes() {
         #expect(UpdateMode(rawValue: "auto") == .auto)

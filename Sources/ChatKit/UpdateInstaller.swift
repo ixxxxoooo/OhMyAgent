@@ -125,30 +125,58 @@ public enum UpdateInstaller {
     ///   - relaunch: 替换后是否重新打开
     public static func launchReplacer(staged: StagedUpdate, targetApp: String, relaunch: Bool) throws {
         let script = stagingRoot.appendingPathComponent("replace.sh")
-        // 脚本逻辑:等旧进程退出(最多 60 秒,仍在运行说明退出被取消,放弃本次);替换失败时恢复原应用
-        let body = """
-        #!/bin/sh
-        i=0; while kill -0 \(ProcessInfo.processInfo.processIdentifier) 2>/dev/null && [ $i -lt 120 ]; do sleep 0.5; i=$((i+1)); done
-        if kill -0 \(ProcessInfo.processInfo.processIdentifier) 2>/dev/null; then exit 0; fi
-        BACKUP="\(targetApp).old"
-        rm -rf "$BACKUP"
-        if mv "\(targetApp)" "$BACKUP"; then
-          if /usr/bin/ditto "\(staged.appPath)" "\(targetApp)"; then
-            /usr/bin/xattr -dr com.apple.quarantine "\(targetApp)" 2>/dev/null
-            rm -rf "$BACKUP" "\(stagingRoot.path)"
-          else
-            rm -rf "\(targetApp)"; mv "$BACKUP" "\(targetApp)"
-          fi
-        fi
-        \(relaunch ? "/usr/bin/open \"\(targetApp)\"" : "")
-        """
-        try body.write(to: script, atomically: true, encoding: .utf8)
+        try replaceScript.write(to: script, atomically: true, encoding: .utf8)
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/sh")
-        process.arguments = [script.path]
+        process.arguments = [script.path, "\(ProcessInfo.processInfo.processIdentifier)", targetApp, staged.appPath, stagingRoot.path, relaunch ? "1" : "0"]
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         try process.run()
+    }
+
+    /// 「等旧进程退出 → 替换 → 重启」脚本。路径一律作为位置参数传入,脚本里不拼接任何路径(路径含引号、$ 等字符也不会出错)。
+    /// 等旧进程退出最多 60 秒,仍在运行说明退出被取消,放弃本次;替换失败时恢复原应用并写下失败标记,下次启动提示。
+    /// 参数:$1 旧进程 PID、$2 要替换的应用、$3 暂存的新应用、$4 暂存根目录、$5 是否重新打开(1/0)。
+    static var replaceScript: String {
+        """
+        #!/bin/sh
+        # 参数:$1 旧进程 PID  $2 要替换的应用  $3 暂存的新应用  $4 暂存根目录  $5 是否重新打开(1/0)
+        PID="$1"; TARGET="$2"; STAGED="$3"; ROOT="$4"; RELAUNCH="$5"
+        LOG="$ROOT/\(replaceLogName)"
+        i=0; while kill -0 "$PID" 2>/dev/null && [ $i -lt 120 ]; do sleep 0.5; i=$((i+1)); done
+        if kill -0 "$PID" 2>/dev/null; then exit 0; fi
+        BACKUP="$TARGET.old"
+        rm -rf "$BACKUP"
+        if mv "$TARGET" "$BACKUP" 2>>"$LOG"; then
+          if /usr/bin/ditto "$STAGED" "$TARGET" 2>>"$LOG"; then
+            /usr/bin/xattr -dr com.apple.quarantine "$TARGET" 2>/dev/null
+            rm -rf "$BACKUP" "$ROOT"
+          else
+            rm -rf "$TARGET"; mv "$BACKUP" "$TARGET"
+            echo "copy" > "$ROOT/\(failureMarkerName)"
+          fi
+        else
+          echo "move" > "$ROOT/\(failureMarkerName)"
+        fi
+        if [ "$RELAUNCH" = "1" ]; then /usr/bin/open "$TARGET"; fi
+        """
+    }
+
+    /// 替换脚本失败时写下的标记文件名。
+    static let failureMarkerName = "failed"
+    /// 替换脚本的错误输出文件名。
+    static let replaceLogName = "replace.log"
+
+    /// 读取并清理上次安装失败的记录(替换脚本没能替换应用,常见原因是应用所在目录不可写)。
+    /// 有记录时清空暂存,避免每次启动都显示「更新」、每次退出都重试失败。
+    /// - Returns: 失败原因(含脚本错误输出摘要);上次没有失败为 nil
+    public static func takeInstallFailure() -> String? {
+        let marker = stagingRoot.appendingPathComponent(failureMarkerName)
+        guard let step = try? String(contentsOf: marker, encoding: .utf8) else { return nil }
+        let output = (try? String(contentsOf: stagingRoot.appendingPathComponent(replaceLogName), encoding: .utf8)) ?? ""
+        clearStaged()
+        let detail = String(output.suffix(400)).trimmingCharacters(in: .whitespacesAndNewlines)
+        return "\(step.trimmingCharacters(in: .whitespacesAndNewlines)): \(detail.isEmpty ? "-" : detail)"
     }
 
     // MARK: 内部

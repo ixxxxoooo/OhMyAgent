@@ -45,6 +45,12 @@ final class UpdateModel {
 
     /// 启动时恢复上次已下载好的更新,并按需启动空闲自动安装。
     func restoreStaged() {
+        if let failure = UpdateInstaller.takeInstallFailure() {
+            Log.update.error("上次更新安装失败,已清理暂存", ["detail": failure])
+            let message = String(localized: "无法替换应用(可能没有写入权限),请从发布页手动下载安装。")
+            phase = .failed(message)
+            AppNotifier.send(title: String(localized: "更新安装失败"), message: message)
+        }
         if let staged = UpdateInstaller.loadStaged(currentVersion: currentVersion, currentBuild: currentBuild) { phase = .ready(staged) }
         startIdleWatcher()
     }
