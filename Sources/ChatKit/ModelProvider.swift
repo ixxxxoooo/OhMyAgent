@@ -228,6 +228,8 @@ public enum ProviderStorage {
 
     static func providersURL(_ directory: URL) -> URL { directory.appendingPathComponent("providers.json") }
     static func keysURL(_ directory: URL) -> URL { directory.appendingPathComponent("provider-keys.json") }
+    /// 默认密钥文件的显示路径(家目录缩写为 `~`;开发版指向 `OhMyAgent-Dev`)。
+    public static var keysDisplayPath: String { (keysURL(defaultDirectory).path as NSString).abbreviatingWithTildeInPath }
 
     /// 读取提供商配置(缺失或损坏返回空)。
     public static func load(directory: URL = defaultDirectory) -> ProviderSnapshot {

@@ -2620,3 +2620,4 @@
 "发布源缺少安装包校验值(sha256),已拒绝安装" = "The release feed has no checksum (sha256) for the installer; installation was refused";
 "无法替换应用(可能没有写入权限),请从发布页手动下载安装。" = "Couldn’t replace the app (it may not be writable). Please download and install it manually from the releases page.";
 "更新安装失败" = "Update installation failed";
+"密钥保存在 %@(权限 0600),不写入日志与 ~/.claude。" = "Keys are stored in %@ (mode 0600) and are never written to logs or ~/.claude.";

@@ -82,7 +82,7 @@ struct ProviderDetailView: View {
             if draft.isOpenAIProtocol {
                 Note("OpenAI 协议由本机 127.0.0.1 上的内置代理转换成 Anthropic 协议;真实地址与密钥只保存在 OhMyAgent 进程内,不会交给 Claude Code。")
             }
-            Note("密钥保存在 ~/Library/Application Support/OhMyAgent/provider-keys.json(权限 0600),不写入日志与 ~/.claude。")
+            Note(String(localized: "密钥保存在 \(ProviderStorage.keysDisplayPath)(权限 0600),不写入日志与 ~/.claude。"))
             HStack {
                 Button("测试连接") { Task { await test() } }.disabled(testing)
                 if testing { OMSpinner(.small) }
