@@ -2594,7 +2594,7 @@
 "自动下载" = "Download automatically";
 "自动下载并在最佳时间安装" = "Download and install at the best time";
 "自动下载只在网络不计费(非热点/低数据模式)时进行;最佳安装时间:电脑空闲 15 分钟以上且没有会话在运行,或下次退出应用时。侧栏的「更新/重启更新」按钮可随时手动触发。" = "Downloads happen only on unmetered networks (not hotspot / Low Data Mode). Best install time: the Mac has been idle for 15+ minutes with no running sessions, or the next time you quit. The sidebar Update / Restart to update button can trigger it any time.";
-"留空使用 GitHub 最新正式版。发布源格式见 开发进度.md。开发版只下载不替换自身。" = "Leave empty to use the latest GitHub release. See 开发进度.md for the feed format. Dev builds only download and never replace themselves.";
+"更新来自 GitHub 最新正式版。开发版只下载、不替换自身。" = "Updates come from the latest GitHub release. Dev builds only download and never replace themselves.";
 "重启更新" = "Restart to update";
 "下载并更新 %@" = "Download and update %@";
 "下载中 %lld%%" = "Downloading %lld%%";

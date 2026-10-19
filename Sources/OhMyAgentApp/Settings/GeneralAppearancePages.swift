@@ -20,8 +20,6 @@ struct GeneralPage: View {
     @AppStorage(ClientPrefs.Key.maxLiveSessions) private var maxLive = 3
     @AppStorage(ClientPrefs.Key.autoUpdate) private var autoUpdate = true
     @AppStorage(ClientPrefs.Key.updateMode) private var updateMode = UpdateMode.download.rawValue
-    @AppStorage(ClientPrefs.Key.updateChannel) private var channel = "stable"
-    @AppStorage(ClientPrefs.Key.updateFeedURL) private var feedURL = ""
     @State private var updates = UpdateModel.shared
     @State private var language = Self.currentLanguage()
     @State private var confirmReset = false
@@ -100,18 +98,12 @@ struct GeneralPage: View {
                     Text("自动下载并在最佳时间安装").tag(UpdateMode.auto.rawValue)
                 }
                 Note("自动下载只在网络不计费(非热点/低数据模式)时进行;最佳安装时间:电脑空闲 15 分钟以上且没有会话在运行,或下次退出应用时。侧栏的「更新/重启更新」按钮可随时手动触发。")
-                Picker("更新通道", selection: $channel) {
-                    Text("稳定").tag("stable")
-                    Text("预览").tag("preview")
-                }
-                TextField("更新源地址 (https)", text: $feedURL, prompt: Text(UpdateChecker.defaultFeedURL))
-                    .textFieldStyle(.roundedBorder)
                 LabeledContent("当前版本", value: "\(updates.currentVersion) (\(updates.currentBuild))")
                 HStack {
                     Button("立即检查") { updates.checkNow() }.disabled(updates.state == .checking)
                     updateStatus
                 }
-                Note("留空使用 GitHub 最新正式版。发布源格式见 开发进度.md。开发版只下载不替换自身。")
+                Note("更新来自 GitHub 最新正式版。开发版只下载、不替换自身。")
             }
             Section("重置") {
                 Button("重置所有客户端设置…", role: .destructive) { confirmReset = true }
@@ -122,7 +114,7 @@ struct GeneralPage: View {
             Button("重置", role: .destructive) {
                 ClientPrefs.resetAll()
                 AppearanceModel.shared.reset()
-                restoreWindows = true; showDock = true; showMenuBar = true; notifyFinished = true; notifySound = true; sendKey = SendKey.enter.rawValue; runningSend = RunningSendMode.steer.rawValue; autoUpdate = true; channel = "stable"
+                restoreWindows = true; showDock = true; showMenuBar = true; notifyFinished = true; notifySound = true; sendKey = SendKey.enter.rawValue; runningSend = RunningSendMode.steer.rawValue; autoUpdate = true
                 NSApp.setActivationPolicy(.regular)
             }
         } message: {
