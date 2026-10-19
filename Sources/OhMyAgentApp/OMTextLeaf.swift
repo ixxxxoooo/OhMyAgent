@@ -157,7 +157,8 @@ final class OMTextLeafCoordinator {
     /// - Returns: 叶子尺寸
     func measuredSize(_ host: OMLeafHostView, config: OMTextLeafConfig, proposedWidth: CGFloat?) -> CGSize {
         let proposed = proposedWidth.flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
-        let width = proposed ?? measuredWidth ?? host.bounds.width
+        // 完全没有宽度信息时用 480(与 Markdown 文字段一致),避免按 1pt 宽度排版得到巨大的虚高高度
+        let width = proposed ?? measuredWidth ?? (host.bounds.width > 0 ? host.bounds.width : 480)
         if measuredEdits == edits, measuredWidth == width { return measured }
         let inset = config.inset
         let fit: CGSize

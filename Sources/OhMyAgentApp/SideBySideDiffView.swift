@@ -61,72 +61,18 @@ private struct SideBySideHunkView: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             Divider()
-            // 惰性:只建视口附近的行,打开大差异时不必一次建出全部行
-            LazyVStack(alignment: .leading, spacing: 0) {
-                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                    HStack(alignment: .top, spacing: 0) {
-                        half(row.left, mark: row.leftIndex.flatMap { marks[$0] }, number: row.left?.oldNumber)
-                        Rectangle().fill(OMColors.hairline).frame(width: 0.5)
-                        half(row.right, mark: row.rightIndex.flatMap { marks[$0] }, number: row.right?.newNumber)
-                    }
-                    .fixedSize(horizontal: false, vertical: true)
-                }
+            // 左右各一个 AppKit 文本叶子(不折行,行高一致所以逐行天然对齐;长行在各自叶子内水平滚动):
+            // 没有对应行的一侧用空行占位,复制各侧只得到该侧的代码正文
+            HStack(alignment: .top, spacing: 0) {
+                DiffTextLeaf(lines: rows.map(\.left), marks: rows.map { row in row.leftIndex.flatMap { marks[$0] } },
+                             twoColumns: false, side: .old, wrap: false)
+                Rectangle().fill(OMColors.hairline).frame(width: 0.5)
+                DiffTextLeaf(lines: rows.map(\.right), marks: rows.map { row in row.rightIndex.flatMap { marks[$0] } },
+                             twoColumns: false, side: .new, wrap: false)
             }
         }
         .background(OMDiffPalette.background(.context))
         .clipShape(RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
-    }
-
-    /// 单侧:行号槽(独立底色 + 强调色条)+ 正文;空侧只显示灰底占位。
-    private func half(_ line: DiffLine?, mark: Range<Int>?, number: Int?) -> some View {
-        let kind = paletteKind(line)
-        return HStack(alignment: .top, spacing: 0) {
-            Text(number.map(String.init) ?? "")
-                .frame(width: 34, alignment: .trailing)
-                .foregroundStyle(OMColors.tertiaryText)
-                .padding(.horizontal, 4)
-                .frame(maxHeight: .infinity, alignment: .top)
-                .diffFill(OMDiffPalette.gutter(kind))
-                .overlay(alignment: .leading) { Rectangle().fill(OMDiffPalette.bar(kind)).frame(width: 3).padding(.vertical, -0.5) }
-            Text(content(line, mark: mark))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 6)
-                .frame(maxHeight: .infinity, alignment: .top)
-                .diffFill(OMDiffPalette.background(kind))
-        }
-        .font(OMFonts.monoSmall)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(line.map { "\(kindLabel($0.kind)) \(DiffSoftLimit.displayText($0.text))" } ?? "")
-    }
-
-    private func paletteKind(_ line: DiffLine?) -> OMDiffPalette.Kind {
-        guard let line else { return .empty }
-        switch line.kind {
-        case .added: return .added
-        case .removed: return .removed
-        case .context: return .context
-        }
-    }
-
-    private func content(_ line: DiffLine?, mark: Range<Int>?) -> AttributedString {
-        guard let line else { return AttributedString(" ") }
-        var text = AttributedString(line.text.isEmpty ? " " : DiffSoftLimit.displayText(line.text))
-        guard let mark, line.kind != .context else { return text }
-        let characters = text.characters
-        guard mark.upperBound <= characters.count, mark.lowerBound < mark.upperBound else { return text }
-        let start = characters.index(characters.startIndex, offsetBy: mark.lowerBound)
-        let end = characters.index(characters.startIndex, offsetBy: mark.upperBound)
-        text[start..<end].backgroundColor = (line.kind == .added ? OMColors.diffAdded : OMColors.diffRemoved).opacity(0.38)
-        return text
-    }
-
-    private func kindLabel(_ kind: DiffLineKind) -> String {
-        switch kind {
-        case .added: return String(localized: "新增")
-        case .removed: return String(localized: "删除")
-        case .context: return String(localized: "上下文")
-        }
     }
 }

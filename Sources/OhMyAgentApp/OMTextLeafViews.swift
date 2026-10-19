@@ -81,7 +81,8 @@ struct ProseTextLeaf: View {
 /// Diff 行组叶子:一个文本视图画出整块(行号槽与底色由布局管理器绘制,复制只得到正文)。
 struct DiffTextLeaf: View {
     let lines: [DiffLine?]
-    let marks: [Range<Int>?]
+    /// 行内变化区间;nil 时按 `lines`(不含占位)在构造富文本时才计算,避免每次 body 重算都跑词级 Diff
+    var marks: [Range<Int>?]?
     var twoColumns = true
     var side: OMLeafContent.DiffSide = .both
     var wrap = true
@@ -96,7 +97,9 @@ struct DiffTextLeaf: View {
         return OMTextLeaf(
             signature: hasher.finalize(),
             config: OMTextLeafConfig(wrap: wrap, inset: .zero, trailingPadding: 8)
-        ) { OMLeafContent.diff(lines, marks: marks, twoColumns: twoColumns, side: side) }
+        ) {
+            OMLeafContent.diff(lines, marks: marks ?? InlineDiff.highlights(for: lines.compactMap { $0 }), twoColumns: twoColumns, side: side)
+        }
         .id(wrap)
     }
 }

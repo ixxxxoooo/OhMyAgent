@@ -78,12 +78,22 @@ enum OMLeafContent {
         }
         let bold = monoFont(fontSize, timeline: false, weight: .semibold) // ui-lint:allow 终端 ANSI 加粗属于输出内容
         let result = NSMutableAttributedString()
+        // 同一份输出里不同的 ANSI 颜色很少:按 (颜色, 变暗) 缓存已转换的 NSColor。
+        // 取色会读取主题调色板(拼十六进制串),逐片段都取在大输出上会卡主线程。
+        var colorCache: [(color: ANSIColor, dim: Bool, value: NSColor)] = []
+        func resolved(_ color: ANSIColor, dim: Bool) -> NSColor {
+            if let hit = colorCache.first(where: { $0.color == color && $0.dim == dim }) { return hit.value }
+            let value = NSColor(ANSITextView.color(color, dim: dim))
+            colorCache.append((color, dim, value))
+            return value
+        }
+        let secondary = NSColor(OMColors.secondaryText)
         for span in ANSIParser.parse(raw, maxLines: maxLines) {
             var attributes: [NSAttributedString.Key: Any] = [.font: span.bold ? bold : font]
             if let color = span.foreground {
-                attributes[.foregroundColor] = NSColor(ANSITextView.color(color, dim: span.dim))
+                attributes[.foregroundColor] = resolved(color, dim: span.dim)
             } else {
-                attributes[.foregroundColor] = span.dim ? NSColor(OMColors.secondaryText) : tint
+                attributes[.foregroundColor] = span.dim ? secondary : tint
             }
             if span.underline { attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue }
             result.append(NSAttributedString(string: span.text, attributes: attributes))

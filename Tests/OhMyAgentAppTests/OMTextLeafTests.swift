@@ -3,6 +3,7 @@
 
 import AppKit
 import DesignSystem
+import DiffKit
 import Foundation
 import Testing
 
@@ -100,5 +101,61 @@ struct OMTextLeafTests {
         #expect(view.isSelectable)
         #expect(!view.drawsBackground)
         #expect(view.retainedStorage != nil)
+    }
+}
+
+@MainActor
+@Suite("Diff 文本叶子内容", .serialized)
+struct OMDiffLeafContentTests {
+    /// 由真实差异计算得到的行(上下文、删除、新增),末尾补一个并排视图里的空占位。
+    private var lines: [DiffLine?] {
+        let diff = LineDiff.diff(old: "let a = 1\nlet b = 2\n", new: "let a = 1\nlet b = 3\n")
+        return (diff.hunks.first?.lines ?? []).map { Optional($0) } + [nil]
+    }
+
+    @Test("正文只含代码文本:行号、符号只存在于属性里,复制不会带上")
+    func bodyIsPlainContent() {
+        let text = OMLeafContent.diff(lines, marks: [nil, nil, 8..<9, nil], twoColumns: true)
+        #expect(text.string == "let a = 1\nlet b = 2\nlet b = 3\n ")
+    }
+
+    @Test("每行都带底色与行号槽属性,行内变化区间带背景色")
+    func attributesPresent() {
+        let text = OMLeafContent.diff(lines, marks: [nil, nil, 8..<9, nil], twoColumns: true)
+        var index = 0
+        for line in text.string.split(separator: "\n", omittingEmptySubsequences: false) {
+            #expect(text.attribute(omLineFillKey, at: index, effectiveRange: nil) != nil)
+            #expect(text.attribute(omGutterKey, at: index, effectiveRange: nil) != nil)
+            index += line.count + 1
+        }
+        // 第三行 "let b = 3" 的最后一个字符 "3" 有行内高亮背景
+        let thirdStart = "let a = 1\nlet b = 2\n".count
+        #expect(text.attribute(.backgroundColor, at: thirdStart + 8, effectiveRange: nil) != nil)
+        #expect(text.attribute(.backgroundColor, at: thirdStart, effectiveRange: nil) == nil)
+    }
+
+    @Test("并排单侧:不画新旧两列,占位行保持一行高度")
+    func sideBySideSingleColumn() {
+        let old = OMLeafContent.diff(lines, marks: [], twoColumns: false, side: .old)
+        let new = OMLeafContent.diff(lines, marks: [], twoColumns: false, side: .new)
+        #expect(old.string.split(separator: "\n", omittingEmptySubsequences: false).count == 4)
+        #expect(new.string.split(separator: "\n", omittingEmptySubsequences: false).count == 4)
+    }
+}
+
+@MainActor
+@Suite("文本叶子测量回退", .serialized)
+struct OMTextLeafMeasureFallbackTests {
+    @Test("没有任何宽度信息时按默认宽度排版,不产生虚高高度")
+    func unknownWidthDoesNotInflateHeight() {
+        let host = OMLeafHostView(wrap: true)
+        let coordinator = OMTextLeafCoordinator()
+        coordinator.apply(to: host.textView, signature: 1) {
+            NSAttributedString(string: String(repeating: "一行普通的文字 ", count: 20),
+                               attributes: [.font: NSFont.systemFont(ofSize: 13)])
+        }
+        let size = coordinator.measuredSize(host, config: OMTextLeafConfig(), proposedWidth: nil)
+        #expect(size.height < 200, "实际高度 \(size.height) 说明按极窄宽度排版了")
+        #expect(size.width > 100)
     }
 }

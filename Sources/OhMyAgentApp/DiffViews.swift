@@ -72,98 +72,12 @@ struct HunkView: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             Divider()
-            // 惰性:只建视口附近的行
-            LazyVStack(alignment: .leading, spacing: 0) {
-                let marks = InlineDiff.highlights(for: hunk.lines)
-                ForEach(Array(hunk.lines.enumerated()), id: \.offset) { index, line in
-                    DiffLineRow(line: line, mark: marks[index])
-                }
-            }
+            // 整个块一个 AppKit 文本视图:行号槽与底色由布局管理器绘制,可跨行连续选择,复制只得到代码正文
+            DiffTextLeaf(lines: hunk.lines.map { Optional($0) }, twoColumns: true, wrap: true)
         }
         .background(OMDiffPalette.background(.context))
         .clipShape(RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
-    }
-}
-
-/// 单行:左侧一个整块的行号槽(独立底色 + 强调色条),右侧正文;背景为不透明色并略向上下外扩,避免行间接缝。
-struct DiffLineRow: View {
-    let line: DiffLine
-    /// 行内变化区间(词级高亮),nil 表示整行同色
-    var mark: Range<Int>?
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 0) {
-            HStack(alignment: .top, spacing: 0) {
-                Text(line.oldNumber.map(String.init) ?? "")
-                    .frame(width: 34, alignment: .trailing)
-                Text(line.newNumber.map(String.init) ?? "")
-                    .frame(width: 34, alignment: .trailing)
-            }
-            .foregroundStyle(OMColors.tertiaryText)
-            .padding(.horizontal, 4)
-            .frame(maxHeight: .infinity, alignment: .top)
-            .diffFill(OMDiffPalette.gutter(paletteKind))
-            .overlay(alignment: .leading) { Rectangle().fill(OMDiffPalette.bar(paletteKind)).frame(width: 3).padding(.vertical, -0.5) }
-            Text(sign)
-                .frame(width: 18)
-                .frame(maxHeight: .infinity, alignment: .top)
-                .diffFill(OMDiffPalette.background(paletteKind))
-            Text(content)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.trailing, 8)
-                .frame(maxHeight: .infinity, alignment: .top)
-                .diffFill(OMDiffPalette.background(paletteKind))
-        }
-        .font(OMFonts.monoSmall)
-        .foregroundStyle(line.kind == .context ? OMColors.secondaryText : OMColors.primaryText)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .fixedSize(horizontal: false, vertical: true)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(accessibilityKind) \(DiffSoftLimit.displayText(line.text))")
-    }
-
-    private var paletteKind: OMDiffPalette.Kind {
-        switch line.kind {
-        case .added: return .added
-        case .removed: return .removed
-        case .context: return .context
-        }
-    }
-
-    /// 正文:有行内区间时,变化部分使用更深的底色。
-    private var content: AttributedString {
-        var text = AttributedString(line.text.isEmpty ? " " : DiffSoftLimit.displayText(line.text))
-        guard let mark, line.kind != .context else { return text }
-        let characters = text.characters
-        guard mark.upperBound <= characters.count, mark.lowerBound < mark.upperBound else { return text }
-        let start = characters.index(characters.startIndex, offsetBy: mark.lowerBound)
-        let end = characters.index(characters.startIndex, offsetBy: mark.upperBound)
-        text[start..<end].backgroundColor = (line.kind == .added ? OMColors.diffAdded : OMColors.diffRemoved).opacity(0.38)
-        return text
-    }
-
-    private var sign: String {
-        switch line.kind {
-        case .added: return "+"
-        case .removed: return "−"
-        case .context: return ""
-        }
-    }
-
-    private var accessibilityKind: String {
-        switch line.kind {
-        case .added: return String(localized: "新增")
-        case .removed: return String(localized: "删除")
-        case .context: return String(localized: "上下文")
-        }
-    }
-}
-
-extension View {
-    /// 以不透明色铺满并向上下各外扩 0.5pt(相邻行互相覆盖,消除小数行高产生的接缝)。
-    func diffFill(_ color: Color) -> some View {
-        background { Rectangle().fill(color).padding(.vertical, -0.5) }
     }
 }
 
