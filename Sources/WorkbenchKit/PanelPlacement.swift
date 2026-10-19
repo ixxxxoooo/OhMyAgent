@@ -144,6 +144,13 @@ public extension WorkbenchLayout {
         return side == placement.toolsSide
     }
 
+    /// 并入工具栏的终端/输出是否正显示在最前面:工具栏可见、它被选中,且没有被停靠会话或浏览器盖住。
+    /// - Parameter item: 终端或输出
+    /// - Returns: 正在显示为 true
+    func isFrontInTools(_ item: PanelItem) -> Bool {
+        rightVisible && toolsPanel == item && activeToolsChat == nil && !sidebarBrowserActive
+    }
+
     /// 某一侧的全部列(不论是否可见),由外向内:项目栏、工具栏、终端。
     func columns(on side: PanelSide) -> [PanelColumn] {
         PanelColumn.allCases.filter { self.side(of: $0) == side }

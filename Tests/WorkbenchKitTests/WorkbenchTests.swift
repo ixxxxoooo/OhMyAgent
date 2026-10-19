@@ -174,6 +174,24 @@ struct WorkbenchTests {
         #expect(removed == [alpha])
     }
 
+    @Test("终端并入工具栏但被文件页盖住时,⌘J 一次就把它切到最前面")
+    func toggleMergedTerminal() throws {
+        let env = try makeEnvironment()
+        defer { try? FileManager.default.removeItem(at: env.root) }
+        let model = makeModel(env.store)
+        _ = try #require(model.openProject(env.dirs[0]))
+        model.setTerminalPlacement(.right)
+        model.showTerminal()
+        #expect(model.layout.isMergedIntoTools(.terminal) && model.isTerminalShown)
+        // 用户切到「文件」页:终端仍在标签条里,但没有显示
+        model.layout.toolsPanel = nil
+        #expect(!model.isTerminalShown)
+        model.toggleTerminal()
+        #expect(model.isTerminalShown && model.layout.toolsPanel == .terminal)
+        model.toggleTerminal()
+        #expect(!model.isTerminalShown && !model.layout.terminalVisible)
+    }
+
     @Test("终端在各位置间移动:显示状态保持,终端标识不变,旧位置被清理,摆放持久化")
     func terminalPlacementMigration() throws {
         let env = try makeEnvironment()

@@ -1126,7 +1126,9 @@ public final class WorkbenchModel {
     public var isTerminalShown: Bool {
         switch layout.placement.terminal {
         case .bottom: return layout.bottomVisible && layout.bottomPane == .terminal
-        case .left, .right: return layout.terminalVisible
+        case .left, .right:
+            // 并入工具栏时:还要它正显示在工具栏最前面(否则 ⌘J 会把被盖住的终端直接移除,要按两次才显示)
+            return layout.terminalVisible && (!layout.isMergedIntoTools(.terminal) || layout.isFrontInTools(.terminal))
         case .editor: return currentResidentTerminalTab != nil
         }
     }
@@ -1403,7 +1405,8 @@ public final class WorkbenchModel {
     public var isOutputShown: Bool {
         switch layout.placement.output {
         case .bottom: return layout.bottomVisible && layout.bottomPane == .output
-        case .left, .right: return layout.outputVisible
+        case .left, .right:
+            return layout.outputVisible && (!layout.isMergedIntoTools(.output) || layout.isFrontInTools(.output))
         case .editor: return !outputTabs.isEmpty
         }
     }
