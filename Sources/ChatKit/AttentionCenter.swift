@@ -237,8 +237,32 @@ public enum RecentStore {
     /// 读取最近项目路径(新→旧,已不存在的目录会被过滤)。
     public static func projects(_ defaults: UserDefaults = RecentStore.defaults) -> [String] {
         let list = defaults.stringArray(forKey: projectsKey) ?? []
-        return list.filter { FileManager.default.fileExists(atPath: $0) }
+        // 目录是否存在的检查最多 12 次 `fileExists`(磁盘 I/O),而本函数会在视图 body 里被反复调用:
+        // 原始列表没变且距上次检查不到 TTL 时直接复用结果(目录被删除最迟 TTL 后体现)
+        let now = ContinuousClock.now
+        let owner = ObjectIdentifier(defaults)
+        if let hit = projectsCache.withLock({ cache -> [String]? in
+            guard let cache, cache.owner == owner, cache.raw == list, now - cache.at < projectsCacheTTL else { return nil }
+            return cache.filtered
+        }) { return hit }
+        let filtered = list.filter { FileManager.default.fileExists(atPath: $0) }
+        projectsCache.withLock { $0 = ProjectsCache(owner: owner, raw: list, filtered: filtered, at: now) }
+        return filtered
     }
+
+    /// 最近项目存在性检查的缓存有效期。
+    static let projectsCacheTTL: Duration = .seconds(5)
+
+    private struct ProjectsCache: Sendable {
+        let owner: ObjectIdentifier
+        let raw: [String]
+        let filtered: [String]
+        let at: ContinuousClock.Instant
+    }
+    private static let projectsCache = OSAllocatedUnfairLock<ProjectsCache?>(initialState: nil)
+
+    /// 丢弃最近项目缓存(测试用)。
+    static func resetProjectsCache() { projectsCache.withLock { $0 = nil } }
 
     /// 记录项目(去重置顶,最多 12 个)。
     public static func recordProject(_ path: String, _ defaults: UserDefaults = RecentStore.defaults) {

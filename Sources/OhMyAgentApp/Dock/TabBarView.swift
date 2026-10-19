@@ -122,6 +122,11 @@ struct TabItemView: View {
     let isFocused: Bool
     @State private var hovering = false
 
+    /// 标签当前的状态填充(无填充为 nil);背景与标题渐隐覆盖层共用,保证两者颜色一致。
+    private var tabFill: Color? {
+        isActive ? (hovering ? OMColors.subtleFill : nil) : (hovering ? OMColors.pressedFill : OMColors.hoverFill)
+    }
+
     var body: some View {
         HStack(spacing: 4) {
             // 会话有状态(运行中呼吸灯/等待/未读)时,状态点取代类型图标(二者互斥)
@@ -138,14 +143,8 @@ struct TabItemView: View {
                 .frame(maxWidth: TabMetrics.labelMaxWidth, alignment: .leading)
                 .fixedSize(horizontal: true, vertical: false)
                 // 尾部有状态/关闭按钮时,标题末端淡出,避免与之重叠
-                .mask(
-                    HStack(spacing: 0) {
-                        Rectangle()
-                        if showsTrailing {
-                            LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing).frame(width: 60) // ui-lint:allow 仅作遮罩/淡出,非装饰
-                        }
-                    }
-                )
+                // 渐隐用背景色渐变覆盖层(不用 .mask:避免每个标签离屏渲染);底色 = 标签栏背景 + 当前标签状态填充
+                .omFadeTrailingEdge(width: 60, base: OMColors.surface, fill: tabFill, enabled: showsTrailing)
         }
         .padding(.horizontal, 8)
         // 关闭按钮/状态点叠在标签右端,不单独占位
@@ -154,7 +153,7 @@ struct TabItemView: View {
         .foregroundStyle(isActive ? OMColors.secondaryText : OMColors.primaryText)
         .background(
             RoundedRectangle(cornerRadius: TabMetrics.radius, style: .continuous)
-                .fill(isActive ? (hovering ? OMColors.subtleFill : Color.clear) : (hovering ? OMColors.pressedFill : OMColors.hoverFill))
+                .fill(tabFill ?? Color.clear)
         )
         .contentShape(RoundedRectangle(cornerRadius: TabMetrics.radius, style: .continuous))
         .transaction { $0.animation = nil }

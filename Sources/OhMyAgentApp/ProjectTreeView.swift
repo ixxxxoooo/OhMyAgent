@@ -36,11 +36,13 @@ extension WorkbenchModel {
         let model = sessions[project.id]
         // 该项目下所有已打开的会话(含尚无内容的空白新对话):点了「新对话」就是真实存在的会话,不随选中项目变化而消失
         let openModels = conversations.filter { $0.key.projectID == project.id }.map(\.value)
-        let cache = Dictionary(project.sessions.map { ($0.sessionId, $0) }, uniquingKeysWith: { first, _ in first })
+        // 只有存在已打开会话时才需要按 ID 查缓存条目(避免为 400 条缓存会话白建字典)
+        let cache = openModels.isEmpty ? [:] : Dictionary(project.sessions.map { ($0.sessionId, $0) }, uniquingKeysWith: { first, _ in first })
         let currentAgent = model?.descriptor.id
         let deleted = Set(project.deletedSessions)
+        let openIDs = Set(openModels.compactMap(\.sessionId))
         var rows: [(key: Date, row: SidebarSession)] = project.sessions.compactMap { item in
-            guard !openModels.contains(where: { $0.sessionId == item.sessionId }), !EmptySessionRegistry.isHidden(item.sessionId), !deleted.contains(item.sessionId) else { return nil }
+            guard !openIDs.contains(item.sessionId), !EmptySessionRegistry.isHidden(item.sessionId), !deleted.contains(item.sessionId) else { return nil }
             let displayDate = Self.parseDate(item.updatedAt) ?? Self.parseDate(item.createdAt) ?? Self.parseDate(item.firstSeenAt)
             return (item.stableKey, SidebarSession(
                 projectID: project.id, sessionId: item.sessionId, uid: nil,
@@ -75,7 +77,8 @@ struct ProjectTreeView: View {
 
     /// 所有项目中已置顶的会话。
     private var pinned: [SidebarSession] {
-        workbench.projects.flatMap { project in
+        // 只有登记了置顶会话的项目才需要构造完整会话行(其余项目由各自的 ProjectGroup 构造),避免每次 body 对全部项目重复排序
+        workbench.projects.filter { !$0.pinnedSessions.isEmpty }.flatMap { project in
             workbench.sidebarSessions(for: project).filter { item in
                 guard let id = item.sessionId else { return false }
                 return project.pinnedSessions.contains(id)
@@ -551,12 +554,8 @@ private struct SessionLine: View {
                 // minWidth: 0 允许收缩到小于文字自然宽度(否则长标题会把整行撑出侧栏)
                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                 .clipped()
-                .mask(
-                    HStack(spacing: 0) {
-                        Rectangle()
-                        LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing).frame(width: 24) // ui-lint:allow 仅作遮罩/淡出,非装饰
-                    }
-                )
+                // 渐隐用背景色渐变覆盖层(不用 .mask:避免每行离屏渲染);底色 = 侧栏背景 + 当前行状态填充
+                .omFadeTrailingEdge(width: 24, base: OMColors.sidebar, fill: isSelected ? OMColors.selectedFill : (hovering ? OMColors.hoverFill : nil))
             trailing
                 .frame(width: 76, height: 20, alignment: .trailing)
         }

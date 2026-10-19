@@ -829,6 +829,23 @@ struct AttentionTests {
         #expect(center.indicator == .none)
     }
 
+    @Test("最近项目存在性检查带缓存:列表变化立即生效,TTL 内目录消失沿用旧结果")
+    func recentProjectsCache() throws {
+        RecentStore.resetProjectsCache()
+        let defaults = try #require(UserDefaults(suiteName: "oma-test-\(UUID().uuidString)"))
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("oma-recent-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        RecentStore.recordProject(dir.path, defaults)
+        #expect(RecentStore.projects(defaults) == [dir.path])
+        // TTL 内目录被删:沿用缓存,避免每次 body 都做磁盘检查
+        try FileManager.default.removeItem(at: dir)
+        #expect(RecentStore.projects(defaults) == [dir.path])
+        // 原始列表变化:立即重新检查
+        RecentStore.recordProject(NSHomeDirectory(), defaults)
+        #expect(RecentStore.projects(defaults) == [NSHomeDirectory()])
+        RecentStore.resetProjectsCache()
+    }
+
     @Test("最近会话去重、限量、按时间排序;最近项目去重置顶")
     func recents() {
         let defaults = UserDefaults(suiteName: "oma-test-\(UUID().uuidString)")!

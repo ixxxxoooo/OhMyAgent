@@ -207,8 +207,7 @@ public final class WorkbenchModel {
     /// 解析 ISO8601(含/不含毫秒)时间;使用值类型解析策略,可在任意线程高频调用。
     public nonisolated static func parseDate(_ text: String?) -> Date? {
         guard let text else { return nil }
-        return (try? Date(text, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)))
-            ?? (try? Date(text, strategy: Date.ISO8601FormatStyle()))
+        return DateParseCache.date(for: text)
     }
 
     // MARK: 项目
