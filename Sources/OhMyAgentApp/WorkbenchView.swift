@@ -374,6 +374,13 @@ struct CenterColumn: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             if workbench.layout.bottomVisible {
                 BottomPanelView(workbench: workbench)
+            } else if DockDrag.shared.panel != nil || DockDrag.shared.tabID.flatMap({ workbench.panelItem(forTab: $0) }) != nil {
+                // 底部栏已收起时,拖动面板标签期间出现落点条,可把标签放回底部
+                Text("放到此处,移到底部面板")
+                    .font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
+                    .frame(maxWidth: .infinity).frame(height: 32)
+                    .background(OMColors.surface)
+                    .panelDropZone(.bottom, workbench: workbench)
             }
         }
         // 主题/强调色变化时整体重建,令牌颜色立即生效(终端进程由 TerminalStore 持有,不受影响)

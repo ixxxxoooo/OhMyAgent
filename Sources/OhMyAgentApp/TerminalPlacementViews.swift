@@ -131,8 +131,13 @@ struct TerminalSidePanel: View {
             .contentShape(Rectangle())
             .panelDragSource(.terminal)
             Divider()
-            TerminalPanelView(workbench: workbench, root: root)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if DockDrag.shared.hasPayload {
+                // 拖动期间换成占位,避免终端 AppKit 视图吞掉落点
+                Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                TerminalPanelView(workbench: workbench, root: root)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(OMColors.surface)
