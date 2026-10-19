@@ -116,6 +116,82 @@ enum OMLeafContent {
         return NSAttributedString(string: text, attributes: [.font: NSFont.systemFont(ofSize: scaled), .foregroundColor: color, .paragraphStyle: style])
     }
 
+    // MARK: 表格
+
+    /// 表格列之间的间距。
+    static let tableColumnGap: CGFloat = 16
+
+    /// 表格的富文本:单元格以制表符分隔、列宽由制表位对齐,表头下方用分隔线;
+    /// 复制选区即得到「制表符 + 换行」分隔的文本(可直接粘贴进电子表格)。
+    /// - Parameters:
+    ///   - header: 表头
+    ///   - rows: 数据行
+    /// - Returns: 富文本
+    static func table(header: [String], rows: [[String]]) -> NSAttributedString {
+        let size = 11.5 * OMScale.ui
+        let columns = max(header.count, rows.map(\.count).max() ?? 0)
+        guard columns > 0 else { return NSAttributedString() }
+        func cell(_ source: String, weight: NSFont.Weight) -> NSAttributedString {
+            tableCell(source, size: size, weight: weight)
+        }
+        let headerCells = (0..<columns).map { cell($0 < header.count ? header[$0] : "", weight: .medium) }
+        let bodyCells = rows.map { row in (0..<columns).map { cell($0 < row.count ? row[$0] : "", weight: .regular) } }
+        // 列宽 = 该列最宽单元格 + 列间距
+        var widths = [CGFloat](repeating: 0, count: columns)
+        for line in [headerCells] + bodyCells {
+            for (index, text) in line.enumerated() { widths[index] = max(widths[index], ceil(text.size().width)) }
+        }
+        var stops: [NSTextTab] = []
+        var position: CGFloat = 0
+        for width in widths.dropLast() {
+            position += width + tableColumnGap
+            stops.append(NSTextTab(textAlignment: .left, location: position))
+        }
+        let result = NSMutableAttributedString()
+        func append(_ line: [NSAttributedString], rule: Bool, last: Bool) {
+            let style = NSMutableParagraphStyle()
+            style.tabStops = stops
+            style.defaultTabInterval = 0
+            style.paragraphSpacing = last ? 0 : 6
+            style.lineBreakMode = .byClipping
+            let piece = NSMutableAttributedString()
+            for (index, text) in line.enumerated() {
+                if index > 0 { piece.append(NSAttributedString(string: "\t")) }
+                piece.append(text)
+            }
+            if !last { piece.append(NSAttributedString(string: "\n")) }
+            piece.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: piece.length))
+            if rule { piece.addAttribute(omRuleBelowKey, value: NSColor(OMColors.hairline), range: NSRange(location: 0, length: piece.length)) }
+            result.append(piece)
+        }
+        append(headerCells, rule: true, last: bodyCells.isEmpty)
+        for (index, line) in bodyCells.enumerated() { append(line, rule: false, last: index == bodyCells.count - 1) }
+        return result
+    }
+
+    /// 表格单元格:行内 Markdown(粗体、斜体、删除线、链接、行内代码)→ 富文本。
+    private static func tableCell(_ source: String, size: CGFloat, weight: NSFont.Weight) -> NSAttributedString {
+        let parsed = inlineMarkdown(source)
+        let result = NSMutableAttributedString()
+        for run in parsed.runs {
+            let intent = run.inlinePresentationIntent ?? []
+            let text = String(parsed[run.range].characters).replacingOccurrences(of: "\n", with: " ")
+            if intent.contains(.code) {
+                result.append(NSAttributedString(string: text, attributes: [
+                    .font: NSFont.monospacedSystemFont(ofSize: size, weight: .regular), .foregroundColor: NSColor(OMColors.accentText),
+                ]))
+                continue
+            }
+            var font = NSFont.systemFont(ofSize: size, weight: intent.contains(.stronglyEmphasized) ? .bold : weight)
+            if intent.contains(.emphasized) { font = NSFontManager.shared.convert(font, toHaveTrait: .italicFontMask) }
+            var attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor(OMColors.primaryText)]
+            if intent.contains(.strikethrough) { attributes[.strikethroughStyle] = NSUnderlineStyle.single.rawValue }
+            if let link = run.link { attributes[.link] = link; attributes[.foregroundColor] = NSColor(OMColors.link) }
+            result.append(NSAttributedString(string: text, attributes: attributes))
+        }
+        return result
+    }
+
     // MARK: Diff
 
     /// Diff 行号槽总宽度(含色条与两侧内边距)与单列宽度、符号列宽度。

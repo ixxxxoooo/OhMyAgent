@@ -12,6 +12,8 @@ import DesignSystem
 let omLineFillKey = NSAttributedString.Key("OMLineFill")
 /// 行号槽标记(值为 `OMGutterInfo`,设在每个段落上):布局管理器据此在左侧画行号槽、色条与符号。
 let omGutterKey = NSAttributedString.Key("OMGutter")
+/// 段落下方分隔线标记(值为 `NSColor`):布局管理器在该段最后一个行片段下方画一条贯穿视图宽度的 0.5pt 线(表格表头用)。
+let omRuleBelowKey = NSAttributedString.Key("OMRuleBelow")
 
 /// 一行的行号槽描述(Diff 用):行号、符号与配色。实现 `isEqual` 以便增量更新时比较属性。
 final class OMGutterInfo: NSObject {
@@ -86,6 +88,10 @@ final class OMLeafLayoutManager: NSLayoutManager {
             guard let fill = value as? NSColor else { return }
             paintFill(fill, characterRange: range, origin: origin, width: width)
         }
+        storage.enumerateAttribute(omRuleBelowKey, in: charRange) { value, range, _ in
+            guard let color = value as? NSColor else { return }
+            paintRule(color, characterRange: range, origin: origin, width: width)
+        }
         storage.enumerateAttribute(omGutterKey, in: charRange) { value, range, _ in
             guard let info = value as? OMGutterInfo else { return }
             paintGutter(info, characterRange: range, origin: origin)
@@ -99,6 +105,16 @@ final class OMLeafLayoutManager: NSLayoutManager {
         enumerateLineFragments(forGlyphRange: glyphRange) { fragment, _, _, _, _ in
             NSRect(x: 0, y: fragment.minY + origin.y - 0.5, width: width, height: fragment.height + 1).fill()
         }
+    }
+
+    /// 在一段字符最后一个行片段的下方画分隔线(位于段后间距的中线)。
+    private func paintRule(_ color: NSColor, characterRange: NSRange, origin: NSPoint, width: CGFloat) {
+        let glyphRange = self.glyphRange(forCharacterRange: characterRange, actualCharacterRange: nil)
+        var bottom: CGFloat?
+        enumerateLineFragments(forGlyphRange: glyphRange) { fragment, _, _, _, _ in bottom = fragment.maxY }
+        guard let bottom else { return }
+        color.setFill()
+        NSRect(x: 0, y: bottom + origin.y + 2.5, width: width, height: 0.5).fill()
     }
 
     /// 画一个段落的行号槽:整段高度的槽底色与色条,首个行片段上画行号与符号。

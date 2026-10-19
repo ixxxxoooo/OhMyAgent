@@ -103,3 +103,21 @@ struct DiffTextLeaf: View {
         .id(wrap)
     }
 }
+
+/// 表格叶子:制表位对齐的文本 + 表头分隔线,不折行,宽表在叶子内水平滚动;复制得到制表符分隔文本。
+struct TableTextLeaf: View {
+    let header: [String]
+    let rows: [[String]]
+
+    var body: some View {
+        var hasher = Hasher()
+        hasher.combine(header)
+        hasher.combine(rows)
+        hasher.combine(OMLeafStyle.current)
+        return OMTextLeaf(
+            signature: hasher.finalize(),
+            config: OMTextLeafConfig(wrap: false, inset: NSSize(width: 10, height: 10))
+        ) { OMLeafContent.table(header: header, rows: rows) }
+        .accessibilityLabel(String(localized: "表格"))
+    }
+}

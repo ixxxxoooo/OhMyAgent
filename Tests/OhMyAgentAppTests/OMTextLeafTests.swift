@@ -159,3 +159,38 @@ struct OMTextLeafMeasureFallbackTests {
         #expect(size.width > 100)
     }
 }
+
+@MainActor
+@Suite("表格文本叶子内容", .serialized)
+struct OMTableLeafContentTests {
+    @Test("单元格以制表符分隔、行以换行分隔,复制即得到 TSV(行内 Markdown 标记已去掉)")
+    func tsvText() {
+        let text = OMLeafContent.table(header: ["模块", "说明"], rows: [["**核心**", "`ACPKit`"], ["界面", "SwiftUI"]])
+        #expect(text.string == "模块\t说明\n核心\tACPKit\n界面\tSwiftUI")
+    }
+
+    @Test("表头带下方分隔线标记,数据行没有")
+    func headerRule() {
+        let text = OMLeafContent.table(header: ["甲", "乙"], rows: [["1", "2"]])
+        #expect(text.attribute(omRuleBelowKey, at: 0, effectiveRange: nil) != nil)
+        #expect(text.attribute(omRuleBelowKey, at: text.length - 1, effectiveRange: nil) == nil)
+    }
+
+    @Test("制表位数 = 列数 - 1,且按列最宽单元格递增")
+    func tabStopsFollowColumnWidths() {
+        let text = OMLeafContent.table(header: ["a", "b", "c"], rows: [["很长很长很长的单元格", "x", "y"]])
+        guard let style = text.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle else {
+            Issue.record("缺少段落样式"); return
+        }
+        #expect(style.tabStops.count == 2)
+        #expect(style.tabStops[0].location > 100, "第一列应按最宽的中文单元格撑开")
+        #expect(style.tabStops[1].location > style.tabStops[0].location)
+    }
+
+    @Test("行不足的数据行按空单元格补齐;空表返回空文本")
+    func raggedAndEmpty() {
+        let text = OMLeafContent.table(header: ["a", "b"], rows: [["1"]])
+        #expect(text.string == "a\tb\n1\t")
+        #expect(OMLeafContent.table(header: [], rows: []).length == 0)
+    }
+}

@@ -25,7 +25,6 @@ struct MarkdownView: View {
                 VStack(alignment: .leading, spacing: 10) { segmentViews(segments) }
             }
         }
-        .textSelection(.enabled)
     }
 
     /// 各渲染段的视图。
@@ -234,37 +233,13 @@ struct CodeBlockView: View {
     }
 }
 
-/// 表格块。
+/// 表格块:正文由 AppKit 文本叶子渲染(制表位对齐、可跨行选择、复制为制表符分隔文本)。
 struct TableBlockView: View {
     let header: [String]
     let rows: [[String]]
 
     var body: some View {
-        // 内容超出容器宽度时可左右滚动(单元格不折行、不截断)
-        ScrollView(.horizontal, showsIndicators: false) {
-            grid
-                .fixedSize(horizontal: true, vertical: false)
-                .padding(10)
-        }
-        .omSolidCard()
-    }
-
-    /// 表格网格本体。
-    private var grid: some View {
-        Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
-            GridRow {
-                ForEach(Array(header.enumerated()), id: \.offset) { _, cell in
-                    InlineMarkdownText(cell).font(OMFonts.small.weight(.medium))
-                }
-            }
-            Divider().gridCellUnsizedAxes(.horizontal)
-            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                GridRow {
-                    ForEach(Array(row.enumerated()), id: \.offset) { _, cell in
-                        InlineMarkdownText(cell).font(OMFonts.small)
-                    }
-                }
-            }
-        }
+        TableTextLeaf(header: header, rows: rows)
+            .omSolidCard()
     }
 }
