@@ -25,7 +25,8 @@ public extension WorkbenchModel {
         guard item == .terminal || item == .output else { return nil }
         if layout.zone(of: item) != .editor { place(item, in: .editor) }
         if item == .terminal { showTerminal() } else { showOutput() }
-        return (item == .terminal ? residentTerminalTabs : outputTabs).first?.id
+        if item == .terminal { return (currentResidentTerminalTab ?? residentTerminalTabs.first)?.id }
+        return outputTabs.first?.id
     }
 
     /// 把面板移到某区域并保证它可见(拖动标签到底部栏/侧栏时用;与仅换摆放的 `place` 不同,会显示该面板)。

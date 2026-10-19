@@ -122,10 +122,27 @@ final class TerminalPanelStore {
         return String(localized: "终端") + (instance.serial > 1 ? " \(instance.serial)" : "")
     }
 
+    /// 丢弃某项目根的全部终端:结束进程并删除状态(项目被移除时调用)。
+    /// - Parameter root: 项目根目录
+    func discard(root: String) {
+        guard let state = states.removeValue(forKey: root) else { return }
+        for instance in state.instances { TerminalStore.shared.remove(instance.id) }
+        persist()
+        Log.terminal.info("项目已移除,结束其终端", ["count": "\(state.instances.count)"])
+    }
+
     /// 写回状态并持久化(只有一个初始实例且未改动的状态不落盘)。
     private func commit(_ state: TerminalPanelState, for root: String) {
         states[root] = state
-        if states.count > Self.maxRoots, let stale = states.keys.first(where: { $0 != root }) { states[stale] = nil }
+        if states.count > Self.maxRoots, let stale = states.keys.first(where: { $0 != root }), let evicted = states.removeValue(forKey: stale) {
+            // 被挤出的项目不再出现在任何列表里,其进程也一并结束,避免成为看不见的孤儿进程
+            for instance in evicted.instances { TerminalStore.shared.remove(instance.id) }
+        }
+        persist()
+    }
+
+    /// 把全部状态写入偏好。
+    private func persist() {
         do {
             defaults.set(try JSONEncoder().encode(states), forKey: Self.defaultsKey)
         } catch {

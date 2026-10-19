@@ -147,6 +147,33 @@ struct WorkbenchTests {
         model.shutdownAll()
     }
 
+    @Test("终端在编辑区:每个项目各一个终端标签,显隐只作用于当前项目;移除项目会回调")
+    func editorTerminalsPerProject() throws {
+        let env = try makeEnvironment()
+        defer { try? FileManager.default.removeItem(at: env.root) }
+        let model = makeModel(env.store)
+        var removed: [String] = []
+        model.onProjectRemoved = { removed.append($0) }
+        let alpha = try #require(model.openProject(env.dirs[0]))
+        model.setTerminalPlacement(.editor)
+        model.showTerminal()
+        let beta = try #require(model.openProject(env.dirs[1]))
+        #expect(!model.isTerminalShown)
+        model.showTerminal()
+        #expect(model.isTerminalShown)
+        #expect(model.dock.allTabs.contains { $0.kind == .terminal(id: "bottom:" + alpha) })
+        #expect(WorkbenchModel.residentTerminalRoot("bottom:" + beta) == beta)
+        // 拖动时取当前项目的终端标签
+        let moving = try #require(model.openPanelTab(.terminal))
+        #expect(model.dock.allTabs.first { $0.id == moving }?.kind == .terminal(id: "bottom:" + beta))
+        // 隐藏当前项目的终端不影响另一个项目
+        model.hideTerminal()
+        #expect(!model.isTerminalShown)
+        #expect(model.dock.allTabs.contains { $0.kind == .terminal(id: "bottom:" + alpha) })
+        model.removeProject(alpha)
+        #expect(removed == [alpha])
+    }
+
     @Test("终端在各位置间移动:显示状态保持,终端标识不变,旧位置被清理,摆放持久化")
     func terminalPlacementMigration() throws {
         let env = try makeEnvironment()

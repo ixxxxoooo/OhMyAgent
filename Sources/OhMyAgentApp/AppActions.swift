@@ -245,7 +245,7 @@ final class AppActions {
     /// 关闭当前终端实例(最后一个被关闭时隐藏面板)。
     func closeActiveTerminal() {
         let workbench = AppEnvironment.shared.workbench
-        guard workbench.layout.placement.terminal != .editor, workbench.isTerminalShown else { return }
+        guard workbench.isTerminalShown else { return }
         let root = workbench.selectedProjectID ?? NSHomeDirectory()
         let store = TerminalPanelStore.shared
         if store.close(store.state(for: root).activeID, root: root) == .closedLast { workbench.hideTerminal() }

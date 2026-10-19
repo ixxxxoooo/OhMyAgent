@@ -59,8 +59,9 @@ struct TabContentView: View {
         case .blame(let path): GitBlameTabView(workbench: workbench, path: path)
         case .agentTerminal(let projectID, let terminalID): AgentTerminalTabView(workbench: workbench, projectID: projectID, terminalID: terminalID)
         case .terminal(let id) where id.hasPrefix("bottom:"):
-            // 常驻终端(从底部/侧栏拖进编辑区的那个):沿用带多标签/终端列表的面板视图
-            TerminalPanelView(workbench: workbench, root: workbench.selectedProjectID ?? NSHomeDirectory())
+            // 常驻终端(从底部/侧栏拖进编辑区的那个):沿用带多标签/终端列表的面板视图;按标签自己的项目根显示,
+            // 不跟随当前项目(否则多个项目的终端标签会显示同一组终端,同一终端视图被两处挂载而空白)
+            TerminalPanelView(workbench: workbench, root: WorkbenchModel.residentTerminalRoot(id) ?? workbench.selectedProjectID ?? NSHomeDirectory())
         case .terminal(let id):
             TerminalTabView(id: id, fallbackDirectory: workbench.selectedProjectID ?? NSHomeDirectory())
         }

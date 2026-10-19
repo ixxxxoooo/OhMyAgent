@@ -59,6 +59,7 @@ final class AppEnvironment {
         }
         // 切换项目后,为新项目重新安排预热
         workbench.onProjectSelected = { [weak self] _ in self?.scheduleEngineWarmup(delay: .seconds(2)) }
+        workbench.onProjectRemoved = { root in TerminalPanelStore.shared.discard(root: root) }
     }
 
     /// 为当前项目安排引擎预热(演示/脚本化 Agent 模式不预热)。

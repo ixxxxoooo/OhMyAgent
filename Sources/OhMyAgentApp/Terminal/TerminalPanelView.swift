@@ -117,7 +117,7 @@ struct TerminalPanelView: View {
     }
 
     private func close(_ id: String) {
-        if store.close(id, root: root) == .closedLast { workbench.hideTerminal() }
+        if store.close(id, root: root) == .closedLast { workbench.hideTerminal(root: root) }
     }
 
     private func rename(_ instance: TerminalInstance) {

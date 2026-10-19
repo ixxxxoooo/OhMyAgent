@@ -43,6 +43,8 @@ public final class WorkbenchModel {
     @ObservationIgnored public let warmPool = EngineWarmPool()
     /// 选中项目变化回调(应用层据此安排预热)。
     @ObservationIgnored public var onProjectSelected: (@MainActor (String) -> Void)?
+    /// 项目被移除后回调(应用层据此结束该项目的常驻终端进程)。
+    @ObservationIgnored public var onProjectRemoved: (@MainActor (String) -> Void)?
     @ObservationIgnored public var makeAgentSession: (@MainActor (URL, String) -> SessionModel?)?
     /// 默认引擎 ID(应用层注入):新会话优先认领它的待命会话,实现「新对话/打开历史几乎零等待」。
     @ObservationIgnored public var defaultAgentID: (@MainActor () -> String?)?
@@ -272,6 +274,7 @@ public final class WorkbenchModel {
             conversations[key] = nil
         }
         lastSlot[id] = nil
+        onProjectRemoved?(id)
         if selectedProjectID == id { selectedProjectID = orderedProjects.first?.id }
         if let selected = selectedProjectID { select(project: selected) }
         log.info("移除项目", ["path": id])
@@ -1101,17 +1104,30 @@ public final class WorkbenchModel {
     /// 项目级常驻终端的标识(与终端存储一致;面板位置变化时进程保持存活)。
     public var residentTerminalID: String { "bottom:" + (selectedProjectID ?? NSHomeDirectory()) }
 
-    /// 编辑区中的常驻终端标签(终端放在编辑区时存在)。
+    /// 从常驻终端标识取出项目根(不是常驻终端标识为 nil)。
+    /// - Parameter terminalID: 终端标识(`bottom:<项目根>`)
+    /// - Returns: 项目根目录
+    public static func residentTerminalRoot(_ terminalID: String) -> String? {
+        terminalID.hasPrefix("bottom:") ? String(terminalID.dropFirst("bottom:".count)) : nil
+    }
+
+    /// 编辑区中的常驻终端标签(终端放在编辑区时存在;每个项目最多一个)。
     var residentTerminalTabs: [WorkbenchTab] {
         dock.allTabs.filter { if case .terminal(let id) = $0.kind { return id.hasPrefix("bottom:") } else { return false } }
     }
 
-    /// 终端当前是否显示在界面上。
+    /// 当前项目在编辑区中的常驻终端标签。
+    var currentResidentTerminalTab: WorkbenchTab? {
+        let id = residentTerminalID
+        return dock.allTabs.first { $0.kind == .terminal(id: id) }
+    }
+
+    /// 终端当前是否显示在界面上(编辑区摆放时看当前项目的终端标签)。
     public var isTerminalShown: Bool {
         switch layout.placement.terminal {
         case .bottom: return layout.bottomVisible && layout.bottomPane == .terminal
         case .left, .right: return layout.terminalVisible
-        case .editor: return !residentTerminalTabs.isEmpty
+        case .editor: return currentResidentTerminalTab != nil
         }
     }
 
@@ -1130,12 +1146,14 @@ public final class WorkbenchModel {
     }
 
     /// 隐藏终端(进程保持存活;编辑区终端标签会被关闭,进程仍由终端存储保留)。
-    public func hideTerminal() {
+    /// - Parameter root: 编辑区摆放时要关闭哪个项目的终端标签(默认当前项目;其他项目的终端标签不受影响)
+    public func hideTerminal(root: String? = nil) {
         switch layout.placement.terminal {
         case .bottom: layout.bottomVisible = false
         case .left, .right: layout.terminalVisible = false
         case .editor:
-            for tab in residentTerminalTabs { dock.close(tab.id) }
+            let id = root.map { "bottom:" + $0 } ?? residentTerminalID
+            for tab in residentTerminalTabs where tab.kind == .terminal(id: id) { dock.close(tab.id) }
             syncSelectionFromDock()
         }
     }
