@@ -78,6 +78,8 @@ public final class WorkbenchModel {
     /// 待命会话被认领后回调(应用层据此补充新的待命会话)。
     @ObservationIgnored public var onWarmSessionTaken: (@MainActor () -> Void)?
     @ObservationIgnored private var saveTask: Task<Void, Never>?
+    /// 落盘序列化器(后台写盘与同步保存共用,保证新快照不被旧快照覆盖)。
+    @ObservationIgnored private let saveSequencer = SaveSequencer()
     /// 启动时从状态文件读到、尚未创建会话的标签记录:首次显示该标签时据此恢复原会话
     @ObservationIgnored private var pendingRestores: [ConversationKey: ChatSlotRecord] = [:]
     /// 启动时目录不存在的项目(外接盘/网络盘未挂载等):不显示,但保存时原样写回,目录恢复后下次启动重新出现
@@ -1499,13 +1501,13 @@ public final class WorkbenchModel {
 
     // MARK: 持久化
 
-    /// 合并短时间内的多次修改后写盘(拖拽分隔条时不会每帧写文件)。
+    /// 合并短时间内的多次修改后写盘(拖拽分隔条时不会每帧写文件);防抖到期后编码与写盘在后台线程完成。
     func scheduleSave() {
         saveTask?.cancel()
         saveTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(400))
             guard !Task.isCancelled else { return }
-            self?.saveNow()
+            self?.saveInBackground()
         }
     }
 
@@ -1524,9 +1526,8 @@ public final class WorkbenchModel {
         return result.values.sorted { ($0.projectID, $0.slot ?? "") < ($1.projectID, $1.slot ?? "") }
     }
 
-    /// 立即写盘。
-    public func saveNow() {
-        saveTask?.cancel()
+    /// 在主线程取当前状态快照(值类型)。
+    private func snapshotState() -> WorkbenchState {
         var state = WorkbenchState()
         state.layout = layout
         let shownIDs = Set(projects.map(\.id))
@@ -1534,9 +1535,35 @@ public final class WorkbenchModel {
         state.selectedProjectID = selectedProjectID
         state.dock = dock
         state.chatSlots = chatSlotRecords()
+        return state
+    }
+
+    /// 后台写盘:快照在主线程取,JSON 编码与原子写入放到后台(不阻塞主线程);
+    /// 代号保证较旧的快照不会覆盖较新的(含退出时的同步保存)。
+    func saveInBackground() {
+        saveTask?.cancel()
+        let state = snapshotState()
+        let generation = saveSequencer.nextGeneration()
+        let sequencer = saveSequencer
+        let store = store
+        let projectCount = projects.count
+        Task.detached(priority: .utility) {
+            let span = Log.perf.span("保存工作台状态", warnMs: 30, quiet: true, ["projects": "\(projectCount)", "mode": "background"])
+            defer { span.end() }
+            do { try sequencer.write(generation: generation, state: state, store: store) } catch {
+                Log.app.error("保存工作台状态失败", error: error, ["file": store.fileURL.path])
+            }
+        }
+    }
+
+    /// 立即写盘(同步;退出与测试使用)。
+    public func saveNow() {
+        saveTask?.cancel()
+        let state = snapshotState()
+        let generation = saveSequencer.nextGeneration()
         let span = Log.perf.span("保存工作台状态", warnMs: 30, quiet: true, ["projects": "\(projects.count)"])
         defer { span.end() }
-        do { try store.save(state) } catch { log.error("保存工作台状态失败", error: error, ["file": store.fileURL.path]) }
+        do { try saveSequencer.write(generation: generation, state: state, store: store) } catch { log.error("保存工作台状态失败", error: error, ["file": store.fileURL.path]) }
     }
 }
 
