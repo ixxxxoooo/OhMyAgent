@@ -141,25 +141,35 @@ struct OMTooltipBubble: View {
 }
 
 /// 悬浮提示修饰器:只负责上报悬停,真正的显示由 `OMTooltipCenter` 完成。
+/// 本地化查表推迟到真正悬停(或文字变化)时:界面上带提示的控件成百上千,
+/// 若在每次 `body` 里都查 `Bundle`,滚动/重算时白白付出这笔开销。
 public struct OMTooltipModifier: ViewModifier {
-    private let text: String
+    /// 未本地化的原文(中文键或已本地化的字符串)
+    private let rawText: String
     private let icon: String?
     @State private var id = UUID()
 
+    /// - Parameters:
+    ///   - text: 提示原文(悬停时才按当前语言查表)
+    ///   - icon: 可选 Lucide 图标
     public init(text: String, icon: String? = nil) {
-        self.text = text
+        self.rawText = text
         self.icon = icon
     }
+
+    /// 按当前语言查表后的提示文字。
+    private var localized: String { Bundle.main.localizedString(forKey: rawText, value: nil, table: nil) }
 
     public func body(content: Content) -> some View {
         content
             .onHover { hovering in
-                if hovering { OMTooltipCenter.shared.schedule(owner: id, text: text, icon: icon) }
+                if hovering { OMTooltipCenter.shared.schedule(owner: id, text: localized, icon: icon) }
                 else { OMTooltipCenter.shared.hide(owner: id) }
             }
-            .onChange(of: text) { OMTooltipCenter.shared.refresh(owner: id, text: text, icon: icon) }
+            .onChange(of: rawText) { OMTooltipCenter.shared.refresh(owner: id, text: localized, icon: icon) }
             .onDisappear { OMTooltipCenter.shared.hide(owner: id) }
-            .accessibilityHint(Text(verbatim: text))
+            // Text 在渲染时才解析本地化,body 里不查表;字符串按键处理、不做格式化
+            .accessibilityHint(Text(LocalizedStringResource(String.LocalizationValue(rawText))))
     }
 }
 
@@ -169,7 +179,7 @@ extension View {
     ///   - text: 提示文字
     ///   - icon: 可选 Lucide 图标
     public func omTooltip<S: StringProtocol>(_ text: S, icon: String? = nil) -> some View {
-        modifier(OMTooltipModifier(text: Bundle.main.localizedString(forKey: String(text), value: nil, table: nil), icon: icon))
+        modifier(OMTooltipModifier(text: String(text), icon: icon))
     }
 }
 
