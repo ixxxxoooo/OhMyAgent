@@ -892,7 +892,8 @@ struct TerminalOutputView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Text("$").foregroundStyle(OMColors.tertiaryText)
-                ShellCommandText(command: session.command, lineLimit: 1)
+                ShellCommandText(command: session.command, lineLimit: 6)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer()
                 if session.sandboxed { OMTag(String(localized: "沙箱"), tint: OMColors.secondaryText) }
                 if session.isBackground { OMTag(String(localized: "后台"), tint: OMColors.secondaryText) }

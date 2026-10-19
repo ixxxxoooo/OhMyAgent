@@ -112,10 +112,12 @@ struct AgentTerminalContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 8) {
+            HStack(alignment: .top, spacing: 8) {
                 Image.om("lock", size: 12).foregroundStyle(OMColors.tertiaryText)
                     .omTooltip("Agent 正在使用这个终端,只读")
-                ShellCommandText(command: session.command, lineLimit: 1)
+                    .frame(height: 16)
+                ShellCommandText(command: session.command, lineLimit: 6)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
                 if session.isBackground { OMTag(String(localized: "后台"), tint: OMColors.secondaryText) }
                 if session.isRunning {
@@ -131,7 +133,8 @@ struct AgentTerminalContentView: View {
             .font(OMFonts.monoSmall)
             .foregroundStyle(OMColors.secondaryText)
             .padding(.horizontal, 12)
-            .frame(height: 28)
+            .padding(.vertical, 6)
+            .frame(minHeight: 28)
             .background(OMColors.surface)
             Divider()
             AgentTerminalHost(session: session, revision: session.output.utf8.count &+ session.discontinuity &* 1_000_003)
