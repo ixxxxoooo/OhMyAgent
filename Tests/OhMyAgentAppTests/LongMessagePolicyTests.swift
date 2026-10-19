@@ -40,4 +40,13 @@ struct LongMessagePolicyTests {
         #expect(!LongMessagePolicy.needsCollapse(content: collapsed + line * 0.4, lineHeight: line))
         #expect(LongMessagePolicy.needsCollapse(content: collapsed + line, lineHeight: line))
     }
+
+    @Test("折叠阈值带滞回:已折叠时退出阈值更低,边界附近不抖动")
+    func needsCollapseHysteresis() {
+        let collapsed = line * CGFloat(LongMessagePolicy.collapsedLines)
+        let boundary = collapsed + line * 0.4   // 介于 0.25 与 0.5 行余量之间
+        #expect(!LongMessagePolicy.needsCollapse(content: boundary, lineHeight: line, wasCollapsible: false))
+        #expect(LongMessagePolicy.needsCollapse(content: boundary, lineHeight: line, wasCollapsible: true))
+        #expect(!LongMessagePolicy.needsCollapse(content: collapsed, lineHeight: line, wasCollapsible: true))
+    }
 }

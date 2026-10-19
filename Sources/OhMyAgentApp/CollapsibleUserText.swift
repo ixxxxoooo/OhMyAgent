@@ -40,8 +40,13 @@ enum LongMessagePolicy {
     }
 
     /// 实测内容是否确实需要折叠。
-    static func needsCollapse(content: CGFloat, lineHeight: CGFloat) -> Bool {
-        content > lineHeight * (CGFloat(collapsedLines) + 0.5)
+    /// - Parameters:
+    ///   - content: 文本实际高度
+    ///   - lineHeight: 单行行高
+    ///   - wasCollapsible: 此前是否已处于折叠形态:是则用较低的退出阈值(滞回),
+    ///     避免窗口宽度在边界附近抖动时在「折叠/平铺」两种视图结构间来回切换
+    static func needsCollapse(content: CGFloat, lineHeight: CGFloat, wasCollapsible: Bool = false) -> Bool {
+        content > lineHeight * (CGFloat(collapsedLines) + (wasCollapsible ? 0.25 : 0.5))
     }
 }
 
@@ -51,16 +56,18 @@ struct CollapsibleUserText: View {
     @State private var expanded = false
     @State private var hovering = false
     @State private var contentHeight: CGFloat = 0
+    /// 上一次是否处于折叠形态(折叠阈值滞回用)
+    @State private var wasCollapsible = false
 
     private var lineHeight: CGFloat { 13 * OMScale.ui * OMScale.timeline * OMFonts.readingLineHeightRatio }
 
     var body: some View {
-        if LongMessagePolicy.isLikelyLong(text) || LongMessagePolicy.needsCollapse(content: contentHeight, lineHeight: lineHeight) {
+        if LongMessagePolicy.isLikelyLong(text) || LongMessagePolicy.needsCollapse(content: contentHeight, lineHeight: lineHeight, wasCollapsible: wasCollapsible) {
             collapsible
         } else {
             // 短消息也测量一次高度:窄窗口下折行超出估算时自动转为折叠
             plainText
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0; wasCollapsible = false }
         }
     }
 
@@ -73,24 +80,18 @@ struct CollapsibleUserText: View {
 
     private var collapsible: some View {
         let height = LongMessagePolicy.windowHeight(content: contentHeight, lineHeight: lineHeight, expanded: expanded)
-        let overflows = LongMessagePolicy.needsCollapse(content: contentHeight, lineHeight: lineHeight)
+        let overflows = LongMessagePolicy.needsCollapse(content: contentHeight, lineHeight: lineHeight, wasCollapsible: wasCollapsible)
         return VStack(alignment: .leading, spacing: 4) {
             ScrollView(.vertical, showsIndicators: hovering) {
                 plainText
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0; wasCollapsible = true }
             }
             // 仅悬停时可在窗口内滚动;其余时间滚轮交给外层会话流
             .scrollDisabled(!hovering)
             .frame(height: height)
-            .mask {
-                // 收起且内容溢出时底部渐隐,提示还有更多
-                if overflows && !expanded {
-                    LinearGradient(stops: [.init(color: .black, location: 0), .init(color: .black, location: 0.78), .init(color: .clear, location: 1)], startPoint: .top, endPoint: .bottom) // ui-lint:allow 仅作遮罩/淡出,非装饰
-                } else {
-                    Rectangle()
-                }
-            }
+            // 仅在「收起且内容溢出」时才挂底部渐隐 mask:mask 会让整块走离屏渲染,不溢出/已展开时不付这笔开销
+            .omBottomFade(enabled: overflows && !expanded)
             .onHover { hovering = $0 }
             if overflows {
                 Button {
@@ -108,6 +109,22 @@ struct CollapsibleUserText: View {
                 .omTooltip(expanded ? String(localized: "收起长消息") : String(localized: "展开全部内容"))
                 .accessibilityLabel(expanded ? String(localized: "收起长消息") : String(localized: "展开全部内容"))
             }
+        }
+    }
+}
+
+private extension View {
+    /// 底部渐隐遮罩,仅 `enabled` 时才挂(`.mask` 会让整块走离屏渲染)。
+    /// 两个分支都用 `.identity` 过渡,切换时不会出现交叉淡入淡出。
+    @ViewBuilder
+    func omBottomFade(enabled: Bool) -> some View {
+        if enabled {
+            mask {
+                LinearGradient(stops: [.init(color: OMColors.maskInk, location: 0), .init(color: OMColors.maskInk, location: 0.78), .init(color: .clear, location: 1)], startPoint: .top, endPoint: .bottom) // ui-lint:allow 仅作遮罩/淡出,非装饰
+            }
+            .transition(.identity)
+        } else {
+            transition(.identity)
         }
     }
 }
