@@ -134,11 +134,6 @@ private struct OMContextMenuAnchor: NSViewRepresentable {
     func updateNSView(_ nsView: OMContextMenuAnchorView, context: Context) { nsView.provider = provider }
 }
 
-/// 弱引用盒子。
-private struct WeakAnchor {
-    weak var view: OMContextMenuAnchorView?
-}
-
 /// 无边框可成为 key 的面板(接收键盘)。
 private final class OMMenuPanel: NSPanel {
     override var canBecomeKey: Bool { true }
@@ -150,7 +145,7 @@ private final class OMMenuPanel: NSPanel {
 final class OMContextMenuCenter {
     static let shared = OMContextMenuCenter()
 
-    private var anchors: [WeakAnchor] = []
+    private var anchors = WeakRegistry<OMContextMenuAnchorView>()
     private var monitor: Any?
     private var panel: OMMenuPanel?
     /// 上下文菜单当前是否正在展示
@@ -167,8 +162,7 @@ final class OMContextMenuCenter {
 
     /// 登记锚点并按需安装全局事件监听。
     func register(_ view: OMContextMenuAnchorView) {
-        anchors.removeAll { $0.view == nil || $0.view === view }
-        anchors.append(WeakAnchor(view: view))
+        anchors.insert(view)
         guard monitor == nil else { return }
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.rightMouseDown, .leftMouseDown, .otherMouseDown, .scrollWheel]) { [weak self] event in
             let consumed = MainActor.assumeIsolated { self?.handle(event) ?? false }
@@ -195,10 +189,9 @@ final class OMContextMenuCenter {
 
     /// 命中点所在的最内层(面积最小、可见)锚点。
     private func innermostAnchor(at pointInWindow: NSPoint, in window: NSWindow) -> OMContextMenuAnchorView? {
-        anchors.removeAll { $0.view == nil }
         var best: (view: OMContextMenuAnchorView, area: CGFloat)?
-        for box in anchors {
-            guard let view = box.view, view.window === window, !view.isHiddenOrHasHiddenAncestor else { continue }
+        for view in anchors.alive() {
+            guard view.window === window, !view.isHiddenOrHasHiddenAncestor else { continue }
             let local = view.convert(pointInWindow, from: nil)
             guard view.bounds.contains(local), view.visibleRect.contains(local) else { continue }
             let area = view.bounds.width * view.bounds.height
