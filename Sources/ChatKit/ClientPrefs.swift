@@ -72,6 +72,10 @@ public enum ClientPrefs {
         public static let runningSend = "chat.runningSend"
         /// 会话闲置多少分钟后休眠 Agent 进程释放内存(0 = 从不)
         public static let idleHibernateMinutes = "session.idleHibernateMinutes"
+        /// 是否启用会话休眠(关闭后任何情况下都不休眠会话)
+        public static let hibernateEnabled = "session.hibernateEnabled"
+        /// 系统内存紧张时是否提前休眠(收紧为闲置 1 分钟、只留 1 个进程)
+        public static let hibernateUnderPressure = "session.hibernateUnderPressure"
         /// 同时保持运行的 Agent 进程上限(0 = 不限);超出时最久未用的空闲会话先休眠
         public static let maxLiveSessions = "session.maxLive"
         /// 任务完成通知是否带提示音
@@ -127,6 +131,16 @@ public enum ClientPrefs {
     /// 运行中再发送的默认行为,默认引导。
     public static func runningSendMode(_ defaults: UserDefaults = .standard) -> RunningSendMode {
         RunningSendMode(rawValue: defaults.string(forKey: Key.runningSend) ?? "") ?? .steer
+    }
+
+    /// 是否启用会话休眠,默认开启。
+    public static func hibernateEnabled(_ defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: Key.hibernateEnabled) as? Bool ?? true
+    }
+
+    /// 系统内存紧张时是否提前休眠,默认开启。
+    public static func hibernateUnderPressure(_ defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: Key.hibernateUnderPressure) as? Bool ?? true
     }
 
     /// 会话闲置休眠时间(分钟,0 = 从不);缺省 10 分钟,范围 0...240。

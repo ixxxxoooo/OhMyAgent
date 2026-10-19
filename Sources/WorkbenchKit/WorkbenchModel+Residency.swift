@@ -29,6 +29,8 @@ extension WorkbenchModel {
     @discardableResult
     public func enforceResidency(now: Date = Date()) -> Int {
         let visible = visibleConversationKeys()
+        // 总开关关闭:仍刷新可见会话的使用时间,但不休眠任何会话
+        let enabled = ClientPrefs.hibernateEnabled()
         var byID: [String: SessionModel] = [:]
         var candidates: [ResidencyCandidate] = []
         for (key, model) in conversations {
@@ -44,8 +46,13 @@ extension WorkbenchModel {
                 lastUsedAt: model.lastUsedAt
             ))
         }
+        guard enabled else {
+            for (key, model) in conversations where visible.contains(key) { model.touch() }
+            return 0
+        }
+        let pressure = underMemoryPressure && ClientPrefs.hibernateUnderPressure()
         var limits = residencyLimits()
-        if underMemoryPressure { limits = limits.underPressure }
+        if pressure { limits = limits.underPressure }
         // 待命(预热)会话也占着进程:并入上限,先回收它们
         let standby = warmPool.standbyCount
         let victims = SessionResidencyPolicy.victims(candidates: candidates, limits: limits, now: now)
@@ -53,9 +60,9 @@ extension WorkbenchModel {
         for id in victims {
             if byID[id]?.hibernate() == true { count += 1 }
         }
-        if underMemoryPressure, standby > 0 { warmPool.discardAll(except: nil) }
+        if pressure, standby > 0 { warmPool.discardAll(except: nil) }
         if count > 0 {
-            log.info("休眠闲置会话", ["count": "\(count)", "total": "\(conversations.count)", "pressure": underMemoryPressure ? "yes" : "no"])
+            log.info("休眠闲置会话", ["count": "\(count)", "total": "\(conversations.count)", "pressure": pressure ? "yes" : "no"])
         }
         return count
     }
