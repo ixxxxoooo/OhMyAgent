@@ -12,9 +12,6 @@ import WorkbenchKit
 
 struct ExplorerView: View {
     let workbench: WorkbenchModel
-    private let model = ExplorerModel.shared
-    /// 拖入的文件悬停在空白处(落点为项目根目录)
-    @State private var rootDropTargeted = false
 
     /// 某根目录的 Git 装饰(随状态轮询更新;非仓库时为空)
     fileprivate static func decorations(forRoot root: String) -> GitDecorationIndex {
@@ -23,39 +20,114 @@ struct ExplorerView: View {
 
     var body: some View {
         if let project = workbench.selectedProject {
-            VStack(spacing: 0) {
-                HStack(spacing: 8) {
-                    Text(project.name).font(OMFonts.small.weight(.medium)).lineLimit(1)
-                    Spacer()
-                    toolButton("file-plus", "新建文件") { ExplorerActions.create(in: project.id, directory: false, workbench: workbench) }
-                    toolButton("folder-plus", "新建文件夹") { ExplorerActions.create(in: project.id, directory: true, workbench: workbench) }
-                    toolButton("chevrons-down-up", "折叠全部文件夹") { model.collapseAll() }
-                    toolButton("refresh-cw", "刷新") { model.bump(); WorkspaceIndexModel.shared.refresh(root: project.id) }
-                }
-                .padding(.horizontal, 10).padding(.vertical, 6)
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
-                        DirectoryChildren(path: project.id, depth: 0, workbench: workbench, root: project.id)
-                    }
-                    .padding(.vertical, 4)
-                    .environment(\.gitDecorations, Self.decorations(forRoot: project.id))
-                    // 多文件夹工作区:附加文件夹各自成一棵树
-                    ForEach(project.extraFolders, id: \.self) { folder in
-                        ExtraRootSection(folder: folder, project: project.id, workbench: workbench)
-                    }
-                }
-                // 拖到行之间或列表下方的空白处 = 放进项目根目录(行上的放置区优先)
-                .explorerDropTarget(project.id, workbench: workbench, targeted: $rootDropTargeted)
-                .overlay {
-                    if rootDropTargeted {
-                        RoundedRectangle(cornerRadius: OMRadius.control).strokeBorder(OMColors.accent, lineWidth: 1.5)
-                            .padding(2).allowsHitTesting(false)
-                    }
-                }
-            }
+            ExplorerProjectView(projectID: project.id, projectName: project.name, extraFolders: project.extraFolders, workbench: workbench)
+                .id(project.id)
         } else {
             OMEmptyState { Label("没有项目", om: "folder", size: 28) } description: { Text("添加一个项目后,这里会显示它的文件。") }
         }
+    }
+}
+
+/// 滚动窗口:首个可见行与可见行数(只在变化时刷新挂载窗口)。
+private struct ExplorerScrollWindow: Equatable {
+    var first = 0
+    var count = 60
+}
+
+/// 一个项目的资源管理器:顶部工具条 + 窗口化的文件树(只挂载可见行,数千行也不卡)。
+private struct ExplorerProjectView: View {
+    let projectID: String
+    let projectName: String
+    let extraFolders: [String]
+    let workbench: WorkbenchModel
+    private let model = ExplorerModel.shared
+    @State private var tree = ExplorerTree()
+    @State private var window = ExplorerScrollWindow()
+    /// 拖入的文件悬停在空白处(落点为项目根目录)
+    @State private var rootDropTargeted = false
+    /// 拖入的文件当前悬停的行
+    @State private var dropRowID: String?
+    @State private var probe = ExplorerScrollProbe()
+
+    /// 固定行高:窗口化需要按行号直接换算位置
+    static let rowHeight: CGFloat = 22
+    /// 内容区上下内边距
+    static let verticalPadding: CGFloat = 4
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Text(projectName).font(OMFonts.small.weight(.medium)).lineLimit(1)
+                Spacer()
+                toolButton("file-plus", "新建文件") { ExplorerActions.create(in: projectID, directory: false, workbench: workbench) }
+                toolButton("folder-plus", "新建文件夹") { ExplorerActions.create(in: projectID, directory: true, workbench: workbench) }
+                toolButton("chevrons-down-up", "折叠全部文件夹") { model.collapseAll() }
+                toolButton("refresh-cw", "刷新") { model.bump(); WorkspaceIndexModel.shared.refresh(root: projectID) }
+            }
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            ScrollView {
+                treeRows
+            }
+            .onScrollGeometryChange(for: ExplorerScrollWindow.self) { geometry in
+                let metrics = ExplorerFlatten.viewport(offset: Double(geometry.contentOffset.y) - Double(Self.verticalPadding),
+                                                       viewport: Double(geometry.containerSize.height), rowHeight: Double(Self.rowHeight))
+                return ExplorerScrollWindow(first: metrics.first, count: metrics.count)
+            } action: { _, new in
+                window = new
+            }
+            .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y } action: { _, new in
+                probe.offset = new
+            }
+            // 统一放置区:文件夹行 = 放进该文件夹,文件行 = 放进所在文件夹,空白处 = 项目根目录
+            .onDrop(of: [.fileURL], delegate: ExplorerListDropDelegate(
+                rows: { tree.rows }, scrollOffset: { probe.offset }, projectID: projectID, workbench: workbench,
+                targetRowID: $dropRowID, rootTargeted: $rootDropTargeted))
+            .overlay {
+                if rootDropTargeted {
+                    RoundedRectangle(cornerRadius: OMRadius.control).strokeBorder(OMColors.accent, lineWidth: 1.5)
+                        .padding(2).allowsHitTesting(false)
+                }
+            }
+        }
+        .onChange(of: extraFolders, initial: true) { _, _ in tree.configure(sources) }
+        .onChange(of: model.collapseRevision) { _, _ in tree.collapseAll() }
+        .task(id: tree.refreshToken) { tree.refresh() }
+        // 拖入的文件悬停在折叠的文件夹上片刻自动展开,便于继续往深层拖
+        .task(id: dropRowID) {
+            guard let id = dropRowID, let row = tree.rows.first(where: { $0.id == id }), row.entry.isDirectory, !row.isExpanded else { return }
+            try? await Task.sleep(for: .milliseconds(700))
+            if dropRowID == id, !Task.isCancelled { tree.expand(row.entry.path) }
+        }
+    }
+
+    private var sources: [ExplorerSource] {
+        [ExplorerSource(root: projectID, showsHeader: false)] + extraFolders.map { ExplorerSource(root: $0, showsHeader: true) }
+    }
+
+    /// 只挂载可见窗口内的行,窗口外用占位高度撑出完整滚动范围。
+    @ViewBuilder
+    private var treeRows: some View {
+        let rows = tree.rows
+        let range = ExplorerFlatten.window(first: window.first, visibleCount: window.count, total: rows.count)
+        let visible = rows[range]
+        let decorations = Dictionary(visible.map(\.root).map { ($0, ExplorerView.decorations(forRoot: $0)) }, uniquingKeysWith: { first, _ in first })
+        let activePath = activeFilePath
+        VStack(alignment: .leading, spacing: 0) {
+            Color.clear.frame(height: CGFloat(range.lowerBound) * Self.rowHeight)
+            ForEach(visible) { item in
+                ExplorerTreeRow(item: item, project: projectID, tree: tree, workbench: workbench,
+                                decoration: item.isRootHeader ? nil : decorations[item.root]?.kind(for: item.entry.path),
+                                isActive: !item.entry.isDirectory && activePath == item.entry.path,
+                                isDropTarget: dropRowID == item.id)
+            }
+            Color.clear.frame(height: CGFloat(max(0, rows.count - range.upperBound)) * Self.rowHeight)
+        }
+        .padding(.vertical, Self.verticalPadding)
+    }
+
+    private var activeFilePath: String? {
+        if case .file(let path)? = workbench.dock.focusedGroup?.active?.kind { return path }
+        return nil
     }
 
     private func toolButton(_ icon: String, _ help: LocalizedStringKey, action: @escaping () -> Void) -> some View {
@@ -64,121 +136,96 @@ struct ExplorerView: View {
     }
 }
 
-/// 多文件夹工作区里的一个附加文件夹:可折叠的根节点 + 它自己的文件树与 Git 装饰。
-private struct ExtraRootSection: View {
-    let folder: String
+/// 文件树中的一行(文件、文件夹或附加文件夹根):点击、拖出与右键菜单。
+/// 放置(拖入)由列表层的单个放置区统一处理(见 `ExplorerListDropDelegate`),
+/// 避免每行各注册一个放置区导致滚动时焦点/响应者遍历随行数暴涨。
+private struct ExplorerTreeRow: View {
+    let item: ExplorerRowItem
     let project: String
+    let tree: ExplorerTree
     let workbench: WorkbenchModel
-    @State private var expanded = true
-    @State private var dropTargeted = false
+    let decoration: GitDecorationKind?
+    let isActive: Bool
+    /// 拖入的文件正悬停在本行(放置目标高亮)
+    let isDropTarget: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ExplorerRow(depth: 0, name: (folder as NSString).lastPathComponent, isDirectory: true, expanded: expanded,
-                        chevron: expanded ? "chevron-down" : "chevron-right", isActive: false, decoration: nil, isDropTarget: dropTargeted) {
-                expanded.toggle()
-            }
-            .explorerDropTarget(folder, workbench: workbench, targeted: $dropTargeted)
-            .omContextMenu {
-                OMMenuItem("在 Finder 中显示", icon: "folder-search") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: folder)]) }
-                OMMenuItem("从工作区移除", icon: "x", isDestructive: true) {
-                    workbench.removeFolder(folder, from: project)
-                    WorkspaceIndexModel.shared.refresh(root: project)
-                }
-            }
-            if expanded {
-                DirectoryChildren(path: folder, depth: 1, workbench: workbench, root: folder)
-                    .environment(\.gitDecorations, ExplorerView.decorations(forRoot: folder))
+        let entry = item.entry
+        ExplorerRow(depth: item.depth, name: entry.name, isDirectory: entry.isDirectory, expanded: item.isExpanded,
+                    chevron: entry.isDirectory ? (item.isExpanded ? "chevron-down" : "chevron-right") : nil,
+                    isActive: isActive, decoration: decoration, isDropTarget: isDropTarget) {
+            if entry.isDirectory { tree.toggle(entry.path) } else { workbench.openFile(entry.path, preview: true) }
+        }
+        .simultaneousGesture(TapGesture(count: 2).onEnded { if !entry.isDirectory { workbench.openFile(entry.path, preview: false) } })
+        // 拖到输入框 = 引用 @路径;拖到标签栏/内容区 = 打开;拖到资源管理器的文件夹 = 移动(附加文件夹根不可拖)
+        .onDrag { item.isRootHeader ? NSItemProvider() : NSItemProvider(object: URL(fileURLWithPath: entry.path) as NSURL) }
+        .omContextMenu {
+            if item.isRootHeader {
+                ExplorerMenu.headerEntries(folder: entry.path, project: project, workbench: workbench)
+            } else {
+                ExplorerMenu.entries(entry: entry, root: item.root, workbench: workbench)
             }
         }
     }
 }
 
-/// 某目录的子项(进入视图时后台列举;文件操作后随刷新信号重新列举)。
-private struct DirectoryChildren: View {
-    let path: String
-    let depth: Int
+/// 列表层的统一放置区:按光标位置换算出落点行(文件夹 = 放进该文件夹,文件 = 放进它所在的文件夹,
+/// 空白处 = 项目根目录),悬停高亮,悬停片刻由视图自动展开文件夹。
+private struct ExplorerListDropDelegate: DropDelegate {
+    let rows: () -> [ExplorerRowItem]
+    let scrollOffset: () -> CGFloat
+    let projectID: String
     let workbench: WorkbenchModel
-    let root: String
-    @State private var entries: [FileEntry] = []
-    private let model = ExplorerModel.shared
+    @Binding var targetRowID: String?
+    @Binding var rootTargeted: Bool
 
-    var body: some View {
-        // 用 VStack 承载 task:空的 ForEach 本身没有视图,修饰符不会生效
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(entries) { entry in
-                if entry.isDirectory {
-                    FolderRow(entry: entry, depth: depth, workbench: workbench, root: root)
-                } else {
-                    FileRow(entry: entry, depth: depth, workbench: workbench, root: root)
-                }
-            }
-        }
-        .task(id: "\(path)#\(model.revision)#\(model.version(of: path))") {
-            let target = path
-            entries = await Task.detached(priority: .userInitiated) { WorkspaceFiles.list(directory: target) }.value
-        }
+    func validateDrop(info: DropInfo) -> Bool { info.hasItemsConforming(to: [.fileURL]) }
+
+    func dropEntered(info: DropInfo) { update(info) }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        update(info)
+        return DropProposal(operation: .copy)
+    }
+
+    func dropExited(info: DropInfo) { clear() }
+
+    func performDrop(info: DropInfo) -> Bool {
+        let directory = target(at: info.location).directory
+        clear()
+        ExplorerActions.drop(info.itemProviders(for: [.fileURL]), into: directory, workbench: workbench)
+        return true
+    }
+
+    private func update(_ info: DropInfo) {
+        let result = target(at: info.location)
+        if targetRowID != result.rowID { targetRowID = result.rowID }
+        let atRoot = result.rowID == nil
+        if rootTargeted != atRoot { rootTargeted = atRoot }
+    }
+
+    private func clear() {
+        targetRowID = nil
+        rootTargeted = false
+    }
+
+    /// 光标位置对应的落点(行 ID 为 nil 表示空白处)。
+    private func target(at location: CGPoint) -> (rowID: String?, directory: String) {
+        let list = rows()
+        let y = Double(location.y + scrollOffset() - ExplorerProjectView.verticalPadding)
+        guard y >= 0 else { return (nil, projectID) }
+        let index = Int(y / Double(ExplorerProjectView.rowHeight))
+        guard list.indices.contains(index) else { return (nil, projectID) }
+        let entry = list[index].entry
+        let directory = entry.isDirectory ? entry.path : (entry.path as NSString).deletingLastPathComponent
+        return (list[index].id, directory)
     }
 }
 
-private struct FolderRow: View {
-    let entry: FileEntry
-    let depth: Int
-    let workbench: WorkbenchModel
-    let root: String
-    @State private var expanded = false
-    /// 拖入的文件正悬停在本文件夹上
-    @State private var dropTargeted = false
-    @Environment(\.gitDecorations) private var decorations
-    private let model = ExplorerModel.shared
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ExplorerRow(depth: depth, name: entry.name, isDirectory: true, expanded: expanded, chevron: expanded ? "chevron-down" : "chevron-right", isActive: false, decoration: decorations.kind(for: entry.path), isDropTarget: dropTargeted) {
-                expanded.toggle()
-            }
-            .onDrag { NSItemProvider(object: URL(fileURLWithPath: entry.path) as NSURL) }
-            // 拖到文件夹上 = 放进该文件夹;悬停片刻自动展开,便于继续往深层拖
-            .explorerDropTarget(entry.path, workbench: workbench, targeted: $dropTargeted)
-            .task(id: dropTargeted) {
-                guard dropTargeted, !expanded else { return }
-                try? await Task.sleep(for: .milliseconds(700))
-                if dropTargeted, !Task.isCancelled { expanded = true }
-            }
-            .omContextMenu { ExplorerMenu.entries(entry: entry, root: root, workbench: workbench) }
-            if expanded {
-                DirectoryChildren(path: entry.path, depth: depth + 1, workbench: workbench, root: root)
-            }
-        }
-        .onChange(of: model.collapseRevision) { _, _ in expanded = false }
-    }
-}
-
-private struct FileRow: View {
-    let entry: FileEntry
-    let depth: Int
-    let workbench: WorkbenchModel
-    let root: String
-    @State private var dropTargeted = false
-    @Environment(\.gitDecorations) private var decorations
-
-    var body: some View {
-        let active = isActive
-        ExplorerRow(depth: depth, name: entry.name, isDirectory: false, expanded: false, chevron: nil, isActive: active, decoration: decorations.kind(for: entry.path), isDropTarget: dropTargeted) {
-            workbench.openFile(entry.path, preview: true)
-        }
-        .simultaneousGesture(TapGesture(count: 2).onEnded { workbench.openFile(entry.path, preview: false) })
-        // 拖到输入框 = 引用 @路径;拖到标签栏/内容区 = 打开;拖到资源管理器的文件夹 = 移动
-        .onDrag { NSItemProvider(object: URL(fileURLWithPath: entry.path) as NSURL) }
-        // 拖到文件上 = 放进它所在的文件夹
-        .explorerDropTarget((entry.path as NSString).deletingLastPathComponent, workbench: workbench, targeted: $dropTargeted)
-        .omContextMenu { ExplorerMenu.entries(entry: entry, root: root, workbench: workbench) }
-    }
-
-    private var isActive: Bool {
-        if case .file(let p)? = workbench.dock.focusedGroup?.active?.kind { return p == entry.path }
-        return false
-    }
+/// 滚动偏移的旁路记录(不参与观察,避免滚动时重绘视图);放置区用它换算光标所在行。
+@MainActor
+private final class ExplorerScrollProbe {
+    var offset: CGFloat = 0
 }
 
 private struct ExplorerRow: View {
@@ -218,6 +265,7 @@ private struct ExplorerRow: View {
             .padding(.vertical, 3)
             .padding(.trailing, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: ExplorerProjectView.rowHeight)
             .background(RoundedRectangle(cornerRadius: OMRadius.tag).fill(isActive || isDropTarget ? OMColors.selectedFill : (hovering ? OMColors.hoverFill : .clear)).padding(.horizontal, 4))
             .overlay {
                 if isDropTarget {
@@ -264,6 +312,16 @@ private extension String {
 }
 
 private enum ExplorerMenu {
+    /// 附加文件夹根节点的右键菜单。
+    @OMMenuBuilder
+    static func headerEntries(folder: String, project: String, workbench: WorkbenchModel) -> [MenuEntry] {
+        OMMenuItem("在 Finder 中显示", icon: "folder-search") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: folder)]) }
+        OMMenuItem("从工作区移除", icon: "x", isDestructive: true) {
+            workbench.removeFolder(folder, from: project)
+            WorkspaceIndexModel.shared.refresh(root: project)
+        }
+    }
+
     /// 资源管理器条目的右键菜单。
     @OMMenuBuilder
     static func entries(entry: FileEntry, root: String, workbench: WorkbenchModel) -> [MenuEntry] {
@@ -467,26 +525,5 @@ enum ExplorerActions {
         await withCheckedContinuation { continuation in
             _ = provider.loadObject(ofClass: URL.self) { url, _ in continuation.resume(returning: url) }
         }
-    }
-}
-
-/// 资源管理器的放置区:接收文件拖放,落点为指定文件夹,悬停时高亮。
-private struct ExplorerDropTarget: ViewModifier {
-    let directory: String
-    let workbench: WorkbenchModel
-    @Binding var targeted: Bool
-
-    func body(content: Content) -> some View {
-        content.onDrop(of: [.fileURL], isTargeted: $targeted) { providers in
-            ExplorerActions.drop(providers, into: directory, workbench: workbench)
-            return true
-        }
-    }
-}
-
-private extension View {
-    /// 让该视图成为资源管理器的放置区(落点为 `directory`)。
-    func explorerDropTarget(_ directory: String, workbench: WorkbenchModel, targeted: Binding<Bool>) -> some View {
-        modifier(ExplorerDropTarget(directory: directory, workbench: workbench, targeted: targeted))
     }
 }
