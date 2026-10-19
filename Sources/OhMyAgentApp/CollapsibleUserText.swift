@@ -53,6 +53,8 @@ enum LongMessagePolicy {
 /// 用户消息正文:短消息原样显示,长消息折叠成固定高度窗口(底部渐隐),悬停可滚动,右下角「展开/收起」。
 struct CollapsibleUserText: View {
     let text: String
+    /// 无选区的单击回调(正文是 AppKit 叶子,点击不会交给外层 SwiftUI 手势)
+    var onClick: (() -> Void)?
     @State private var expanded = false
     @State private var hovering = false
     @State private var contentHeight: CGFloat = 0
@@ -72,10 +74,7 @@ struct CollapsibleUserText: View {
     }
 
     private var plainText: some View {
-        Text(text)
-            .font(OMFonts.reading)
-            .lineSpacing(OMFonts.readingLineSpacing)
-            .textSelection(.enabled)
+        ProseTextLeaf(text: text, size: 13, color: OMColors.primaryText, timeline: true, onClick: onClick)
     }
 
     private var collapsible: some View {

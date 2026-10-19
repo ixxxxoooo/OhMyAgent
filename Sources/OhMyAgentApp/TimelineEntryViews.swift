@@ -167,7 +167,10 @@ struct UserMessageView: View {
                 }
             }
             if !entry.displayText.isEmpty {
-                CollapsibleUserText(text: entry.displayText)
+                CollapsibleUserText(text: entry.displayText) {
+                    // 正文是 AppKit 文本叶子,点击不会冒泡到卡片的 SwiftUI 手势:无选区的单击在这里进入编辑
+                    if !entry.isSteered { sticky?.beginEditing(entry, pinned: false) }
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -370,10 +373,7 @@ struct ThoughtView: View {
             }
             .buttonStyle(.plain)
             if expanded {
-                Text(entry.text)
-                    .font(OMFonts.small)
-                    .foregroundStyle(OMColors.secondaryText)
-                    .textSelection(.enabled)
+                ProseTextLeaf(text: entry.text, size: 11.5, color: OMColors.secondaryText, timeline: false)
                     .padding(.leading, 15)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -441,11 +441,7 @@ struct NoticeView: View {
             interruptDivider
         } else if entry.isMuted {
             // 第三方 Agent 的指标类通知(如 TPS):淡色等宽小字,无图标
-            Text(entry.text)
-                .font(OMFonts.monoSmall)
-                .foregroundStyle(OMColors.tertiaryText)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            OutputTextLeaf(raw: entry.text, fontSize: 11.5, maxLines: 40, ansi: false, tint: OMColors.tertiaryText)
         } else {
             standard
         }
