@@ -48,8 +48,8 @@ private final class AnchorCache {
 struct ConversationAnchorRail: View {
     let model: SessionModel
     let sticky: StickyUserState
-    /// 点击某条提问
-    let onSelect: (UUID) -> Void
+    /// 点击某条提问的跳转动作(稳定的引用载体,使本视图入参恒定、可被 SwiftUI 跳过重算)
+    let jump: AnchorJumpAction
 
     @State private var cache = AnchorCache()
     @State private var hovering = false
@@ -102,7 +102,7 @@ struct ConversationAnchorRail: View {
         return VStack(spacing: 0) {
             ForEach(shown) { anchor in
                 let isCurrent = anchor.id == current
-                Button { picked = anchor.id; onSelect(anchor.id) } label: {
+                Button { picked = anchor.id; jump(anchor.id) } label: {
                     RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous)
                         .fill(isCurrent ? OMColors.accent : OMColors.tertiaryText.opacity(hovering ? 0.8 : 0.5))
                         .frame(width: isCurrent ? 16 : 10, height: 2)
@@ -122,7 +122,7 @@ struct ConversationAnchorRail: View {
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(anchors) { anchor in
                         let isCurrent = anchor.id == current
-                        Button { picked = anchor.id; onSelect(anchor.id) } label: {
+                        Button { picked = anchor.id; jump(anchor.id) } label: {
                             HStack(spacing: 8) {
                                 Text(verbatim: "\(anchor.number)")
                                     .font(OMFonts.caption)

@@ -12,11 +12,14 @@ import WorkbenchKit
 struct ChatView: View {
     let model: SessionModel
     @State private var position = ScrollPosition(edge: .bottom)
-    /// 跟随底部状态(纯逻辑,见 ChatKit.FollowState)
-    @State private var follow = FollowState()
+    /// 跟随底部状态(`FollowState` 的观察包装:逐帧暂存字段不触发 body 重算,见 FollowTracker)
+    @State private var follow = FollowTracker()
     @State private var scrollPhase: ScrollPhase = .idle
-    /// 上下边缘是否还有被遮住的内容(没有时不做渐隐,避免末行文字被淡化、底部留出多余空白)
-    @State private var fadeEdges = TimelineEdgeFade.Edges(top: false, bottom: false)
+    /// 上下边缘是否还有被遮住的内容(没有时不做渐隐,避免末行文字被淡化、底部留出多余空白);
+    /// 只被 `TimelineEdgeFadeHost` 读取,变化时不让 ChatView.body 重算
+    @State private var edgeFade = EdgeFadeModel()
+    /// 锚点栏跳转动作的稳定载体(使锚点栏入参稳定、可被跳过)
+    @State private var anchorJump = AnchorJumpAction()
     /// 吸顶用户消息的状态(位置上报、目标解析)
     @State private var sticky = StickyUserState()
     /// 分组结果缓存(输入区等无关状态变化时不重复分组)
@@ -51,6 +54,7 @@ struct ChatView: View {
     }
 
     var body: some View {
+        let _ = installAnchorJump()
         ZStack {
             OMColors.surface.ignoresSafeArea()
                 .contentShape(Rectangle())
@@ -177,7 +181,7 @@ struct ChatView: View {
         }
         .coordinateSpace(.named(chatScrollSpace))
         .onScrollTargetVisibilityChange(idType: UUID.self, threshold: 0.01) { ids in sticky.updateVisible(ids) }
-        .overlay { TimelineEdgeFade(edges: fadeEdges) }
+        .overlay { TimelineEdgeFadeHost(model: edgeFade) }
         .overlay(alignment: .top) { StickyUserOverlay(model: model, state: sticky, maxWidth: contentMaxWidth) }
         .clipped()
         .scrollPosition($position)
@@ -202,29 +206,23 @@ struct ChatView: View {
                 bottom: geometry.contentOffset.y + geometry.containerSize.height < geometry.contentSize.height - 4
             )
         } action: { _, edges in
-            omWithAnimation { fadeEdges = edges }
+            edgeFade.update(edges)
         }
         .onScrollGeometryChange(for: CGFloat.self) { $0.contentSize.height } action: { _, _ in
-            autoFollow()
+            // 内容增高只需要「贴底时跟随」;放手状态下的新内容计数由修订号触发的路径负责
+            autoFollow(countsActivity: false)
         }
-        .onChange(of: model.timeline.revision) { autoFollow() }
-        .overlay(alignment: .bottom) { jumpButton }
-        .overlay(alignment: .leading) {
-            ConversationAnchorRail(model: model, sticky: sticky) { id in
-                // 跳转到某条提问:暂停贴底自动跟随,避免流式输出把视口拽回底部
-                sticky.followSuspended = true
-                // 目标提问在窗口之外(被折叠的更早轮次)时,先把窗口扩到能包含它,下一回合再滚过去
-                let all = itemsCache.items(for: model.timeline, density: toolDensity)
-                if let needed = TimelineWindow.turnsToReveal(id, in: all, visibleTurns: visibleTurns) {
-                    visibleTurns = needed
-                    Task { @MainActor in
-                        await Task.yield()
-                        omWithAnimation { position.scrollTo(id: id, anchor: .top) }
-                    }
-                } else {
-                    omWithAnimation { position.scrollTo(id: id, anchor: .top) }
-                }
+        // 修订号监听放进 0 尺寸叶子视图:ChatView.body 不再依赖 revision(流式每批次都会变)
+        .background { TimelineRevisionDriver(timeline: model.timeline) { autoFollow() } }
+        .overlay(alignment: .bottom) {
+            JumpToLatestHost(follow: follow, model: model) {
+                follow.jumpToLatest()
+                sticky.followSuspended = false
+                omWithAnimation { position.scrollTo(edge: .bottom) }
             }
+        }
+        .overlay(alignment: .leading) {
+            ConversationAnchorRail(model: model, sticky: sticky, jump: anchorJump)
         }
         .onAppear {
             // 时间线挂载耗时:到下一个主循环(首轮布局之后)为止
@@ -233,27 +231,35 @@ struct ChatView: View {
         }
     }
 
+    /// 刷新锚点跳转处理(每次求值调用;载体是稳定的引用对象,闭包不参与观察)。
+    private func installAnchorJump() {
+        anchorJump.handler = { id in
+            // 跳转到某条提问:暂停贴底自动跟随,避免流式输出把视口拽回底部
+            sticky.followSuspended = true
+            // 目标提问在窗口之外(被折叠的更早轮次)时,先把窗口扩到能包含它,下一回合再滚过去
+            let all = itemsCache.items(for: model.timeline, density: toolDensity)
+            if let needed = TimelineWindow.turnsToReveal(id, in: all, visibleTurns: visibleTurns) {
+                visibleTurns = needed
+                Task { @MainActor in
+                    await Task.yield()
+                    omWithAnimation { position.scrollTo(id: id, anchor: .top) }
+                }
+            } else {
+                omWithAnimation { position.scrollTo(id: id, anchor: .top) }
+            }
+        }
+    }
+
     /// 内容变化后:贴底且用户没在滚动时才自动滚到底;否则只累计「新消息」。
-    private func autoFollow() {
+    /// - Parameter countsActivity: 是否做「放手期间新内容」的记账。修订号触发时必须记账;
+    ///   仅内容高度变化触发时,放手状态下无事可做,直接返回,避免无谓的状态写入。
+    private func autoFollow(countsActivity: Bool = true) {
+        if !countsActivity, !follow.pinned { return }
         let shouldScroll = follow.contentChanged(entryCount: model.timeline.entries.count, userScrolling: scrollPhase != .idle)
         guard shouldScroll, !sticky.followSuspended else { return }
         // 状态记账(上面)必须每次触发都做;真正的 scrollTo 每帧至多一次
         followScroll.schedule { [sticky] in
             if !sticky.followSuspended { position.scrollTo(edge: .bottom) }
-        }
-    }
-
-    /// 离开底部时的悬浮按钮:回到最新;有新内容时显示条数。
-    @ViewBuilder
-    private var jumpButton: some View {
-        if follow.showsJumpButton {
-            JumpToLatestButton(unseen: follow.unseen, hasActivity: follow.hasActivity || model.isRunning) {
-                follow.jumpToLatest()
-                sticky.followSuspended = false
-                omWithAnimation { position.scrollTo(edge: .bottom) }
-            }
-            .padding(.bottom, 10)
-            .transition(.opacity.combined(with: .offset(y: 6)))
         }
     }
 }

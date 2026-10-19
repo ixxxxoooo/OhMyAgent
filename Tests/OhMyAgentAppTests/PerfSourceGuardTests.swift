@@ -77,4 +77,14 @@ struct PerfSourceGuardTests {
             #expect(offenders.isEmpty, "\(name) 第 \(offenders) 行:拖动中直接写布局会让所有观察者逐 tick 重算")
         }
     }
+
+    @Test("ChatView.body 不得依赖滚动帧率/流式批次变化的状态:禁止 @State FollowState、body 内监听 timeline.revision、withAnimation 写渐隐边缘")
+    func chatViewBodyStaysQuiet() throws {
+        let lines = try Self.codeLines("ChatView.swift")
+        func offenders(_ predicate: (String) -> Bool) -> [Int] { lines.filter { predicate($0.code) }.map(\.line) }
+        #expect(offenders { $0.contains("@State") && $0.contains("FollowState()") }.isEmpty, "跟随状态应使用 FollowTracker(逐帧字段不参与观察)")
+        #expect(offenders { $0.contains(".onChange(of: model.timeline.revision)") }.isEmpty, "revision 监听应放进 TimelineRevisionDriver 叶子视图")
+        #expect(offenders { $0.contains("fadeEdges") }.isEmpty, "渐隐边缘应走 EdgeFadeModel + TimelineEdgeFadeHost")
+        #expect(lines.contains { $0.code.contains("TimelineRevisionDriver(") }, "ChatView 应挂载 TimelineRevisionDriver")
+    }
 }
