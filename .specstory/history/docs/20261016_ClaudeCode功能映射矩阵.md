@@ -1,155 +1,111 @@
-# Claude Code 功能映射矩阵
+# Claude Code 功能映射矩阵(含 MCP / 技能扩展支持)
 
 > @author ixxxxoooo
-> 通道说明:
-> - **A**:ACP 原生(经适配器)
-> - **B**:配置文件层(直接读写 `~/.claude/settings.json`、`~/.claude.json`、`.mcp.json`、`.claude/*`、`CLAUDE.md`)
-> - **C**:CLI 子进程(`claude mcp|plugin|auth|doctor` 等)
-> - **D**:客户端自实现
-> - **N/A**:TUI 专属,GUI 以等价方式替代或不适用,并说明原因
+> 本文合并了原《MCP与技能扩展支持》。状态以 `Sources/` 代码为准(2026-10-19 核对),找不到对应实现的条目一律标「未实现」。
+> **通道**:A = ACP 原生(经适配器);B = 直接读写配置文件(`ClaudeConfigKit`);C = 调用 `claude` CLI(`CLIRunner`);D = 客户端自实现;N/A = TUI 专属或不适用。
+> **状态**:已实现 / 部分 / 未实现 / 不适用。
 
 ## 1. 核心对话能力
 
-| Claude Code 能力 | 通道 | GUI 实现 |
+| 能力 | 通道 | 状态 | GUI 实现 |
+| --- | --- | --- | --- |
+| 思维流 `agent_thought_chunk` | A | 已实现 | 时间线思维块 |
+| 文本流式 | A | 已实现 | `MarkdownTextRunRenderer` 增量渲染 |
+| 工具调用 | A | 已实现 | 工具行/卡片(`ToolRowViews`、`ToolPresentation`) |
+| 权限审批 | A | 已实现 | 审批卡(`ToolApprovalCard`),`OMA_AUTOALLOW` 可自动批准 |
+| 计划/Todo | A | 已实现 | Plan 卡与 `*.plan.md` 标签页(`PlanDocument`) |
+| 子 Agent | A | 已实现 | 子代理卡片(`SubagentCardView`、`SubagentStatus`) |
+| 后台终端 | A+D | 已实现 | `TerminalManager`(ACP terminal 能力)+ 终端面板 |
+| Elicitation / AskUserQuestion | A | 已实现 | `Elicitation`、问题向导(`QuestionWizardView`) |
+| 图片 / `@` 提及 | A | 已实现 | `ImageIntake`、`FileMentions`、`Completion` |
+| 取消 | A | 已实现 | `session/cancel` |
+| 会话恢复 | A | 已实现 | `session/load` / `resume` / `list` / `close`(`ACPClient`) |
+| 用量与上下文 | A | 已实现 | `ContextUsage`、`ContextUsagePanel`、`PlanUsage` |
+| 运行中引导/排队 | D | 已实现 | `followUps` / `queuedPrompt` |
+
+## 2. 斜杠命令
+
+客户端本地命令见 `ChatKit/LocalCommands.swift`;Claude Code 内置命令清单见 `ChatKit/ClaudeBuiltinCommands.swift`;其余命令来自 Agent 的 `available_commands_update`,以补全项透传给 Agent。
+
+| 命令 | 状态 | GUI 入口 |
 | --- | --- | --- |
-| Extended Thinking | A | `agent_thought_chunk` → 可折叠思维面板 |
-| 文本流式 | A | `agent_message_chunk` → 零延迟渐显 + 高亮 |
-| 工具调用 | A | `tool_call` / `tool_call_update` → 工具卡片 |
-| 权限审批 | A | `session/request_permission` → 原生审批面板 |
-| 计划/Todo | A | `plan` 更新 → Plan 面板 |
-| Subagent | A | 嵌套会话,可单独取消 |
-| 后台终端 | A+D | ACP terminal 能力 + 自实现终端视图 |
-| Elicitation | A | 结构化表单 / URL 跳转 |
-| 图片/@ 提及 | A | 输入区粘贴、拖入、补全 |
-| 取消 | A | `session/cancel`(Esc / 停止按钮) |
-| 会话恢复 | A | `session/load` / `resume` / `list` / `delete` / `close` |
-| 用量与费用 | A | session usage 更新 → 用量环 |
+| `/new` `/clear` | 已实现 | 新对话 |
+| `/help` `/status` | 已实现 | 客户端本地展示 |
+| `/model` | 已实现 | 无参数打开模型菜单,带参数切换 |
+| `/config` `/permissions` `/doctor` `/usage` `/cost` | 已实现 | 分别打开对应设置页 |
+| `/agents` `/skills` `/memory` `/hooks` `/plugin` `/mcp` | 已实现 | 打开工具与扩展对应页;`/mcp` 带参数时交给 Agent |
+| `/resume` | 已实现 | 打开历史会话 |
+| `/rename` | 已实现 | 重命名当前会话 |
+| `/export` | 已实现 | 导出 Markdown |
+| `/explore` `/worktree` `/apply-worktree` `/delete-worktree` `/best-of-n` | 已实现(客户端扩展) | Explore 子 Agent、Git 工作树、多模型对比 |
+| `/compact` `/init` `/review` `/security-review` `/context` `/output-style` `/effort` `/autocompact` | 部分 | 在 Claude Code 内置清单里,作为命令透传给 Agent,无专属 GUI |
+| `/login` `/logout` | 部分 | 在内置清单里,凭据由本机 `claude` 管理,应用不做登录 UI |
+| `/goal` | 已实现 | 输入区上方目标条(`ChatStatusViews`) |
+| fork 会话 | 已实现 | `SessionModel.forkCurrentSession`(`session/fork`) |
+| `/rewind` | 不适用(有等价功能) | 回复「依赖终端界面」,用每轮结束的「本轮改动」卡片回退到检查点(`CheckpointStore`) |
+| `/add-dir` | 不适用(有等价功能) | 提示改用工作区「添加文件夹…」(`WorkspaceFolders`) |
+| `/todos` | 不适用(有等价功能) | 待办显示在输入框上方的待办卡片 |
+| `/vim` `/terminal-setup` `/statusline` `/ide` `/install-github-app` `/bug` `/release-notes` `/pr-comments` | 不适用 | 以提示文案说明不可用或已移除 |
+| `/loop` `/schedule` | 部分 | 客户端有独立的自动化(`AutomationKit`:定时与 cron 子集),与同名斜杠命令不是同一实现 |
+| `/btw` `/recap` `/reload-skills` | 未实现 | 无专属入口 |
 
-## 2. 斜杠命令全量映射
+## 3. 配置文件与扩展对象
 
-### 2.1 会话类
+| 对象 | 路径 | 通道 | 状态 / GUI |
+| --- | --- | --- | --- |
+| 用户/项目/本地设置 | `~/.claude/settings.json`、`.claude/settings.json`、`.claude/settings.local.json` | B | 已实现;`ConfigScope` 为 user / project / local |
+| 托管设置 | 系统托管目录 | B | 未实现(`ConfigScope` 无 managed 作用域) |
+| MCP | `~/.claude.json`、`.mcp.json` | B+C | 已实现(`MCPStore`、设置 → MCP) |
+| Skills | `~/.claude/skills`、`.claude/skills`、旧 `commands` | B | 已实现(`SkillStore`、设置 → 技能、新建向导 `CommandCreateSheet`) |
+| Subagents | `~/.claude/agents`、`.claude/agents` | B | 已实现(设置 → 子 Agent) |
+| 记忆/规则 | `CLAUDE.md`、`AGENTS.md`、rules | B | 已实现(`MemoryStore`、设置 → 规则) |
+| Hooks | settings 的 `hooks` | B | 已实现(`HooksStore`、设置 → Hooks) |
+| Plugins | `~/.claude/plugins` | B 只读 + C 操作 | 已实现(`PluginStore`:安装/卸载/启停/更新/市场增删与更新走 `claude plugin`) |
+| 项目信任 | - | B | 已实现(`ProjectTrust`、设置 → 项目信任) |
 
-| 命令 | 通道 | GUI 入口 |
-| --- | --- | --- |
-| `/clear` | A | 新建会话(菜单、⌘N) |
-| `/compact [instructions]` | A | 上下文用量环菜单 → 压缩,压缩事件在时间线可视化 |
-| `/resume [session]` | A | 会话列表双击 / ⌘P |
-| `/fork [prompt]` | A | 会话菜单 → 分叉 |
-| `/rewind` | D | 检查点时间线 → 回滚文件与会话 |
-| `/rename [name]` | A | 会话标题双击编辑 |
-| `/export [filename]` | D | 会话菜单 → 导出 Markdown |
-| `/recap` | A | 以斜杠命令透传,结果以卡片展示 |
-| `/branch [name]` | C | Git 面板 → 新建分支 |
-| `/copy [N]` | D | 消息右键 → 复制 |
-| `/btw [question]` | A | 旁路提问浮层 |
-| `/exit` | N/A | 关闭窗口(⌘W) |
+## 4. MCP
 
-### 2.2 上下文与成本
+- 传输:`MCPStore` 支持 stdio / http / sse / ws,SSE 在界面标注「已弃用」。
+- 作用域:user / project / local(`ConfigScope`);插件、claude.ai 连接器、managed 作用域未实现。
+- 状态:connected / needsAuth(界面显示「需要认证」)/ failed / unknown(由 `claude mcp list` 输出解析);项目 `.mcp.json` 服务器的审批状态(`needsApproval`,依据 `enabledMcpjsonServers` / `disabledMcpjsonServers` 等设置)会在列表中体现。
+- 管理页(`MCPManagerView`)支持:添加(表单与 JSON,等价 `add-json`)、编辑、删除、启停、重连、从 Claude Desktop 配置导入(读取 `claude_desktop_config.json`)。
+- 运行参数:`MCP_TIMEOUT`、`MAX_MCP_OUTPUT_TOKENS` 等环境变量在设置 → 高级;MCP 按需加载见 `McpToolSearch`。
+- 输入框补全:MCP 提供的 prompt 以 `/mcp__服务器__提示` 出现在斜杠补全里。
+- 会话 MCP 注入:`session/new` 的 `mcpServers` 由 `SessionModel` 组装(Bridge 以及注册表里启用的 `AgentMCPEntry`);用户自己的 MCP 由 `claude` 自行加载。
+- 未实现:Channels 展示、MCP resources 的 `@` 补全(Sources 中未找到对应代码)。
 
-| 命令 | 通道 | GUI 入口 |
-| --- | --- | --- |
-| `/context [all]` | A | 上下文用量环详情 |
-| `/cost` | A | 用量与成本面板 |
-| `/usage` `/usage-credits` | C | 设置 → 用量与成本 |
-| `/stats` `/insights` | C | 设置 → 用量与成本 |
-| `/status` | C | 状态栏 + 设置 → 诊断 |
-| `/heapdump` | N/A | 诊断页导出诊断包代替 |
+## 5. Skills / Subagents / Hooks / Memory
 
-### 2.3 配置类
+- Skills:`SkillStore` 解析 frontmatter(含 `disable-model-invocation`),设置页可视化编辑、新建;未知字段保留。
+- Hooks:事件清单取自 `HooksStore.events`(SessionStart、SessionEnd、UserPromptSubmit、PreToolUse、PermissionRequest、PostToolUse、PostToolUseFailure、Notification、SubagentStart、SubagentStop、Stop、StopFailure、PreCompact、PostCompact、InstructionsLoaded、TeammateIdle);处理器类型 command / http / prompt / agent / mcp_tool;来自插件的 Hook 只读。
+- Memory:多层 `CLAUDE.md` / rules 编辑;未实现「本会话实际加载了哪些指令文件」视图。
 
-| 命令 | 通道 | GUI 入口 |
-| --- | --- | --- |
-| `/config [key=value]` | B | 设置窗口 |
-| `/model [model]` | A | 工具栏模型选择器(config option) |
-| `/effort [level]` | A | 工具栏思考强度选择器 |
-| `/fast [on\|off]` | A | 工具栏 fast 开关 |
-| `/permissions` | B | 设置 → 权限 |
-| `/memory` | B | 设置 → 记忆与指令 |
-| `/output-style [style]` | B | 设置 → Agent 与模型 |
-| `/advisor` `/autocompact` | A/B | 设置 → Agent 与模型 |
-| `/theme` `/color` `/tui` `/vim` `/scroll-speed` `/focus` | N/A | TUI 外观,由 GUI 外观设置替代 |
-| `/keybindings` | D | 设置 → 快捷键(GUI 快捷键体系独立) |
-| `/statusline` | B | 底部状态栏,支持自定义脚本 |
-| `/privacy-settings` | C | 设置 → 隐私 |
-| `/terminal-setup` `/radio` `/voice` `/stickers` `/powerup` | N/A | 终端/娱乐/语音专属功能 |
+## 6. OhMyAgent Bridge 工具
 
-### 2.4 扩展类
+Bridge 是挂在 `LocalGateway` 上的进程内 HTTP MCP 服务(`Sources/AgentHost/BridgeServer.swift`,MCP 服务名 `ohmyagent`),工具名即 `BridgeTool` 的 rawValue,不带前缀:
 
-| 命令 | 通道 | GUI 入口 |
-| --- | --- | --- |
-| `/mcp [reconnect\|enable\|disable]` | A+B+C | 设置 → MCP |
-| `/skills` `/reload-skills` `/skill-doctor` | B | 设置 → Skills |
-| `/plugin` `/reload-plugins` `/plugin-authoring` | C | 设置 → Plugins |
-| `/agents` `/list-agents` | B | 设置 → Subagents |
-| `/hooks` | B | 设置 → Hooks |
-| `/add-dir` | A | 会话设置 → 附加目录(additionalDirectories) |
-| `/update-config` | B | 设置窗口 |
+| 类别 | 工具名 |
+| --- | --- |
+| 编辑器 | `open_file`、`show_diff`、`get_selection` |
+| 通知 | `notify` |
+| 画布 | `canvas_create`、`canvas_update`、`canvas_list` |
+| 搜索 | `search_code` |
+| 浏览器 | `browser_navigate`、`browser_snapshot`、`browser_click`、`browser_hover`、`browser_back`、`browser_forward`、`browser_reload`、`browser_type`、`browser_scroll`、`browser_screenshot`、`browser_console`、`browser_network`、`browser_tabs` |
+| 交互 | `ask_user_question` |
+| 图表 | `chart_guide` |
 
-### 2.5 工程类
+`browser_screenshot` 可返回 image 内容块。Bridge 默认启用全部工具(`enabled` 可裁剪)。
 
-| 命令 | 通道 | GUI 入口 |
-| --- | --- | --- |
-| `/init` | A | 项目欢迎页按钮 |
-| `/review` `/code-review` `/ultrareview` | A | 透传 + 结果卡片 |
-| `/security-review` | A | 透传 + 结果卡片 |
-| `/diff` | D | Diff 面板 |
-| `/pr-comments` `/autofix-pr` | A | 透传 |
-| `/doctor` | C | 设置 → 诊断 |
-| `/sandbox` | B | 设置 → 权限 → 沙盒 |
-| `/debug` `/verify` `/simplify` `/batch` `/run` `/run-skill-generator` | A | 内置 skill,透传 |
-| `/claude-api` `/dataviz` `/deep-research` `/design*` `/slides` | A | 内置 skill,透传 |
+## 7. 权限模式
 
-### 2.6 编排类
+模式选择器的色调映射在 `ModeTone`(含 default、plan 等);模式列表来自 Agent 上报的 config option / `current_mode_update`。设置 → 权限(`AgentPermissionPages`)提供权限规则编辑,选择「不经确认」类模式时会显示风险警告文案。
 
-| 命令 | 通道 | GUI 入口 |
-| --- | --- | --- |
-| `/plan [description]` | A | 模式选择器切到 plan |
-| `/goal` | A | 目标条(goal 扩展) |
-| `/loop` `/schedule` | A+D | 定时任务面板 |
-| `/background` `/tasks` `/stop` `/subtask` | A | 后台任务面板 |
-| `/workflows` `/workflow-authoring` `/ultraplan` | A | 透传 |
-| `/cd` | A | 切换会话 cwd(新建会话) |
+## 8. 其他对象
 
-### 2.7 账号与外部集成
-
-| 命令 | 通道 | GUI 入口 |
-| --- | --- | --- |
-| `/login` `/logout` | C+A | 设置 → 账号与鉴权(`claude auth`、ACP authenticate) |
-| `/upgrade` `/passes` `/rate-limit-options` | C | 跳转网页 |
-| `/chrome` `/claude-in-chrome` | N/A | 浏览器扩展联动,仅提示 |
-| `/desktop` `/mobile` `/remote-control` `/remote-env` `/teleport` `/web-setup` | N/A | 跨端交接,仅提供状态展示与说明 |
-| `/install-github-app` `/install-slack-app` | C | 设置 → 集成,启动 CLI 流程 |
-| `/ide` | N/A | 本应用自身即宿主 |
-| `/feedback` `/bug` `/help` `/release-notes` `/team-onboarding` `/artifacts*` `/design-sync` `/auto-mode-setup` `/fewer-permission-prompts` | A/C | 帮助菜单或透传 |
-
-## 3. 配置文件与目录
-
-| 对象 | 路径 | 通道 |
-| --- | --- | --- |
-| 用户设置 | `~/.claude/settings.json` | B |
-| 项目设置 | `.claude/settings.json`、`.claude/settings.local.json` | B |
-| 托管设置 | 系统托管目录 | B(只读) |
-| MCP local/user | `~/.claude.json` | B/C |
-| MCP project | `.mcp.json` | B |
-| Skills | `~/.claude/skills/*/SKILL.md`、`.claude/skills/*/SKILL.md` | B |
-| 旧 commands | `.claude/commands/*.md` | B(视为 Skill) |
-| Subagents | `.claude/agents/*.md`、`~/.claude/agents` | B |
-| Rules | `.claude/rules/*.md` | B |
-| 记忆 | `CLAUDE.md`、`AGENTS.md`、auto memory | B |
-| Hooks | settings 中 `hooks` 字段 | B |
-| Plugins | `~/.claude/plugins` | C(只读展示 + CLI 操作) |
-
-## 4. 权限模式
-
-| 模式 | 说明 | GUI 处理 |
-| --- | --- | --- |
-| default | 敏感操作询问 | 默认 |
-| acceptEdits | 自动接受文件编辑与常见文件系统命令 | 一键切换 |
-| plan | 只规划不执行 | 一键切换 |
-| auto | 分类器自动判断 | 设置中启用,需用户级配置 |
-| dontAsk | 未预批准的一律拒绝 | 设置中启用 |
-| bypassPermissions | 全部放行 | 二次确认,可被托管策略禁用,仅在隔离环境提示 |
-
-## 5. Hook 事件(GUI 只读展示 + 可视化编辑)
-
-SessionStart、UserPromptSubmit、PreToolUse、PermissionRequest、PostToolUse、PostToolUseFailure、Notification、SubagentStart、SubagentStop、Stop、PreCompact、PostCompact、InstructionsLoaded、ConfigChange、CwdChanged、FileChanged、WorktreeCreate、WorktreeRemove、Elicitation、SessionEnd 等。具体事件集以 Claude Code 当前版本文档为准,编辑器的事件列表由 `ClaudeConfigKit` 内置枚举并支持未知事件透传。
+| 对象 | 状态 |
+| --- | --- |
+| 检查点/回退 | 已实现(`DiffKit/CheckpointStore`) |
+| 沙盒 | 终端沙箱 `TerminalSandbox` 已实现(客户端终端);Claude Code 自身 sandbox 配置页未在 Sources 中找到,视为未实现 |
+| 定时任务 | 客户端自动化 `AutomationKit` 已实现 |
+| Quick Ask 全局热键条 | 未实现(Sources 中无对应代码) |
+| Statusline 自定义脚本 | 不适用 |

@@ -2,7 +2,7 @@
 
 > @author ixxxxoooo
 > 日期:2026-10-19
-> 背景:与 `~/baocode`(Flutter,直接 `claude -p --input-format stream-json --output-format stream-json --include-partial-messages`)对比后,评估 OhMyAgent 是否应绕过 Node 适配器(`claude-agent-acp`)直连 CLI,或让多个会话共享一个适配器进程。**结论:本轮不实现,仅作决策记录。**
+> 背景:与外部参考项目 `~/baocode`(作者本机的 Flutter 项目,不在本仓库;直接 `claude -p --input-format stream-json --output-format stream-json --include-partial-messages`)对比后,评估 OhMyAgent 是否应绕过 Node 适配器(`claude-agent-acp`)直连 CLI,或让多个会话共享一个适配器进程。**结论:本轮不实现,仅作决策记录。**
 
 ## 1. 现状
 
@@ -10,7 +10,7 @@
 OhMyAgent ──ACP(JSON-RPC/stdio)──▶ Node 适配器(每会话一个) ──▶ claude CLI(每会话一个)
 ```
 
-- 每个活跃会话 ≈ 380 MB:Node 适配器 ~100 MB + `claude` CLI ~265 MB(实测见 `20261019_内存与CPU占用优化方案.md`)。
+- 每个活跃会话 ≈ 380 MB:Node 适配器 ~100 MB + `claude` CLI ~265 MB(实测见 `20261019_性能优化记录.md` §4.1「进程占用」)。
 - 已落地的缓解:会话休眠/唤醒 + 驻留策略(闲置 10 分钟或超过 3 个进程时休眠),待命池预热。
 - 事件链路:`Transport` 行读取 → `ACPClient` 事件流 → `EventCoalescer` 合批 → 主线程 `SessionModel.handle`。本轮已把合批窗口改为随主线程处理耗时自适应,并给两个积压点加了阈值告警(`backlog.acpLines`/`backlog.events`,5000 条)。
 
@@ -18,7 +18,7 @@ OhMyAgent ──ACP(JSON-RPC/stdio)──▶ Node 适配器(每会话一个) ─
 
 收益:
 - 每会话省 ~100 MB 内存与一次 Node 冷启动(约 200~400 ms);少一层 JSON 转换,首字延迟略低。
-- 与 BaoCode 同构,可直接对照其事件处理。
+- 与外部参考项目 BaoCode(仓库外)同构,可对照其事件处理。
 
 代价与风险:
 - **协议能力回退**:适配器实现了 ACP 的权限请求(`session/request_permission`)、文件读写代理、终端代理、`session/resume`/`load` 回放、模式切换、斜杠命令、`additionalDirectories` 等。直连后这些都要在 Swift 侧用 `stream-json` 的控制消息(`can_use_tool`、`control_request` 等)重新实现,且协议随 CLI 版本漂移,没有 ACP 这种稳定契约。
