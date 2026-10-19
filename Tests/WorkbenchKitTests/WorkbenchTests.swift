@@ -167,7 +167,8 @@ struct WorkbenchTests {
         // 编辑区 → 右栏:标签关闭,侧栏显示
         model.setTerminalPlacement(.right)
         #expect(!model.dock.allTabs.contains { $0.kind == .terminal(id: terminalID) })
-        #expect(model.layout.terminalVisible && model.layout.visibleColumns(on: .right) == [.terminal])
+        // 工具栏默认在右侧:终端并入工具栏标签条,不另起一列
+        #expect(model.layout.terminalVisible && model.layout.isMergedIntoTools(.terminal) && model.layout.toolsPanel == .terminal)
 
         // 右栏 → 底部:侧栏隐藏,底部面板显示终端
         model.setTerminalPlacement(.bottom)

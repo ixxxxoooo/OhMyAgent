@@ -26,7 +26,9 @@ struct PanelPlacementModelTests {
         layout.rightVisible = true
         layout.terminalVisible = true
         #expect(layout.columns(on: .left) == [.sidebar, .tools, .terminal])
-        #expect(layout.visibleColumns(on: .left) == [.sidebar, .tools, .terminal])
+        // 终端与工具栏同侧时并入工具栏标签条,不另起一列
+        #expect(layout.visibleColumns(on: .left) == [.sidebar, .tools])
+        #expect(layout.isMergedIntoTools(.terminal))
         #expect(layout.columns(on: .right).isEmpty)
         #expect(layout.toggleCount(on: .left) == 2)
 
