@@ -69,9 +69,6 @@ struct BottomPanelView: View {
                 } else {
                 switch currentPane {
                 case .output: LogViewerView()
-                case .terminal where DockDrag.shared.hasPayload:
-                    // 拖动期间换成占位:终端是 AppKit 视图,自己注册了拖放会吞掉落点(终端进程常驻,不受影响)
-                    Color.clear
                 case .terminal:
                     // 底部面板使用项目级常驻终端(可有多个);面板隐藏/切换标签都不会结束其中的进程
                     TerminalPanelView(workbench: workbench, root: workbench.selectedProjectID ?? NSHomeDirectory())
