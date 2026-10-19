@@ -506,7 +506,8 @@ public final class SessionModel {
                 self.log.info("Agent 已就绪", ["agent": result.agentName, "ms": "\(OMLogger.milliseconds(since: connectStart))", "mcpServers": "\(prepared.servers.count)", "bridge": prepared.bridge == nil ? "off" : "on", "restore": restoring == nil ? "no" : "yes"])
                 self.connectTask = nil
                 self.refreshHistory()
-                if wokeFrom != nil { self.reapplyDormantConfig() }
+                // 先等权限模式/思考强度恢复完,再执行排队动作与发送排队消息(否则首条消息可能按默认模式执行)
+                if wokeFrom != nil { await self.reapplyDormantConfig(client: client) }
                 self.runWakeActions()
                 if let restoring {
                     // 排队消息等会话回放完成后再发(openSession 末尾会 flush)
@@ -2288,12 +2289,19 @@ public final class SessionModel {
     }
 
     /// 把休眠前的权限模式、思考强度等恢复出来(模型由会话记录自带,不处理)。
-    private func reapplyDormantConfig() {
+    /// - Parameter client: 已连接的客户端(逐项等待设置完成)
+    private func reapplyDormantConfig(client: ACPClient) async {
         let saved = dormantConfig
         dormantConfig = [:]
+        guard let sessionId else { return }
         for option in configOptions where option.category != "model" {
             guard let wanted = saved[option.id], option.currentValue.stringValue != wanted else { continue }
-            setConfigOption(option.id, value: wanted, remember: false)
+            do {
+                let updated = try await client.setConfigOption(sessionId: sessionId, configId: option.id, value: .string(wanted))
+                if !updated.isEmpty { configOptions = updated }
+            } catch {
+                log.warning("唤醒后恢复会话设置失败", ["option": option.id, "error": "\(error)"])
+            }
         }
     }
 
