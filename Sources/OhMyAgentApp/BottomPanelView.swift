@@ -10,6 +10,8 @@ import WorkbenchKit
 struct BottomPanelView: View {
     @Bindable var workbench: WorkbenchModel
     @State private var dragStartHeight: Double?
+    /// 各标签在全局坐标中的范围(用于判断松手时是否落在某个标签上以换顺序)
+    @State private var tabFrames: [BottomPane: CGRect] = [:]
 
     /// 底部面板可用的视图:只列出摆放在底部的面板(终端、输出)。
     private var panes: [BottomPane] {
@@ -38,14 +40,13 @@ struct BottomPanelView: View {
                         .foregroundStyle(isPaneActive(pane) ? OMColors.primaryText : OMColors.secondaryText)
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(isPaneActive(pane) ? OMColors.selectedFill : .clear, in: OMPillShape())
-                        // 标签可拖动换顺序
-                        .draggable(Self.dragPrefix + pane.rawValue)
-                        .dropDestination(for: String.self) { payloads, _ in
-                            guard let text = payloads.first, text.hasPrefix(Self.dragPrefix),
-                                  let dragged = BottomPane(rawValue: String(text.dropFirst(Self.dragPrefix.count))) else { return false }
-                            omWithAnimation { workbench.moveBottomPane(dragged, onto: pane) }
-                            return true
-                        }
+                        // 标签可拖动:在标签条内松手 = 换顺序;拖到工作区边缘/中心 = 换面板位置
+                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { tabFrames[pane] = $0 }
+                        .simultaneousGesture(
+                            DragGesture(minimumDistance: 6, coordinateSpace: .global)
+                                .onChanged { TerminalDragState.shared.update($0.location, panel: Self.panelItem(pane)) }
+                                .onEnded { finishTabDrag(pane, at: $0.location) }
+                        )
                 }
                 ForEach(workbench.dockedChats(in: .bottom)) { chat in
                     DockedChatTab(workbench: workbench, chat: chat)
@@ -106,8 +107,21 @@ struct BottomPanelView: View {
         workbench.activeChat(in: .bottom) == nil && currentPane == pane
     }
 
-    /// 标签拖拽载荷前缀。
-    private static let dragPrefix = "oma-bpane:"
+    /// 底部标签对应的可拖动面板。
+    private static func panelItem(_ pane: BottomPane) -> PanelItem { pane == .terminal ? .terminal : .output }
+
+    /// 结束标签拖动:落在其他底部标签上则换顺序,落在工作区其他位置则换面板摆放。
+    /// - Parameters:
+    ///   - pane: 被拖动的标签
+    ///   - location: 松手位置(全局坐标)
+    private func finishTabDrag(_ pane: BottomPane, at location: CGPoint) {
+        let placement = TerminalDragState.shared.finish(at: location)
+        if let onto = tabFrames.first(where: { $0.key != pane && $0.value.contains(location) })?.key {
+            omWithAnimation { workbench.moveBottomPane(pane, onto: onto) }
+        } else if let placement, placement != .bottom, let zone = PanelZone(rawValue: placement.rawValue) {
+            omWithAnimation { workbench.place(Self.panelItem(pane), in: zone) }
+        }
+    }
 
     private static func title(_ pane: BottomPane) -> String {
         switch pane {

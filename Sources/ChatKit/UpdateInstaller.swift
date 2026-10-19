@@ -86,7 +86,7 @@ public enum UpdateInstaller {
     ///   - progress: 进度回调 0…1(任意线程)
     /// - Returns: 暂存结果
     public static func download(_ info: UpdateInfo, progress: @escaping @Sendable (Double) -> Void) async throws -> StagedUpdate {
-        guard let url = URL(string: info.url), url.scheme == "https" || url.isFileURL else { throw UpdateInstallError.badURL }
+        guard let url = URL(string: info.url), url.scheme == "https" || url.host == "127.0.0.1" || url.host == "localhost" else { throw UpdateInstallError.badURL }
         let started = Date()
         let fm = FileManager.default
         clearStaged()
