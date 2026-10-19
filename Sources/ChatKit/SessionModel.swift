@@ -453,7 +453,7 @@ public final class SessionModel {
                 var wokeFrom: String?
                 if restoring == nil {
                     if let dormant = self.dormantSessionId {
-                        wokeFrom = await self.resumeDormant(dormant, client: client, methods: result.authMethods, servers: prepared.servers)
+                        wokeFrom = try await self.resumeDormant(dormant, client: client, methods: result.authMethods, servers: prepared.servers)
                     } else {
                         let setup = try await self.newSessionAuthenticating(client: client, methods: result.authMethods, servers: prepared.servers)
                         self.sessionId = setup.sessionId
@@ -480,11 +480,18 @@ public final class SessionModel {
                     self.flushQueuedPrompt()
                 }
             } catch {
-                self.log.error("连接 Agent 失败", error: error, ["agent": descriptor.id, "ms": "\(OMLogger.milliseconds(since: connectStart))"])
+                self.log.error("连接 Agent 失败", error: error, ["agent": descriptor.id, "ms": "\(OMLogger.milliseconds(since: connectStart))", "waking": self.isHibernated ? "yes" : "no"])
                 await supervisor.stop()
+                await manager.shutdown()
+                if self.terminalManager === manager { self.terminalManager = nil }
                 self.bridge?.stop()
                 self.bridge = nil
                 self.connectTask = nil
+                // 唤醒失败:排队的动作(打开/分叉/删除等)已失去上下文,丢弃;休眠标记与会话 ID 保留,重新连接时再尝试接回
+                if !self.wakeActions.isEmpty {
+                    self.log.warning("唤醒失败,丢弃排队动作", ["count": "\(self.wakeActions.count)"])
+                    self.wakeActions = []
+                }
                 self.phase = .failed(error.localizedDescription)
             }
         }
@@ -2203,7 +2210,8 @@ public final class SessionModel {
 
     /// 用 `session/resume` 接回休眠前的会话;失败(如记录已被清理)则新建会话并在时间线提示,对话文本仍保留。
     /// - Returns: 成功接回的会话 ID;退回新建时为 nil
-    private func resumeDormant(_ dormant: String, client: ACPClient, methods: [AuthMethod], servers: [MCPServerConfig]) async -> String? {
+    /// - Throws: 接回与新建都失败时抛出新建的错误,由连接流程置为失败态(不能带着旧会话 ID 假装就绪)
+    private func resumeDormant(_ dormant: String, client: ACPClient, methods: [AuthMethod], servers: [MCPServerConfig]) async throws -> String? {
         let started = ContinuousClock.now
         do {
             let setup = try await client.resumeSession(sessionId: dormant, cwd: workspace.path, mcpServers: servers, additionalDirectories: additionalDirectories, meta: effectiveMeta())
@@ -2222,6 +2230,7 @@ public final class SessionModel {
             } catch {
                 log.error("休眠唤醒后新建会话失败", error: error)
                 timeline.appendNotice(String(localized: "唤醒会话失败:\(error.localizedDescription)"), isError: true)
+                throw error
             }
             return nil
         }
