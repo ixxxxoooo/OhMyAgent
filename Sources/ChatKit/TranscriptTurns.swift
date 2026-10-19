@@ -96,9 +96,13 @@ public enum TranscriptTurns {
         guard let content = message?["content"] else { return false }
         if let text = content as? String {
             return !text.hasPrefix("<local-command") && !text.hasPrefix("<command-name>") && !text.hasPrefix("<system-reminder>")
+                && SyntheticUserMessage.classify(text) == nil
         }
         if let blocks = content as? [[String: Any]] {
-            return !blocks.contains { $0["type"] as? String == "tool_result" }
+            if blocks.contains(where: { $0["type"] as? String == "tool_result" }) { return false }
+            // 单个文本块是合成消息(如中断)时同样不算一次提问
+            if blocks.count == 1, let text = blocks[0]["text"] as? String, SyntheticUserMessage.classify(text) != nil { return false }
+            return true
         }
         return false
     }

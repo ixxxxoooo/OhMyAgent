@@ -305,6 +305,17 @@ public final class TimelineStore {
         structureRevision += 1
     }
 
+    /// 把合成用户消息转成时间线条目(`severity == "interrupt"` 的淡色分隔行);`hidden` 不产生条目。
+    /// - Parameter message: 已识别的合成消息
+    private func appendSynthetic(_ message: SyntheticUserMessage) {
+        switch message {
+        case .interrupted(let label): appendNotice(label, severity: "interrupt")
+        case .denied: appendNotice(ChatL10n.t("已拒绝该操作"), severity: "interrupt")
+        case .hidden: return
+        }
+        entries.last?.isMuted = true
+    }
+
     /// 追加模型切换分割线(时间线中显示「由 X 切换为 Y」)。
     /// - Parameters:
     ///   - from: 切换前的模型名
@@ -562,6 +573,11 @@ public final class TimelineStore {
         case .text(let value):
             // `@browser` 附加的提示块不是用户写的,历史重放时不显示
             if kind == .user, BrowserMention.isHint(value) { return }
+            // Claude Code 写入的合成用户消息(中断/拒绝等)不是用户输入:改成淡色提示或直接隐藏
+            if kind == .user, let synthetic = SyntheticUserMessage.classify(value) {
+                appendSynthetic(synthetic)
+                return
+            }
             text = value
         case .resourceLink(_, let name, _, let title): text = "[\(title ?? name)]"
         case .image(let base64, let mimeType, _):

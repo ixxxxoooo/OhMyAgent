@@ -432,7 +432,9 @@ struct NoticeView: View {
     }
 
     var body: some View {
-        if entry.isMuted {
+        if entry.severity == "interrupt" {
+            interruptDivider
+        } else if entry.isMuted {
             // 第三方 Agent 的指标类通知(如 TPS):淡色等宽小字,无图标
             Text(entry.text)
                 .font(OMFonts.monoSmall)
@@ -442,6 +444,21 @@ struct NoticeView: View {
         } else {
             standard
         }
+    }
+
+    /// 中断/拒绝:两侧发丝线 + 居中淡色图标与说明,沿用模型切换分割线的样式。
+    private var interruptDivider: some View {
+        HStack(spacing: 10) {
+            Rectangle().fill(OMColors.hairline).frame(height: 0.5)
+            Label(entry.text, om: "circle-stop")
+                .font(OMFonts.caption)
+                .foregroundStyle(OMColors.tertiaryText)
+                .lineLimit(1)
+            Rectangle().fill(OMColors.hairline).frame(height: 0.5)
+        }
+        .padding(.vertical, 6)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(entry.text)
     }
 
     private var standard: some View {
