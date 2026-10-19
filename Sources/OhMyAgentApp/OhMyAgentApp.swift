@@ -208,7 +208,7 @@ struct WorkbenchCommands: Commands {
         CommandGroup(after: .newItem) {
             Button("新对话") { workbench.newConversationInContext() }
                 .keyboardShortcut(shortcuts.shortcut(for: .newConversation))
-                .disabled(workbench.activeSession.map { $0.phase != .ready } ?? false)
+                .disabled(workbench.activeSession.map { !$0.isAvailable } ?? false)
             Button("新会话(无需项目)") { workbench.newGeneralConversation() }
             Button("打开项目…") {
                 if let url = WorkspaceStore.chooseDirectory() { AppActions.shared.openWorkspace(url) }

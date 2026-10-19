@@ -169,11 +169,11 @@ struct WorkbenchView: View {
         AttentionCenter.shared.setFocus(windowIsKey ? workbench.activeSession?.uid : nil)
     }
 
-    /// 响应托盘/通知发起的「打开会话」请求:仅处理属于当前项目、且连接就绪时的请求。
+    /// 响应托盘/通知发起的「打开会话」请求:仅处理属于当前项目、且连接就绪(或休眠可唤醒)时的请求。
     private func consumeSessionRequest() {
         guard let request = actions.sessionRequest, let id = workbench.selectedProjectID,
               id == URL(fileURLWithPath: request.workspacePath).standardizedFileURL.path,
-              let model = workbench.activeSession, model.phase == .ready else { return }
+              let model = workbench.activeSession, model.isAvailable else { return }
         actions.sessionRequest = nil
         AttentionCenter.shared.markRead(model.uid)
         if let sessionId = request.sessionId, sessionId != model.sessionId {

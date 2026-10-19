@@ -798,7 +798,8 @@ public final class WorkbenchModel {
             return
         }
         let summary = model.history.first { $0.sessionId == sessionId } ?? SessionSummary(sessionId: sessionId, cwd: id, title: title)
-        if model.phase == .ready {
+        if model.isAvailable {
+            // 休眠中的会话由 openSession 自己唤醒后再打开
             model.openSession(summary)
         } else {
             // 新会话还在连接:连上后再打开历史会话

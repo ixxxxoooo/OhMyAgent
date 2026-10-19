@@ -342,6 +342,8 @@ public final class SessionModel {
 
     /// 已休眠:Agent 进程已结束以释放内存,时间线/草稿/标题仍在;再次使用时自动唤醒(见 `hibernate()`/`wake()`)
     public private(set) var isHibernated = false
+    /// 可以接受操作:已就绪,或休眠中(需要进程的操作会先自动唤醒)。界面上「是否可用」的判断应使用它而不是 `phase == .ready`。
+    public var isAvailable: Bool { phase == .ready || isHibernated }
     /// 最近一次使用时间(发送、轮次结束、被切到前台),驻留策略据此决定休眠顺序
     public private(set) var lastUsedAt = Date()
     /// 休眠时记下的会话 ID:唤醒时用 `session/resume` 接回(没有对话内容的会话不记,唤醒即新建)
@@ -1528,7 +1530,9 @@ public final class SessionModel {
     /// - Parameter sessionId: 协议会话 ID
     /// - Returns: 引擎是否确认删除;引擎不支持或失败时为 false(仍应在客户端侧移除)
     public func deleteOnEngine(_ sessionId: String) async -> Bool {
-        guard let client, capabilities.canDelete, !sessionId.isEmpty else { return false }
+        guard !sessionId.isEmpty else { return false }
+        if isHibernated, !(await wakeAndWait()) { return false }
+        guard let client, capabilities.canDelete else { return false }
         do {
             try await client.deleteSession(sessionId: sessionId)
             log.info("引擎侧已删除会话", ["target": String(sessionId.prefix(8))])
@@ -2192,6 +2196,19 @@ public final class SessionModel {
         lastUsedAt = Date()
         log.info("唤醒会话")
         connect()
+    }
+
+    /// 唤醒并等待连接结束(就绪或失败)。
+    /// - Parameter timeout: 最长等待时间
+    /// - Returns: 是否已就绪
+    func wakeAndWait(timeout: Duration = .seconds(20)) async -> Bool {
+        wake()
+        let deadline = ContinuousClock.now + timeout
+        while phase != .ready, ContinuousClock.now < deadline {
+            if case .failed = phase { return false }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        return phase == .ready
     }
 
     /// 需要 Agent 进程的操作:休眠中先唤醒,就绪后再执行;否则立即执行。

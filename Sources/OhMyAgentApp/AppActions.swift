@@ -88,19 +88,22 @@ final class AppActions {
             : String(localized: "「\(title)」将被永久删除,无法恢复。")
         guard OMDialog.confirm(title: String(localized: "删除会话"), message: message, confirmTitle: String(localized: "删除"), destructive: true) else { return }
         let owner = agentID ?? workbench.cachedAgentID(ofSession: sessionId, in: projectID)
-        func matches(_ model: SessionModel) -> Bool { model.phase == .ready && (owner == nil || model.descriptor.id == owner) }
-        let bystander = models.first { $0.sessionId != sessionId && matches($0) }
+        // 休眠中的连接也可用(删除前会自动唤醒),但优先用已就绪的旁观连接,免得为删除专门唤醒进程
+        func matches(_ model: SessionModel) -> Bool { model.isAvailable && (owner == nil || model.descriptor.id == owner) }
+        let bystanders = models.filter { $0.sessionId != sessionId && matches($0) }
+        let bystander = bystanders.first { $0.phase == .ready } ?? bystanders.first
         let displaying = models.first { $0.sessionId == sessionId && matches($0) }
         RecentStore.removeSession(sessionId)
         if let bystander {
             workbench.forgetSession(sessionId, in: projectID)
             Task { _ = await bystander.deleteOnEngine(sessionId) }
         } else if let displaying {
-            // 只有正显示它的连接能删:先让引擎删(最多等 3 秒),再关闭标签
+            // 只有正显示它的连接能删:先让引擎删(最多等 3 秒;休眠中需要先唤醒,最多等 10 秒),再关闭标签
+            let wait: Duration = displaying.isHibernated ? .seconds(10) : .seconds(3)
             Task {
                 await withTaskGroup(of: Void.self) { group in
                     group.addTask { _ = await displaying.deleteOnEngine(sessionId) }
-                    group.addTask { try? await Task.sleep(for: .seconds(3)) }
+                    group.addTask { try? await Task.sleep(for: wait) }
                     await group.next()
                     group.cancelAll()
                 }
