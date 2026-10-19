@@ -43,9 +43,19 @@ public enum MarkdownParser {
         parseState(text).blocks
     }
 
+    /// 统一换行为 `\n`。Swift 的 `String` 把 `\r\n` 当作单个字符,`split(separator: "\n")` 切不开 CRLF 文本
+    /// (Windows 风格的 `.md` 会整篇退化成一个段落,标题、表格、列表全部失效);单独的 `\r`(旧 Mac)同理。
+    /// - Parameter text: 原始文本
+    /// - Returns: 只含 `\n` 换行的文本(没有 `\r` 时原样返回,不产生拷贝)
+    static func normalizedNewlines(_ text: String) -> String {
+        guard text.utf8.contains(13) else { return text }
+        return text.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
+    }
+
     /// 解析并保留续解析信息。
     /// - Parameter text: 原始文本
     public static func parseState(_ text: String) -> MarkdownParseState {
+        let text = normalizedNewlines(text)
         let (blocks, starts) = parseCore(text)
         return MarkdownParseState(text: text, blocks: blocks, starts: starts)
     }
@@ -62,6 +72,7 @@ public enum MarkdownParser {
     ///   - previous: 上一次的解析结果;为 nil 或文本不是其扩展时退回整段解析
     /// - Returns: 解析结果(与 `parseState(text)` 等价)
     public static func parseState(_ text: String, continuing previous: MarkdownParseState?) -> MarkdownParseState {
+        let text = normalizedNewlines(text)
         guard let previous, !previous.starts.isEmpty, text.utf8.count >= previous.text.utf8.count,
               text.utf8.starts(with: previous.text.utf8) else { return parseState(text) }
         let keep = max(previous.blocks.count - 2, 0)

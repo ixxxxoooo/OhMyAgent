@@ -111,3 +111,25 @@ struct MarkdownIncrementalTests {
         if case .list(let items) = after.blocks.first { #expect(items.count == 2) } else { Issue.record("应为单个列表") }
     }
 }
+
+@Suite("Markdown 换行归一化")
+struct MarkdownNewlineTests {
+    @Test("CRLF 文本与 LF 文本解析结果一致(标题、分隔线、列表、表格都能识别)")
+    func crlfMatchesLF() {
+        let lf = "# 迁移权限\n\n正文 **加粗**\n\n---\n\n## 前置条件\n\n1. 第一项\n2. 第二项\n\n| 角色 | 字段 |\n|---|---|\n| 源 | a |\n"
+        let crlf = lf.replacingOccurrences(of: "\n", with: "\r\n")
+        #expect(MarkdownParser.parse(crlf) == MarkdownParser.parse(lf))
+        let kinds = MarkdownParser.parse(crlf).map { "\($0)" }
+        #expect(kinds.contains { $0.hasPrefix("heading") })
+        #expect(kinds.contains { $0.hasPrefix("table") })
+    }
+
+    @Test("单独的 CR 换行同样被识别,续解析对 CRLF 文本等价于整段解析")
+    func lonelyCRAndContinuing() {
+        let cr = "# 标题\r\r正文\r"
+        #expect(MarkdownParser.parse(cr) == MarkdownParser.parse("# 标题\n\n正文\n"))
+        let first = MarkdownParser.parseState("# 标题\r\n\r\n段落一\r\n")
+        let full = "# 标题\r\n\r\n段落一\r\n\r\n- 项\r\n"
+        #expect(MarkdownParser.parseState(full, continuing: first).blocks == MarkdownParser.parseState(full).blocks)
+    }
+}
