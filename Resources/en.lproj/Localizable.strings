@@ -2661,3 +2661,7 @@
 "右栏停靠区" = "Right Dock";
 "在右栏打开" = "Open in Right Panel";
 "在中栏打开" = "Open in Center";
+"把「项目栏 / 右栏停靠区」的卡片拖到左侧或右侧。终端、输出、文件预览、Plan、资源管理器都是右栏里的标签,可关闭、可拖到中栏或在右栏内分屏;换位置不会中断终端里正在运行的进程。" = "Drag the Project Bar / Right Dock cards to the left or right side. Terminal, output, file previews, plans and the explorer are tabs in the right dock: close them, drag them to the center, or split inside the dock. Moving never interrupts running terminals.";
+"文件与 Plan 默认打开位置" = "Open files and plans in";
+"中栏" = "Center";
+"点击会话里的文件、Plan 或资源管理器条目时在这里打开,方便与会话左右对照;右键菜单可单次指定位置。" = "Clicked files, plans and explorer items open here so you can compare side by side with the chat; the context menu picks a side for one open (⌥-click also flips it).";
