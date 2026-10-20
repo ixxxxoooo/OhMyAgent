@@ -269,7 +269,7 @@ public actor ClaudeAcpAgent: ACPRequestHandler {
         let session = try await getOrCreate(params, sessionId: id, resumedModelHint: hint)
         let output = await replay(transcript, sessionId: id, session: session, cwd: cwd)
         await session.adoptReplay(messageIdToUuid: output.messageIdToUuid)
-        log.info("会话已加载", ["session": id, "messages": "\(transcript.count)", "ms": "\(Int((ContinuousClock.now - started).components.seconds * 1000))"])
+        log.info("会话已加载", ["session": id, "messages": "\(transcript.count)", "ms": "\(OMLogger.milliseconds(since: started))"])
         return await setupResponse(session)
     }
 

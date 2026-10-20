@@ -179,10 +179,11 @@ struct SettingsView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(10).background(OMColors.danger.opacity(0.1))
                 }
+                // 宽高都给出上下限:尺寸只由窗口决定,不再先按理想尺寸把整页内容测量一遍(切页卡顿的主因)
                 page
                     .id(router.page)
-                    .frame(maxWidth: contentWidth)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(minWidth: 0, maxWidth: contentWidth, minHeight: 0, maxHeight: .infinity)
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
                     .background(OMColors.surface)
             }
             .background(OMColors.surface)

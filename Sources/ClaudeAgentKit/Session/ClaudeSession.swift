@@ -163,7 +163,7 @@ actor ClaudeSession: ClaudeQueryDelegate {
         }
         resumedFromHistory = creation.resume != nil
         try await configure(initResult: initResult, initialMode: initialMode, resumedModel: resumedModel, isResume: creation.resume != nil)
-        log.info("会话已就绪", ["resume": creation.resume ?? "-", "model": models.currentModelId, "mode": currentMode, "ms": "\(Int((ContinuousClock.now - started).components.seconds * 1000))"])
+        log.info("会话已就绪", ["resume": creation.resume ?? "-", "model": models.currentModelId, "mode": currentMode, "ms": "\(OMLogger.milliseconds(since: started))"])
     }
 
     /// Node 适配器的 `ALLOW_BYPASS`:root 下禁用,除非声明沙盒。
