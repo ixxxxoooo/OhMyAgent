@@ -93,38 +93,30 @@ struct DockSplitView: View {
         return ratios.indices.contains(index) ? ratios[index] : 1.0 / Double(max(split.children.count, 1))
     }
 
-    /// 1pt 可见线 + 8pt 命中区的分隔条。
+    /// 1pt 可见线 + 9pt AppKit 命中区的分隔条(统一手柄 `OMSplitHandle`)。
     private func divider(after index: Int, usable: CGFloat) -> some View {
-        Rectangle()
-            .fill(OMColors.hairline)
-            .frame(width: horizontal ? Self.handle : nil, height: horizontal ? nil : Self.handle)
-            .overlay {
-                Color.clear
-                    .frame(width: horizontal ? 8 : nil, height: horizontal ? nil : 8)
-                    .contentShape(Rectangle())
-                    .onHover { inside in
-                        if inside { (horizontal ? NSCursor.resizeLeftRight : NSCursor.resizeUpDown).push() } else { NSCursor.pop() }
-                    }
-                    .gesture(
-                        DragGesture(minimumDistance: 1, coordinateSpace: .global)
-                            .onChanged { value in
-                                let base = dragBase ?? split.ratios
-                                if dragBase == nil { dragBase = base; PanelDragState.shared.beginHold() }
-                                guard base.indices.contains(index + 1) else { return }
-                                let delta = Double((horizontal ? value.translation.width : value.translation.height) / usable)
-                                var next = base
-                                next[index] = base[index] + delta
-                                next[index + 1] = base[index + 1] - delta
-                                liveRatios = DockLayout.normalizedRatios(next)
-                            }
-                            .onEnded { _ in
-                                if dragBase != nil { PanelDragState.shared.endHold() }
-                                dragBase = nil
-                                if let committed = liveRatios { workbench.mutateDock(host) { $0.setRatios(committed, forSplit: split.id) } }
-                                liveRatios = nil
-                            }
-                    )
+        OMSplitHandle(
+            axis: horizontal ? .vertical : .horizontal,
+            onBegan: {
+                dragBase = split.ratios
+                PanelDragState.shared.beginHold()
+            },
+            onChanged: { translation in
+                let base = dragBase ?? split.ratios
+                guard base.indices.contains(index + 1), usable > 0 else { return }
+                let delta = Double(translation / usable)
+                var next = base
+                next[index] = base[index] + delta
+                next[index + 1] = base[index + 1] - delta
+                liveRatios = DockLayout.normalizedRatios(next)
+            },
+            onEnded: {
+                if dragBase != nil { PanelDragState.shared.endHold() }
+                dragBase = nil
+                if let committed = liveRatios { workbench.mutateDock(host) { $0.setRatios(committed, forSplit: split.id) } }
+                liveRatios = nil
             }
-            .accessibilityHidden(true)
+        )
+        .accessibilityHidden(true)
     }
 }

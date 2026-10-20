@@ -1,5 +1,5 @@
 // @author ixxxxoooo
-// 侧栏分隔条:1pt 细线 + 更宽的不可见拖动热区;拖动调整宽度;双击恢复默认宽度(右栏再双击展开到约半个窗口)。
+// 侧栏分隔条(基于统一手柄 `OMSplitHandle`):1pt 细线 + 更宽的 AppKit 拖动热区,悬停出现强调线;拖动调整宽度;双击恢复默认宽度(右栏再双击展开到约半个窗口)。
 // 取代原生 NavigationSplitView / inspector 的分隔条:原生列是 NSHostingView,会抢走窗口顶部浮层按钮的点击。
 
 import DesignSystem
@@ -33,44 +33,36 @@ struct PanelResizer: View {
     }
 
     var body: some View {
-        Rectangle()
-            .fill(OMColors.hairline)
-            .frame(width: 1)
-            .overlay {
-                Color.clear
-                    .frame(width: 9)
-                    .contentShape(Rectangle())
-                    .pointerStyle(.columnResize)
-                    .gesture(
-                        DragGesture(minimumDistance: 1, coordinateSpace: .global)
-                            .onChanged { value in
-                                let start = base ?? min(currentWidth, maximumWidth)
-                                if base == nil { base = start }
-                                let range = dimension.range.lowerBound...max(dimension.range.lowerBound, min(dimension.range.upperBound, maximumWidth))
-                                let next = PanelMetrics.resized(base: start, translation: Double(value.translation.width), side: side, range: range)
-                                workbench.panelDrag.update(next, for: dimension)
-                            }
-                            .onEnded { _ in
-                                base = nil
-                                workbench.commitPanelDrag(dimension)
-                            }
-                    )
-                    .onTapGesture(count: 2) {
-                        // 右栏:默认宽度 ↔ 展开到约半个窗口;项目栏:恢复默认
-                        let target = dimension == .rightWidth
-                            ? PanelMetrics.doubleClickTarget(current: currentWidth, defaultWidth: defaultWidth, maximum: maximumWidth, window: TerminalDragState.shared.workspaceFrame.width)
-                            : defaultWidth
-                        workbench.setPanelDimension(dimension, to: target)
-                    }
+        OMSplitHandle(
+            axis: .vertical,
+            onBegan: { base = min(currentWidth, maximumWidth) },
+            onChanged: { translation in
+                let start = base ?? min(currentWidth, maximumWidth)
+                if base == nil { base = start }
+                let range = dimension.range.lowerBound...max(dimension.range.lowerBound, min(dimension.range.upperBound, maximumWidth))
+                let next = PanelMetrics.resized(base: start, translation: Double(translation), side: side, range: range)
+                workbench.panelDrag.update(next, for: dimension)
+            },
+            onEnded: {
+                base = nil
+                workbench.commitPanelDrag(dimension)
+            },
+            onDoubleClick: {
+                // 右栏:默认宽度 ↔ 展开到约半个窗口;项目栏:恢复默认
+                let target = dimension == .rightWidth
+                    ? PanelMetrics.doubleClickTarget(current: currentWidth, defaultWidth: defaultWidth, maximum: maximumWidth, window: TerminalDragState.shared.workspaceFrame.width)
+                    : defaultWidth
+                workbench.setPanelDimension(dimension, to: target)
             }
-            .accessibilityLabel(side == .left ? String(localized: "调整左栏宽度") : String(localized: "调整右栏宽度"))
-            .accessibilityAdjustableAction { direction in
-                let step: Double = 20
-                switch direction {
-                case .increment: workbench.setPanelDimension(dimension, to: currentWidth + step)
-                case .decrement: workbench.setPanelDimension(dimension, to: currentWidth - step)
-                @unknown default: break
-                }
+        )
+        .accessibilityLabel(side == .left ? String(localized: "调整左栏宽度") : String(localized: "调整右栏宽度"))
+        .accessibilityAdjustableAction { direction in
+            let step: Double = 20
+            switch direction {
+            case .increment: workbench.setPanelDimension(dimension, to: currentWidth + step)
+            case .decrement: workbench.setPanelDimension(dimension, to: currentWidth - step)
+            @unknown default: break
             }
+        }
     }
 }
