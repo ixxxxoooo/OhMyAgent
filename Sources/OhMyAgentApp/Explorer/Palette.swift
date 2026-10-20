@@ -56,10 +56,10 @@ enum PaletteCommands {
                 if let id = workbench.selectedProjectID { workbench.openHistory(project: id) }
             },
             PaletteCommand(id: "fileHistory", title: String(localized: "查看当前文件的 Git 历史"), icon: "clock", shortcut: nil) {
-                if let id = workbench.selectedProjectID, case .file(let path)? = workbench.dock.focusedGroup?.active?.kind { workbench.openHistory(project: id, path: path) }
+                if let id = workbench.selectedProjectID, case .file(let path)? = workbench.focusedActiveTab?.kind { workbench.openHistory(project: id, path: path) }
             },
             PaletteCommand(id: "fileBlame", title: String(localized: "查看当前文件的 Git Blame"), icon: "user", shortcut: nil) {
-                if case .file(let path)? = workbench.dock.focusedGroup?.active?.kind { workbench.openBlame(path) }
+                if case .file(let path)? = workbench.focusedActiveTab?.kind { workbench.openBlame(path) }
             },
             PaletteCommand(id: "terminal", title: String(localized: "新建终端"), icon: "square-terminal", shortcut: key(.newTerminal)) { AppActions.shared.newTerminal() },
             PaletteCommand(id: "terminal-new-tab", title: String(localized: "新建终端标签"), icon: "square-terminal", shortcut: nil) { AppActions.shared.openTerminal() },

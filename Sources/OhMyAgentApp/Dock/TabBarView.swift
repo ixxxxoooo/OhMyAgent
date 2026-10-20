@@ -22,6 +22,7 @@ private enum TabMetrics {
 /// 标签栏。
 struct TabBarView: View {
     let workbench: WorkbenchModel
+    @Environment(\.dockHost) private var host
     let group: TabGroup
     let isFocused: Bool
     /// 左侧让位宽度(侧栏收起时,为红绿灯与左上浮层按钮留位)
@@ -35,7 +36,7 @@ struct TabBarView: View {
     @State private var showOverflow = false
 
     /// 是否为第一个(主)标签组。
-    private var isMainGroup: Bool { workbench.dock.groups.first?.id == group.id }
+    private var isMainGroup: Bool { workbench.dock(host).groups.first?.id == group.id }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -46,7 +47,7 @@ struct TabBarView: View {
                         ForEach(Array(group.tabs.enumerated()), id: \.element.id) { index, tab in
                             TabItemView(workbench: workbench, group: group, tab: tab, isActive: tab.id == group.activeID, isFocused: isFocused)
                                 .id(tab.id)
-                                .onDrop(of: [.plainText, .fileURL], delegate: TabStripDropDelegate(workbench: workbench, groupID: group.id, index: index))
+                                .onDrop(of: [.plainText, .fileURL], delegate: TabStripDropDelegate(workbench: workbench, host: host, groupID: group.id, index: index))
                         }
                         Color.clear
                             .frame(minWidth: 24, maxWidth: .infinity)
@@ -56,7 +57,7 @@ struct TabBarView: View {
                     .frame(minWidth: stripWidth, alignment: .leading)
                 }
                 // 放到标签之间/末尾空白处:追加到末尾(单个标签上的落点代理优先)
-                .onDrop(of: [.plainText, .fileURL], delegate: TabStripDropDelegate(workbench: workbench, groupID: group.id, index: nil))
+                .onDrop(of: [.plainText, .fileURL], delegate: TabStripDropDelegate(workbench: workbench, host: host, groupID: group.id, index: nil))
                 .onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.width } action: { _, value in
                     stripWidth = value
                 }
@@ -116,6 +117,7 @@ private struct TabBarIconButtonStyle: ButtonStyle {
 /// 单个标签:胶囊背景(未激活态浅灰,悬停加深;激活态透明并融入内容区)+ 图标 + 标题 + 运行态/未保存点 + 关闭按钮(悬停显示)。
 struct TabItemView: View {
     let workbench: WorkbenchModel
+    @Environment(\.dockHost) private var host
     let group: TabGroup
     let tab: WorkbenchTab
     let isActive: Bool
@@ -164,7 +166,7 @@ struct TabItemView: View {
         .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
         .accessibilityAction(named: Text("关闭标签")) { AppActions.shared.requestCloseTab(tab.id) }
         .simultaneousGesture(TapGesture(count: 2).onEnded {
-            if tab.isPreview { workbench.dock.keepOpen(tab.id) } else { workbench.dock.toggleMaximize(group: group.id) }
+            if tab.isPreview { workbench.mutateDock(host) { $0.keepOpen(tab.id) } } else { workbench.mutateDock(host) { $0.toggleMaximize(group: group.id) } }
         })
         .background(MiddleClickCatcher {
             if !tab.isPinned { AppActions.shared.requestCloseTab(tab.id) }
@@ -203,7 +205,7 @@ struct TabItemView: View {
     private var trailing: some View {
         ZStack {
             if tab.isPinned {
-                Button { workbench.dock.togglePinned(tab.id) } label: {
+                Button { workbench.mutateDock(host) { $0.togglePinned(tab.id) } } label: {
                     Image.om("pin", size: 10).frame(width: 16, height: 16).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -292,12 +294,12 @@ struct TabItemView: View {
             }
         }
         OMMenuDivider()
-        OMMenuItem(verbatim: tab.isPinned ? String(localized: "取消固定") : String(localized: "固定"), icon: "pin") { workbench.dock.togglePinned(tab.id) }
+        OMMenuItem(verbatim: tab.isPinned ? String(localized: "取消固定") : String(localized: "固定"), icon: "pin") { workbench.mutateDock(host) { $0.togglePinned(tab.id) } }
         OMMenuItem("向右拆分", icon: "columns-2", isEnabled: group.tabs.count >= 2) {
-            workbench.dock.drop(tab.id, onGroup: group.id, zone: .right)
+            workbench.mutateDock(host) { $0.drop(tab.id, onGroup: group.id, zone: .right) }
             workbench.syncSelectionFromDock()
         }
-        OMMenuItem(verbatim: workbench.dock.maximizedGroupID == group.id ? String(localized: "还原布局") : String(localized: "最大化此组"), icon: "maximize-2") { workbench.dock.toggleMaximize(group: group.id) }
+        OMMenuItem(verbatim: workbench.dock(host).maximizedGroupID == group.id ? String(localized: "还原布局") : String(localized: "最大化此组"), icon: "maximize-2") { workbench.mutateDock(host) { $0.toggleMaximize(group: group.id) } }
         panelMoveEntries
         if case .file(let path) = tab.kind {
             OMMenuDivider()

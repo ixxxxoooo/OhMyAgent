@@ -6,16 +6,34 @@ import IconKit
 import SwiftUI
 import WorkbenchKit
 
-/// 停靠区。
+/// 当前视图子树所属的停靠区(中栏或右栏);标签栏、标签组、落点代理据此读写对应的 `DockLayout`。
+private struct DockHostKey: EnvironmentKey {
+    static let defaultValue: DockHost = .center
+}
+
+extension EnvironmentValues {
+    /// 所属停靠区。
+    var dockHost: DockHost {
+        get { self[DockHostKey.self] }
+        set { self[DockHostKey.self] = newValue }
+    }
+}
+
+/// 停靠区(中栏与右栏共用)。
 struct DockView: View {
     @Bindable var workbench: WorkbenchModel
+    var host: DockHost = .center
 
     var body: some View {
-        if let id = workbench.dock.maximizedGroupID, let group = workbench.dock.group(id) {
-            TabGroupView(workbench: workbench, group: group)
-        } else {
-            DockNodeView(workbench: workbench, node: workbench.dock.root)
+        let layout = workbench.dock(host)
+        Group {
+            if let id = layout.maximizedGroupID, let group = layout.group(id) {
+                TabGroupView(workbench: workbench, group: group)
+            } else {
+                DockNodeView(workbench: workbench, node: layout.root)
+            }
         }
+        .environment(\.dockHost, host)
     }
 }
 
@@ -37,6 +55,7 @@ struct DockNodeView: View {
 /// 分屏:按 ratios 分配空间,子节点之间放置可拖动的分隔条。
 struct DockSplitView: View {
     let workbench: WorkbenchModel
+    @Environment(\.dockHost) private var host
     let split: DockSplit
     var edges = DockEdges()
     @State private var dragBase: [Double]?
@@ -101,7 +120,7 @@ struct DockSplitView: View {
                             .onEnded { _ in
                                 if dragBase != nil { PanelDragState.shared.endHold() }
                                 dragBase = nil
-                                if let committed = liveRatios { workbench.dock.setRatios(committed, forSplit: split.id) }
+                                if let committed = liveRatios { workbench.mutateDock(host) { $0.setRatios(committed, forSplit: split.id) } }
                                 liveRatios = nil
                             }
                     )

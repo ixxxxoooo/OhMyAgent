@@ -57,7 +57,7 @@ struct WorkbenchView: View {
             actions.capture(openWindow: openWindow)
             MouseNavigationMonitor.install(workbench: workbench)
         }
-        .onChange(of: workbench.dock.allTabs.compactMap(\.terminalID)) { _, ids in
+        .onChange(of: workbench.allDockTabs.compactMap(\.terminalID)) { _, ids in
             // 终端标签被关闭 → 结束其 shell 进程
             TerminalStore.shared.prune(keeping: Set(ids))
         }
@@ -144,7 +144,7 @@ struct WorkbenchView: View {
 
     /// 导航历史的触发信号:聚焦组的激活标签与标签总数(关闭标签时需要清理历史)。
     private var navigationSignature: NavigationSignature {
-        NavigationSignature(active: workbench.dock.focusedGroup?.activeID, tabCount: workbench.dock.allTabs.count)
+        NavigationSignature(active: workbench.dock.focusedGroup?.activeID, tabCount: workbench.allDockTabs.count)
     }
 
     /// 导航历史触发信号。

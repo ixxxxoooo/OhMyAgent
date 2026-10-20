@@ -181,7 +181,7 @@ struct FileTabView: View {
             if let lsp, lsp.status != .off { LSPStatusBar(controller: lsp) }
         }
         .onChange(of: doc.isDirty, initial: true) { wasDirty, dirty in
-            workbench.dock.setDirty(dirty, for: tab.id)
+            workbench.setDirty(dirty, for: tab.id)
             if wasDirty, !dirty { lsp?.didSave() }
         }
         .onChange(of: changesRevision, initial: true) {

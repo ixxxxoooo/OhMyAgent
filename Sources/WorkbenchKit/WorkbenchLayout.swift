@@ -73,6 +73,8 @@ public struct WorkbenchLayout: Codable, Equatable, Sendable {
     public var outputVisible = false
     /// 输出侧栏宽度
     public var outputWidth: Double = PanelMetrics.terminalDefault
+    /// 文件/Plan 点击时的默认打开位置(右栏或中栏编辑区;`.auto` 视为右栏)
+    public var fileOpenTarget: OpenTarget = .editor
     /// 终端面板内右侧终端列表的宽度(≥2 个终端时出现)
     public var terminalListWidth: Double = PanelMetrics.terminalListDefault
     /// 终端列表是否被用户手动折叠
@@ -83,7 +85,7 @@ public struct WorkbenchLayout: Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case leftVisible, rightVisible, bottomVisible, leftWidth, rightWidth, bottomHeight
         case leftPane, rightPane, bottomPane, rightPaneOrder, bottomPaneOrder, placement, terminalVisible, terminalWidth, outputVisible, outputWidth
-        case terminalListWidth, terminalListCollapsed
+        case terminalListWidth, terminalListCollapsed, fileOpenTarget
     }
 
     /// 容错解码:新增字段缺失或取值未知时使用默认值,旧版本状态文件可继续读取。
@@ -107,6 +109,7 @@ public struct WorkbenchLayout: Codable, Equatable, Sendable {
         outputWidth = try c.decodeIfPresent(Double.self, forKey: .outputWidth) ?? PanelMetrics.terminalDefault
         terminalListWidth = try c.decodeIfPresent(Double.self, forKey: .terminalListWidth) ?? PanelMetrics.terminalListDefault
         terminalListCollapsed = try c.decodeIfPresent(Bool.self, forKey: .terminalListCollapsed) ?? false
+        fileOpenTarget = (try? c.decodeIfPresent(OpenTarget.self, forKey: .fileOpenTarget)) ?? .editor
     }
 
     /// 限制各尺寸在合理范围内(防止损坏的状态文件导致不可见的面板),并校正与摆放位置相关的状态。
@@ -264,6 +267,8 @@ public struct WorkbenchState: Codable, Equatable, Sendable {
     public var selectedProjectID: String?
     /// 停靠布局(旧版本状态文件没有该字段)
     public var dock: DockLayout?
+    /// 右栏停靠布局(旧版本状态文件没有该字段)
+    public var rightDock: DockLayout?
     /// 退出时仍有内容的会话标签(旧版本状态文件没有该字段)
     public var chatSlots: [ChatSlotRecord]?
 

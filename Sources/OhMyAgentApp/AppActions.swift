@@ -129,9 +129,9 @@ final class AppActions {
     /// 把所有文件标签的「未保存」标记与文档状态对齐(保存/重新载入后调用)。
     func refreshDirtyFlags() {
         let workbench = AppEnvironment.shared.workbench
-        for tab in workbench.dock.allTabs {
+        for tab in workbench.allDockTabs {
             if case .file(let path) = tab.kind {
-                workbench.dock.setDirty(FileDocumentStore.shared.documents[path]?.isDirty ?? false, for: tab.id)
+                workbench.setDirty(FileDocumentStore.shared.documents[path]?.isDirty ?? false, for: tab.id)
             }
         }
     }
@@ -139,7 +139,7 @@ final class AppActions {
     /// 保存当前聚焦标签对应的文件。
     func saveActiveFile() {
         let workbench = AppEnvironment.shared.workbench
-        guard case .file(let path)? = workbench.dock.focusedGroup?.active?.kind else { return }
+        guard case .file(let path)? = workbench.focusedActiveTab?.kind else { return }
         Task { _ = await FileDocumentStore.shared.save(path); refreshDirtyFlags() }
     }
 
@@ -150,14 +150,14 @@ final class AppActions {
 
     /// 是否存在可保存的当前文件(供菜单启用状态)。
     var canSaveActiveFile: Bool {
-        guard case .file(let path)? = AppEnvironment.shared.workbench.dock.focusedGroup?.active?.kind else { return false }
+        guard case .file(let path)? = AppEnvironment.shared.workbench.focusedActiveTab?.kind else { return false }
         return FileDocumentStore.shared.documents[path]?.isDirty ?? false
     }
 
     /// ⌘W:关闭聚焦组的当前标签;固定标签不关闭;没有任何标签时才关闭窗口。
     func closeActiveTabOrWindow() {
         let workbench = AppEnvironment.shared.workbench
-        if let tab = workbench.dock.focusedGroup?.active {
+        if let tab = workbench.focusedActiveTab {
             if !tab.isPinned { requestCloseTab(tab.id) }
         } else {
             NSApp.keyWindow?.performClose(nil)
@@ -167,7 +167,7 @@ final class AppActions {
     /// 请求关闭标签:文件有未保存修改时询问「保存 / 不保存 / 取消」。
     func requestCloseTab(_ id: UUID) {
         let workbench = AppEnvironment.shared.workbench
-        guard let tab = workbench.dock.tab(id) else { return }
+        guard let tab = workbench.anyTab(id) else { return }
         guard case .file(let path) = tab.kind, let doc = FileDocumentStore.shared.documents[path], doc.isDirty else {
             workbench.closeTab(id)
             return
@@ -201,7 +201,7 @@ final class AppActions {
         let directory = TerminalPrefs.load().startDirectoryPath(project: workbench.selectedProjectID)
         let id = UUID().uuidString
         TerminalStore.shared.register(id: id, directory: directory)
-        let index = workbench.dock.allTabs.filter { if case .terminal = $0.kind { return true } else { return false } }.count + 1
+        let index = workbench.allDockTabs.filter { if case .terminal = $0.kind { return true } else { return false } }.count + 1
         workbench.openTerminal(id: id, title: String(localized: "终端") + (index > 1 ? " \(index)" : ""))
         showMainWindow()
     }

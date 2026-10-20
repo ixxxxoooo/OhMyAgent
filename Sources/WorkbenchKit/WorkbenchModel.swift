@@ -41,6 +41,18 @@ public final class WorkbenchModel {
         }
     }
 
+    /// 右栏停靠区:终端、输出、文件/Plan 预览、资源管理器、Git、搜索、浏览器等标签(持久化)。
+    public var rightDock: DockLayout {
+        didSet {
+            guard rightDock != oldValue else { return }
+            if !rightDock.differsOnlyInRatios(from: oldValue) { reapConversations() }
+            scheduleSave()
+        }
+    }
+
+    /// 最近一次获得焦点的停靠区(⌘S/⌘W 等「当前标签」命令据此取聚焦组)。
+    public var focusedHost: DockHost = .center
+
     /// 面板拖动中的临时尺寸(拖分栏期间只写它,松手才经 `commitPanelDrag` 提交到 `layout`)。
     @ObservationIgnored public let panelDrag = PanelDragState.shared
 
@@ -117,6 +129,7 @@ public final class WorkbenchModel {
         let records = (state.chatSlots ?? []).filter { aliveIDs.contains($0.projectID) && !$0.sessionId.isEmpty }
         pendingRestores = Dictionary(records.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
         dock = (state.dock ?? DockLayout()).restoredForLaunch(projectIDs: aliveIDs, keepChats: Set(pendingRestores.keys))
+        rightDock = (state.rightDock ?? DockLayout()).restoredForLaunch(projectIDs: aliveIDs, keepChats: Set(pendingRestores.keys), keepsPanels: true)
         self.healSessionCreationDates()
         log.info("工作台状态已加载", ["projects": "\(alive.count)", "selected": selected ?? "-"])
         if !unavailableProjects.isEmpty {
@@ -171,7 +184,7 @@ public final class WorkbenchModel {
     /// 回收没有标签承载的会话(标签被关闭、项目被移除后调用);运行中的轮次随进程一起结束。
     func reapConversations() {
         guard !conversations.isEmpty else { return }
-        let alive = Set(dock.allTabs.compactMap { tab -> ConversationKey? in
+        let alive = Set(allDockTabs.compactMap { tab -> ConversationKey? in
             if case .chat(let projectID, let slot) = tab.kind { return ConversationKey(projectID: projectID, slot: slot) }
             return nil
         } + layout.dockedChats.map { ConversationKey(projectID: $0.projectID, slot: $0.slot) })
@@ -296,7 +309,7 @@ public final class WorkbenchModel {
         let removed = projects.remove(at: index)
         warmPool.discard(workspace: removed.url.path)
         let folders = [id] + removed.extraFolders
-        dock.closeTabs { tab in folders.contains { Self.belongs(tab.kind, toProject: $0) } }
+        closeTabsInAllDocks { tab in folders.contains { Self.belongs(tab.kind, toProject: $0) } }
         for key in conversations.keys where key.projectID == id {
             conversations[key]?.shutdown()
             conversations[key] = nil
@@ -386,16 +399,14 @@ public final class WorkbenchModel {
     ///   - line: 定位行(1 起)
     ///   - preview: 是否预览方式
     @discardableResult
-    public func openFile(_ path: String, line: Int? = nil, preview: Bool = true) -> UUID {
-        mode = .workspace
-        return dock.open(.file(path: path), title: (path as NSString).lastPathComponent, preview: preview, line: line)
+    public func openFile(_ path: String, line: Int? = nil, preview: Bool = true, target: OpenTarget = .auto) -> UUID {
+        openTab(.file(path: path), title: (path as NSString).lastPathComponent, preview: preview, line: line, host: resolveHost(target))
     }
 
     /// 打开单个文件的差异标签。
     @discardableResult
     public func openDiff(_ path: String) -> UUID {
-        mode = .workspace
-        return dock.open(.diff(path: path), title: String(localized: "差异") + " · " + (path as NSString).lastPathComponent, preview: true)
+        openTab(.diff(path: path), title: String(localized: "差异") + " · " + (path as NSString).lastPathComponent, preview: true, host: resolveHost(.auto))
     }
 
     /// 打开子 Agent 的只读完整会话标签。
@@ -405,8 +416,7 @@ public final class WorkbenchModel {
     ///   - title: 标签标题
     @discardableResult
     public func openSubagent(project projectID: String, toolCallID: String, title: String) -> UUID {
-        mode = .workspace
-        return dock.open(.subagent(projectID: projectID, toolCallID: toolCallID), title: title)
+        openTab(.subagent(projectID: projectID, toolCallID: toolCallID), title: title)
     }
 
     /// 以新标签页打开 Agent 终端的只读输出(任务坞点击行时使用,与普通标签一致进入聚焦组)。
@@ -416,8 +426,7 @@ public final class WorkbenchModel {
     ///   - title: 标签标题(通常为命令)
     @discardableResult
     public func openAgentTerminal(project projectID: String, terminalID: String, title: String) -> UUID {
-        mode = .workspace
-        return dock.open(.agentTerminal(projectID: projectID, terminalID: terminalID), title: title)
+        openTab(.agentTerminal(projectID: projectID, terminalID: terminalID), title: title, host: .right)
     }
 
     /// 打开预览标签(如放大查看的 Mermaid 图)。
@@ -426,8 +435,7 @@ public final class WorkbenchModel {
     ///   - title: 标签标题
     @discardableResult
     public func openPreview(id: String, title: String) -> UUID {
-        mode = .workspace
-        return dock.open(.preview(id: id), title: title)
+        openTab(.preview(id: id), title: title)
     }
 
     /// 打开终端标签。
@@ -436,8 +444,7 @@ public final class WorkbenchModel {
     ///   - title: 标签标题
     @discardableResult
     public func openTerminal(id: String, title: String) -> UUID {
-        mode = .workspace
-        return dock.open(.terminal(id: id), title: title)
+        openTab(.terminal(id: id), title: title, host: .right)
     }
 
     /// 打开 Git 提交历史标签。
@@ -448,19 +455,18 @@ public final class WorkbenchModel {
     public func openHistory(project projectID: String, path: String? = nil) -> UUID {
         mode = .workspace
         let title = path.map { String(localized: "历史") + " · " + ($0 as NSString).lastPathComponent } ?? String(localized: "Git 历史")
-        return dock.open(.history(projectID: projectID, path: path), title: title)
+        return openTab(.history(projectID: projectID, path: path), title: title)
     }
 
     /// 打开文件的逐行追溯(blame)标签。
     @discardableResult
     public func openBlame(_ path: String) -> UUID {
-        mode = .workspace
-        return dock.open(.blame(path: path), title: "Blame · " + (path as NSString).lastPathComponent)
+        openTab(.blame(path: path), title: "Blame · " + (path as NSString).lastPathComponent)
     }
 
     /// 关闭某项目全部子 Agent 标签(会话被替换后它们指向的工具调用已不存在)。
     func closeSubagentTabs(in projectID: String) {
-        dock.closeTabs { tab in
+        closeTabsInAllDocks { tab in
             switch tab.kind {
             case .subagent(let p, _), .agentTerminal(let p, _): return p == projectID
             default: return false
@@ -471,20 +477,21 @@ public final class WorkbenchModel {
     /// 打开本轮改动汇总标签。
     @discardableResult
     public func openChanges(project id: String) -> UUID {
-        mode = .workspace
-        return dock.open(.changes(projectID: id), title: String(localized: "改动"))
+        openTab(.changes(projectID: id), title: String(localized: "改动"))
     }
 
     /// 激活标签;会话标签同时切换当前项目。
     public func activateTab(_ id: UUID) {
-        dock.activate(id)
-        syncSelectionFromDock()
+        activateAnyTab(id)
     }
 
     /// 关闭标签;关闭后焦点落到相邻标签时同步当前项目。记入关闭栈以便 ⌘⇧T 恢复。
     public func closeTab(_ id: UUID) {
-        if let tab = dock.tab(id) { closedTabs.push(tab) }
-        dock.close(id)
+        if let tab = anyTab(id) { closedTabs.push(tab) }
+        switch host(of: id) {
+        case .right?: rightDock.close(id)
+        default: dock.close(id)
+        }
         syncSelectionFromDock()
     }
 
@@ -1533,7 +1540,7 @@ public final class WorkbenchModel {
     /// 当前仍有内容的会话标签记录(已创建会话的取实时状态;尚未显示的取启动时读到的记录),退出后用于恢复。
     private func chatSlotRecords() -> [ChatSlotRecord] {
         var result: [ConversationKey: ChatSlotRecord] = [:]
-        let openTabs = Set(dock.allTabs.compactMap { tab -> ConversationKey? in
+        let openTabs = Set(allDockTabs.compactMap { tab -> ConversationKey? in
             if case .chat(let projectID, let slot) = tab.kind { return ConversationKey(projectID: projectID, slot: slot) }
             return nil
         })
@@ -1553,6 +1560,7 @@ public final class WorkbenchModel {
         state.projects = projects + unavailableProjects.filter { !shownIDs.contains($0.id) }
         state.selectedProjectID = selectedProjectID
         state.dock = dock
+        state.rightDock = rightDock
         state.chatSlots = chatSlotRecords()
         return state
     }

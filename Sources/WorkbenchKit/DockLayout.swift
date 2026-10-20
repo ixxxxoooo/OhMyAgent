@@ -436,7 +436,8 @@ public struct DockLayout: Codable, Equatable, Sendable {
 
     /// 返回适合启动时恢复的布局:剔除不可恢复的临时标签(子 Agent、预览、终端)与已不存在项目的标签,并校正结构。
     /// - Parameter projectIDs: 当前仍存在的项目 ID
-    public func restoredForLaunch(projectIDs: Set<String>, keepChats: Set<ConversationKey> = []) -> DockLayout {
+    /// - Parameter keepsPanels: 右栏停靠区用:保留终端、输出、工具面板、计划等面板类标签(它们没有跨启动的进程状态,重开即重建)
+    public func restoredForLaunch(projectIDs: Set<String>, keepChats: Set<ConversationKey> = [], keepsPanels: Bool = false) -> DockLayout {
         var copy = self
         copy.maximizedGroupID = nil
         // 会话进程不跨启动保留,但有内容的会话标签会在原标签里恢复同一个会话(keepChats);
@@ -445,7 +446,12 @@ public struct DockLayout: Codable, Equatable, Sendable {
         let hasRecord = Set(keepChats.map(\.projectID))
         copy.closeTabs { tab in
             switch tab.kind {
-            case .subagent, .preview, .terminal, .agentTerminal: return true
+            case .subagent, .agentTerminal: return true
+            case .preview(let id):
+                guard keepsPanels else { return true }
+                // 浏览器页面随应用重启重建,不恢复;其余面板类预览(输出/工具面板/计划)保留
+                return id.hasPrefix("oma-browser:") || (id.hasPrefix("oma-plan:") && !FileManager.default.fileExists(atPath: String(id.dropFirst("oma-plan:".count))))
+            case .terminal: return !keepsPanels
             case .chat(let id, let slot):
                 guard projectIDs.contains(id) else { return true }
                 if keepChats.contains(ConversationKey(projectID: id, slot: slot)) { return false }

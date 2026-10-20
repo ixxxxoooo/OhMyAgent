@@ -126,7 +126,7 @@ private struct ExplorerProjectView: View {
     }
 
     private var activeFilePath: String? {
-        if case .file(let path)? = workbench.dock.focusedGroup?.active?.kind { return path }
+        if case .file(let path)? = workbench.focusedActiveTab?.kind { return path }
         return nil
     }
 
@@ -410,7 +410,7 @@ enum ExplorerActions {
             if let error { report(error); return }
             Log.editor.info("资源管理器重命名", ["from": source, "to": target])
             // 已打开的该文件标签随之关闭,避免指向失效路径
-            workbench.dock.closeTabs { tab in
+            workbench.closeTabsInAllDocks { tab in
                 if case .file(let p) = tab.kind { return p == source || p.hasPrefix(source + "/") }
                 return false
             }
@@ -429,7 +429,7 @@ enum ExplorerActions {
             }.value
             if let error { report(error); return }
             Log.editor.info("资源管理器移到废纸篓", ["path": source])
-            workbench.dock.closeTabs { tab in
+            workbench.closeTabsInAllDocks { tab in
                 if case .file(let p) = tab.kind { return p == source || p.hasPrefix(source + "/") }
                 return false
             }
@@ -506,7 +506,7 @@ enum ExplorerActions {
             }.value
             for job in jobs where job.kind == .move && FileManager.default.fileExists(atPath: job.destination) {
                 // 已打开的标签改指新位置;旧路径的(未修改)内存文档丢弃,打开时按新路径重新读取
-                workbench.dock.retargetFiles(from: job.source, to: job.destination)
+                workbench.retargetFilesInAllDocks(from: job.source, to: job.destination)
                 for path in FileDocumentStore.shared.documents.keys where path == job.source || path.hasPrefix(job.source + "/") {
                     FileDocumentStore.shared.discard(path)
                 }

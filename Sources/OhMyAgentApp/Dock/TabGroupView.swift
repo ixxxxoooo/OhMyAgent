@@ -165,6 +165,7 @@ struct DockEdges: Equatable {
 /// 标签组视图。
 struct TabGroupView: View {
     let workbench: WorkbenchModel
+    @Environment(\.dockHost) private var host
     let group: TabGroup
     /// 该组贴着停靠区的哪几条边
     var edges = DockEdges()
@@ -172,7 +173,7 @@ struct TabGroupView: View {
     /// 保活的标签(最近使用的若干个视图保持挂载,切换时不重建)
     @State private var keepAlive = TabKeepAlive()
 
-    private var isFocused: Bool { workbench.dock.focusedGroupID == group.id }
+    private var isFocused: Bool { workbench.dock(host).focusedGroupID == group.id }
 
     var body: some View {
         let _ = PanelToggleProbe.count("tabGroup")
@@ -190,12 +191,13 @@ struct TabGroupView: View {
                     .clipped()
                     // 拖拽结束后(松手在别处、被取消)落点高亮可能没收到 dropExited,以拖拽状态兜底清除
                     .overlay { DropOverlay(zone: DockDrag.shared.hasPayload ? zone : nil).allowsHitTesting(false) }
-                    .onDrop(of: [.plainText, .fileURL], delegate: GroupDropDelegate(workbench: workbench, groupID: group.id, size: proxy.size, zone: $zone))
+                    .onDrop(of: [.plainText, .fileURL], delegate: GroupDropDelegate(workbench: workbench, host: host, groupID: group.id, size: proxy.size, zone: $zone))
             }
         }
         .contentShape(Rectangle())
         .simultaneousGesture(TapGesture().onEnded {
-            workbench.dock.focus(group: group.id)
+            workbench.focusedHost = host
+            workbench.mutateDock(host) { $0.focus(group: group.id) }
             workbench.syncSelectionFromDock()
         })
     }
@@ -311,6 +313,7 @@ enum DockFileDrop {
 /// 内容区落点代理:实时计算落点并在放下时分屏/并入。
 struct GroupDropDelegate: DropDelegate {
     let workbench: WorkbenchModel
+    let host: DockHost
     let groupID: UUID
     let size: CGSize
     @Binding var zone: DockDropZone?
@@ -332,25 +335,25 @@ struct GroupDropDelegate: DropDelegate {
         let target = zone ?? DockDropZone.zone(at: info.location, in: size)
         zone = nil
         if DockFileDrop.isFileDrop(info) {
-            let model = workbench, group = groupID
+            let model = workbench, group = groupID, host = host
             DockFileDrop.loadFiles(info) { paths in
-                model.dock.focus(group: group)
+                model.mutateDock(host) { $0.focus(group: group) }
                 for path in paths {
-                    let id = model.openFile(path, preview: false)
+                    let id = model.openFile(path, preview: false, target: host == .right ? .right : .editor)
                     // 落在边缘:新建分屏;落在中心:并入该组
-                    model.dock.drop(id, onGroup: group, zone: target)
+                    model.moveTab(id, toHost: host, group: group, zone: target)
                 }
                 model.syncSelectionFromDock()
             }
             return true
         }
         guard let provider = info.itemProviders(for: [.plainText]).first else { return false }
-        let model = workbench, group = groupID
+        let model = workbench, group = groupID, host = host
         _ = provider.loadObject(ofClass: String.self) { text, _ in
             guard let text else { return }
             Task { @MainActor in
                 guard let id = DockDrag.resolveTab(text, in: model) else { return }
-                model.dock.drop(id, onGroup: group, zone: target)
+                model.moveTab(id, toHost: host, group: group, zone: target)
                 model.syncSelectionFromDock()
                 DockDrag.shared.tabID = nil
                 DockDrag.shared.toolsPane = nil
@@ -364,6 +367,7 @@ struct GroupDropDelegate: DropDelegate {
 /// 标签栏落点代理:放到某个标签上插入其位置,放到空白处追加到末尾。
 struct TabStripDropDelegate: DropDelegate {
     let workbench: WorkbenchModel
+    let host: DockHost
     let groupID: UUID
     /// 目标下标;nil 表示追加
     let index: Int?
@@ -376,13 +380,13 @@ struct TabStripDropDelegate: DropDelegate {
 
     func performDrop(info: DropInfo) -> Bool {
         if DockFileDrop.isFileDrop(info) {
-            let model = workbench, group = groupID, at = index
+            let model = workbench, group = groupID, at = index, host = host
             DockFileDrop.loadFiles(info) { paths in
-                model.dock.focus(group: group)
+                model.mutateDock(host) { $0.focus(group: group) }
                 var position = at
                 for path in paths {
-                    let id = model.openFile(path, preview: false)
-                    model.dock.move(id, toGroup: group, at: position)
+                    let id = model.openFile(path, preview: false, target: host == .right ? .right : .editor)
+                    model.moveTab(id, toHost: host, group: group, index: position)
                     position = position.map { $0 + 1 }
                 }
                 model.syncSelectionFromDock()
@@ -390,12 +394,12 @@ struct TabStripDropDelegate: DropDelegate {
             return true
         }
         guard let provider = info.itemProviders(for: [.plainText]).first else { return false }
-        let model = workbench, group = groupID, at = index
+        let model = workbench, group = groupID, at = index, host = host
         _ = provider.loadObject(ofClass: String.self) { text, _ in
             guard let text else { return }
             Task { @MainActor in
                 guard let id = DockDrag.resolveTab(text, in: model) else { return }
-                model.dock.move(id, toGroup: group, at: at)
+                model.moveTab(id, toHost: host, group: group, index: at)
                 model.syncSelectionFromDock()
                 DockDrag.shared.tabID = nil
                 DockDrag.shared.toolsPane = nil
