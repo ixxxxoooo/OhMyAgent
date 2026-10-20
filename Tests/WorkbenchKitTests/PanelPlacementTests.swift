@@ -93,6 +93,29 @@ struct PanelPlacementModelTests {
     }
 }
 
+@Suite("右栏动态宽度")
+struct RightWidthTests {
+    @Test("最大宽度 = 窗口 − 项目栏 − 中栏最小宽度,且不小于下限")
+    func maximum() {
+        #expect(PanelMetrics.rightMax(window: 1600, sidebar: 260) == 1600 - 260 - PanelMetrics.centerMinimum)
+        #expect(PanelMetrics.rightMax(window: 400, sidebar: 260) == PanelMetrics.rightRange.lowerBound)
+        var layout = WorkbenchLayout()
+        layout.leftWidth = 300
+        #expect(PanelMetrics.rightMax(window: 1500, layout: layout) == 1500 - 300 - PanelMetrics.centerMinimum)
+        layout.leftVisible = false
+        #expect(PanelMetrics.rightMax(window: 1500, layout: layout) == 1500 - PanelMetrics.centerMinimum)
+        #expect(PanelMetrics.rightMax(window: 0, layout: layout) == PanelMetrics.rightRange.upperBound)
+    }
+
+    @Test("双击:非默认回到默认;默认时展开到半个窗口(受最大宽度约束)")
+    func doubleClick() {
+        #expect(PanelMetrics.doubleClickTarget(current: 700, defaultWidth: 340, maximum: 1200, window: 1600) == 340)
+        #expect(PanelMetrics.doubleClickTarget(current: 340, defaultWidth: 340, maximum: 1200, window: 1600) == 800)
+        #expect(PanelMetrics.doubleClickTarget(current: 340, defaultWidth: 340, maximum: 500, window: 1600) == 500)
+        #expect(PanelMetrics.doubleClickTarget(current: 340, defaultWidth: 340, maximum: 240, window: 500) == 340)
+    }
+}
+
 @Suite("面板拖动落点")
 struct PanelDropTargetTests {
     private let size = CGSize(width: 1000, height: 800)

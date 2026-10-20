@@ -1,5 +1,5 @@
 // @author ixxxxoooo
-// 侧栏分隔条:1pt 细线 + 更宽的不可见拖动热区;拖动调整宽度,双击恢复默认宽度。
+// 侧栏分隔条:1pt 细线 + 更宽的不可见拖动热区;拖动调整宽度;双击恢复默认宽度(右栏再双击展开到约半个窗口)。
 // 取代原生 NavigationSplitView / inspector 的分隔条:原生列是 NSHostingView,会抢走窗口顶部浮层按钮的点击。
 
 import DesignSystem
@@ -25,6 +25,12 @@ struct PanelResizer: View {
         workbench.panelDrag.effective(dimension, committed: workbench.layout)
     }
 
+    /// 该维度当前允许的最大宽度:右栏随窗口宽度动态计算(保证中栏不被挤没),项目栏用静态范围。
+    private var maximumWidth: Double {
+        guard dimension == .rightWidth else { return dimension.range.upperBound }
+        return PanelMetrics.rightMax(window: TerminalDragState.shared.workspaceFrame.width, layout: workbench.layout)
+    }
+
     var body: some View {
         Rectangle()
             .fill(OMColors.hairline)
@@ -39,7 +45,8 @@ struct PanelResizer: View {
                             .onChanged { value in
                                 let start = base ?? currentWidth
                                 if base == nil { base = start }
-                                let next = PanelMetrics.resized(base: start, translation: Double(value.translation.width), side: side, range: dimension.range)
+                                let range = dimension.range.lowerBound...max(dimension.range.lowerBound, min(dimension.range.upperBound, maximumWidth))
+                                let next = PanelMetrics.resized(base: start, translation: Double(value.translation.width), side: side, range: range)
                                 workbench.panelDrag.update(next, for: dimension)
                             }
                             .onEnded { _ in
@@ -47,7 +54,13 @@ struct PanelResizer: View {
                                 workbench.commitPanelDrag(dimension)
                             }
                     )
-                    .onTapGesture(count: 2) { workbench.setPanelDimension(dimension, to: defaultWidth) }
+                    .onTapGesture(count: 2) {
+                        // 右栏:默认宽度 ↔ 展开到约半个窗口;项目栏:恢复默认
+                        let target = dimension == .rightWidth
+                            ? PanelMetrics.doubleClickTarget(current: currentWidth, defaultWidth: defaultWidth, maximum: maximumWidth, window: TerminalDragState.shared.workspaceFrame.width)
+                            : defaultWidth
+                        workbench.setPanelDimension(dimension, to: target)
+                    }
             }
             .accessibilityLabel(side == .left ? String(localized: "调整左栏宽度") : String(localized: "调整右栏宽度"))
             .accessibilityAdjustableAction { direction in

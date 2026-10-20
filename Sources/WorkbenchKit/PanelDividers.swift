@@ -70,4 +70,26 @@ public enum PanelMetrics {
         let raw = side == .left ? base + translation : base - translation
         return min(max(raw, range.lowerBound), range.upperBound)
     }
+
+    /// 右栏当前可用的最大宽度:窗口减去同在窗口里的其它可见列(项目栏)的宽度与中栏最小宽度。
+    /// - Parameters:
+    ///   - window: 工作区宽度;非正数(尚未量到)时返回静态上限
+    ///   - layout: 当前布局
+    /// - Returns: 右栏最大宽度
+    public static func rightMax(window: Double, layout: WorkbenchLayout) -> Double {
+        guard window > 0 else { return rightRange.upperBound }
+        return rightMax(window: window, sidebar: layout.leftVisible ? layout.leftWidth : 0)
+    }
+
+    /// 双击分隔条的目标宽度:当前不是默认宽度时回到默认;已是默认宽度时展开到工作区约一半(不超过最大宽度)。
+    /// - Parameters:
+    ///   - current: 当前宽度
+    ///   - defaultWidth: 默认宽度
+    ///   - maximum: 当前允许的最大宽度
+    ///   - window: 工作区宽度
+    /// - Returns: 目标宽度
+    public static func doubleClickTarget(current: Double, defaultWidth: Double, maximum: Double, window: Double) -> Double {
+        guard abs(current - defaultWidth) < 1 else { return defaultWidth }
+        return min(max(window / 2, defaultWidth), max(maximum, defaultWidth))
+    }
 }
