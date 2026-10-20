@@ -63,17 +63,24 @@ struct ProseTextLeaf: View {
     var timeline = true
     /// 无选区的单击回调
     var onClick: (() -> Void)?
+    /// 用户消息的工作区:非空时正文里的 `@路径` 渲染为文件 chip
+    var mentionWorkspace: URL?
 
     var body: some View {
         var hasher = Hasher()
         hasher.combine(text)
+        hasher.combine(mentionWorkspace)
         hasher.combine(size)
         hasher.combine(timeline)
         hasher.combine(OMLeafStyle.current)
         let resolved = NSColor(color)
         hasher.combine(resolved.usingColorSpace(.sRGB)?.hashValue ?? 0)
         return OMTextLeaf(signature: hasher.finalize(), onPlainClick: onClick) {
-            OMLeafContent.prose(text, size: size, color: resolved, timeline: timeline)
+            if let mentionWorkspace {
+                OMLeafContent.userMessage(text, workspace: mentionWorkspace, size: size, color: resolved, timeline: timeline)
+            } else {
+                OMLeafContent.prose(text, size: size, color: resolved, timeline: timeline)
+            }
         }
     }
 }

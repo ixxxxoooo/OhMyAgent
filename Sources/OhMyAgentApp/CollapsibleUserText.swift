@@ -55,6 +55,8 @@ struct CollapsibleUserText: View {
     let text: String
     /// 无选区的单击回调(正文是 AppKit 叶子,点击不会交给外层 SwiftUI 手势)
     var onClick: (() -> Void)?
+    /// 工作区:非空时正文里的文件引用渲染为 chip
+    var mentionWorkspace: URL?
     @State private var expanded = false
     @State private var hovering = false
     @State private var contentHeight: CGFloat = 0
@@ -74,7 +76,7 @@ struct CollapsibleUserText: View {
     }
 
     private var plainText: some View {
-        ProseTextLeaf(text: text, size: 13, color: OMColors.primaryText, timeline: true, onClick: onClick)
+        ProseTextLeaf(text: text, size: 13, color: OMColors.primaryText, timeline: true, onClick: onClick, mentionWorkspace: mentionWorkspace)
     }
 
     private var collapsible: some View {

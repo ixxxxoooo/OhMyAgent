@@ -167,10 +167,10 @@ struct UserMessageView: View {
                 }
             }
             if !entry.displayText.isEmpty {
-                CollapsibleUserText(text: entry.displayText) {
+                CollapsibleUserText(text: entry.displayText, onClick: {
                     // 正文是 AppKit 文本叶子,点击不会冒泡到卡片的 SwiftUI 手势:无选区的单击在这里进入编辑
                     if !entry.isSteered { sticky?.beginEditing(entry, pinned: false) }
-                }
+                }, mentionWorkspace: sticky?.model?.workspace)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

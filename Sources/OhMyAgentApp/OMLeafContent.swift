@@ -116,6 +116,27 @@ enum OMLeafContent {
         return NSAttributedString(string: text, attributes: [.font: NSFont.systemFont(ofSize: scaled), .foregroundColor: color, .paragraphStyle: style])
     }
 
+    /// 用户消息正文:其中的文件/文件夹引用(`@路径`)渲染成与输入框一致的 chip,复制时还原为记号。
+    /// - Parameters:
+    ///   - text: 消息文本
+    ///   - workspace: 工作区目录(相对路径基准;用于判断引用是否存在)
+    ///   - size: 基准字号
+    ///   - color: 文字色
+    ///   - timeline: 是否乘「时间线字号」
+    ///   - exists: 路径存在性判断(测试可注入)
+    /// - Returns: 富文本;无有效引用时与 `prose` 相同
+    static func userMessage(
+        _ text: String, workspace: URL, size: CGFloat, color: NSColor, timeline: Bool = true,
+        exists: (String) -> Bool? = FileMentions.fileSystemExists
+    ) -> NSAttributedString {
+        let plain = prose(text, size: size, color: color, timeline: timeline)
+        guard text.contains("@") else { return plain }
+        let pieces = ComposerMentionLayout.pieces(for: text, workspace: workspace, allowTrailingEnd: true, exists: exists)
+        guard pieces.contains(where: { if case .mention = $0 { true } else { false } }) else { return plain }
+        let attributes = plain.attributes(at: 0, effectiveRange: nil)
+        return MentionChipImage.attributedString(pieces: pieces, attributes: attributes)
+    }
+
     // MARK: 表格
 
     /// 表格列之间的间距。

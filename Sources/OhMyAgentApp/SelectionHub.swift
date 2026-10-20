@@ -35,19 +35,20 @@ final class SelectionHub {
         var viewID: ObjectIdentifier
         /// 叶子在内容坐标(自上而下)里的整体边框
         var frame: CGRect
-        /// 叶子被卸载时冻结的文本(已套用复制变换)
-        var frozenText: String?
+        /// 叶子被卸载时冻结的富文本副本与复制变换(切片复制时还原 chip 记号)
+        var frozenStorage: NSAttributedString?
+        var frozenTransform: ((String) -> String)?
         /// 冻结时的长度(UTF-16)
         var frozenLength = 0
 
         /// 当前长度(UTF-16)。
         var length: Int { view?.textStorage?.length ?? frozenLength }
 
-        /// 复制用文本:已套用叶子的复制变换(变换须保持长度不变,偏移才对得上)。
-        var text: String {
-            guard let view else { return frozenText ?? "" }
-            let raw = view.string
-            return view.copyTransform?(raw) ?? raw
+        /// 取选中范围的复制文本:chip 还原为记号、套用叶子的复制变换(视图已卸载时用冻结副本)。
+        func slice(_ range: NSRange) -> String {
+            if let view { return view.copyText(in: range) }
+            guard let frozenStorage else { return "" }
+            return OMReadOnlyTextView.copyText(of: frozenStorage, range: range, transform: frozenTransform)
         }
     }
 
@@ -96,8 +97,8 @@ final class SelectionHub {
         guard let key = viewKeys.removeValue(forKey: id), var atom = atoms[key], atom.viewID == id else { return }
         if anchor != nil {
             atom.frozenLength = leaf.textStorage?.length ?? 0
-            let raw = leaf.string
-            atom.frozenText = leaf.copyTransform?(raw) ?? raw
+            atom.frozenStorage = leaf.textStorage.map { NSAttributedString(attributedString: $0) }
+            atom.frozenTransform = leaf.copyTransform
             atom.view = nil
             atoms[key] = atom
         } else {
@@ -176,7 +177,11 @@ final class SelectionHub {
     func selectedText() -> String {
         guard let (list, ranges) = currentRanges() else { return "" }
         let sameRow = list.indices.map { $0 > 0 && abs(list[$0].frame.minY - list[$0 - 1].frame.minY) < 1 }
-        return SelectionMath.joined(texts: list.map(\.text), ranges: ranges, sameRowAsPrevious: sameRow)
+        // 先按范围切片(chip 字符还原为记号),再以整段范围交给拼接数学
+        let pieces = list.indices.map { index in ranges[index].map { list[index].slice(NSRange(location: $0.lowerBound, length: $0.count)) } }
+        let texts = pieces.map { $0 ?? "" }
+        let full: [Range<Int>?] = pieces.map { $0.map { 0..<($0 as NSString).length } }
+        return SelectionMath.joined(texts: texts, ranges: full, sameRowAsPrevious: sameRow)
     }
 
     // MARK: - 鼠标跟踪

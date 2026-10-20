@@ -169,6 +169,37 @@ class OMReadOnlyTextView: NSTextView {
     /// 选择中枢(`SelectionHub`)当前画在本叶子上的高亮范围。
     var hubRange: NSRange?
 
+    /// 属性键:附件(chip)字符复制时还原成的文本(如 `@"路径"` 记号)。
+    static let copyTextKey = NSAttributedString.Key("omCopyText")
+    /// 属性键:chip 对应的文件路径,单击在编辑区打开。
+    static let mentionPathKey = NSAttributedString.Key("omMentionPath")
+
+    /// 取富文本某段的复制文本:附件字符换成其还原文本,再套用复制变换。
+    /// - Parameters:
+    ///   - storage: 富文本(叶子的文本存储或冻结副本)
+    ///   - range: 选中范围(UTF-16,须在存储内)
+    ///   - transform: 复制变换(如软换行还原)
+    /// - Returns: 用于剪贴板的纯文本
+    static func copyText(of storage: NSAttributedString, range: NSRange, transform: ((String) -> String)?) -> String {
+        guard range.location >= 0, range.upperBound <= storage.length else { return "" }
+        var result = ""
+        let raw = storage.string as NSString
+        var cursor = range.location
+        storage.enumerateAttribute(copyTextKey, in: range, options: []) { value, run, _ in
+            if cursor < run.location { result += raw.substring(with: NSRange(location: cursor, length: run.location - cursor)) }
+            if let token = value as? String { result += token } else { result += raw.substring(with: run) }
+            cursor = run.upperBound
+        }
+        if cursor < range.upperBound { result += raw.substring(with: NSRange(location: cursor, length: range.upperBound - cursor)) }
+        return transform?(result) ?? result
+    }
+
+    /// 本叶子某段的复制文本。
+    func copyText(in range: NSRange) -> String {
+        guard let storage = textStorage else { return "" }
+        return Self.copyText(of: storage, range: range, transform: copyTransform)
+    }
+
     required override init(frame frameRect: NSRect, textContainer container: NSTextContainer?) {
         super.init(frame: frameRect, textContainer: container)
     }
@@ -206,8 +237,7 @@ class OMReadOnlyTextView: NSTextView {
         if SelectionHub.shared.hasSelection, SelectionHub.shared.copySelection() { return }
         let selected = selectedRange()
         guard selected.length > 0 else { return }
-        var plain = (string as NSString).substring(with: selected)
-        if let copyTransform { plain = copyTransform(plain) }
+        let plain = copyText(in: selected)
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(plain, forType: .string)
     }
@@ -250,12 +280,34 @@ class OMReadOnlyTextView: NSTextView {
             return
         }
         window?.makeFirstResponder(self)
+        // 单击文件 chip:在编辑区打开(拖动仍可从 chip 起选)
+        if let path = mentionPath(at: event) {
+            let start = event.locationInWindow
+            if let up = window?.nextEvent(matching: [.leftMouseUp, .leftMouseDragged], until: .distantFuture, inMode: .eventTracking, dequeue: true),
+               up.type == .leftMouseUp, hypot(up.locationInWindow.x - start.x, up.locationInWindow.y - start.y) < 4 {
+                _ = AppEnvironment.shared.workbench.openFile(path, preview: true)
+                return
+            }
+        }
         // 单击与拖动都由中枢接管:拖出本叶子时可以连续选到别的叶子
         guard let dragged = SelectionHub.shared.track(from: self, with: event) else {
             nativeMouseDown(event)
             return
         }
         if !dragged { onPlainClick?() }
+    }
+
+    /// 鼠标事件落在文件 chip 上时返回其路径。
+    private func mentionPath(at event: NSEvent) -> String? {
+        guard let storage = textStorage, storage.length > 0, let layout = layoutManager, let container = textContainer else { return nil }
+        let point = convert(event.locationInWindow, from: nil)
+        let local = NSPoint(x: point.x - textContainerOrigin.x, y: point.y - textContainerOrigin.y)
+        var fraction: CGFloat = 0
+        let glyph = layout.glyphIndex(for: local, in: container, fractionOfDistanceThroughGlyph: &fraction)
+        let index = layout.characterIndexForGlyph(at: glyph)
+        guard index < storage.length, let path = storage.attribute(Self.mentionPathKey, at: index, effectiveRange: nil) as? String else { return nil }
+        let rect = layout.boundingRect(forGlyphRange: NSRange(location: glyph, length: 1), in: container)
+        return rect.contains(local) ? path : nil
     }
 
     /// 无法由中枢接管时的原生行为:NSTextView 自带跟踪;原地单击且没有选区才算「单击」。

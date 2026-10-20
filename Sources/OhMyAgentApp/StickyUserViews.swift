@@ -218,6 +218,14 @@ struct StickyUserCard: View {
     @Environment(\.stickyUser) private var sticky
     @State private var hovering = false
 
+    /// 吸顶文字:含文件引用时 chip 以行内图片显示,否则是纯文字。
+    private var stickyText: Text {
+        let text = entry.displayText
+        guard text.contains("@"), let workspace = sticky?.model?.workspace else { return Text(verbatim: text) }
+        let pieces = ComposerMentionLayout.pieces(for: text, workspace: workspace, allowTrailingEnd: true)
+        return MentionChipImage.inlineText(pieces: pieces, font: OMFonts.reading)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             if !entry.attachments.isEmpty {
@@ -229,7 +237,7 @@ struct StickyUserCard: View {
                 }
             }
             if !entry.displayText.isEmpty {
-                Text(verbatim: entry.displayText)
+                stickyText
                     .font(OMFonts.reading)
                     .lineSpacing(OMFonts.readingLineSpacing)
                     .lineLimit(3)
