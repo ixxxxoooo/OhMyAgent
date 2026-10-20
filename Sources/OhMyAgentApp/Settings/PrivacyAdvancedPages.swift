@@ -42,9 +42,7 @@ struct PrivacyPage: View {
 /// 高级。
 struct AdvancedPage: View {
     @Bindable var model: ClaudeSettingsModel
-    @AppStorage(ClientPrefs.Key.pathNode) private var nodePath = ""
     @AppStorage(ClientPrefs.Key.pathClaude) private var claudePath = ""
-    @AppStorage(ClientPrefs.Key.pathAdapter) private var adapterPath = ""
     @AppStorage(ClientPrefs.Key.featureFileSystem) private var fileSystem = false
     @AppStorage(ClientPrefs.Key.featureTerminal) private var terminal = false
     @AppStorage(ClientPrefs.Key.featureElicitation) private var elicitation = true
@@ -59,12 +57,9 @@ struct AdvancedPage: View {
     var body: some View {
         SettingsForm {
             Section("工具路径(留空自动探测)") {
-                TextField("node", text: $nodePath, prompt: Text(tools?.nodePath ?? String(localized: "未找到")))
                 TextField("claude", text: $claudePath, prompt: Text(tools?.claudePath ?? String(localized: "未找到")))
-                TextField("ACP 适配器入口", text: $adapterPath, prompt: Text(tools?.adapterEntry ?? String(localized: "未找到")))
                 HStack {
                     Button("应用并重新探测") { Task { await redetect() } }
-                    if let version = tools?.nodeVersion { Text("node \(version)").font(OMFonts.small).foregroundStyle(OMColors.secondaryText) }
                 }
                 Note("修改后对新建会话生效;已打开的会话保持原有进程。")
             }

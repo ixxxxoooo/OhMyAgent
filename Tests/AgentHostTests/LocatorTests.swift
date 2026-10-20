@@ -8,15 +8,6 @@ import Testing
 
 @Suite("工具定位")
 struct LocatorTests {
-    @Test("版本号解析与比较")
-    func versions() {
-        #expect(ExecutableLocator.majorVersion("v22.18.0") == 22)
-        #expect(ExecutableLocator.majorVersion("26.8.1") == 26)
-        #expect(ExecutableLocator.compareVersions("v22.19.0", "v22.18.0") == 1)
-        #expect(ExecutableLocator.compareVersions("v22.0.0", "v26.8.1") == -1)
-        #expect(ExecutableLocator.compareVersions("v22.0.0", "v22.0.0") == 0)
-    }
-
     @Test("解析带标记的 env -0 输出并剥离 shell 噪声")
     func envParsing() {
         var data = Data("noise\n__OMA_ENV_START__".utf8)
@@ -28,58 +19,45 @@ struct LocatorTests {
         #expect(ShellEnvironment.parse(Data("garbage".utf8)) == nil)
     }
 
-    @Test("Claude 提供者缺少依赖时给出明确错误")
+    @Test("Claude 提供者缺少 claude 时给出明确错误")
     func missingTools() {
         let provider = ClaudeACPProvider()
-        let tools = LocatedTools(nodePath: nil, nodeVersion: nil, claudePath: nil, adapterEntry: nil, environment: [:])
-        #expect(throws: AgentLaunchError.self) { try provider.makeLaunch(cwd: "/tmp", tools: tools) }
+        let tools = LocatedTools(claudePath: nil, environment: [:])
+        #expect(throws: AgentLaunchError.self) { try provider.makeEndpoint(cwd: "/tmp", tools: tools) }
     }
 
-    @Test("Claude 提供者设置 CLAUDE_CODE_EXECUTABLE")
-    func claudeEnv() throws {
-        let tools = LocatedTools(nodePath: "/n", nodeVersion: "v22", claudePath: "/c", adapterEntry: "/a.js", environment: ["PATH": "/bin"])
-        let launch = try ClaudeACPProvider().makeLaunch(cwd: "/work", tools: tools)
-        #expect(launch.executable == "/n")
-        #expect(launch.arguments == ["/a.js"])
-        #expect(launch.environment["CLAUDE_CODE_EXECUTABLE"] == "/c")
-        #expect(launch.workingDirectory == "/work")
-    }
-
-    @Test("适配器自动安装:npm 参数跳过平台二进制并固定版本")
-    func adapterInstallArguments() {
-        let args = AdapterInstaller.installArguments(prefix: "/tmp/acp")
-        #expect(args.first == "install")
-        #expect(args.contains("--omit=optional"))
-        #expect(args.contains("--ignore-scripts"))
-        #expect(args.last == "@agentclientprotocol/claude-agent-acp@\(AdapterInstaller.version)")
-        #expect(args[args.firstIndex(of: "--prefix").map { $0 + 1 } ?? 0] == "/tmp/acp")
-    }
-
-    @Test("适配器自动安装:入口已存在时直接返回而不调用 npm")
-    func adapterInstallIdempotent() async throws {
-        let prefix = FileManager.default.temporaryDirectory.appendingPathComponent("oma-acp-\(UUID().uuidString)")
-        defer { try? FileManager.default.removeItem(at: prefix) }
-        let entry = prefix.appendingPathComponent(AdapterInstaller.entryRelativePath)
-        try FileManager.default.createDirectory(at: entry.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try Data("// stub".utf8).write(to: entry)
-        let result = try await AdapterInstaller.shared.install(nodePath: "/nonexistent/node", environment: [:], prefix: prefix)
-        #expect(result == entry.path)
-    }
-
-    @Test("适配器自动安装:找不到 npm 时给出明确错误")
-    func adapterInstallNoNPM() async {
-        let prefix = FileManager.default.temporaryDirectory.appendingPathComponent("oma-acp-\(UUID().uuidString)")
-        defer { try? FileManager.default.removeItem(at: prefix) }
-        if AdapterInstaller.locateNPM(nodePath: "/nonexistent/bin/node", environment: ["PATH": "/nonexistent"]) != nil { return }
-        await #expect(throws: AdapterInstallError.self) {
-            try await AdapterInstaller.shared.install(nodePath: "/nonexistent/bin/node", environment: ["PATH": "/nonexistent"], prefix: prefix)
+    @Test("Claude 提供者返回进程内接入点并设置 CLAUDE_CODE_EXECUTABLE")
+    func claudeEndpoint() throws {
+        let tools = LocatedTools(claudePath: "/c", environment: ["PATH": "/bin"])
+        guard case .inProcess(let config) = try ClaudeACPProvider().makeEndpoint(cwd: "/work", tools: tools) else {
+            Issue.record("应为进程内接入点")
+            return
         }
+        #expect(config.executable == "/c")
+        #expect(config.environment["CLAUDE_CODE_EXECUTABLE"] == "/c")
+        #expect(config.environment["PATH"] == "/bin")
+    }
+
+    @Test("定位器按覆盖 > PATH 顺序找 claude,且不再依赖 node")
+    func locateClaude() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("oma-locate-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let fake = dir.appendingPathComponent("claude")
+        try Data("#!/bin/sh\n".utf8).write(to: fake)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fake.path)
+        let viaPath = ExecutableLocator.locate(environment: ["PATH": dir.path, "HOME": "/nonexistent"])
+        #expect(viaPath.claudePath == fake.path && viaPath.isACPReady)
+        let override = ExecutableLocator.locate(overrides: ["claude": fake.path], environment: ["PATH": "/nonexistent", "HOME": "/nonexistent"])
+        #expect(override.claudePath == fake.path)
+        let none = ExecutableLocator.locate(environment: ["PATH": "/nonexistent", "HOME": "/nonexistent"])
+        #expect(none.claudePath == nil || none.claudePath?.hasPrefix("/opt/homebrew") == true || none.claudePath?.hasPrefix("/usr/local") == true)
     }
 
     @Test("通用 ACP 提供者在 PATH 中解析命令")
     func genericResolve() throws {
         let descriptor = AgentDescriptor(id: "x", name: "X", kind: .genericACP, command: "sh", args: ["-c", "true"])
-        let tools = LocatedTools(nodePath: nil, nodeVersion: nil, claudePath: nil, adapterEntry: nil, environment: ["PATH": "/bin:/usr/bin"])
+        let tools = LocatedTools(environment: ["PATH": "/bin:/usr/bin"])
         let launch = try GenericACPProvider(descriptor: descriptor).makeLaunch(cwd: "/tmp", tools: tools)
         #expect(launch.executable.hasSuffix("/sh"))
     }
@@ -102,7 +80,7 @@ struct ProcessIntegrationTests {
         let exe = "\(dir)/FakeAgent"
         let descriptor = AgentDescriptor(id: "fake", name: "Fake", kind: .genericACP, command: exe)
         let supervisor = AgentSupervisor(provider: GenericACPProvider(descriptor: descriptor), cwd: "/tmp", delegate: AutoAllowDelegate())
-        let tools = LocatedTools(nodePath: nil, nodeVersion: nil, claudePath: nil, adapterEntry: nil, environment: ProcessInfo.processInfo.environment)
+        let tools = LocatedTools(environment: ProcessInfo.processInfo.environment)
         let result = try await supervisor.start(tools: tools)
         #expect(result.agentName == "scripted-agent")
         let client = try #require(await supervisor.client)
@@ -112,11 +90,11 @@ struct ProcessIntegrationTests {
         await supervisor.stop()
     }
 
-    @Test("真实 claude-agent-acp 完成握手(环境具备时)")
+    @Test("原生适配器经进程内传输完成握手(环境具备 claude 时)")
     func realAdapterHandshake() async throws {
         let env = ProcessInfo.processInfo.environment
-        let tools = ExecutableLocator.locate(projectRoot: packageRoot, environment: env)
-        guard tools.isACPReady, tools.claudePath != nil else { return }
+        let tools = ExecutableLocator.locate(environment: env)
+        guard tools.isACPReady else { return }
         let supervisor = AgentSupervisor(provider: ClaudeACPProvider(), cwd: packageRoot, delegate: AutoAllowDelegate())
         let result = try await supervisor.start(tools: tools)
         #expect(result.protocolVersion == 1)

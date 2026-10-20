@@ -595,7 +595,7 @@ struct ClientPrefsTests {
     @Test("路径覆盖忽略空白,预算不为负")
     func overridesAndBudget() {
         let store = defaults()
-        store.set("  ", forKey: ClientPrefs.Key.pathNode)
+        store.set("  ", forKey: ClientPrefs.Key.pathClaude)
         store.set("/opt/claude", forKey: ClientPrefs.Key.pathClaude)
         #expect(ClientPrefs.pathOverrides(store) == ["claude": "/opt/claude"])
         store.set(-3.0, forKey: ClientPrefs.Key.budgetUSD)

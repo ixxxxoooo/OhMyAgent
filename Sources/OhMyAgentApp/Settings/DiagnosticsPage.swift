@@ -176,7 +176,7 @@ struct DiagnosticsPage: View {
         let tools = await Toolchain.shared.resolve()
         var lines = [String(localized: "# OhMyAgent 诊断报告"), String(localized: "时间: \(Date().formatted(.iso8601))"), "macOS: \(ProcessInfo.processInfo.operatingSystemVersionString)",
                      String(localized: "应用版本: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev")"),
-                     "node: \(tools.nodePath ?? "-") \(tools.nodeVersion ?? "")", "claude: \(tools.claudePath ?? "-")", "adapter: \(tools.adapterEntry ?? "-")",
+                     "claude: \(tools.claudePath ?? "-")",
                      String(localized: "首帧: \(DiagnosticsStore.shared.firstFrameMilliseconds.map { "\($0)ms" } ?? "-")"), "", String(localized: "## 进程")]
         lines += rows.map { String(format: "%@ (%d) %.0fMB cpu %.1f%%", $0.name, $0.id, $0.rssMB, $0.cpu) }
         let settings = ClaudeSettingsModel(paths: center.paths)

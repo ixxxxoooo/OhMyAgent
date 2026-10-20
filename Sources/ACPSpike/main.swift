@@ -43,9 +43,8 @@ let clock = ContinuousClock()
 let t0 = clock.now
 let env = await ShellEnvironment.resolve()
 print("[env] 解析登录 shell 环境: \(clock.now - t0)")
-let tools = ExecutableLocator.locate(projectRoot: FileManager.default.currentDirectoryPath, environment: env)
-print("[tools] node=\(tools.nodePath ?? "-") (\(tools.nodeVersion ?? "-")) claude=\(tools.claudePath ?? "-")")
-print("[tools] adapter=\(tools.adapterEntry ?? "-")")
+let tools = ExecutableLocator.locate(environment: env)
+print("[tools] claude=\(tools.claudePath ?? "-")")
 
 let supervisor = AgentSupervisor(provider: ClaudeACPProvider(), cwd: cwd, delegate: AutoAllow())
 do {

@@ -91,6 +91,11 @@ struct DemoCoverageTests {
         let ws = try M3ScenarioTests.tempWorkspace()
         defer { try? FileManager.default.removeItem(at: ws) }
         let model = try await M3ScenarioTests.readyModel(workspace: ws)
+        // 空白会话(输入框居中)切换模型不插分割线,先产生一轮对话
+        model.send("#demo-changes")
+        #expect(await SessionModelTests.wait { !model.pendingPermissions.isEmpty })
+        if let prompt = model.pendingPermissions.first { model.resolve(prompt, optionId: "allow") }
+        #expect(await SessionModelTests.wait { !model.isRunning })
         model.setConfigOption("model", value: "scripted-2")
         #expect(await SessionModelTests.wait { model.timeline.entries.contains { $0.kind == .modelSwitch } })
         let entry = try #require(model.timeline.entries.last { $0.kind == .modelSwitch })

@@ -439,23 +439,9 @@ public final class SessionModel {
         let cwd = workspace.path
         log.info("开始连接 Agent", ["agent": descriptor.id, "cwd": cwd])
         connectTask = Task { [weak self] in
-            var tools = await Toolchain.shared.resolve()
+            let tools = await Toolchain.shared.resolve()
             guard let self else { return }
-            // 应用包未内置适配器时自动安装,用户无需手动运行脚本
-            if descriptor.kind == .claudeACP, tools.adapterEntry == nil, tools.nodePath != nil {
-                self.connectNote = String(localized: "正在安装 Claude Code 适配器(仅首次需要,约几十秒)…")
-                do {
-                    tools = try await Toolchain.shared.ensureAdapter(tools)
-                } catch {
-                    self.log.error("自动安装适配器失败", error: error, ["agent": descriptor.id, "ms": "\(OMLogger.milliseconds(since: connectStart))"])
-                    self.connectNote = nil
-                    self.connectTask = nil
-                    self.phase = .failed(error.localizedDescription)
-                    return
-                }
-                self.connectNote = nil
-            }
-            self.log.info("工具链解析完成", ["node": tools.nodePath ?? "-", "nodeVersion": tools.nodeVersion ?? "-", "claude": tools.claudePath ?? "-", "adapter": tools.adapterEntry ?? "-"])
+            self.log.info("工具链解析完成", ["claude": tools.claudePath ?? "-"])
             let environment = ClientPrefs.filterTerminalEnvironment(tools.environment, inherit: ClientPrefs.terminalInheritsEnvironment())
             let manager = TerminalManager(workspace: cwd, environment: { environment }, sandbox: { ClientPrefs.terminalSandboxConfig() }, onCreated: { [weak self] created in
                 Task { @MainActor in self?.registerTerminal(created) }
@@ -480,7 +466,7 @@ public final class SessionModel {
                                              extraCapabilities: features.extraCapabilities)
             do {
                 let result = try await supervisor.start(tools: tools)
-                guard let client = await supervisor.client else { throw AgentLaunchError.missingAdapter }
+                guard let client = await supervisor.client else { throw AgentLaunchError.missingClaude }
                 self.attach(supervisor: supervisor, client: client, result: result)
                 let registry = AgentRegistryStore().load()
                 let prepared = await self.prepareMCPServers(registry: registry, environment: tools.environment)

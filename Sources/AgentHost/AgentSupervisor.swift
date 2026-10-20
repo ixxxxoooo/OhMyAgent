@@ -2,6 +2,7 @@
 // Agent 监督者:拉起子进程、完成握手、监测退出,并向上层提供状态流。
 
 import ACPKit
+import ClaudeAgentKit
 import Foundation
 import OMLog
 
@@ -23,6 +24,8 @@ public actor AgentSupervisor {
     private let advertiseTerminal: Bool
     private let extraCapabilities: [String: JSONValue]
     private var transport: StdioTransport?
+    /// 进程内原生适配器(Claude Code);随监督者停止而关闭
+    private var inProcessAgent: ClaudeAcpAgent?
     public private(set) var client: ACPClient?
     public private(set) var state: AgentState = .idle
     public private(set) var initializeResult: InitializeResult?
@@ -67,11 +70,21 @@ public actor AgentSupervisor {
         if let initializeResult, case .ready = state { return initializeResult }
         set(.starting)
         do {
-            let launch = try provider.makeLaunch(cwd: cwd, tools: tools)
-            let transport = StdioTransport(launch: launch)
-            let client = ACPClient(transport: transport, delegate: delegate)
-            try await client.start()
-            self.transport = transport
+            let client: ACPClient
+            switch try provider.makeEndpoint(cwd: cwd, tools: tools) {
+            case .process(let launch):
+                let transport = StdioTransport(launch: launch)
+                client = ACPClient(transport: transport, delegate: delegate)
+                try await client.start()
+                self.transport = transport
+            case .inProcess(let config):
+                let (clientSide, agentSide) = LoopbackTransport.makePair()
+                let agent = ClaudeAcpAgent(connection: ACPConnection(transport: agentSide, label: "claude-agent"), config: config)
+                try await agent.start()
+                inProcessAgent = agent
+                client = ACPClient(transport: clientSide, delegate: delegate)
+                try await client.start()
+            }
             self.client = client
             let result = try await client.initialize(fileSystem: advertiseFileSystem, terminal: advertiseTerminal, extraCapabilities: extraCapabilities)
             initializeResult = result
@@ -91,12 +104,20 @@ public actor AgentSupervisor {
         client = nil
         transport = nil
         initializeResult = nil
+        if let agent = inProcessAgent {
+            inProcessAgent = nil
+            Task { await agent.shutdown() }
+        }
     }
 
     /// 停止子进程并回收。
     public func stop() async {
         Log.agent.info("停止 Agent", ["cwd": cwd])
         if let client { await client.close() }
+        if let agent = inProcessAgent {
+            inProcessAgent = nil
+            await agent.shutdown()
+        }
         client = nil
         transport = nil
         initializeResult = nil

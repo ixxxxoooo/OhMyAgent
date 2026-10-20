@@ -547,7 +547,6 @@
 "导出诊断时脱敏(路径与令牌)" = "Redact paths and tokens when exporting diagnostics";
 "凭据" = "Credentials";
 "工具路径(留空自动探测)" = "Tool paths (leave empty to auto-detect)";
-"ACP 适配器入口" = "ACP Adapter Entry";
 "应用并重新探测" = "Apply and Re-detect";
 "MCP 运行参数" = "MCP Runtime Options";
 "环境变量(%@层)" = "Environment variables (%@ layer)";
@@ -916,8 +915,7 @@
 /* 全量补全:错误提示、设置页、工具展示、Git/MCP/插件等(由 Scripts/l10n-scan.py 扫描发现) */
 "连接已关闭" = "Connection closed";
 "请求已取消" = "Request cancelled";
-"通过 claude-agent-acp 适配器接入官方 Claude Code" = "Connects to the official Claude Code via the claude-agent-acp adapter";
-"未找到 Node.js(需要 22 或更高版本)。请安装 Node,或在设置 → 高级中指定路径。" = "Node.js not found (version 22 or later is required). Install Node, or set the path in Settings → Advanced.";
+"通过内置原生适配器接入官方 Claude Code" = "Connects to the official Claude Code through the built-in native adapter";
 "未找到 claude 命令行工具。请先安装 Claude Code。" = "claude command-line tool not found. Please install Claude Code first.";
 "Agent「%@」未配置可执行文件。" = "Agent “%@” has no executable configured.";
 "缺少随应用分发的辅助程序 %@,请重新安装或运行 Scripts/bundle.sh。" = "Missing helper %@ that ships with the app. Reinstall, or run Scripts/bundle.sh.";
@@ -1339,9 +1337,6 @@
 
 /* 列表分隔符:中文用顿号,英文用逗号 */
 "、" = ", ";
-"未找到 claude-agent-acp 适配器。应用会自动安装;如仍失败,请检查网络后重试,或在设置 → 高级中指定路径。" = "claude-agent-acp adapter not found. The app installs it automatically; if that still fails, check your network and retry, or set the path in Settings → Advanced.";
-"未找到 npm,无法自动安装 claude-agent-acp 适配器。请安装 Node.js 22+(自带 npm),或在设置 → 高级中指定适配器路径。" = "npm not found, so the claude-agent-acp adapter cannot be installed automatically. Install Node.js 22+ (includes npm), or set the adapter path in Settings → Advanced.";
-"自动安装 claude-agent-acp 适配器失败(退出码 %lld):%@。请检查网络后点击「重试」,或在设置 → 高级中指定适配器路径。" = "Automatic install of the claude-agent-acp adapter failed (exit code %lld): %@. Check your network and click Retry, or set the adapter path in Settings → Advanced.";
 "适配器安装完成但未找到入口文件,请点击「重试」或在设置 → 高级中指定路径。" = "The adapter was installed but its entry file was not found. Click Retry or set the path in Settings → Advanced.";
 "正在安装 Claude Code 适配器(仅首次需要,约几十秒)…" = "Installing the Claude Code adapter (first run only, takes a few dozen seconds)…";
 "正在安装适配器…" = "Installing adapter…";
@@ -2689,3 +2684,26 @@
 "原位置已有同名项目" = "An item with the same name already exists at the original location";
 "OhMyAgent 墨玻璃" = "OhMyAgent Ink Glass";
 "OhMyAgent 纸玻璃" = "OhMyAgent Paper Glass";
+"无法启动 claude:%@" = "Unable to launch claude: %@";
+"claude 命令超时" = "claude command timed out";
+"找不到可执行文件 %@" = "Executable not found: %@";
+"未实现的方法:%@" = "Method not implemented: %@";
+"不支持的鉴权方式:%@" = "Unsupported authentication method: %@";
+"缺少或非法的 sessionId" = "Missing or invalid sessionId";
+"缺少 modeId" = "Missing modeId";
+"缺少 configId 或 value" = "Missing configId or value";
+"缺少 prompt" = "Missing prompt";
+"claude 进程已退出(%@)" = "The claude process exited (%@)";
+"控制请求失败" = "Control request failed";
+"不支持的控制请求:%@" = "Unsupported control request: %@";
+"claude 进程已退出" = "The claude process exited";
+"会话已结束" = "Session has ended";
+"Claude 在没有返回结果的情况下结束了本轮,请重试。" = "Claude ended the turn without returning a result. Please try again.";
+"Claude 请求失败" = "Claude request failed";
+"对话已重置" = "Conversation reset";
+"标题不能为空" = "Title must not be empty";
+"提示内容为空" = "Prompt is empty";
+"会话不存在:%@" = "Session not found: %@";
+"claude 进程已退出:%@" = "The claude process exited: %@";
+"拖放" = "Drop";
+"启用此提供商" = "Enable this provider";

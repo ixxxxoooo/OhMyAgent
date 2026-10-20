@@ -48,9 +48,7 @@ public enum ClientPrefs {
         public static let redactLogs = "privacy.redactLogs"
         /// 自动压缩窗口(token,0 = 默认):给上下文设上限,对应 CLAUDE_CODE_AUTO_COMPACT_WINDOW
         public static let autoCompactWindow = "advanced.autoCompactWindow"
-        public static let pathNode = "advanced.path.node"
         public static let pathClaude = "advanced.path.claude"
-        public static let pathAdapter = "advanced.path.adapter"
         public static let featureFileSystem = "feature.fileSystem"
         public static let featureTerminal = "feature.terminal"
         /// 声明 `_meta.terminal_output`:显示 Agent 自己执行的命令输出(含后台命令)
@@ -211,7 +209,7 @@ public enum ClientPrefs {
     /// 工具路径覆盖(空串视为未设置)。
     public static func pathOverrides(_ defaults: UserDefaults = .standard) -> [String: String] {
         var result: [String: String] = [:]
-        for (name, key) in [("node", Key.pathNode), ("claude", Key.pathClaude), ("adapter", Key.pathAdapter)] {
+        for (name, key) in [("claude", Key.pathClaude)] {
             if let value = defaults.string(forKey: key)?.trimmingCharacters(in: .whitespaces), !value.isEmpty { result[name] = value }
         }
         return result

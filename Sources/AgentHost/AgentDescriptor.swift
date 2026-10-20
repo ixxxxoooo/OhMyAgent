@@ -2,11 +2,12 @@
 // Agent 描述符与提供者协议:新增 ACP Agent 只需增加描述符,无需改代码。
 
 import ACPKit
+import ClaudeAgentKit
 import Foundation
 
 /// Agent 种类。
 public enum AgentKind: String, Codable, Sendable, Hashable {
-    /// 通过 claude-agent-acp 适配器接入 Claude Code
+    /// 通过进程内原生适配器(ClaudeAgentKit)接入 Claude Code
     case claudeACP
     /// 任意 ACP 原生 Agent(Codex CLI、Gemini CLI、Goose、OpenCode 等)
     case genericACP
@@ -53,14 +54,12 @@ public struct AgentDescriptor: Codable, Sendable, Hashable, Identifiable {
         id: "claude-code",
         name: "Claude Code",
         kind: .claudeACP,
-        summary: String(localized: "通过 claude-agent-acp 适配器接入官方 Claude Code")
+        summary: String(localized: "通过内置原生适配器接入官方 Claude Code")
     )
 }
 
 /// 启动前提不满足时的错误。
 public enum AgentLaunchError: Error, LocalizedError, Sendable {
-    case missingNode
-    case missingAdapter
     case missingClaude
     case missingCommand(String)
     case missingHelper(String)
@@ -68,8 +67,6 @@ public enum AgentLaunchError: Error, LocalizedError, Sendable {
 
     public var errorDescription: String? {
         switch self {
-        case .missingNode: return String(localized: "未找到 Node.js(需要 22 或更高版本)。请安装 Node,或在设置 → 高级中指定路径。")
-        case .missingAdapter: return String(localized: "未找到 claude-agent-acp 适配器。应用会自动安装;如仍失败,请检查网络后重试,或在设置 → 高级中指定路径。")
         case .missingClaude: return String(localized: "未找到 claude 命令行工具。请先安装 Claude Code。")
         case .missingCommand(let name): return String(localized: "Agent「\(name)」未配置可执行文件。")
         case .notInstalled(let name): return String(localized: "Agent「\(name)」尚未安装。请到设置 → Agent 注册表点击「一键安装」。")
@@ -78,14 +75,22 @@ public enum AgentLaunchError: Error, LocalizedError, Sendable {
     }
 }
 
-/// Agent 提供者:负责把描述符变成可启动的进程配置。
+/// Agent 接入点:子进程(stdio)或进程内原生适配器。
+public enum AgentEndpoint: Sendable {
+    /// 作为子进程启动,经 stdio 说 ACP
+    case process(ProcessLaunch)
+    /// 进程内原生 Claude 适配器:与客户端经内存传输相连,按会话拉起 `claude`
+    case inProcess(ClaudeAgentConfig)
+}
+
+/// Agent 提供者:负责把描述符变成可连接的接入点。
 public protocol AgentProvider: Sendable {
     var descriptor: AgentDescriptor { get }
-    /// 生成子进程启动配置。
+    /// 生成接入点。
     /// - Parameters:
     ///   - cwd: 工作目录
     ///   - tools: 工具定位结果
-    func makeLaunch(cwd: String, tools: LocatedTools) throws -> ProcessLaunch
+    func makeEndpoint(cwd: String, tools: LocatedTools) throws -> AgentEndpoint
 }
 
 /// 基于描述符创建提供者。
@@ -100,7 +105,7 @@ public enum AgentProviders {
     }
 }
 
-/// Claude Code(经 claude-agent-acp)。
+/// Claude Code(经进程内原生适配器 `ClaudeAcpAgent`)。
 public struct ClaudeACPProvider: AgentProvider {
     public var descriptor: AgentDescriptor
 
@@ -108,17 +113,18 @@ public struct ClaudeACPProvider: AgentProvider {
         self.descriptor = descriptor
     }
 
-    public func makeLaunch(cwd: String, tools: LocatedTools) throws -> ProcessLaunch {
-        guard let node = tools.nodePath else { throw AgentLaunchError.missingNode }
-        guard let adapter = tools.adapterEntry else { throw AgentLaunchError.missingAdapter }
+    public func makeEndpoint(cwd: String, tools: LocatedTools) throws -> AgentEndpoint {
         guard let claude = tools.claudePath else { throw AgentLaunchError.missingClaude }
         var env = tools.environment
         // 使用用户已安装并已登录的 claude,凭据由官方进程自行管理
         env["CLAUDE_CODE_EXECUTABLE"] = claude
         for (key, value) in descriptor.env { env[key] = value }
         env[AgentEnvironment.marker] = "1"
-        return ProcessLaunch(executable: node, arguments: [adapter] + descriptor.args, environment: env, workingDirectory: cwd)
+        return .inProcess(ClaudeAgentConfig(executable: claude, environment: env, version: Self.adapterVersion))
     }
+
+    /// 原生适配器版本号(`initialize.agentInfo.version`)。
+    public static let adapterVersion = "1.0.0"
 }
 
 /// 任意 ACP 原生 Agent。
@@ -129,6 +135,11 @@ public struct GenericACPProvider: AgentProvider {
         self.descriptor = descriptor
     }
 
+    public func makeEndpoint(cwd: String, tools: LocatedTools) throws -> AgentEndpoint {
+        .process(try makeLaunch(cwd: cwd, tools: tools))
+    }
+
+    /// 生成子进程启动配置。
     public func makeLaunch(cwd: String, tools: LocatedTools) throws -> ProcessLaunch {
         var env = tools.environment
         for (key, value) in descriptor.env { env[key] = value }
