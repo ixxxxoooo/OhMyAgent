@@ -443,6 +443,7 @@ enum ExplorerActions {
     }
 
     private static func report(_ message: String) {
+        Log.ui.warning("资源管理器文件操作失败", ["error": message])
         OMDialog.alert(title: String(localized: "操作失败"), message: message, isError: true)
     }
 

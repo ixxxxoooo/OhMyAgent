@@ -4,6 +4,7 @@
 // 解析是纯逻辑,便于测试;`detect` 在后台执行 lsof,带超时。
 
 import Foundation
+import OMLog
 
 /// 一个监听中的开发服务器。
 public struct DevServer: Sendable, Equatable {
@@ -106,7 +107,10 @@ public enum DevServerDetector {
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = FileHandle.nullDevice
-        do { try process.run() } catch { return nil }
+        do { try process.run() } catch {
+            Log.tool.debug("启动探测进程失败", ["path": path, "error": "\(error)"])
+            return nil
+        }
         let timer = DispatchWorkItem { if process.isRunning { process.terminate() } }
         DispatchQueue.global().asyncAfter(deadline: .now() + 3, execute: timer)
         let data = pipe.fileHandleForReading.readDataToEndOfFile()

@@ -1084,7 +1084,10 @@ public final class SessionModel {
         let initial = await Task.detached(priority: .userInitiated) { () -> Result<ResolvedMapping?, ProviderStorage.ResolveError> in
             do { return .success(try ProviderStorage.resolveMapping(directory: directory, environment: environment)) }
             catch let error as ProviderStorage.ResolveError { return .failure(error) }
-            catch { return .success(nil) }
+            catch {
+                Log.config.warning("解析模型映射时遇到未预期的错误,回退默认配置", ["error": "\(error)"])
+                return .success(nil)
+            }
         }.value
         // 注册到本机网关(改写 `_meta`);失败时回退默认配置并提示
         var outcome: Result<ActivatedMapping?, ProviderStorage.ResolveError>
