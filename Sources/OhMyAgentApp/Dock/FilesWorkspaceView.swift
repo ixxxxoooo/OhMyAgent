@@ -143,6 +143,16 @@ private struct FilesWorkspaceBody: View {
             }
         }
         .background(OMColors.surface)
+        // 收起后的「展开」按钮:与资源管理器头部的按钮同一位置(右上角,同样的内边距)
+        .overlay(alignment: .topTrailing) {
+            if collapsed {
+                Button { toggleTree() } label: { Image.om("list-tree", size: 13) }
+                    .buttonStyle(.plain).foregroundStyle(OMColors.secondaryText)
+                    .padding(.horizontal, 10).padding(.vertical, 6)
+                    .omTooltip("展开资源管理器")
+                    .accessibilityLabel(String(localized: "展开资源管理器"))
+            }
+        }
         // 文件被外部删除/重命名后,别让左侧停在失效路径上
         .task(id: ExplorerModel.shared.revision) {
             if let path = model.current, !FileManager.default.fileExists(atPath: path) { model.forget(path) }
@@ -154,7 +164,7 @@ private struct FilesWorkspaceBody: View {
         ExplorerHooks(
             openFile: { open($0) },
             activePath: model.current,
-            trailingAction: (icon: "panel-right-close", help: "收起资源管理器", action: { toggleTree() }))
+            trailingAction: (icon: "list-tree", help: "收起资源管理器", action: { toggleTree() }))
     }
 
     @ViewBuilder
@@ -164,15 +174,6 @@ private struct FilesWorkspaceBody: View {
                 .id(current)
         } else {
             FilesEmptyState(workbench: workbench, projectID: projectID, extraFolders: extraFolders, onOpen: { open($0) })
-                .overlay(alignment: .topTrailing) {
-                    if collapsed {
-                        Button { toggleTree() } label: { Image.om("panel-right", size: 14).frame(width: 28, height: 24) }
-                            .buttonStyle(.omIcon)
-                            .omTooltip("展开资源管理器")
-                            .accessibilityLabel(String(localized: "展开资源管理器"))
-                            .padding(8)
-                    }
-                }
         }
     }
 

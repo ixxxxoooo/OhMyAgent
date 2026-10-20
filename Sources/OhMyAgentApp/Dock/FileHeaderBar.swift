@@ -85,11 +85,8 @@ struct FileHeaderBar: View {
                     NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
                 }
             }
-            // 资源管理器展开时,收起按钮在其自己的顶部,这里只在收起后显示「展开」
-            if let controls = filesControls, controls.treeCollapsed {
-                HeaderIconButton(icon: controls.treeCollapsed ? "panel-right" : "panel-right-close",
-                                 help: controls.treeCollapsed ? "展开资源管理器" : "收起资源管理器", tint: nil, action: controls.onToggleTree)
-            }
+            // 资源管理器收起时,右上角悬浮着「展开」按钮,留出位置避免重叠
+            if filesControls?.treeCollapsed == true { Color.clear.frame(width: 24, height: 1) }
         }
     }
 
