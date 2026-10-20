@@ -1,7 +1,8 @@
 // @author ixxxxoooo
 // 菜单栏托盘:NSStatusItem + NSMenu。
-// 图标为系统 template 星形(由菜单栏自动按明暗/壁纸着色,不会再出现黑色);
-// 右下角状态点是独立的子视图图层,颜色取主题强调色:运行中实心呼吸、待处理空心环呼吸、未读完成静止实心点;已读后消失。
+// 图标为品牌标记「Oh 环 · 运行点」的 template 版(由菜单栏自动按明暗/壁纸着色,不会再出现黑色);
+// 有状态时图标只留圆环,运行点由独立的彩色图层接管(正好盖在标记的点上),颜色取主题强调色:
+// 运行中实心变色呼吸、待处理空心环呼吸、未读完成静止实心点;已读后恢复完整单色标记。
 // 不使用 SwiftUI MenuBarExtra(它在状态变化时的刷新循环曾造成 CPU 空转),菜单仅在打开时构建。
 
 import IconKit
@@ -67,14 +68,16 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     /// 刷新图标、状态点与提示。
     func refresh() {
         guard let button = statusItem?.button else { return }
-        if button.image == nil || button.image?.isTemplate != true { button.image = Self.templateIcon() }
+        let spec = TrayDotSpec.make(indicator: attention.indicator, reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
+        // 有状态时图标去掉运行点,由彩色状态点在原位置呼吸
+        let icon = spec == nil ? Self.idleIcon : Self.activeIcon
+        if button.image !== icon { button.image = icon }
         if dotView == nil || dotView?.superview !== button {
             let dot = TrayDotView()
             dot.attach(to: button)
             dotView = dot
         }
-        dotView?.apply(TrayDotSpec.make(indicator: attention.indicator, reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion),
-                       color: Self.dotColor(attention.indicator))
+        dotView?.apply(spec, color: Self.dotColor(attention.indicator))
         button.toolTip = Self.tooltip(attention)
         NSApp.dockTile.badgeLabel = {
             let n = attention.count(of: .unreadDone) + attention.count(of: .needsInput)
@@ -101,24 +104,38 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         }
     }
 
+    // 品牌标记几何(18×18pt 画布,y 向上;与 `Scripts/make-icon.swift` 一致)
+    private static let markRadius: CGFloat = 6.2
+    private static let markDotAngle: CGFloat = 40 * .pi / 180
+    /// 运行点半径(pt);状态点图层与之同大,正好盖在标记的点上。
+    static let markDotRadius: CGFloat = 2.1
+    /// 运行点圆心相对图标中心的偏移(pt,y 向上)。
+    static let markDotOffset = CGPoint(x: markRadius * cos(markDotAngle), y: markRadius * sin(markDotAngle))
+
+    /// 完整标记(空闲时显示)。
+    private static let idleIcon = templateIcon(withDot: true)
+    /// 只有圆环(有状态时显示,运行点由彩色状态点图层接管)。
+    private static let activeIcon = templateIcon(withDot: false)
+
     /// 菜单栏图标:品牌标记「Oh 环 · 运行点」的 template 版(开口圆环 + 右上缺口里的实心点;
-    /// 仅 alpha 有效,由菜单栏按明暗与壁纸着色)。几何与 `Scripts/make-icon.swift` 一致。
+    /// 仅 alpha 有效,由菜单栏按明暗与壁纸着色)。
+    /// - Parameter withDot: 是否画运行点;有状态时不画,由彩色状态点图层显示在同一位置
     /// - Returns: 18×18pt 的 template 图像
-    static func templateIcon() -> NSImage {
+    static func templateIcon(withDot: Bool = true) -> NSImage {
         let size = NSSize(width: 18, height: 18)
         let image = NSImage(size: size, flipped: false) { _ in
             let center = NSPoint(x: 9, y: 9)
-            let radius: CGFloat = 6.2
             NSColor.black.set() // ui-lint:allow template 图像仅取 alpha,由系统着色
             let ring = NSBezierPath()
-            ring.appendArc(withCenter: center, radius: radius, startAngle: 2, endAngle: 78, clockwise: true)
+            ring.appendArc(withCenter: center, radius: markRadius, startAngle: 2, endAngle: 78, clockwise: true)
             ring.lineWidth = 2
             ring.lineCapStyle = .round
             ring.stroke()
-            let angle = 40 * CGFloat.pi / 180
-            let dot = NSPoint(x: center.x + radius * cos(angle), y: center.y + radius * sin(angle))
-            let dotRadius: CGFloat = 2.1
-            NSBezierPath(ovalIn: NSRect(x: dot.x - dotRadius, y: dot.y - dotRadius, width: dotRadius * 2, height: dotRadius * 2)).fill()
+            if withDot {
+                let dot = NSPoint(x: center.x + markDotOffset.x, y: center.y + markDotOffset.y)
+                let r = markDotRadius
+                NSBezierPath(ovalIn: NSRect(x: dot.x - r, y: dot.y - r, width: r * 2, height: r * 2)).fill()
+            }
             return true
         }
         image.isTemplate = true
@@ -293,11 +310,12 @@ struct TrayDotSpec: Equatable {
     }
 }
 
-/// 托盘按钮右下角的状态点:独立图层,呼吸用 Core Animation(不重绘图标、不占主线程定时器)。
+/// 托盘状态点:独立图层,正好盖在品牌标记的运行点上;呼吸用 Core Animation(不重绘图标、不占主线程定时器)。
 @MainActor
 private final class TrayDotView: NSView {
-    private let diameter: CGFloat = 6
+    private let diameter = StatusItemController.markDotRadius * 2
     private var current: TrayDotSpec?
+    private var currentColor: NSColor?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -308,49 +326,55 @@ private final class TrayDotView: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
 
-    /// 挂到状态栏按钮右下角(自动布局,不依赖坐标系翻转)。
+    /// 挂到状态栏按钮上,圆心对准图标(居中绘制)里运行点的位置。
+    /// 自动布局的纵向常量沿视图 y 轴方向,按钮翻转时向下为正,故按 `isFlipped` 换号。
     func attach(to button: NSView) {
         translatesAutoresizingMaskIntoConstraints = false
         button.addSubview(self)
+        let offset = StatusItemController.markDotOffset
         NSLayoutConstraint.activate([
             widthAnchor.constraint(equalToConstant: diameter),
             heightAnchor.constraint(equalToConstant: diameter),
-            trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -3),
-            bottomAnchor.constraint(equalTo: button.bottomAnchor, constant: -3)
+            centerXAnchor.constraint(equalTo: button.centerXAnchor, constant: offset.x),
+            centerYAnchor.constraint(equalTo: button.centerYAnchor, constant: button.isFlipped ? -offset.y : offset.y)
         ])
     }
 
-    /// 应用规格与颜色;规格未变时只更新颜色,避免打断呼吸动画。
+    /// 应用规格与颜色;规格与颜色都未变时不动,避免打断呼吸动画。
     func apply(_ spec: TrayDotSpec?, color: NSColor?) {
         guard let spec, let color else {
             isHidden = true
             layer?.removeAllAnimations()
             current = nil
+            currentColor = nil
             return
         }
         isHidden = false
-        guard let layer else { return }
+        guard let layer, spec != current || color != currentColor else { return }
+        current = spec
+        currentColor = color
         layer.cornerRadius = diameter / 2
+        // 待处理:空心环;其余:实心点。呼吸对象分别是描边色与填充色
+        let keyPath = spec.ring ? "borderColor" : "backgroundColor"
         if spec.ring {
             layer.backgroundColor = NSColor.clear.cgColor
-            layer.borderWidth = 1.5
+            layer.borderWidth = 1.2
             layer.borderColor = color.cgColor
         } else {
             layer.backgroundColor = color.cgColor
             layer.borderWidth = 0
         }
-        guard spec != current else { return }
-        current = spec
         layer.removeAllAnimations()
         guard let period = spec.breathPeriod else { return }
+        // 变色呼吸:强调色 ⇄ 提亮的强调色,配合轻微明暗,不缩放(点要始终填满标记的位置)
+        let tint = CABasicAnimation(keyPath: keyPath)
+        tint.fromValue = color.cgColor
+        tint.toValue = (color.highlight(withLevel: 0.5) ?? color).cgColor
         let fade = CABasicAnimation(keyPath: "opacity")
         fade.fromValue = 1.0
-        fade.toValue = 0.4
-        let scale = CABasicAnimation(keyPath: "transform.scale")
-        scale.fromValue = 1.0
-        scale.toValue = 0.78
+        fade.toValue = 0.6
         let group = CAAnimationGroup()
-        group.animations = [fade, scale]
+        group.animations = [tint, fade]
         group.duration = period
         group.autoreverses = true
         group.repeatCount = .infinity

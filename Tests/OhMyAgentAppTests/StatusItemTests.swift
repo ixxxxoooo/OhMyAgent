@@ -10,9 +10,19 @@ import Testing
 @MainActor
 @Suite("托盘图标与状态点")
 struct StatusItemTests {
-    @Test("图标是 template,由系统按菜单栏明暗着色")
+    @Test("图标是 template,由系统按菜单栏明暗着色(完整标记与仅圆环两种)")
     func iconIsTemplate() {
         #expect(StatusItemController.templateIcon().isTemplate)
+        #expect(StatusItemController.templateIcon(withDot: false).isTemplate)
+    }
+
+    @Test("状态点对准标记运行点:位于圆环半径上、右上 40°,与运行点同大")
+    func dotSitsOnMark() {
+        let offset = StatusItemController.markDotOffset
+        #expect(abs(hypot(offset.x, offset.y) - 6.2) < 0.001)
+        #expect(offset.x > 0 && offset.y > 0)
+        #expect(abs(atan2(offset.y, offset.x) * 180 / .pi - 40) < 0.001)
+        #expect(StatusItemController.markDotRadius == 2.1)
     }
 
     @Test("状态点规格:运行实心呼吸、待处理空心环呼吸、未读静止、无状态不显示")
