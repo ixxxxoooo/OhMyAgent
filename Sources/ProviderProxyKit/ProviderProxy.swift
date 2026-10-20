@@ -207,7 +207,7 @@ public actor ProviderProxy {
         let key = target.label
         let mapped: MappedRequest
         // OpenAI 官方端点:带上缓存路由键(按路由+模型稳定),让同一会话的多轮请求更容易命中前缀缓存
-        let cacheKey = route.upstreamBase.host == "api.openai.com" ? "oma-\(key)-\(target.model)" : nil
+        let cacheKey = route.upstreamBase.host == "api.openai.com" ? "oma-\(key)-\(target.model ?? requested)" : nil
         do { mapped = try ProtocolMapping.openAIRequest(fromAnthropic: request.body, model: target.model, promptCacheKey: cacheKey) } catch {
             return Self.error(status: 400, message: "invalid request body")
         }
