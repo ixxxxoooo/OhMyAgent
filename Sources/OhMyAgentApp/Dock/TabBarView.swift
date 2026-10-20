@@ -195,10 +195,12 @@ struct TabItemView: View {
                 .lineLimit(1)
                 .frame(maxWidth: TabMetrics.labelMaxWidth, alignment: .leading)
                 .fixedSize(horizontal: true, vertical: false)
+                // 未预留位置的标签(非选中)悬停出现关闭按钮时,标题末端淡出避免重叠
+                .omFadeTrailingEdge(width: 40, base: OMColors.surface, fill: tabFill, enabled: hovering && !reservesTrailing)
         }
-        // 右侧固定留出关闭按钮/图钉的位置(16pt + 间距),标题不会与之重叠,悬停时标签宽度也不跳动
+        // 选中/固定/有未保存点的标签右侧预留 16pt 位置,其余标签保持紧凑
         .padding(.leading, 8)
-        .padding(.trailing, 26)
+        .padding(.trailing, reservesTrailing ? 24 : 8)
         .frame(minWidth: TabMetrics.minWidth)
         // 关闭按钮/状态点叠在标签右端,不单独占位
         .overlay(alignment: .trailing) { trailing.padding(.trailing, 6) }
@@ -245,6 +247,9 @@ struct TabItemView: View {
                 .foregroundStyle(isActive ? OMColors.primaryText : OMColors.tertiaryText)
         }
     }
+
+    /// 是否为尾部按钮(关闭/图钉/未保存点)预留固定位置。
+    private var reservesTrailing: Bool { isActive || tab.isPinned || tab.isDirty }
 
     /// 尾部是否有内容(悬停的关闭按钮、图钉或未保存点)。
     private var showsTrailing: Bool {
