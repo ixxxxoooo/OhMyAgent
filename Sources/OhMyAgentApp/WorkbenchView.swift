@@ -195,6 +195,8 @@ struct WorkbenchView: View {
             try? await Task.sleep(for: .seconds(seconds))
             for _ in 0..<max(toggleCount, 1) { toggle(); try? await Task.sleep(for: .seconds(1.5)) }
         }
+        // 演示模式钩子:OMA_DEMO_OPEN_SESSIONS 打开历史会话、OMA_DEMO_BENCH 运行性能基准
+        await DemoLaunchHooks.run(workbench: workbench, env: env)
         // 演示模式:OMA_DEMO_SCENARIO=<场景名> 等价于 OMA_AUTOSEND="/demo-<场景名>"
         if let scenario = DemoLaunch.environment?.scenario, env["OMA_AUTOSEND"] == nil { env["OMA_AUTOSEND"] = "/demo-" + scenario }
         let wantsSession = env["OMA_AUTOSEND"] != nil || env["OMA_DRAFT"] != nil

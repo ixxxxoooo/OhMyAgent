@@ -234,7 +234,7 @@ struct ProjectTreeView: View {
             .foregroundStyle(OMColors.secondaryText)
             .omTooltip("设置 (⌘,)")
             .accessibilityLabel("设置")
-            if DemoLaunch.isActive { DemoBadgeView() } else if AppEnv.isDev() { DevBadgeView() }
+            if DemoLaunch.isActive { DemoBadgeView(workbench: workbench) } else if AppEnv.isDev() { DevBadgeView() }
             Spacer()
             UpdateFooterButton()
         }

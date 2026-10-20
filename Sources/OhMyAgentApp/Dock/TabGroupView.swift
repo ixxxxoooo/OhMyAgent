@@ -136,6 +136,7 @@ func tabIcon(_ kind: TabKind) -> String {
     case .preview(let id):
         if id == WorkbenchModel.automationTabID { return "workflow" }
         if id == WorkbenchModel.customizeTabID { return "sliders-horizontal" }
+        if id == WorkbenchModel.demoMetricsTabID { return "gauge" }
         if WorkbenchModel.canvasID(fromTab: id) != nil { return "chart-column" }
         if WorkbenchModel.browserID(fromTab: id) != nil { return "globe" }
         if let pane = WorkbenchModel.toolsPane(fromTab: id) { return RightPaneView.icon(pane) }

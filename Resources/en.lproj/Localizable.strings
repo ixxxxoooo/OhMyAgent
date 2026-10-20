@@ -2640,3 +2640,16 @@
 "引擎已退出或无法启动,没能恢复这个会话。请到「设置 → Agent」检查命令是否可用后重试。" = "The agent exited or failed to start, so this session could not be restored. Check that the command works in Settings → Agent and try again.";
 "当前引擎找不到这个会话:它可能属于其他引擎、从未发送过消息,或已被删除。" = "This engine cannot find the session. It may belong to another engine, never had a message, or was deleted.";
 "阅读" = "Read";
+"演示指标" = "Demo Metrics";
+"在性能实验室里实测:项目打开、会话加载、复制、渲染、模型/引擎切换与真实内存。" = "Measured in the performance lab: project open, session load, copy, rendering, model/engine switching and real memory.";
+"运行全部" = "Run All";
+"通过" = "Passed";
+"偏慢" = "Slow";
+"内存 %@ → 峰值 %@ → %@ MB" = "Memory %@ → peak %@ → %@ MB";
+"只运行此项" = "Run This Only";
+"预算 %@ %@" = "Budget %@ %@";
+"真实内存曲线" = "Real Memory Curve";
+"应用本体" = "App";
+"子进程" = "Child Processes";
+"当前 %@ MB · 阶段 %@" = "Now %@ MB · Phase %@";
+"演示模式:数据来自沙盒,Agent 为脚本化演示 Agent,不会触碰真实项目与账号。点击打开「演示指标」" = "Demo mode: data comes from the sandbox and the Agent is a scripted demo Agent; real projects and accounts are untouched. Click to open Demo Metrics.";

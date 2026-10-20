@@ -7,6 +7,7 @@ import DesignSystem
 import Foundation
 import OMLog
 import SwiftUI
+import WorkbenchKit
 
 /// 演示模式的进程级状态(`OMA_DEMO=1` 时启用)。
 @MainActor
@@ -32,7 +33,14 @@ enum DemoLaunch {
 
 /// 左侧栏底部(设置按钮右侧)的「演示模式」徽章,提醒当前数据来自沙盒、Agent 为脚本化演示 Agent。
 struct DemoBadgeView: View {
+    let workbench: WorkbenchModel
+
     var body: some View {
+        Button { workbench.openDemoMetrics() } label: { badge }
+            .buttonStyle(.plain)
+    }
+
+    private var badge: some View {
         Text("演示模式")
             .font(OMFonts.caption.weight(.medium))
             .foregroundStyle(OMColors.warning)
@@ -40,7 +48,7 @@ struct DemoBadgeView: View {
             .padding(.vertical, 2)
             .background(OMColors.warning.opacity(0.15), in: OMPillShape())
             .overlay(OMPillShape().strokeBorder(OMColors.warning.opacity(0.4), lineWidth: 0.5))
-            .omTooltip("演示模式:数据来自沙盒,Agent 为脚本化演示 Agent,不会触碰真实项目与账号")
+            .omTooltip("演示模式:数据来自沙盒,Agent 为脚本化演示 Agent,不会触碰真实项目与账号。点击打开「演示指标」")
             .accessibilityLabel("演示模式")
             .allowsHitTesting(true)
     }

@@ -130,6 +130,7 @@ def scan_file(path):
 # 有意不翻译的位置(协议/日志/辅助进程/不可恢复错误/字符串比较用的字面量)。
 # 元素为 (文件路径前缀, 键或 None);键为 None 表示该前缀下全部放行。
 ALLOWLIST = (
+    ("Sources/OhMyAgentApp/Demo/DemoBenchmarkRunner.swift", None),   # 演示基准的明细文本(仅演示模式,面向开发者)
     ("Sources/ACPKit/ACPClient.swift", None),            # JSON-RPC 错误文本(给 Agent 看)
     ("Sources/ACPKit/JSONRPC.swift", None),
     ("Sources/ACPKit/JSONValue.swift", None),

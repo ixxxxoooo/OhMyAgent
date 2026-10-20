@@ -42,6 +42,8 @@ struct TabContentView: View {
                 LogViewerView()
             } else if id == WorkbenchModel.automationTabID {
                 AutomationPage(workbench: workbench)
+            } else if id == WorkbenchModel.demoMetricsTabID {
+                DemoMetricsTabView()
             } else if id == WorkbenchModel.customizeTabID {
                 CustomizePage(workbench: workbench)
             } else if let browserID = WorkbenchModel.browserID(fromTab: id) {

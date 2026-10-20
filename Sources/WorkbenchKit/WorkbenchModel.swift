@@ -1293,6 +1293,20 @@ public final class WorkbenchModel {
         return tab
     }
 
+    /// 演示指标标签的标识(演示模式的性能实验室面板)。
+    public nonisolated static let demoMetricsTabID = "oma-demo-metrics"
+
+    /// 打开(或激活)演示指标标签。
+    @discardableResult
+    public func openDemoMetrics() -> UUID {
+        mode = .workspace
+        let tab = dock.open(.preview(id: Self.demoMetricsTabID), title: String(localized: "演示指标"))
+        dock.keepOpen(tab)
+        dock.activate(tab)
+        syncSelectionFromDock()
+        return tab
+    }
+
     // MARK: Canvas
 
     /// 画布标签的标识前缀(预览类标签,后缀为画布 id)。
