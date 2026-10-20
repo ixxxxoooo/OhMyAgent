@@ -121,6 +121,7 @@ final class OMTextLeafCoordinator {
         if !replaceTail(storage, with: fresh) { storage.setAttributedString(fresh); fullRebuilds += 1 }
         storage.endEditing()
         edits += 1
+        SelectionHub.shared.leafContentDidChange(view)
     }
 
     /// 新内容以旧内容为前缀(且前缀属性相同)时只替换尾部。

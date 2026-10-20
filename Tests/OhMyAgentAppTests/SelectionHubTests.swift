@@ -170,6 +170,39 @@ struct SelectionHubTests {
         hub.clearSelection()
     }
 
+    @Test("选择期间上方内容增长导致叶子整体下移:选择不悬空,仍可继续拖选")
+    func leavesShiftDuringSelection() {
+        let f = Fixture(["第一段文字", "第二段文字", "第三段文字"])
+        let hub = SelectionHub.shared
+        hub.beginSelection(at: f.windowPoint(leaf: 0, offset: 2), from: f.leaves[0])
+        hub.extendSelection(to: f.windowPoint(leaf: 1, offset: 3))
+        #expect(hub.selectedText() == "段文字\n\n第二段")
+        // 模拟流式输出把下面的叶子整体推下 40pt(键以位置为基础,会整体改变)
+        f.document.frame.size.height += 40
+        for leaf in f.leaves.dropFirst() { leaf.frame.origin.y += 40 }
+        hub.extendSelection(to: f.windowPoint(leaf: 2, offset: 3))
+        #expect(hub.hasSelection)
+        #expect(hub.selectedText() == "段文字\n\n第二段文字\n\n第三段")
+        hub.clearSelection()
+    }
+
+    @Test("叶子内容被重建后高亮自动补画")
+    func highlightReplayedAfterContentChange() {
+        let f = Fixture(["abcdefghij", "klm"])
+        let hub = SelectionHub.shared
+        hub.beginSelection(at: f.windowPoint(leaf: 0, offset: 2), from: f.leaves[0])
+        hub.extendSelection(to: f.windowPoint(leaf: 0, offset: 6))
+        let leaf = f.leaves[0]
+        #expect(leaf.hubRange != nil)
+        // 内容被重建(模拟流式更新):临时属性随之丢失,hubRange 缓存若不重置就不会再画
+        leaf.textStorage?.setAttributedString(NSAttributedString(
+            string: "abcdefghij", attributes: [.font: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)]))
+        hub.leafContentDidChange(leaf)
+        let attribute = leaf.layoutManager?.temporaryAttribute(.backgroundColor, atCharacterIndex: 3, effectiveRange: nil)
+        #expect(attribute != nil, "重建后选区高亮应被补画")
+        hub.clearSelection()
+    }
+
     @Test("没有叶子/没有选择时复制返回 false")
     func noSelection() {
         SelectionHub.shared.clearSelection()

@@ -272,6 +272,9 @@ class OMReadOnlyTextView: NSTextView {
         nextResponder?.scrollWheel(with: event)
     }
 
+    /// 窗口未激活时的第一次点击也直接开始选择(否则第一下被吃掉,看起来像「选不中」)。
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
     override func mouseDown(with event: NSEvent) {
         // 双击选词、三击选段仍走 NSTextView 原生行为(先清掉中枢选择)
         guard event.clickCount == 1 else {

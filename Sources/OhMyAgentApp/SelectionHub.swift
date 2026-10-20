@@ -251,18 +251,43 @@ final class SelectionHub {
     }
 
     /// 用当前已挂载的叶子刷新原子表(位置、视图);已卸载的原子保持冻结。
+    /// 叶子因上方内容增长(流式输出、懒加载补高)而换位时,原子键随之改变:
+    /// 先收集全部换位,再把选择的两端重映射到新键——否则选择会「悬空」,表现为选不中或选区消失。
     private func refreshAtoms() {
         guard let doc = scope?.documentView else { return }
+        var live: [(leaf: OMReadOnlyTextView, key: String, frame: CGRect)] = []
         for leaf in leaves.allObjects {
             guard leaf.window != nil, (leaf.textStorage?.length ?? 0) > 0, Self.scopeScrollView(of: leaf) === scope else { continue }
             let reference = frameReference(of: leaf)
             let frame = contentRect(reference.convert(reference.bounds, to: doc), in: doc)
-            let key = "\(Int(frame.minX.rounded())):\(Int(frame.minY.rounded()))"
-            let id = ObjectIdentifier(leaf)
-            if let old = viewKeys[id], old != key, atoms[old]?.viewID == id { atoms[old] = nil }
-            viewKeys[id] = key
-            atoms[key] = Atom(key: key, view: leaf, viewID: id, frame: frame)
+            live.append((leaf, "\(Int(frame.minX.rounded())):\(Int(frame.minY.rounded()))", frame))
         }
+        // 第一遍:撤掉所有换位叶子的旧原子,记录 旧键 → 新键
+        var renames: [String: String] = [:]
+        for item in live {
+            let id = ObjectIdentifier(item.leaf)
+            if let old = viewKeys[id], old != item.key, atoms[old]?.viewID == id {
+                renames[old] = item.key
+                atoms[old] = nil
+            }
+        }
+        if let anchorKey = anchor?.key, let renamed = renames[anchorKey] { anchor?.key = renamed }
+        if let focusKey = focus?.key, let renamed = renames[focusKey] { focus?.key = renamed }
+        // 第二遍:登记新原子
+        for item in live {
+            let id = ObjectIdentifier(item.leaf)
+            viewKeys[id] = item.key
+            atoms[item.key] = Atom(key: item.key, view: item.leaf, viewID: id, frame: item.frame)
+        }
+    }
+
+    /// 叶子内容被更新(流式追加、重建):重置它的高亮缓存并按当前选择重画,
+    /// 避免文本存储被编辑后临时属性丢失、选区高亮「掉了」。
+    func leafContentDidChange(_ leaf: OMReadOnlyTextView) {
+        guard hasSelection, leaf.window != nil else { return }
+        leaf.hubRange = nil
+        refreshAtoms()
+        applyHighlights()
     }
 
     /// 原子按「内容坐标」排序:自上而下,同一行自左向右。
