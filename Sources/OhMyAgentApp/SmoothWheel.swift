@@ -129,14 +129,15 @@ final class SmoothWheel: NSObject {
     ///   - phase: CG 滚动阶段(1 开始 / 2 变化 / 4 结束)
     private func post(dx: Int, dy: Int, phase: Int64) {
         guard let window, let cg = template?.copy() else { stopLink(); return }
+        // 以原事件拷贝为底(保留窗口归属),把位移写进连续滚动用的各个字段
         cg.setIntegerValueField(.eventSourceUserData, value: Self.marker)
         cg.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+        cg.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: Int64(dy))
+        cg.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: Int64(dx))
         cg.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: Int64(dy))
         cg.setIntegerValueField(.scrollWheelEventPointDeltaAxis2, value: Int64(dx))
         cg.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: Double(dy))
         cg.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2, value: Double(dx))
-        cg.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: 0)
-        cg.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: 0)
         cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: phase)
         cg.setIntegerValueField(.scrollWheelEventMomentumPhase, value: 0)
         guard let synthetic = NSEvent(cgEvent: cg) else { return }
