@@ -51,8 +51,8 @@ enum MarkdownTextRunBuilder {
     /// - Returns: 该块的富文本
     static func piece(_ block: MarkdownBlock, document: Bool = false) -> NSAttributedString {
         let scale = OMScale.ui * OMScale.timeline
-        // 文档排版(对齐 GitHub / Cursor 的阅读页):正文 15、段间距 16、标题上方留 1.5 倍行距
-        let bodySize = (document ? 15 : 13) * scale
+        // 文档排版:字号与会话一致,只放宽行距、段间距与标题上方留白
+        let bodySize = 13 * scale
         let gap: CGFloat = document ? 16 : 10
         switch block {
         case .heading(let level, let text):
@@ -83,14 +83,6 @@ enum MarkdownTextRunBuilder {
 
     /// 标题字号(基准,未缩放)。
     private static func headingSize(_ level: Int, document: Bool = false) -> CGFloat {
-        if document {
-            switch level {
-            case 1: return 28
-            case 2: return 22
-            case 3: return 18
-            default: return 16
-            }
-        }
         switch level {
         case 1: return 20
         case 2: return 17
