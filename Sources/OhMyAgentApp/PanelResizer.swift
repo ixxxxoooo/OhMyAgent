@@ -25,7 +25,7 @@ struct PanelResizer: View {
         workbench.panelDrag.effective(dimension, committed: workbench.layout)
     }
 
-    /// 该维度允许的最大宽度:右栏取「窗口 − 项目栏 − 中栏最小宽度(与布局的 280 一致)」,
+    /// 该维度允许的最大宽度:右栏取「窗口 − 项目栏 − 中栏最小宽度(`PanelMetrics.centerMinimum`)」,
     /// 即布局实际放得下的最宽值;超过它只会让存储宽度大于显示宽度,拖回来时要先「空拖」一段才有反应。项目栏用静态范围。
     private var maximumWidth: Double {
         guard dimension == .rightWidth else { return dimension.range.upperBound }
