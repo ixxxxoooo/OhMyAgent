@@ -63,7 +63,7 @@ private struct SideBySideHunkView: View {
             Divider()
             // 左右各一个 AppKit 文本叶子(不折行,行高一致所以逐行天然对齐;长行在各自叶子内水平滚动):
             // 没有对应行的一侧用空行占位,复制各侧只得到该侧的代码正文
-            HStack(alignment: .top, spacing: 0) {
+            EqualHalves {
                 DiffTextLeaf(lines: rows.map(\.left), marks: rows.map { row in row.leftIndex.flatMap { marks[$0] } },
                              twoColumns: false, side: .old, wrap: false)
                 Rectangle().fill(OMColors.hairline).frame(width: 0.5)
@@ -74,5 +74,35 @@ private struct SideBySideHunkView: View {
         .background(OMDiffPalette.background(.context))
         .clipShape(RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
+    }
+}
+
+/// 左 / 右 / 中间分隔线三个子视图的布局:左右两侧永远各占(总宽 − 分隔线)的一半。
+/// 不用 `HStack`:两侧是不折行的文本叶子,理想宽度随各自最长行变化,`HStack` 会按理想宽度分配而左右不等宽。
+private struct EqualHalves: Layout {
+    /// 分隔线宽度
+    private let divider: CGFloat = 0.5
+
+    /// 每侧宽度。
+    private func sideWidth(_ total: CGFloat) -> CGFloat { max((total - divider) / 2, 0) }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard subviews.count == 3 else { return .zero }
+        let widest = max(subviews[0].sizeThatFits(.unspecified).width, subviews[2].sizeThatFits(.unspecified).width)
+        let total = proposal.width ?? (widest * 2 + divider)
+        let side = sideWidth(total)
+        let height = max(subviews[0].sizeThatFits(ProposedViewSize(width: side, height: nil)).height,
+                         subviews[2].sizeThatFits(ProposedViewSize(width: side, height: nil)).height)
+        return CGSize(width: total, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard subviews.count == 3 else { return }
+        let side = sideWidth(bounds.width)
+        let sideProposal = ProposedViewSize(width: side, height: bounds.height)
+        subviews[0].place(at: bounds.origin, anchor: .topLeading, proposal: sideProposal)
+        subviews[1].place(at: CGPoint(x: bounds.minX + side, y: bounds.minY), anchor: .topLeading,
+                          proposal: ProposedViewSize(width: divider, height: bounds.height))
+        subviews[2].place(at: CGPoint(x: bounds.minX + side + divider, y: bounds.minY), anchor: .topLeading, proposal: sideProposal)
     }
 }
