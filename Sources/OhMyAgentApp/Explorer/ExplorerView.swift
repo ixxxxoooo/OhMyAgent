@@ -102,6 +102,8 @@ private struct ExplorerProjectView: View {
                 }
             }
         }
+        // ⌘Z 撤销文件操作只在指针位于资源管理器内时生效,避免干扰其它区域的撤销
+        .onHover { ExplorerUndoCenter.shared.pointerInside = $0 }
         .onChange(of: extraFolders, initial: true) { _, _ in tree.configure(sources) }
         .onChange(of: model.collapseRevision) { _, _ in tree.collapseAll() }
         .task(id: tree.refreshToken) { tree.refresh() }
@@ -417,6 +419,7 @@ enum ExplorerActions {
             }.value
             if let error { report(error); return }
             Log.editor.info("资源管理器新建", ["path": target, "dir": "\(isDirectory)"])
+            ExplorerUndoCenter.shared.record(FileOpGroup(title: "新建", ops: [.created(path: target)]), workbench: workbench)
             ExplorerModel.shared.bump()
             WorkspaceIndexModel.shared.refresh(root: workbench.selectedProjectID)
             if !isDirectory { if let onCreated { onCreated(target) } else { workbench.openFile(target, preview: false) } }
@@ -435,6 +438,7 @@ enum ExplorerActions {
             }.value
             if let error { report(error); return }
             Log.editor.info("资源管理器重命名", ["from": source, "to": target])
+            ExplorerUndoCenter.shared.record(FileOpGroup(title: "重命名", ops: [.move(from: source, to: target)]), workbench: workbench)
             // 已打开的该文件标签随之关闭,避免指向失效路径
             workbench.closeTabsInAllDocks { tab in
                 if case .file(let p) = tab.kind { return p == source || p.hasPrefix(source + "/") }
@@ -452,12 +456,18 @@ enum ExplorerActions {
         guard OMDialog.confirm(title: String(localized: "要把「\(entry.name)」移到废纸篓吗?"), confirmTitle: String(localized: "移到废纸篓"), destructive: true) else { return }
         let source = entry.path
         Task {
-            let error = await Task.detached { () -> String? in
-                do { try FileManager.default.trashItem(at: URL(fileURLWithPath: source), resultingItemURL: nil); return nil }
-                catch { return error.localizedDescription }
+            let result = await Task.detached { () -> (error: String?, trashed: String?) in
+                do {
+                    var resulting: NSURL?
+                    try FileManager.default.trashItem(at: URL(fileURLWithPath: source), resultingItemURL: &resulting)
+                    return (nil, resulting?.path)
+                } catch { return (error.localizedDescription, nil) }
             }.value
-            if let error { report(error); return }
+            if let error = result.error { report(error); return }
             Log.editor.info("资源管理器移到废纸篓", ["path": source])
+            if let trashed = result.trashed {
+                ExplorerUndoCenter.shared.record(FileOpGroup(title: "移到废纸篓", ops: [.trashed(original: source, trashed: trashed)]), workbench: workbench)
+            }
             workbench.closeTabsInAllDocks { tab in
                 if case .file(let p) = tab.kind { return p == source || p.hasPrefix(source + "/") }
                 return false
@@ -519,24 +529,28 @@ enum ExplorerActions {
         guard !transfers.isEmpty else { return }
         let jobs = transfers
         Task {
-            let failures = await Task.detached { () -> [String] in
+            let (failures, ops) = await Task.detached { () -> ([String], [FileOp]) in
                 let fm = FileManager.default
                 var failures: [String] = []
+                var ops: [FileOp] = []
                 for job in jobs {
                     do {
                         if fm.fileExists(atPath: job.destination) {
-                            try fm.trashItem(at: URL(fileURLWithPath: job.destination), resultingItemURL: nil)
+                            var resulting: NSURL?
+                            try fm.trashItem(at: URL(fileURLWithPath: job.destination), resultingItemURL: &resulting)
+                            if let trashed = resulting?.path { ops.append(.trashed(original: job.destination, trashed: trashed)) }
                         }
                         switch job.kind {
-                        case .move: try fm.moveItem(atPath: job.source, toPath: job.destination)
-                        case .copy: try fm.copyItem(atPath: job.source, toPath: job.destination)
+                        case .move: try fm.moveItem(atPath: job.source, toPath: job.destination); ops.append(.move(from: job.source, to: job.destination))
+                        case .copy: try fm.copyItem(atPath: job.source, toPath: job.destination); ops.append(.created(path: job.destination))
                         }
                     } catch {
                         failures.append("\((job.source as NSString).lastPathComponent):\(error.localizedDescription)")
                     }
                 }
-                return failures
+                return (failures, ops)
             }.value
+            ExplorerUndoCenter.shared.record(FileOpGroup(title: "拖放", ops: ops), workbench: workbench)
             for job in jobs where job.kind == .move && FileManager.default.fileExists(atPath: job.destination) {
                 // 已打开的标签改指新位置;旧路径的(未修改)内存文档丢弃,打开时按新路径重新读取
                 workbench.retargetFilesInAllDocks(from: job.source, to: job.destination)

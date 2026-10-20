@@ -178,6 +178,7 @@ struct OhMyAgentApp: App {
         FontSmoothing.applyAtLaunch()
         // 鼠标滚轮平滑(应用内,是否生效由偏好决定)
         MainActor.assumeIsolated { SmoothWheel.shared.start() }
+        MainActor.assumeIsolated { ExplorerUndoCenter.shared.start() }
         Log.bootstrap(process: "app")
         PerfSession.markStart()
         LaunchTrace.mark("App 初始化")
