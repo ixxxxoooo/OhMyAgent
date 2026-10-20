@@ -27,6 +27,8 @@ final class GitModel {
     private(set) var stashes: [GitStash] = []
     /// 正在执行的操作名(界面显示进度,并禁用重复触发)
     private(set) var busy: String?
+    /// 改动列表中当前选中的行(`分组:路径`),用于高亮
+    var selectedChangeKey: String?
     /// 最近一次失败的提示(用户关闭后清除)
     var lastError: String?
     var commitMessage = ""

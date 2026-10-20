@@ -515,6 +515,10 @@ private struct ChangeRow: View {
     let section: ChangeSection
     @State private var hovering = false
 
+    /// 选中标识:同一文件可同时出现在暂存与未暂存分组,按分组区分
+    private var selectionKey: String { "\(section):\(change.path)" }
+    private var isSelected: Bool { model.selectedChangeKey == selectionKey }
+
     private var kind: GitChangeKind? {
         switch section {
         case .staged: return change.staged
@@ -540,10 +544,10 @@ private struct ChangeRow: View {
         .padding(.horizontal, 10)
         .frame(height: 24)   // 固定行高:悬停出现操作按钮时不改变高度
         .contentShape(Rectangle())
-        .background(hovering ? OMColors.hoverFill : .clear)
+        .background(isSelected ? OMColors.selectedFill : (hovering ? OMColors.hoverFill : .clear))
         .onHover { hovering = $0 }
         // 单击立即打开差异;双击用 simultaneousGesture 叠加,避免单击被迫等待双击判定(约 0.3~0.5s 延迟)
-        .onTapGesture { openDiff() }
+        .onTapGesture { model.selectedChangeKey = selectionKey; openDiff() }
         .simultaneousGesture(TapGesture(count: 2).onEnded { workbench.openFile(model.absolutePath(change.path), preview: false) })
         .accessibilityElement(children: .combine)
         .accessibilityLabel(name + (dir.isEmpty ? "" : "," + dir))

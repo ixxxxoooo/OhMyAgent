@@ -87,10 +87,23 @@ private struct BranchPicker: View {
     let onDone: () -> Void
     let onDismiss: () -> Void
 
-    @State private var branches: [GitBranch] = []
-    @State private var loaded = false
+    /// 上次读到的分支列表(按工作区缓存):再次打开时先用它立即出列表,后台刷新后再替换
+    @MainActor private static var cache: [String: [GitBranch]] = [:]
+    @State private var branches: [GitBranch]
+    @State private var loaded: Bool
+    private var cacheKey: String { workspace.standardizedFileURL.path }
     @State private var working = false
     @State private var errorText: String?
+
+    init(workspace: URL, current: GitHead, onDone: @escaping () -> Void, onDismiss: @escaping () -> Void) {
+        self.workspace = workspace
+        self.current = current
+        self.onDone = onDone
+        self.onDismiss = onDismiss
+        let cached = Self.cache[workspace.standardizedFileURL.path]
+        _branches = State(initialValue: cached ?? [])
+        _loaded = State(initialValue: cached != nil)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -101,7 +114,7 @@ private struct BranchPicker: View {
                 itemsForQuery: { items(for: $0) },
                 row: { rowContent($0) }, onSelect: { pick in Task { await run(pick) } }, onDismiss: onDismiss
             )
-            .id(loaded)
+            .id(branches.map(\.name))
             .disabled(working)
             if let errorText {
                 Divider()
@@ -156,6 +169,7 @@ private struct BranchPicker: View {
         }
         do {
             branches = try await repo.branches()
+            Self.cache[cacheKey] = branches
         } catch {
             Log.git.error("读取分支列表失败", ["error": "\(error)"])
             errorText = (error as? LocalizedError)?.errorDescription ?? "\(error)"
