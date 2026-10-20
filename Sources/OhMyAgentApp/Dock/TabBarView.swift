@@ -34,6 +34,8 @@ struct TabBarView: View {
     /// 滚动区可视宽度:标签内容至少撑满它,尾部空白才都归窗口拖动区
     @State private var stripWidth: CGFloat = 0
     @State private var showOverflow = false
+    /// 拖分栏期间对 `stripWidth` 写入的延后任务(引用盒子,写它不触发视图刷新)
+    @State private var settle = SettleBox()
     /// 右栏「+」新增标签菜单
     @State private var showAdd = false
 
@@ -68,7 +70,14 @@ struct TabBarView: View {
                 // 放到标签之间/末尾空白处:追加到末尾(单个标签上的落点代理优先)
                 .onDrop(of: [.plainText, .fileURL], delegate: TabStripDropDelegate(workbench: workbench, host: host, groupID: group.id, index: nil))
                 .onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.width } action: { _, value in
-                    stripWidth = value
+                    // 拖分栏时每帧都改 stripWidth 会让标签条逐帧二次布局(实测右栏拖动掉帧的主因),
+                    // 拖动中只记下最新值,停手约 120ms 后再一次性写入
+                    guard workbench.panelDrag.isDragging else { settle.task?.cancel(); stripWidth = value; return }
+                    settle.task?.cancel()
+                    settle.task = Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(120))
+                        if !Task.isCancelled { stripWidth = value }
+                    }
                 }
                 .onScrollGeometryChange(for: Bool.self) { $0.contentSize.width > $0.containerSize.width + 1 } action: { _, value in
                     overflowing = value
@@ -482,4 +491,10 @@ private struct TabOverflowRow: View {
         }
     }
 
+}
+
+/// 持有一个可取消的延后任务;类引用,修改它不会让视图失效。
+@MainActor
+private final class SettleBox {
+    var task: Task<Void, Never>?
 }

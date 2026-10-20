@@ -13,7 +13,7 @@ struct UpdateFooterButton: View {
         if let spec = Self.spec(phase: updates.phase, available: updates.availableInfo) {
             Button { updates.performPrimaryAction() } label: {
                 HStack(spacing: 4) {
-                    if spec.busy { OMSpinner(.small) } else { Image.om(spec.icon, size: 12) }
+                    if spec.busy { OMSpinner(.small) }
                     Text(spec.title)
                 }
                 .font(OMFonts.caption.weight(.medium))
