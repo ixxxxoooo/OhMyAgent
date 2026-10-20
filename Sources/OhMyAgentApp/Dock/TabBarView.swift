@@ -270,6 +270,10 @@ struct TabItemView: View {
             workbench.mutateDock(host) { $0.drop(tab.id, onGroup: group.id, zone: .right) }
             workbench.syncSelectionFromDock()
         }
+        OMMenuItem("向下拆分", icon: "rows-2", isEnabled: group.tabs.count >= 2) {
+            workbench.mutateDock(host) { $0.drop(tab.id, onGroup: group.id, zone: .bottom) }
+            workbench.syncSelectionFromDock()
+        }
         OMMenuItem(verbatim: workbench.dock(host).maximizedGroupID == group.id ? String(localized: "还原布局") : String(localized: "最大化此组"), icon: "maximize-2") { workbench.mutateDock(host) { $0.toggleMaximize(group: group.id) } }
         OMMenuItem(verbatim: host == .right ? String(localized: "移到中栏") : String(localized: "移到右栏"), icon: host == .right ? "panel-top" : "panel-right") {
             omWithAnimation {

@@ -102,4 +102,24 @@ struct RightDockTests {
         model.closeAnyTab(id)
         #expect(model.host(of: id) == nil)
     }
+
+    @Test("右栏内部可上下/左右分屏;跨区拖到边缘新建分屏")
+    func splitInsideRightDock() throws {
+        let (model, _) = makeModel()
+        let a = model.openTab(.preview(id: WorkbenchModel.outputTabID), title: "输出", host: .right)
+        let b = model.openTab(.preview(id: WorkbenchModel.toolsTabPrefix + "files"), title: "文件", host: .right)
+        #expect(model.rightDock.groups.count == 1)
+        // 同区内向下拆分
+        model.mutateDock(.right) { $0.drop(b, onGroup: model.rightDock.groups[0].id, zone: .bottom) }
+        #expect(model.rightDock.groups.count == 2)
+        guard case .split(let split) = model.rightDock.root else { Issue.record("右栏应为分屏"); return }
+        #expect(split.axis == .vertical)
+        // 中栏标签拖到右栏组的右边缘:新建左右分屏,标签换 ID 但内容不变
+        let file = model.openFile("/tmp/x.swift", preview: false, target: .editor)
+        let target = model.rightDock.groups[0].id
+        let moved = try #require(model.moveTab(file, toHost: .right, group: target, zone: .right))
+        #expect(model.host(of: moved) == .right && model.host(of: file) == nil)
+        #expect(model.rightDock.groups.count == 3)
+        _ = a
+    }
 }
