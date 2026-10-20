@@ -134,6 +134,8 @@ struct WorkbenchView: View {
         }
         // 窗口放不下「面板 + 中栏最小宽度」时面板让出宽度(而不是把整个工作区撑出窗口、右上角开关被挤出可视区)
         .frame(minWidth: 0, idealWidth: CGFloat(width), maxWidth: CGFloat(width))
+        // 面板优先分到空间、中栏只保底 `centerMinimum`:否则 HStack 把剩余空间在两个「可伸缩」视图间对半分,右栏被卡在约半个窗口
+        .layoutPriority(1)
         .clipped()
         // 滑出时面板仍盖在(已一次性扩宽的)中栏之上,否则会被后绘制的中栏遮住而「瞬间消失」
         .zIndex(1)
