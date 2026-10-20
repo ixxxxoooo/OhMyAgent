@@ -20,7 +20,7 @@ let finished = DispatchSemaphore(value: 0)
 do {
     try await agent.start(onClose: { finished.signal() })
 } catch {
-    FileHandle.standardError.write(Data("启动失败: \(error.localizedDescription)\n".utf8))
+    FileHandle.standardError.write(Data("start failed: \(error.localizedDescription)\n".utf8))
     exit(1)
 }
 await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
