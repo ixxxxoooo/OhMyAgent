@@ -149,8 +149,8 @@ enum OMLeafContent {
     ///   - rows: 数据行
     /// - Returns: 富文本
     static func table(header: [String], rows: [[String]], roomy: Bool = false) -> NSAttributedString {
-        // 文档排版(整页阅读):字号 15(与正文一致)、列间距 28、行间距 12;会话里保持紧凑
-        let size = (roomy ? 15 : 11.5) * OMScale.ui
+        // 文档排版(整页阅读):字号与会话一致,只放宽列间距 28、行间距 12
+        let size = 11.5 * OMScale.ui
         let columnGap: CGFloat = roomy ? 28 : tableColumnGap
         let rowGap: CGFloat = roomy ? 12 : 6
         let columns = max(header.count, rows.map(\.count).max() ?? 0)
