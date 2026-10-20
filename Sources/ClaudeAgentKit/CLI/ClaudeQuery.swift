@@ -100,7 +100,8 @@ public actor ClaudeQuery {
     ///   - content: 内容块(Anthropic 消息格式)
     ///   - uuid: 消息 UUID(用于回放确认与回合匹配)
     ///   - priority: 排队优先级(`now` 为转向,即时注入)
-    public func sendUser(content: [JSONValue], uuid: String, priority: String? = nil) {
+    ///   - human: 是否标注来源为人类输入(`origin: {kind: human}`,CLI 的信任闸门依赖它)
+    public func sendUser(content: [JSONValue], uuid: String, priority: String? = nil, human: Bool = false) {
         let message = JSONValue.make([
             ("type", "user"),
             ("message", ["role": "user", "content": .array(content)]),
@@ -108,6 +109,7 @@ public actor ClaudeQuery {
             ("session_id", ""),
             ("uuid", .string(uuid)),
             ("priority", priority.map(JSONValue.string)),
+            ("origin", human ? ["kind": "human"] : nil),
         ])
         write(message)
     }
