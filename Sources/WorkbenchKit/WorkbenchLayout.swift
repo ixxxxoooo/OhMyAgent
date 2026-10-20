@@ -65,8 +65,8 @@ public struct WorkbenchLayout: Codable, Equatable, Sendable {
     public var terminalListCollapsed = false
     /// Files 工作区右侧资源管理器的宽度
     public var filesTreeWidth: Double = PanelMetrics.filesTreeDefault
-    /// Files 工作区右侧资源管理器是否收起
-    public var filesTreeCollapsed = false
+    /// Files 工作区右侧资源管理器是否收起(默认收起)
+    public var filesTreeCollapsed = true
     /// 旧版本布局迁移信息(不持久化;读取旧状态文件时产生,由工作台启动时消费)
     public var legacyMigration: LegacyPanelMigration?
 
@@ -101,7 +101,7 @@ public struct WorkbenchLayout: Codable, Equatable, Sendable {
         terminalListWidth = try c.decodeIfPresent(Double.self, forKey: .terminalListWidth) ?? PanelMetrics.terminalListDefault
         terminalListCollapsed = try c.decodeIfPresent(Bool.self, forKey: .terminalListCollapsed) ?? false
         filesTreeWidth = try c.decodeIfPresent(Double.self, forKey: .filesTreeWidth) ?? PanelMetrics.filesTreeDefault
-        filesTreeCollapsed = try c.decodeIfPresent(Bool.self, forKey: .filesTreeCollapsed) ?? false
+        filesTreeCollapsed = try c.decodeIfPresent(Bool.self, forKey: .filesTreeCollapsed) ?? true
         // 迁移旧布局:底部/侧栏里可见的终端与输出、右栏正显示的工具视图,都变成右栏停靠区里的标签
         if let legacy = try? decoder.container(keyedBy: LegacyKeys.self) {
             let old = (try? legacy.decodeIfPresent(LegacyPlacement.self, forKey: .placement)) ?? nil

@@ -82,7 +82,7 @@ struct PanelPlacementModelTests {
         #expect(layout.filesTreeWidth == PanelMetrics.filesTreeRange.lowerBound)
         let old = try JSONDecoder().decode(WorkbenchLayout.self, from: Data("{}".utf8))
         #expect(old.filesTreeWidth == PanelMetrics.filesTreeDefault)
-        #expect(!old.filesTreeCollapsed)
+        #expect(old.filesTreeCollapsed)
     }
 
     @Test("未知的摆放取值回落到默认值,不会让整个状态文件失效")

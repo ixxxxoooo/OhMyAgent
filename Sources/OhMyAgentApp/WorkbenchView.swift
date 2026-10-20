@@ -248,12 +248,12 @@ struct WorkbenchView: View {
         }
         if let pane = env["OMA_RIGHT_PANE"], let value = RightPane(rawValue: pane) {
             workbench.showRight(value)
-            // 调试:Files 工作区启动即在左侧打开指定文件(相对项目根或绝对路径);OMA_FILES_TREE=collapsed 收起资源管理器
+            // 调试:Files 工作区启动即在左侧打开指定文件(相对项目根或绝对路径);OMA_FILES_TREE=expanded 展开资源管理器(默认收起)
             if value == .files, let project = workbench.selectedProjectID {
                 if let file = env["OMA_FILES_OPEN"], !file.isEmpty {
                     FilesWorkspaceStore.shared.model(for: project).open(file.hasPrefix("/") ? file : (project as NSString).appendingPathComponent(file))
                 }
-                if env["OMA_FILES_TREE"] == "collapsed" { workbench.layout.filesTreeCollapsed = true }
+                if env["OMA_FILES_TREE"] == "expanded" { workbench.layout.filesTreeCollapsed = false }
             }
             if let query = env["OMA_SEARCH_QUERY"] {
                 SearchModel.shared.root = workbench.selectedProjectID
