@@ -17,11 +17,18 @@ struct DiffRenderTests {
         let view = DiffView(diff: diff)
             .frame(width: 520)
             .background(Color.white)
-        let renderer = ImageRenderer(content: view)
-        renderer.scale = 2
-        let image = try #require(renderer.nsImage)
-        let tiff = try #require(image.tiffRepresentation)
-        let rep = try #require(NSBitmapImageRep(data: tiff))
+        // Diff 已改为 AppKit 文本叶子,ImageRenderer 只会画出占位禁止图标,须经真实的 NSHostingView 离屏绘制
+        let host = NSHostingView(rootView: view)
+        host.frame = NSRect(x: 0, y: 0, width: 520, height: 10)
+        let height = max(host.fittingSize.height, 120)
+        host.frame = NSRect(x: 0, y: 0, width: 520, height: height)
+        let window = NSWindow(contentRect: host.frame, styleMask: [.borderless], backing: .buffered, defer: true)
+        window.contentView = host
+        host.layoutSubtreeIfNeeded()
+        host.displayIfNeeded()
+        let bounds = host.bounds
+        let rep = try #require(host.bitmapImageRepForCachingDisplay(in: bounds))
+        host.cacheDisplay(in: bounds, to: rep)
         if let path = ProcessInfo.processInfo.environment["DIFF_DUMP"], let png = rep.representation(using: .png, properties: [:]) {
             try png.write(to: URL(fileURLWithPath: path))
         }
@@ -41,7 +48,7 @@ struct DiffRenderTests {
         let gutterX = 30 * 2
         var bodyColors = Set<[Int]>()
         var gutterColors = Set<[Int]>()
-        for y in stride(from: 70, to: rep.pixelsHigh - 20, by: 1) {
+        for y in stride(from: 80, to: rep.pixelsHigh - 44, by: 1) {
             bodyColors.insert(rgb(rep, bodyX, y))
             gutterColors.insert(rgb(rep, gutterX, y))
         }
