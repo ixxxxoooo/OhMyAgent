@@ -192,6 +192,26 @@ struct WorkbenchTests {
         model.shutdownAll()
     }
 
+    @Test("多个终端是各自独立的标签:可循环切换,关闭当前终端只关一个")
+    func separateTerminalTabs() throws {
+        let env = try makeEnvironment()
+        defer { try? FileManager.default.removeItem(at: env.root) }
+        let model = makeModel(env.store)
+        _ = try #require(model.openProject(env.dirs[0]))
+        _ = model.openTerminal(id: "t-1", title: "终端 1")
+        _ = model.openTerminal(id: "t-2", title: "终端 2")
+        #expect(model.terminalTabs.count == 2)
+        // 最后打开的在显示;循环一次回到第一个,再循环回到第二个
+        model.cycleTerminalTab(1)
+        let first = model.rightDock.groups.first?.activeID
+        #expect(model.terminalTabs.first?.id == first)
+        model.cycleTerminalTab(-1)
+        #expect(model.rightDock.groups.first?.activeID == model.terminalTabs.last?.id)
+        model.closeActiveTerminalTab()
+        #expect(model.terminalTabs.count == 1)
+        model.shutdownAll()
+    }
+
     @Test("右栏摆放持久化,恢复默认布局")
     func placementPersistence() throws {
         let env = try makeEnvironment()

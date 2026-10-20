@@ -34,6 +34,8 @@ struct TabBarView: View {
     /// 滚动区可视宽度:标签内容至少撑满它,尾部空白才都归窗口拖动区
     @State private var stripWidth: CGFloat = 0
     @State private var showOverflow = false
+    /// 右栏「+」新增标签菜单
+    @State private var showAdd = false
 
     /// 是否为第一个(主)标签组。
     private var isMainGroup: Bool { workbench.dock(host).groups.first?.id == group.id }
@@ -76,6 +78,7 @@ struct TabBarView: View {
                     omWithAnimation(.snappy(duration: 0.2)) { proxy.scrollTo(id, anchor: .center) }
                 }
             }
+            if host == .right, isMainGroup { addButton }
             if overflowing {
                 overflowButton
             }
@@ -83,6 +86,34 @@ struct TabBarView: View {
         }
         .frame(height: TitlebarMetrics.height)
         .background(OMColors.surface)
+    }
+
+    /// 右栏标签条的「+」:弹下拉选择要新增的标签(终端 / 资源管理器 / 搜索 / 源代码管理 / 浏览器 / 输出)。
+    private var addButton: some View {
+        Button { showAdd.toggle() } label: {
+            Image.om("plus", size: 13)
+                .frame(width: TabMetrics.height, height: TabMetrics.height)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(TabBarIconButtonStyle())
+        .padding(.trailing, 4)
+        .omTooltip("新增标签")
+        .accessibilityLabel("新增标签")
+        .omPicker(isPresented: $showAdd, entries: Self.addEntries, selectedID: nil, placement: .below, width: 200, showsSearch: false) { entry in
+            AppActions.shared.addRightTab(entry.id)
+        }
+    }
+
+    /// 「+」菜单条目(id 即 `AppActions.addRightTab` 的参数)。
+    private static var addEntries: [PickEntry] {
+        [
+            PickEntry(id: "terminal", title: String(localized: "终端"), icon: "square-terminal"),
+            PickEntry(id: "files", title: String(localized: "资源管理器"), icon: "folder"),
+            PickEntry(id: "search", title: String(localized: "搜索"), icon: "search"),
+            PickEntry(id: "git", title: String(localized: "源代码管理"), icon: "git-branch"),
+            PickEntry(id: "browser", title: String(localized: "浏览器"), icon: "globe"),
+            PickEntry(id: "output", title: String(localized: "输出"), icon: "file-text"),
+        ]
     }
 
     /// 标签放不下时右端的「全部标签」下拉入口。

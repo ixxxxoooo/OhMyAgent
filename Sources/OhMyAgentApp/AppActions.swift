@@ -195,34 +195,46 @@ final class AppActions {
         for id in ids { requestCloseTab(id) }
     }
 
-    /// 在当前项目目录新建终端标签。
-    func openTerminal() {
+    /// 在当前项目目录新建终端标签(每个终端是右栏里一个独立标签)。
+    /// - Parameter title: 标签标题;nil 时按「终端 / 终端 2…」编号
+    func openTerminal(title: String? = nil) {
         let workbench = AppEnvironment.shared.workbench
         let directory = TerminalPrefs.load().startDirectoryPath(project: workbench.selectedProjectID)
         let id = UUID().uuidString
         TerminalStore.shared.register(id: id, directory: directory)
-        let index = workbench.allDockTabs.filter { if case .terminal = $0.kind { return true } else { return false } }.count + 1
-        workbench.openTerminal(id: id, title: String(localized: "终端") + (index > 1 ? " \(index)" : ""))
+        let index = workbench.terminalTabs.count + 1
+        let name = title ?? (String(localized: "终端") + (index > 1 ? " \(index)" : ""))
+        workbench.openTerminal(id: id, title: name)
+        workbench.layout.rightVisible = true
         showMainWindow()
     }
 
-    /// 新建终端(⌃⇧`):终端在编辑区时新开一个终端标签;在底部/左右栏时显示面板并新增一个终端实例。
-    func newTerminal() {
+    /// 右栏「+」菜单:按条目 id 新增/聚焦对应标签。
+    /// - Parameter kind: `terminal`/`files`/`search`/`git`/`browser`/`output`;未知值忽略
+    func addRightTab(_ kind: String) {
         let workbench = AppEnvironment.shared.workbench
-        let root = workbench.selectedProjectID ?? NSHomeDirectory()
-        workbench.showTerminal()
-        if TerminalPanelStore.shared.addTerminal(root: root) == nil {
-            OMDialog.alert(title: String(localized: "终端数量已达上限"), message: String(localized: "请先关闭不用的终端再新建。"))
+        switch kind {
+        case "terminal": openTerminal()
+        case "files": workbench.showRight(.files)
+        case "search": workbench.showRight(.search)
+        case "git": workbench.showRight(.git)
+        case "output": workbench.showOutput()
+        case "browser":
+            guard let workspace = workbench.selectedProjectID else { return }
+            let model = BrowserController.shared.create(workspace: workspace)
+            workbench.openBrowser(id: model.id, title: String(localized: "浏览器"), activate: true)
+        default: return
         }
-        showMainWindow()
+        workbench.layout.rightVisible = true
     }
 
-    /// 切换到相邻的终端实例(仅面板内的多终端)。
+    /// 新建终端(⌃⇧`):新开一个终端标签。
+    func newTerminal() { openTerminal() }
+
+    /// 切换到相邻的终端标签。
     /// - Parameter step: 1 下一个,-1 上一个
     func cycleTerminal(_ step: Int) {
-        let workbench = AppEnvironment.shared.workbench
-        workbench.showTerminal()
-        TerminalPanelStore.shared.cycle(step, root: workbench.selectedProjectID ?? NSHomeDirectory())
+        AppEnvironment.shared.workbench.cycleTerminalTab(step)
     }
 
     /// 以右栏只读标签查看 Agent 的终端(后台命令的实时输出)。
@@ -237,13 +249,9 @@ final class AppActions {
         showMainWindow()
     }
 
-    /// 关闭当前终端实例(最后一个被关闭时隐藏面板)。
+    /// 关闭当前显示的终端标签。
     func closeActiveTerminal() {
-        let workbench = AppEnvironment.shared.workbench
-        guard workbench.isTerminalShown else { return }
-        let root = workbench.selectedProjectID ?? NSHomeDirectory()
-        let store = TerminalPanelStore.shared
-        if store.close(store.state(for: root).activeID, root: root) == .closedLast { workbench.hideTerminal() }
+        AppEnvironment.shared.workbench.closeActiveTerminalTab()
     }
 
     /// 打开预览标签(如放大的 Mermaid 图)。

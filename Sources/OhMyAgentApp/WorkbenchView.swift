@@ -301,25 +301,21 @@ struct WorkbenchView: View {
         if let value = env["OMA_SIDEBAR_SIDE"].flatMap(PanelSide.init(rawValue:)) { workbench.setSidebarSide(value) }
         if let value = env["OMA_TOOLS_SIDE"].flatMap(PanelSide.init(rawValue:)) { workbench.setToolsSide(value) }
         if env["OMA_SHOW_TERMINAL"] != nil { workbench.showTerminal() }
-        // 调试:OMA_TERMINAL_NAMES=构建,服务,日志 —— 给当前项目预置多个命名终端(第一个重命名已有终端,其余新建)
-        if let names = env["OMA_TERMINAL_NAMES"]?.split(separator: ",").map(String.init), let first = names.first {
-            let root = workbench.selectedProjectID ?? NSHomeDirectory()
-            TerminalPanelStore.shared.rename(TerminalPanelState.baseID(root), to: first, root: root)
-            let existing = Set(TerminalPanelStore.shared.state(for: root).instances.compactMap(\.customTitle))  // 重复启动不重复新建
-            for name in names.dropFirst() where !existing.contains(name) { TerminalPanelStore.shared.addTerminal(root: root, name: name) }
-            TerminalPanelStore.shared.activate(TerminalPanelState.baseID(root), root: root)
+        // 调试:OMA_TERMINAL_NAMES=构建,服务,日志 —— 给当前项目预置多个命名终端标签(每个终端一个独立标签)
+        if let names = env["OMA_TERMINAL_NAMES"]?.split(separator: ",").map(String.init), !names.isEmpty {
+            let existing = Set(workbench.terminalTabs.map(\.title))  // 重复启动不重复新建
+            for name in names where !existing.contains(name) { actions.openTerminal(title: name) }
         }
         if let ms = env["OMA_CYCLE_TERMINALS"].flatMap(Int.init) {
-            // 调试(性能采样):给每个终端灌 3000 行输出后,每 ms 毫秒循环切换一次终端,持续约 20 秒
-            let root = workbench.selectedProjectID ?? NSHomeDirectory()
-            for _ in 0..<TerminalPanelStore.shared.state(for: root).instances.count {
+            // 调试(性能采样):给每个终端灌 3000 行输出后,每 ms 毫秒循环切换一次终端标签,持续约 20 秒
+            for _ in 0..<workbench.terminalTabs.count {
                 TerminalStore.shared.controllers.values.forEach { $0.send("seq 1 3000\r") }
-                TerminalPanelStore.shared.cycle(1, root: root)
+                workbench.cycleTerminalTab(1)
                 try? await Task.sleep(for: .milliseconds(400))
             }
             try? await Task.sleep(for: .seconds(3))
             for _ in 0..<(20_000 / max(ms, 50)) {
-                TerminalPanelStore.shared.cycle(1, root: root)
+                workbench.cycleTerminalTab(1)
                 try? await Task.sleep(for: .milliseconds(max(ms, 50)))
             }
         }
