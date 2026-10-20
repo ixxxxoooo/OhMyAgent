@@ -114,7 +114,7 @@ private struct BranchPicker: View {
                 itemsForQuery: { items(for: $0) },
                 row: { rowContent($0) }, onSelect: { pick in Task { await run(pick) } }, onDismiss: onDismiss
             )
-            .id(branches.map(\.name))
+            .id("\(loaded)-\(branches.map(\.name))")
             .disabled(working)
             if let errorText {
                 Divider()
