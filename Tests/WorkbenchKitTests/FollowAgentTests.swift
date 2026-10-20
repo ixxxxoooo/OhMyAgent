@@ -22,6 +22,7 @@ struct FollowAgentTests {
             session.attention = AttentionCenter()
             return session
         }
+        model.layout.fileOpenTarget = .editor  // 本组用例验证中栏标签;右栏路由见 DockIntegrationTests
         let ids = try dirs.map { try #require(model.openProject($0)) }
         return (model, ids, root)
     }

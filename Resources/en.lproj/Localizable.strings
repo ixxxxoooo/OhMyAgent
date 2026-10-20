@@ -2659,3 +2659,5 @@
 "打开文件、终端或资源管理器,它们会以标签显示在这里" = "Files, terminals and the explorer open here as tabs";
 "资源管理器" = "Explorer";
 "右栏停靠区" = "Right Dock";
+"在右栏打开" = "Open in Right Panel";
+"在中栏打开" = "Open in Center";

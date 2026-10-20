@@ -58,7 +58,7 @@ public struct WorkbenchLayout: Codable, Equatable, Sendable {
     /// 各面板的摆放位置(项目栏与右栏所在侧)
     public var placement = PanelPlacement()
     /// 文件/Plan 点击时的默认打开位置(右栏或中栏编辑区;`.auto` 视为右栏)
-    public var fileOpenTarget: OpenTarget = .editor
+    public var fileOpenTarget: OpenTarget = .right
     /// 终端面板内右侧终端列表的宽度(≥2 个终端时出现)
     public var terminalListWidth: Double = PanelMetrics.terminalListDefault
     /// 终端列表是否被用户手动折叠
@@ -93,7 +93,7 @@ public struct WorkbenchLayout: Codable, Equatable, Sendable {
         rightWidth = try c.decodeIfPresent(Double.self, forKey: .rightWidth) ?? PanelMetrics.rightDefault
         leftPane = (try? c.decodeIfPresent(LeftPane.self, forKey: .leftPane)) ?? .sessions
         placement = (try? c.decodeIfPresent(PanelPlacement.self, forKey: .placement)) ?? PanelPlacement()
-        fileOpenTarget = (try? c.decodeIfPresent(OpenTarget.self, forKey: .fileOpenTarget)) ?? .editor
+        fileOpenTarget = (try? c.decodeIfPresent(OpenTarget.self, forKey: .fileOpenTarget)) ?? .right
         terminalListWidth = try c.decodeIfPresent(Double.self, forKey: .terminalListWidth) ?? PanelMetrics.terminalListDefault
         terminalListCollapsed = try c.decodeIfPresent(Bool.self, forKey: .terminalListCollapsed) ?? false
         // 迁移旧布局:底部/侧栏里可见的终端与输出、右栏正显示的工具视图,都变成右栏停靠区里的标签

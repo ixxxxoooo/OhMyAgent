@@ -23,11 +23,14 @@ struct WorkbenchTests {
     }
 
     private func makeModel(_ store: WorkbenchStore) -> WorkbenchModel {
-        WorkbenchModel(store: store, autoConnect: false) { url in
+        let model = WorkbenchModel(store: store, autoConnect: false) { url in
             let session = SessionModel(workspace: url)
             session.attention = AttentionCenter()
             return session
         }
+        // 这些用例验证中栏标签行为:文件默认打开到中栏(默认值为右栏,见 DockIntegrationTests)
+        model.layout.fileOpenTarget = .editor
+        return model
     }
 
     @Test("工作树项目:带关联登记、可回溯原项目、旧状态文件无 worktree 字段也能解码")
@@ -131,7 +134,9 @@ struct WorkbenchTests {
         try "{ 不是 json".write(to: env.store.fileURL, atomically: true, encoding: .utf8)
         let broken = makeModel(env.store)
         #expect(broken.projects.isEmpty)
-        #expect(broken.layout == WorkbenchLayout())
+        var expected = WorkbenchLayout()
+        expected.fileOpenTarget = .editor  // makeModel 为中栏用例固定的偏好
+        #expect(broken.layout == expected)
 
         var state = WorkbenchState()
         state.layout.leftWidth = 5

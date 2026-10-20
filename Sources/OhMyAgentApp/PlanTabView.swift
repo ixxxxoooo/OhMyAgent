@@ -22,6 +22,8 @@ struct PlanTabView: View {
     @State private var errorText: String?
     @State private var saveError: String?
     @State private var mode = PlanViewMode.preview
+    /// 路径已链接化的正文(后台计算;未算出前显示原文)
+    @State private var linkedBody: String?
 
     private var url: URL { URL(fileURLWithPath: path) }
 
@@ -46,6 +48,19 @@ struct PlanTabView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(OMColors.surface)
         .task(id: path) { await load() }
+        .task(id: text) { await refreshLinks() }
+    }
+
+    /// 后台把正文里指向项目内真实文件的行内代码路径改写成可点击链接(磁盘检查不占主线程)。
+    private func refreshLinks() async {
+        let body = document.body
+        guard !body.isEmpty, let root = AppEnvironment.shared.workbench.selectedProjectID else { linkedBody = nil; return }
+        linkedBody = await Task.detached(priority: .utility) {
+            PlanPathLinker.link(body, root: root) { path in
+                var isDirectory: ObjCBool = false
+                return FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) && !isDirectory.boolValue
+            }
+        }.value
     }
 
     // MARK: 工具栏
@@ -161,7 +176,7 @@ struct PlanTabView: View {
                     PlanTodoList(todos: plan.todos)
                     Divider().overlay(OMColors.hairline)
                 }
-                MarkdownView(text: plan.body)
+                MarkdownView(text: linkedBody ?? plan.body)
             }
             .padding(.horizontal, 28).padding(.vertical, 20)
             .frame(maxWidth: 820, alignment: .leading)

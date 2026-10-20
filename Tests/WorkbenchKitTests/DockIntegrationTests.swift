@@ -23,6 +23,7 @@ struct DockIntegrationTests {
             return session
         }
         let ids = try dirs.map { try #require(model.openProject($0)) }
+        model.layout.fileOpenTarget = .editor  // 这些用例验证中栏行为;右栏默认见 openTargetRouting
         return (model, ids, root, store)
     }
 
@@ -41,6 +42,29 @@ struct DockIntegrationTests {
         #expect(model.rightDock.allTabs.contains { $0.id == tools })
         #expect(WorkbenchModel.toolsPane(fromTab: WorkbenchModel.toolsTabPrefix + "git") == .git)
         #expect(WorkbenchModel.toolsPane(fromTab: "oma-browser:x") == nil)
+    }
+
+    @Test("文件默认在右栏打开,可单次指定位置;同一文件全局唯一")
+    func openTargetRouting() throws {
+        let (model, ids, root, _) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        model.layout.fileOpenTarget = .right
+        let path = ids[0] + "/x.swift"
+        let a = model.openFile(path, preview: false)
+        #expect(model.host(of: a) == .right && model.layout.rightVisible)
+        // 单次指定中栏:已打开的同一文件就地聚焦,不会出现第二份
+        #expect(model.openFile(path, preview: false, target: .editor) == a)
+        #expect(model.allDockTabs.filter { $0.kind == .file(path: path) }.count == 1)
+        let b = model.openFile(ids[0] + "/y.swift", preview: false, target: .editor)
+        #expect(model.host(of: b) == .center)
+        #expect(model.oppositeTarget == .editor)
+        model.layout.fileOpenTarget = .editor
+        #expect(model.oppositeTarget == .right)
+        // Plan 同理:按设置打开到右栏,且焦点不抢
+        model.layout.fileOpenTarget = .right
+        let plan = model.openPlan(path: ids[0] + "/p.plan.md", title: "计划")
+        #expect(model.host(of: plan) == .right)
+        model.shutdownAll()
     }
 
     @Test("打开项目会创建会话标签,切换项目聚焦对应标签")

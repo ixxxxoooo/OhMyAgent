@@ -95,6 +95,9 @@ public extension WorkbenchModel {
         }
     }
 
+    /// 与默认打开位置相反的位置(⌥ 单击、右键「在另一侧打开」使用)。
+    var oppositeTarget: OpenTarget { resolveHost(.auto) == .right ? .editor : .right }
+
     /// 两个停靠区里的全部标签(中栏在前)。
     var allDockTabs: [WorkbenchTab] { dock.allTabs + rightDock.allTabs }
 

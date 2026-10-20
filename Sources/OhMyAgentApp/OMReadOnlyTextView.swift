@@ -6,6 +6,7 @@
 // 3. 为后续跨消息选择中枢(`SelectionHub`)提供统一的叶子类型。
 
 import AppKit
+import ChatKit
 import DesignSystem
 
 /// 整行底色标记(值为 `NSColor`):布局管理器据此把整行(含折行)铺满视图宽度。
@@ -283,12 +284,13 @@ class OMReadOnlyTextView: NSTextView {
             return
         }
         window?.makeFirstResponder(self)
-        // 单击文件 chip:在编辑区打开(拖动仍可从 chip 起选)
-        if let path = mentionPath(at: event) {
+        // 单击文件 chip 或 `oma-file:` 路径链接:按「文件默认打开位置」打开(⌥ 单击反向);拖动仍可从 chip 起选
+        if let (path, line) = mentionPath(at: event).map({ ($0, Int?.none) }) ?? openFileLink(at: event) {
             let start = event.locationInWindow
             if let up = window?.nextEvent(matching: [.leftMouseUp, .leftMouseDragged], until: .distantFuture, inMode: .eventTracking, dequeue: true),
                up.type == .leftMouseUp, hypot(up.locationInWindow.x - start.x, up.locationInWindow.y - start.y) < 4 {
-                _ = AppEnvironment.shared.workbench.openFile(path, preview: true)
+                let workbench = AppEnvironment.shared.workbench
+                _ = workbench.openFile(path, line: line, preview: true, target: event.modifierFlags.contains(.option) ? workbench.oppositeTarget : .auto)
                 return
             }
         }
@@ -311,6 +313,20 @@ class OMReadOnlyTextView: NSTextView {
         guard index < storage.length, let path = storage.attribute(Self.mentionPathKey, at: index, effectiveRange: nil) as? String else { return nil }
         let rect = layout.boundingRect(forGlyphRange: NSRange(location: glyph, length: 1), in: container)
         return rect.contains(local) ? path : nil
+    }
+
+    /// 鼠标事件落在 `oma-file:` 路径链接上时返回(绝对路径, 行号)。
+    private func openFileLink(at event: NSEvent) -> (String, Int?)? {
+        guard let storage = textStorage, storage.length > 0, let layout = layoutManager, let container = textContainer else { return nil }
+        let point = convert(event.locationInWindow, from: nil)
+        let local = NSPoint(x: point.x - textContainerOrigin.x, y: point.y - textContainerOrigin.y)
+        var fraction: CGFloat = 0
+        let glyph = layout.glyphIndex(for: local, in: container, fractionOfDistanceThroughGlyph: &fraction)
+        let index = layout.characterIndexForGlyph(at: glyph)
+        guard index < storage.length else { return nil }
+        let value = storage.attribute(.link, at: index, effectiveRange: nil)
+        let url = (value as? URL) ?? (value as? String).flatMap(URL.init(string:))
+        return url.flatMap(PlanPathLinker.parse(link:))
     }
 
     /// 无法由中枢接管时的原生行为:NSTextView 自带跟踪;原地单击且没有选区才算「单击」。

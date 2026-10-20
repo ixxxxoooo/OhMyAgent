@@ -363,12 +363,23 @@ extension AppearancePage {
         )
     }
 
-    /// 布局:迷你工作台示意图,拖动面板卡片到左栏/右栏/底部/编辑区(也可直接拖动面板标题条换位置)。
+    /// 布局:迷你工作台示意图(项目栏与右栏停靠区左右换位),以及文件/Plan 的默认打开位置。
     @ViewBuilder
     fileprivate var layoutSection: some View {
         SettingsCard("布局") {
             LayoutDragEditor(workbench: workbench)
-            Note("把「项目栏 / 文件 / Git / 终端 / 输出」的卡片拖到想要的位置;终端和输出的标题条也可以直接拖到窗口的左侧、右侧、底部或中间。换位置不会中断终端里正在运行的进程。").footnote()
+            Note("把「项目栏 / 右栏停靠区」的卡片拖到左侧或右侧。终端、输出、文件预览、Plan、资源管理器都是右栏里的标签,可关闭、可拖到中栏或在右栏内分屏;换位置不会中断终端里正在运行的进程。").footnote()
+            SettingsRow("文件与 Plan 默认打开位置") {
+                Picker("", selection: Binding(
+                    get: { workbench.layout.fileOpenTarget == .editor ? OpenTarget.editor : OpenTarget.right },
+                    set: { workbench.layout.fileOpenTarget = $0 }
+                )) {
+                    Text("右栏").tag(OpenTarget.right)
+                    Text("中栏").tag(OpenTarget.editor)
+                }
+                .pickerStyle(.segmented).labelsHidden().fixedSize()
+            }
+            Note("点击会话里的文件、Plan 或资源管理器条目时在这里打开,方便与会话左右对照;右键菜单可单次指定位置。").footnote()
             Button("恢复默认布局") { workbench.resetLayout() }
         }
     }

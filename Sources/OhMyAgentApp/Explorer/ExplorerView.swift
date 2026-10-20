@@ -154,7 +154,7 @@ private struct ExplorerTreeRow: View {
         ExplorerRow(depth: item.depth, name: entry.name, isDirectory: entry.isDirectory, expanded: item.isExpanded,
                     chevron: entry.isDirectory ? (item.isExpanded ? "chevron-down" : "chevron-right") : nil,
                     isActive: isActive, decoration: decoration, isDropTarget: isDropTarget) {
-            if entry.isDirectory { tree.toggle(entry.path) } else { workbench.openFile(entry.path, preview: true) }
+            if entry.isDirectory { tree.toggle(entry.path) } else { workbench.openFile(entry.path, preview: true, target: NSEvent.modifierFlags.contains(.option) ? workbench.oppositeTarget : .auto) }
         }
         .simultaneousGesture(TapGesture(count: 2).onEnded { if !entry.isDirectory { workbench.openFile(entry.path, preview: false) } })
         // 拖到输入框 = 引用 @路径;拖到标签栏/内容区 = 打开;拖到资源管理器的文件夹 = 移动(附加文件夹根不可拖)
@@ -329,6 +329,10 @@ private enum ExplorerMenu {
         let relative = entry.path.hasPrefix(root + "/") ? String(entry.path.dropFirst(root.count + 1)) : entry.path
         if !entry.isDirectory {
             OMMenuItem("打开", icon: "file-text") { workbench.openFile(entry.path, preview: false) }
+            let other = MainActor.assumeIsolated { workbench.oppositeTarget }
+            OMMenuItem(verbatim: other == .right ? String(localized: "在右栏打开") : String(localized: "在中栏打开"), icon: other == .right ? "panel-right" : "panel-top") {
+                workbench.openFile(entry.path, preview: false, target: other)
+            }
         }
         OMMenuItem("新建文件…", icon: "file-plus") { ExplorerActions.create(in: parent, directory: false, workbench: workbench) }
         OMMenuItem("新建文件夹…", icon: "folder-plus") { ExplorerActions.create(in: parent, directory: true, workbench: workbench) }

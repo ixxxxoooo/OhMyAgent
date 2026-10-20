@@ -63,6 +63,7 @@ struct FileMentionChip: View {
     /// 点击文件 chip 在编辑器打开(文件夹不处理)。
     private func openFile() {
         guard !mention.isDirectory else { return }
-        _ = AppEnvironment.shared.workbench.openFile(mention.path, preview: true)
+        let workbench = AppEnvironment.shared.workbench
+        _ = workbench.openFile(mention.path, preview: true, target: NSEvent.modifierFlags.contains(.option) ? workbench.oppositeTarget : .auto)
     }
 }
