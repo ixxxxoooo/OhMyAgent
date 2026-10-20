@@ -1060,36 +1060,47 @@ public final class WorkbenchModel {
         scheduleSave()
     }
 
-    /// 自愈修复会话创建时间:对旧数据中缺失创建时间或因批量赋值共享相同时间戳的会话,从文件系统解析真实物理创建时间纠偏。
+    /// 自愈修复会话创建时间:对旧数据中缺失创建时间或因批量赋值共享相同时间戳的会话,
+    /// 在后台线程从文件系统解析真实物理创建时间,再回到主线程应用纠偏(启动路径不做磁盘 I/O)。
     func healSessionCreationDates() {
-        var changed = false
-        for pIndex in projects.indices {
-            let proj = projects[pIndex]
-            var sessions = proj.sessions
+        struct Job: Sendable { let projectID: String; let sessionId: String; let agentId: String?; let current: String? }
+        var jobs: [Job] = []
+        for proj in projects {
             var counts: [String: Int] = [:]
-            for s in sessions {
+            for s in proj.sessions {
                 if let k = s.createdAt ?? s.firstSeenAt { counts[k, default: 0] += 1 }
             }
-            for sIndex in sessions.indices {
-                var s = sessions[sIndex]
+            for s in proj.sessions {
                 let currentKey = s.createdAt ?? s.firstSeenAt
                 let isDuplicated = currentKey.map { (counts[$0] ?? 0) > 1 } ?? true
-                let needsHeal = s.createdAt == nil || isDuplicated
-                if needsHeal, let physical = SessionTimeResolver.resolvePhysicalCreationDate(sessionId: s.sessionId, projectPath: proj.id, agentID: s.agentId) {
-                    let fixed = physical.formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true))
-                    if s.createdAt != fixed {
-                        s.createdAt = fixed
-                        s.firstSeenAt = fixed
-                        sessions[sIndex] = s
-                        changed = true
-                    }
+                if s.createdAt == nil || isDuplicated {
+                    jobs.append(Job(projectID: proj.id, sessionId: s.sessionId, agentId: s.agentId, current: s.createdAt))
                 }
             }
-            if proj.sessions != sessions {
-                projects[pIndex].sessions = sessions
-            }
         }
-        if changed { scheduleSave() }
+        guard !jobs.isEmpty else { return }
+        let pending = jobs
+        Task { [weak self] in
+            let fixes: [(Job, String)] = await Task.detached(priority: .utility) {
+                var result: [(Job, String)] = []
+                for job in pending {
+                    guard let physical = SessionTimeResolver.resolvePhysicalCreationDate(sessionId: job.sessionId, projectPath: job.projectID, agentID: job.agentId) else { continue }
+                    let fixed = physical.formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true))
+                    if job.current != fixed { result.append((job, fixed)) }
+                }
+                return result
+            }.value
+            guard let self, !fixes.isEmpty else { return }
+            var changed = false
+            for (job, fixed) in fixes {
+                guard let p = self.projects.firstIndex(where: { $0.id == job.projectID }),
+                      let s = self.projects[p].sessions.firstIndex(where: { $0.sessionId == job.sessionId }) else { continue }
+                self.projects[p].sessions[s].createdAt = fixed
+                self.projects[p].sessions[s].firstSeenAt = fixed
+                changed = true
+            }
+            if changed { self.scheduleSave() }
+        }
     }
 
     /// 关闭所有会话(应用退出)。
