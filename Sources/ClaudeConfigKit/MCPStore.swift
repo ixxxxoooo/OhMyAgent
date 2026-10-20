@@ -139,7 +139,7 @@ public struct MCPStore: Sendable {
         // 覆盖关系:local > project > user
         let rank: [ConfigScope: Int] = [.local: 3, .project: 2, .user: 1]
         for index in entries.indices {
-            let winner = entries.filter { $0.config.name == entries[index].config.name }.max { rank[$0.scope]! < rank[$1.scope]! }
+            let winner = entries.filter { $0.config.name == entries[index].config.name }.max { (rank[$0.scope] ?? 0) < (rank[$1.scope] ?? 0) }
             if let winner, winner.scope != entries[index].scope { entries[index].overriddenBy = winner.scope }
         }
         return entries.sorted { ($0.config.name, $0.scope.rawValue) < ($1.config.name, $1.scope.rawValue) }

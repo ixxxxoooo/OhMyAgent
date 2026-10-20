@@ -309,7 +309,7 @@ struct MCPEditorSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(target.entry == nil ? String(localized: "添加 MCP 服务器") : String(localized: "编辑 \(target.entry!.config.name)")).font(OMFonts.title)
+            Text(target.entry.map { String(localized: "编辑 \($0.config.name)") } ?? String(localized: "添加 MCP 服务器")).font(OMFonts.title)
             FormRow(label: String(localized: "名称")) { TextField("例如 github", text: $name).textFieldStyle(.omField) }
             if target.entry == nil {
                 FormRow(label: String(localized: "作用域"), hint: String(localized: "用户:所有项目可用;本地:仅此工作区、不入版本库;项目:写入 .mcp.json 与团队共享")) {

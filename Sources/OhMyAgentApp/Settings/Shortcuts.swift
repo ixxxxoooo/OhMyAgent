@@ -105,7 +105,7 @@ struct ShortcutBinding: Equatable, Codable, Sendable {
         let name: String
         if event.keyCode == 36 || event.keyCode == 76 { name = "return" }
         else if event.keyCode == 48 { name = "tab" }
-        else if let character = event.charactersIgnoringModifiers?.lowercased(), character.count == 1, character.unicodeScalars.first!.value >= 0x20 { name = character }
+        else if let character = event.charactersIgnoringModifiers?.lowercased(), character.count == 1, (character.unicodeScalars.first?.value ?? 0) >= 0x20 { name = character }
         else { return nil }
         var list: [String] = []
         if flags.contains(.command) { list.append("command") }

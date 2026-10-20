@@ -766,7 +766,7 @@ public final class WorkbenchModel {
               let project = projects.first(where: { $0.id == projectID }) else { return nil }
         mode = .workspace
         let slot = UUID().uuidString
-        let baseTitle = (source.sessionTitle?.isEmpty == false) ? source.sessionTitle! : project.name
+        let baseTitle = source.sessionTitle.flatMap { $0.isEmpty ? nil : $0 } ?? project.name
         let tab = dock.open(.chat(projectID: projectID, slot: slot), title: String(localized: "分支") + " · " + baseTitle)
         dock.activate(tab)
         lastSlot[projectID] = .some(slot)

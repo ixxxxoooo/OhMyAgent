@@ -269,18 +269,18 @@ public enum LineDiff {
             for op in ops[start..<end] {
                 switch op.kind {
                 case .equal:
-                    let o = op.oldIndex!, n = op.newIndex!
+                    guard let o = op.oldIndex, let n = op.newIndex else { continue }
                     lines.append(DiffLine(kind: .context, text: newLines[n], oldNumber: o + 1, newNumber: n + 1))
                     if firstOld { oldStart = o + 1; firstOld = false }
                     if firstNew { newStart = n + 1; firstNew = false }
                     oldCount += 1; newCount += 1
                 case .delete:
-                    let o = op.oldIndex!
+                    guard let o = op.oldIndex else { continue }
                     lines.append(DiffLine(kind: .removed, text: oldLines[o], oldNumber: o + 1, newNumber: nil))
                     if firstOld { oldStart = o + 1; firstOld = false }
                     oldCount += 1; removed += 1
                 case .insert:
-                    let n = op.newIndex!
+                    guard let n = op.newIndex else { continue }
                     lines.append(DiffLine(kind: .added, text: newLines[n], oldNumber: nil, newNumber: n + 1))
                     if firstNew { newStart = n + 1; firstNew = false }
                     newCount += 1; added += 1

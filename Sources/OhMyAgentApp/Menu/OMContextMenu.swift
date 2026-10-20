@@ -195,7 +195,8 @@ final class OMContextMenuCenter {
             let local = view.convert(pointInWindow, from: nil)
             guard view.bounds.contains(local), view.visibleRect.contains(local) else { continue }
             let area = view.bounds.width * view.bounds.height
-            if best == nil || area < best!.area { best = (view, area) }
+            if let current = best, area >= current.area { continue }
+            best = (view, area)
         }
         return best?.view
     }
