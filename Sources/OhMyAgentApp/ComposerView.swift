@@ -21,7 +21,12 @@ struct ComposerView: View {
     @State private var selected = 0
     @State private var dismissedAt: String?
     @State private var lookup: Task<Void, Never>?
-    @State private var dropTargeted = false
+    /// SwiftUI 卡片区域收到拖入
+    @State private var cardDropTargeted = false
+    /// 文本区(AppKit 自己注册拖放)收到拖入
+    @State private var textDropTargeted = false
+    /// 任一区域被拖入即高亮:鼠标一碰到卡片边框就识别,不会因为落在文字区而消失
+    private var dropTargeted: Bool { cardDropTargeted || textDropTargeted }
 
     /// 发送草稿;开启「在工作树中运行」且是全新会话时,先建工作树再在其中发送。
     private func submit(afterTurn: Bool = false) {
@@ -64,6 +69,7 @@ struct ComposerView: View {
                 // 不再在这里按能力拦截:不支持图片时由 addAttachment 给出提示,而不是悄悄吞掉粘贴/拖入
                 acceptsImages: { true },
                 onFileURLs: { urls in insertMentions(for: urls) },
+                onDragTargeted: { textDropTargeted = $0 },
                 onEdit: updateCompletion,
                 onSelectionText: { model.selectedText = $0 },
                 // 文件提及内联成 chip,跟在文字后面
@@ -105,7 +111,7 @@ struct ComposerView: View {
                     .allowsHitTesting(false)
             }
         }
-        .onDrop(of: [.fileURL, .image], isTargeted: $dropTargeted) { providers in
+        .onDrop(of: [.fileURL, .image], isTargeted: $cardDropTargeted) { providers in
             Task { @MainActor in
                 let dropped = await ImageIntake.split(from: providers)
                 for image in dropped.images { model.addAttachment(image) }

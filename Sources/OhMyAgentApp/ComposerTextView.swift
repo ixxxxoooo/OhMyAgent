@@ -228,14 +228,28 @@ final class SubmitTextView: NSTextView {
         }
     }
 
+    /// 拖拽进入/离开文本区(文本区自己注册了拖放,拖到文字上时 SwiftUI 卡片收不到事件,靠它把状态回报给卡片高亮)
+    var onDragTargeted: ((Bool) -> Void)?
+
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
         let board = sender.draggingPasteboard
-        if acceptsImages(), ImageIntake.hasImage(board) { return .copy }
-        if onFileURLs != nil, ImageIntake.hasFileURLs(board) { return .copy }
+        if acceptsImages(), ImageIntake.hasImage(board) { onDragTargeted?(true); return .copy }
+        if onFileURLs != nil, ImageIntake.hasFileURLs(board) { onDragTargeted?(true); return .copy }
         return super.draggingEntered(sender)
     }
 
+    override func draggingExited(_ sender: NSDraggingInfo?) {
+        onDragTargeted?(false)
+        super.draggingExited(sender)
+    }
+
+    override func draggingEnded(_ sender: NSDraggingInfo) {
+        onDragTargeted?(false)
+        super.draggingEnded(sender)
+    }
+
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        onDragTargeted?(false)
         let board = sender.draggingPasteboard
         var handled = false
         if acceptsImages(), ImageIntake.hasImage(board) {
@@ -339,6 +353,8 @@ struct ComposerTextView: NSViewRepresentable {
     var onImages: (([ImageAttachment]) -> Void)?
     var acceptsImages: () -> Bool = { false }
     var onFileURLs: (([URL]) -> Void)?
+    /// 拖拽进入/离开文本区(用于卡片高亮)
+    var onDragTargeted: ((Bool) -> Void)?
     /// 文本或光标变化(未处于输入法组合态时)
     var onEdit: ((String, Int) -> Void)?
     /// 选中文字变化(无选中为 nil)
@@ -378,6 +394,7 @@ struct ComposerTextView: NSViewRepresentable {
         textView.onImages = { [coordinator = context.coordinator] images in coordinator.parent.onImages?(images) }
         textView.acceptsImages = { [coordinator = context.coordinator] in coordinator.parent.acceptsImages() }
         textView.onFileURLs = { [coordinator = context.coordinator] urls in coordinator.parent.onFileURLs?(urls) }
+        textView.onDragTargeted = { [coordinator = context.coordinator] value in coordinator.parent.onDragTargeted?(value) }
         textView.onWidthChange = { [coordinator = context.coordinator] in coordinator.updateHeight(immediate: true) }
         textView.setDragIntakeEnabled(context.environment.tabIsActive)
         textView.setAccessibilityLabel(String(localized: "消息输入框"))
