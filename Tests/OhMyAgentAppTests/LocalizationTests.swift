@@ -28,7 +28,8 @@ struct LocalizationTests {
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
         let range = NSRange(text.startIndex..., in: text)
         return regex.matches(in: text, range: range).compactMap { match in
-            Range(match.range, in: text).map { String(text[$0]) }
+            // 去掉位置序号(`%2$lld` 与 `%lld` 视为同一种类),只比较类型
+            Range(match.range, in: text).map { String(text[$0]).replacingOccurrences(of: #"\d+\$"#, with: "", options: .regularExpression) }
         }
     }
 
