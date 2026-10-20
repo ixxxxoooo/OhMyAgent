@@ -49,19 +49,22 @@ enum MarkdownTextRunBuilder {
     /// 单个块的富文本(不含块间分隔符);代码、表格、分隔线不属于文字段,返回空。
     /// - Parameter block: 文字块
     /// - Returns: 该块的富文本
-    static func piece(_ block: MarkdownBlock) -> NSAttributedString {
+    static func piece(_ block: MarkdownBlock, document: Bool = false) -> NSAttributedString {
         let scale = OMScale.ui * OMScale.timeline
-        let bodySize = 13 * scale
+        // 文档排版(对齐 GitHub / Cursor 的阅读页):正文 15、段间距 16、标题上方留 1.5 倍行距
+        let bodySize = (document ? 15 : 13) * scale
+        let gap: CGFloat = document ? 16 : 10
         switch block {
         case .heading(let level, let text):
-            let size = headingSize(level) * scale
-            let style = paragraphStyle(size: size, before: level <= 2 ? 6 : 2, after: 10)
+            let size = headingSize(level, document: document) * scale
+            let before: CGFloat = document ? (level <= 2 ? 28 : 20) : (level <= 2 ? 6 : 2)
+            let style = paragraphStyle(size: size, before: before, after: document ? 12 : 10, document: document)
             return inline(text, size: size, weight: .medium, color: NSColor(OMColors.primaryText), style: style)
         case .paragraph(let text):
-            let style = paragraphStyle(size: bodySize, before: 0, after: 10)
+            let style = paragraphStyle(size: bodySize, before: 0, after: gap, document: document)
             return inline(text, size: bodySize, weight: .regular, color: NSColor(OMColors.primaryText), style: style)
         case .quote(let text):
-            let style = paragraphStyle(size: bodySize, before: 0, after: 10, indent: 13)
+            let style = paragraphStyle(size: bodySize, before: 0, after: gap, indent: 13, document: document)
             let quote = NSMutableAttributedString(attributedString: inline(
                 text, size: bodySize, weight: .regular, color: NSColor(OMColors.secondaryText), style: style))
             quote.addAttribute(omQuoteKey, value: true, range: NSRange(location: 0, length: quote.length))
@@ -70,7 +73,7 @@ enum MarkdownTextRunBuilder {
             let result = NSMutableAttributedString()
             for (itemIndex, item) in items.enumerated() {
                 if itemIndex > 0 { result.append(blockSeparator) }
-                result.append(listItem(item, size: bodySize, last: itemIndex == items.count - 1))
+                result.append(listItem(item, size: bodySize, last: itemIndex == items.count - 1, document: document))
             }
             return result
         case .code, .table, .rule:
@@ -79,7 +82,15 @@ enum MarkdownTextRunBuilder {
     }
 
     /// 标题字号(基准,未缩放)。
-    private static func headingSize(_ level: Int) -> CGFloat {
+    private static func headingSize(_ level: Int, document: Bool = false) -> CGFloat {
+        if document {
+            switch level {
+            case 1: return 28
+            case 2: return 22
+            case 3: return 18
+            default: return 16
+            }
+        }
         switch level {
         case 1: return 20
         case 2: return 17
@@ -89,9 +100,10 @@ enum MarkdownTextRunBuilder {
     }
 
     /// 段落样式:行高为字号 1.5 倍(与 `OMFonts.lineSpacing` 校准一致)。
-    private static func paragraphStyle(size: CGFloat, before: CGFloat, after: CGFloat, indent: CGFloat = 0) -> NSMutableParagraphStyle {
+    private static func paragraphStyle(size: CGFloat, before: CGFloat, after: CGFloat, indent: CGFloat = 0, document: Bool = false) -> NSMutableParagraphStyle {
         let style = NSMutableParagraphStyle()
-        style.lineSpacing = OMFonts.lineSpacing(forSize: size)
+        // 文档排版行高再松一点(约 1.65 倍)
+        style.lineSpacing = OMFonts.lineSpacing(forSize: size) + (document ? size * 0.12 : 0)
         style.paragraphSpacingBefore = before
         style.paragraphSpacing = after
         style.firstLineHeadIndent = indent
@@ -100,7 +112,7 @@ enum MarkdownTextRunBuilder {
     }
 
     /// 单个列表项:缩进 + 标记 + 制表位对齐,折行后文字与首行文字左对齐。
-    private static func listItem(_ item: MarkdownListItem, size: CGFloat, last: Bool) -> NSAttributedString {
+    private static func listItem(_ item: MarkdownListItem, size: CGFloat, last: Bool, document: Bool = false) -> NSAttributedString {
         let indent = CGFloat(item.level) * 16
         let font = NSFont.systemFont(ofSize: size)
         let markerColor = NSColor(item.checked == true ? OMColors.accent : OMColors.secondaryText)
@@ -118,7 +130,7 @@ enum MarkdownTextRunBuilder {
             markerWidth = (item.marker as NSString).size(withAttributes: [.font: font]).width
         }
         markerWidth += 6
-        let style = paragraphStyle(size: size, before: 0, after: last ? 10 : 4)
+        let style = paragraphStyle(size: size, before: 0, after: last ? (document ? 16 : 10) : (document ? 6 : 4), document: document)
         style.firstLineHeadIndent = indent
         style.headIndent = indent + markerWidth
         style.tabStops = [NSTextTab(textAlignment: .left, location: indent + markerWidth)]
@@ -245,6 +257,8 @@ final class MarkdownTextRunRenderer {
         var timeline: CGFloat
         var themeRevision: Int
         var systemIsDark: Bool
+        /// 文档排版(整页阅读:更大的字号、行距与段间距);会话时间线为 false
+        var document = false
 
         /// 当前样式快照。
         static var current: Style {
@@ -274,6 +288,8 @@ final class MarkdownTextRunRenderer {
     private(set) var incrementalUpdates = 0
     /// 整体重建次数(测试与诊断用)
     private(set) var fullRebuilds = 0
+    /// 是否使用文档排版(由视图在每次更新前写入)
+    var document = false
 
     /// 外观签名:四种颜色在视图当前外观下的 sRGB 分量。
     struct AppearanceSignature: Equatable {
@@ -347,7 +363,8 @@ final class MarkdownTextRunRenderer {
     ///   - view: 目标文本视图
     func apply(_ blocks: [MarkdownBlock], to view: MarkdownTextView) {
         guard let storage = view.textStorage else { return }
-        let style = Style.current
+        var style = Style.current
+        style.document = document
         let separators = max(renderedBlocks.count - 1, 0)
         // 文本存储与记录对不上(被外部改过)时放弃增量,整体重建
         let consistent = renderedStyle == style && storage.length == renderedLengths.reduce(0, +) + separators
@@ -362,7 +379,7 @@ final class MarkdownTextRunRenderer {
             if index > 0 { tail.append(MarkdownTextRunBuilder.blockSeparator) }
             // 最后一个块在流式时每批都变,缓存它只会挤掉有用的条目;其余块缓存
             let piece = index == blocks.count - 1
-                ? MarkdownTextRunBuilder.piece(blocks[index])
+                ? MarkdownTextRunBuilder.piece(blocks[index], document: document)
                 : MarkdownPieceCache.piece(for: blocks[index], style: style)
             tail.append(piece)
             lengths.append(piece.length)
@@ -445,7 +462,7 @@ enum MarkdownPieceCache {
             return hit.string
         }
         misses += 1
-        let built = MarkdownTextRunBuilder.piece(block)
+        let built = MarkdownTextRunBuilder.piece(block, document: style.document)
         cache.setObject(Value(built), forKey: key, cost: built.length * 64)
         return built
     }
@@ -465,6 +482,7 @@ struct MarkdownTextRepresentable: NSViewRepresentable {
     let quoteBar: NSColor
     let linkColor: NSColor
     let selectionColor: NSColor
+    var document = false
 
     func makeCoordinator() -> MarkdownTextRunRenderer { MarkdownTextRunRenderer() }
 
@@ -484,6 +502,7 @@ struct MarkdownTextRepresentable: NSViewRepresentable {
         // 内容变化时文本存储的 replaceCharacters 已让 TextKit 自行失效脏区,不需要额外 needsDisplay
         context.coordinator.applyAppearance(
             to: view, codeFill: codeFill, quoteBar: quoteBar, linkColor: linkColor, selectionColor: selectionColor)
+        context.coordinator.document = document
         context.coordinator.apply(blocks, to: view)
     }
 
@@ -508,6 +527,9 @@ struct MarkdownTextRepresentable: NSViewRepresentable {
 /// 一段连续文字块的视图。
 struct MarkdownTextRunView: View, Equatable {
     let blocks: [MarkdownBlock]
+    @Environment(\.markdownDocument) private var document
+
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool { lhs.blocks == rhs.blocks }
 
     var body: some View {
         MarkdownTextRepresentable(
@@ -515,7 +537,18 @@ struct MarkdownTextRunView: View, Equatable {
             codeFill: NSColor(OMColors.accent.opacity(0.1)),
             quoteBar: NSColor(OMColors.hairline),
             linkColor: NSColor(OMColors.link),
-            selectionColor: NSColor(OMColors.accent.opacity(0.2))
+            selectionColor: NSColor(OMColors.accent.opacity(0.2)),
+            document: document
         )
+    }
+}
+
+private struct MarkdownDocumentKey: EnvironmentKey { static let defaultValue = false }
+
+extension EnvironmentValues {
+    /// 是否按「文档」排版 Markdown(整页阅读用;会话时间线保持紧凑)。
+    var markdownDocument: Bool {
+        get { self[MarkdownDocumentKey.self] }
+        set { self[MarkdownDocumentKey.self] = newValue }
     }
 }

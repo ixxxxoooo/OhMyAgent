@@ -22,7 +22,7 @@ struct EditableMarkdownPreview: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 10) {
+            LazyVStack(alignment: .leading, spacing: 16) {
                 ForEach(0..<layout.blocks.count, id: \.self) { (index: Int) in
                     if editing == index {
                         BlockEditor(text: $draft, onDone: { commit() })
@@ -34,6 +34,7 @@ struct EditableMarkdownPreview: View {
                 Color.clear.frame(height: 120).contentShape(Rectangle())
                     .onTapGesture { if editing != nil { commit() } }
             }
+            .environment(\.markdownDocument, true)
             .frame(maxWidth: 820, alignment: .leading)
             .padding(.horizontal, 28).padding(.vertical, 22)
             .frame(maxWidth: .infinity)
@@ -60,9 +61,19 @@ struct EditableMarkdownPreview: View {
                 MarkdownView(text: source)
             }
         }
+        // 每块单独排版,文本视图首段的「段前距」会被忽略:标题上方的留白在这里补上(与整页阅读一致)
+        .padding(.top, headingGap(block.kind))
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .onTapGesture { begin(index, source: source) }
+    }
+
+    /// 标题块上方额外留白(块间距 16 之外补足到 28 / 20)。
+    /// - Parameter kind: 块种类
+    /// - Returns: 额外上边距
+    private func headingGap(_ kind: MarkdownLiveBlockKind) -> CGFloat {
+        guard case .heading(let level) = kind else { return 0 }
+        return level <= 2 ? 12 : 4
     }
 
     /// 取文档中某范围的文本。

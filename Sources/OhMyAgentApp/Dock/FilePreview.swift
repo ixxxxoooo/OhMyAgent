@@ -130,6 +130,7 @@ struct MarkdownPreviewView: View {
     var body: some View {
         ScrollView {
             MarkdownView(text: shown, lazy: true)
+                .environment(\.markdownDocument, true)
                 .frame(maxWidth: 820, alignment: .leading)
                 .padding(.horizontal, 28).padding(.vertical, 22)
                 .frame(maxWidth: .infinity)

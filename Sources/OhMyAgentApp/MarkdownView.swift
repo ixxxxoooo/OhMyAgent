@@ -15,14 +15,15 @@ struct MarkdownView: View {
     var streaming = false
     /// 是否懒加载各段(放在 ScrollView 里的整页预览用,只排版可见段,避免大文档一次性排版卡主线程)
     var lazy = false
+    @Environment(\.markdownDocument) private var document
 
     var body: some View {
         let segments = MarkdownSegment.split(MarkdownCache.blocks(for: text, streaming: streaming))
         Group {
             if lazy {
-                LazyVStack(alignment: .leading, spacing: 10) { segmentViews(segments) }
+                LazyVStack(alignment: .leading, spacing: document ? 16 : 10) { segmentViews(segments) }
             } else {
-                VStack(alignment: .leading, spacing: 10) { segmentViews(segments) }
+                VStack(alignment: .leading, spacing: document ? 16 : 10) { segmentViews(segments) }
             }
         }
     }
