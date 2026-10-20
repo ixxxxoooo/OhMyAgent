@@ -275,7 +275,8 @@ struct TabItemView: View {
     }
 
     /// 是否为尾部按钮(关闭/图钉/未保存点)预留固定位置。
-    private var reservesTrailing: Bool { isActive || tab.isPinned || tab.isDirty }
+    /// 所有标签统一预留,选中与否宽度一致(切换选中不会让标签变宽/变窄)。
+    private var reservesTrailing: Bool { true }
 
     /// 尾部是否有内容(悬停的关闭按钮、图钉或未保存点)。
     private var showsTrailing: Bool {
