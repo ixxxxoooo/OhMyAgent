@@ -73,8 +73,11 @@ struct WorkbenchView: View {
     /// 项目栏、工具栏、终端侧栏落在哪一侧由 `layout.placement` 决定(设置 → 外观 → 布局)。
     /// 顶部浮层(回退/前进/面板开关)盖在整个工作区之上,按钮位置恒定且可点击。
     private var workspaceBody: some View {
+        // 面板列宽由外层量到的总宽度直接算死(见 `panelColumn`),不交给 HStack 在多个可伸缩视图间协商:
+        // 协商会把剩余空间对半分,右栏拖到约半个窗口就被卡住。
+        GeometryReader { geo in
         HStack(spacing: 0) {
-            ForEach(workbench.layout.visibleColumns(on: .left)) { panelColumn($0, side: .left) }
+            ForEach(workbench.layout.visibleColumns(on: .left)) { panelColumn($0, side: .left, total: Double(geo.size.width)) }
             // GeometryReader 不向父级报告内容的固有最小宽度:中栏内部(标签条、输入区工具行)的刚性最小宽度
             // 不会再把右栏挤窄,右栏因此能一直拖到只给中栏留 `centerMinimum`;超出的内容被裁掉。
             GeometryReader { _ in
@@ -83,7 +86,8 @@ struct WorkbenchView: View {
             .frame(minWidth: CGFloat(PanelMetrics.centerMinimum), maxWidth: .infinity)
             .clipped()
             // 右侧由内向外排列
-            ForEach(workbench.layout.visibleColumns(on: .right).reversed()) { panelColumn($0, side: .right) }
+            ForEach(workbench.layout.visibleColumns(on: .right).reversed()) { panelColumn($0, side: .right, total: Double(geo.size.width)) }
+        }
         }
         // 面板显隐的滑入/滑出动画只挂在面板自己的 transition 上(见 `panelTransition`),这里不给整个 HStack 加动画:
         // 否则中栏的宽度会逐帧变化,整条会话时间线与所有常驻会话标签每帧重新排版,开关侧栏就会掉帧。
@@ -116,10 +120,15 @@ struct WorkbenchView: View {
 
     /// 一列面板 + 它与中栏之间的分隔条(分隔条总在靠近中栏的一侧)。
     @ViewBuilder
-    private func panelColumn(_ column: PanelColumn, side: PanelSide) -> some View {
+    private func panelColumn(_ column: PanelColumn, side: PanelSide, total: Double) -> some View {
         // 宽度取「拖动中临时值,否则已提交值」:拖动期间 layout 不变,只有被拖动的这一列重新布局
         let dimension = PanelDimension(column: column)
-        let width = workbench.panelDrag.effective(dimension, committed: workbench.layout)
+        let stored = workbench.panelDrag.effective(dimension, committed: workbench.layout)
+        // 窗口放不下「面板 + 中栏最小宽度」时面板让出宽度:上限 = 总宽 − 其它可见面板 − 中栏最小宽度
+        let layout = workbench.layout
+        let others = (layout.visibleColumns(on: .left) + layout.visibleColumns(on: .right)).filter { $0 != column }
+            .reduce(0.0) { $0 + workbench.panelDrag.effective(PanelDimension(column: $1), committed: layout) + 1 }
+        let width = min(stored, max(0, total - PanelMetrics.centerMinimum - others - 1))
         let defaultWidth = column == .sidebar ? PanelMetrics.leftDefault : PanelMetrics.rightDefault
         if side == .right { PanelResizer(workbench: workbench, dimension: dimension, side: side, defaultWidth: defaultWidth).zIndex(1).transition(panelTransition(side)) }
         Group {
@@ -132,10 +141,7 @@ struct WorkbenchView: View {
                 RightDockView(workbench: workbench)
             }
         }
-        // 窗口放不下「面板 + 中栏最小宽度」时面板让出宽度(而不是把整个工作区撑出窗口、右上角开关被挤出可视区)
-        .frame(minWidth: 0, idealWidth: CGFloat(width), maxWidth: CGFloat(width))
-        // 面板优先分到空间、中栏只保底 `centerMinimum`:否则 HStack 把剩余空间在两个「可伸缩」视图间对半分,右栏被卡在约半个窗口
-        .layoutPriority(1)
+        .frame(width: CGFloat(width))
         .clipped()
         // 滑出时面板仍盖在(已一次性扩宽的)中栏之上,否则会被后绘制的中栏遮住而「瞬间消失」
         .zIndex(1)
