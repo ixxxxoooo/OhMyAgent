@@ -368,8 +368,12 @@ struct UserMessageEditor: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        // 原位编辑时卡片浮在会话流之上,玻璃会透出下方文字:先垫一层不透明内容底色(与吸顶编辑时的遮罩一致)
-        .background(OMColors.surface, in: RoundedRectangle(cornerRadius: OMRadius.modal, style: .continuous))
+        // 原位编辑卡只有一块玻璃,开销与底部输入框相同:玻璃主题直接用 Liquid Glass(下方文字会被模糊透出);
+        // 纸感主题或「减少透明度」时 `omGlass` 自带不透明回退,这里再垫内容底色保证不透字
+        .background(
+            MaterialPolicy.shared.useGlass && ThemeRuntime.style.allowsGlass ? Color.clear : OMColors.surface,
+            in: RoundedRectangle(cornerRadius: OMRadius.modal, style: .continuous)
+        )
         .omGlass(in: RoundedRectangle(cornerRadius: OMRadius.modal, style: .continuous))
     }
 
