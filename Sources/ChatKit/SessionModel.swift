@@ -1744,8 +1744,8 @@ public final class SessionModel {
                     if !setup.configOptions.isEmpty { self.configOptions = setup.configOptions }
                     self.timeline.appendNotice(String(localized: "模型映射已更新为 \(target),对话上下文已保留。"))
                 } else {
+                    // 空会话(还没有任何内容)切换模型:静默重建,不往时间线写提示,界面保持居中的新会话样式
                     try await self.startFreshSession(client: client, cwd: cwd, servers: servers, meta: meta)
-                    self.timeline.appendNotice(String(localized: "模型映射已更新为 \(target)。"))
                 }
                 self.log.info("会话刷新模型映射", ["ms": "\(OMLogger.milliseconds(since: started))"])
             } catch {
