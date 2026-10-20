@@ -63,33 +63,11 @@ public struct WorkbenchTab: Codable, Hashable, Identifiable, Sendable {
     }
 }
 
-/// 标签组内的侧边面板(资源管理器 / 搜索 / Git):显示在组内容区的右侧,可收起;在这里打开的文件成为本组的标签。
-public struct GroupSidePanel: Codable, Hashable, Sendable {
-    /// 面板视图
-    public var pane: RightPane
-    /// 面板宽度
-    public var width: Double
-    /// 是否已收起
-    public var collapsed: Bool
-
-    /// 宽度范围与默认值。
-    public static let widthRange: ClosedRange<Double> = 160...640
-    public static let defaultWidth: Double = 240
-
-    public init(pane: RightPane, width: Double = GroupSidePanel.defaultWidth, collapsed: Bool = false) {
-        self.pane = pane
-        self.width = min(max(width, Self.widthRange.lowerBound), Self.widthRange.upperBound)
-        self.collapsed = collapsed
-    }
-}
-
 /// 标签组:一条标签栏及其内容区。
 public struct TabGroup: Codable, Hashable, Identifiable, Sendable {
     public var id: UUID
     public var tabs: [WorkbenchTab]
     public var activeID: UUID?
-    /// 组内侧边面板(资源管理器等);没有为 nil
-    public var sidePanel: GroupSidePanel?
 
     public init(id: UUID = UUID(), tabs: [WorkbenchTab] = [], activeID: UUID? = nil) {
         self.id = id
@@ -432,57 +410,6 @@ public struct DockLayout: Codable, Equatable, Sendable {
         if group(id) != nil { focusedGroupID = id }
     }
 
-    // MARK: 组内侧边面板
-
-    /// 在某个组里显示侧边面板(已是同一视图且已收起则展开)。同一视图在全局只出现在一个组:其它组里的同视图面板被移除。
-    /// - Parameters:
-    ///   - pane: 面板视图
-    ///   - groupID: 目标组
-    public mutating func showSidePanel(_ pane: RightPane, in groupID: UUID) {
-        guard group(groupID) != nil else { return }
-        let width = groups.first { $0.sidePanel?.pane == pane }?.sidePanel?.width ?? GroupSidePanel.defaultWidth
-        for other in groups where other.id != groupID && other.sidePanel?.pane == pane { removeSidePanel(in: other.id) }
-        mutateGroup(groupID) { group in
-            if var panel = group.sidePanel, panel.pane == pane { panel.collapsed = false; group.sidePanel = panel }
-            else { group.sidePanel = GroupSidePanel(pane: pane, width: group.sidePanel?.width ?? width) }
-        }
-    }
-
-    /// 移除某个组的侧边面板;组若因此变空则折叠。
-    /// - Parameter groupID: 目标组
-    public mutating func removeSidePanel(in groupID: UUID) {
-        mutateGroup(groupID) { $0.sidePanel = nil }
-        collapseEmptyGroups()
-    }
-
-    /// 切换某个组侧边面板的收起状态。
-    /// - Parameter groupID: 目标组
-    public mutating func toggleSidePanelCollapsed(in groupID: UUID) {
-        mutateGroup(groupID) { group in
-            guard var panel = group.sidePanel else { return }
-            panel.collapsed.toggle()
-            group.sidePanel = panel
-        }
-    }
-
-    /// 设置某个组侧边面板的宽度(自动限制范围)。
-    /// - Parameters:
-    ///   - width: 宽度
-    ///   - groupID: 目标组
-    public mutating func setSidePanelWidth(_ width: Double, in groupID: UUID) {
-        mutateGroup(groupID) { group in
-            guard var panel = group.sidePanel else { return }
-            panel.width = min(max(width, GroupSidePanel.widthRange.lowerBound), GroupSidePanel.widthRange.upperBound)
-            group.sidePanel = panel
-        }
-    }
-
-    /// 持有某个视图侧边面板的组。
-    /// - Parameter pane: 面板视图
-    public func groupWithSidePanel(_ pane: RightPane) -> TabGroup? {
-        groups.first { $0.sidePanel?.pane == pane }
-    }
-
     /// 切换组的最大化状态。
     public mutating func toggleMaximize(group id: UUID) {
         maximizedGroupID = maximizedGroupID == id ? nil : (group(id) != nil ? id : nil)
@@ -625,7 +552,7 @@ public struct DockLayout: Codable, Equatable, Sendable {
             var kept: [DockNode] = [], ratios: [Double] = []
             for (i, child) in s.children.enumerated() {
                 let c = collapse(child, isRoot: false)
-                if case .group(let g) = c, g.tabs.isEmpty, g.sidePanel == nil { continue }
+                if case .group(let g) = c, g.tabs.isEmpty { continue }
                 kept.append(c)
                 ratios.append(i < s.ratios.count ? s.ratios[i] : 1)
             }

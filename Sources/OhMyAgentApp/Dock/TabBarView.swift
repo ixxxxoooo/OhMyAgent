@@ -29,8 +29,6 @@ struct TabBarView: View {
     var leadingInset: CGFloat = 0
     /// 右侧让位宽度(右栏收起时,为右上角右栏开关留位)
     var trailingInset: CGFloat = 0
-    /// 组内侧边面板是否已收起:nil 表示不显示开关(中栏);true/false 在标签栏右端显示展开/收起按钮
-    var sidePanelCollapsed: Bool?
     /// 标签是否超出可视宽度(决定是否显示「全部标签」下拉)
     @State private var overflowing = false
     /// 滚动区可视宽度:标签内容至少撑满它,尾部空白才都归窗口拖动区
@@ -81,32 +79,10 @@ struct TabBarView: View {
             if overflowing {
                 overflowButton
             }
-            if let collapsed = sidePanelCollapsed { sidePanelButton(collapsed: collapsed) }
             if trailingInset > 0 { Color.clear.frame(width: trailingInset).background(WindowDragArea()) }
         }
         .frame(height: TitlebarMetrics.height)
         .background(OMColors.surface)
-    }
-
-    /// 右端的侧边面板开关:收起时点击展开(没有面板则放资源管理器),展开时不显示(面板自己的标题条里有收起按钮)。
-    @ViewBuilder
-    private func sidePanelButton(collapsed: Bool) -> some View {
-        if collapsed {
-            Button {
-                omWithAnimation {
-                    if group.sidePanel != nil { workbench.mutateDock(host) { $0.toggleSidePanelCollapsed(in: group.id) } }
-                    else { workbench.mutateDock(host) { $0.showSidePanel(.files, in: group.id) } }
-                }
-            } label: {
-                Image.om("panel-right", size: 13)
-                    .frame(width: TabMetrics.height, height: TabMetrics.height)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(TabBarIconButtonStyle())
-            .padding(.trailing, 4)
-            .omTooltip("展开侧边面板")
-            .accessibilityLabel("展开侧边面板")
-        }
     }
 
     /// 标签放不下时右端的「全部标签」下拉入口。

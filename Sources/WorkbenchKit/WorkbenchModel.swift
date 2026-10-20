@@ -979,20 +979,16 @@ public final class WorkbenchModel {
         panelToggleStamp = PanelToggleStamp(name: "right", at: .now)
         layout.rightVisible.toggle()
         // 右栏停靠区还没有任何标签时,展开即放一个资源管理器,避免出现空栏
-        if layout.rightVisible, rightDock.allTabs.isEmpty, rightDock.groups.allSatisfy({ $0.sidePanel == nil }) { showRight(.files) }
+        if layout.rightVisible, rightDock.allTabs.isEmpty { openToolsTab(.files, title: Self.toolsPaneTitle(.files)) }
     }
 
-    /// 显示右栏并展开某个工具视图(文件 / 搜索 / Git):
-    /// 已作为标签存在则就地聚焦;否则作为右栏聚焦组的侧边面板展开(可收起、可拖成标签)。
-    /// - Parameter pane: 工具视图
+    /// 显示右栏并打开某个工具面板标签(文件 / 搜索 / Git)。
+    /// - Parameter pane: 工具面板
     public func showRight(_ pane: RightPane) {
+        guard RightPane.available.contains(pane) else { layout.rightVisible = true; return }
+        let tab = openToolsTab(pane, title: Self.toolsPaneTitle(pane))
+        activateAnyTab(tab)
         layout.rightVisible = true
-        guard RightPane.available.contains(pane) else { return }
-        if let (_, tab) = existingTab(for: .preview(id: Self.toolsTabPrefix + pane.rawValue)) {
-            activateAnyTab(tab.id)
-            return
-        }
-        mutateDock(.right) { $0.showSidePanel(pane, in: $0.focusedGroupID) }
     }
 
     /// 工具面板的标签标题。
