@@ -225,7 +225,10 @@ public actor ClaudeAcpAgent: ACPRequestHandler {
 
     /// 响应发出后异步推送可用命令。
     private func scheduleAfterSetup(_ session: ClaudeSession) {
-        Task { await session.sendAvailableCommands() }
+        Task {
+            await session.sendAvailableCommands()
+            await session.startMcpAuthentication()
+        }
     }
 
     private func newSession(_ params: JSONValue) async throws -> JSONValue {

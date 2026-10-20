@@ -256,6 +256,7 @@ extension ClaudeSession {
             await failActive(JSONRPCError(code: -32000, message: "Authentication required"))
             return
         }
+        if await handleExitPlanInterruption(message) { return }
         if stopReasonField == "refusal" {
             if let explanation = lastRefusalExplanation { await sendAssistantText(explanation, message: message) }
             await settleOrDefer(makeOutcome("refusal"))

@@ -23,6 +23,10 @@ actor ClaudeSession: ClaudeQueryDelegate {
 
     var query: ClaudeQuery?
     var consumer: Task<Void, Never>?
+    /// 消息泵代数:清空上下文重启换了新进程后,旧泵据此静默退出(不当作进程退出处理)
+    var queryGeneration = 0
+    /// 后台进行中的 MCP 服务器授权(同一时刻最多一个)
+    var mcpAuthTask: Task<Void, Never>?
     var closed = false
     var resumedFromHistory = false
 
@@ -267,18 +271,24 @@ actor ClaudeSession: ClaudeQueryDelegate {
     // MARK: 消息泵
 
     private func startConsumer(_ query: ClaudeQuery) {
+        queryGeneration += 1
+        let generation = queryGeneration
         consumer = Task { [weak self] in
             for await message in query.messages {
                 guard let self else { return }
+                guard await self.isCurrentGeneration(generation) else { return }
                 await self.handle(message)
             }
-            await self?.queryEnded()
+            await self?.queryEnded(generation: generation)
         }
     }
 
+    /// 消息泵是否仍属于当前进程。
+    private func isCurrentGeneration(_ generation: Int) -> Bool { generation == queryGeneration }
+
     /// 进程退出或通道关闭:让排队中的回合以错误收尾并通知 Agent。
-    private func queryEnded() async {
-        guard !closed else { return }
+    private func queryEnded(generation: Int) async {
+        guard !closed, generation == queryGeneration else { return }
         let stderr = await query?.recentStderr ?? ""
         closed = true
         let tail = stderr.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -307,6 +317,8 @@ actor ClaudeSession: ClaudeQueryDelegate {
         self.query = nil
         consumer?.cancel()
         consumer = nil
+        mcpAuthTask?.cancel()
+        mcpAuthTask = nil
         await query?.close()
         log.info("会话已关闭")
     }

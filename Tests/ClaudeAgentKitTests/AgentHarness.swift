@@ -33,14 +33,21 @@ final class FakeLauncher: ClaudeProcessLauncher, @unchecked Sendable {
     let fake: FakeClaudeCLI
     private let lock = NSLock()
     private var launched: [ClaudeCLIOptions] = []
+    private var followUps: [FakeClaudeCLI] = []
 
     init(_ fake: FakeClaudeCLI) { self.fake = fake }
+
+    /// 登记第二次及之后启动要交出的假 CLI(清空上下文重启换新进程时用)。
+    func enqueueNext(_ next: FakeClaudeCLI) { lock.withLock { followUps.append(next) } }
 
     var options: [ClaudeCLIOptions] { lock.withLock { launched } }
 
     func makeTransport(for options: ClaudeCLIOptions) -> any ACPTransport {
-        lock.withLock { launched.append(options) }
-        return fake.transport
+        let next: FakeClaudeCLI? = lock.withLock {
+            launched.append(options)
+            return launched.count > 1 && !followUps.isEmpty ? followUps.removeFirst() : nil
+        }
+        return (next ?? fake).transport
     }
 }
 
