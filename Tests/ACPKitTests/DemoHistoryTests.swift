@@ -164,3 +164,22 @@ struct PerfLabScenarioTests {
         #expect(text.contains("```chart") && text.contains("```mermaid") && text.contains("| 模块 |"))
     }
 }
+
+@Suite("演示文档守卫")
+struct DemoDocsGuardTests {
+    /// 读取仓库内的文档文本(按测试文件位置回溯到仓库根)。
+    private func repoText(_ relative: String) throws -> String {
+        var url = URL(fileURLWithPath: #filePath)
+        for _ in 0..<3 { url.deleteLastPathComponent() }
+        return try String(contentsOf: url.appendingPathComponent(relative), encoding: .utf8)
+    }
+
+    @Test("场景目录文档的场景总数与代码目录一致,且包含性能实验室全部场景")
+    func catalogDocMatchesCode() throws {
+        let doc = try repoText(".specstory/history/docs/20261018_演示场景目录.md")
+        #expect(doc.contains("共 \(DemoScenarios.all.count) 个场景"), "文档场景数需与 DemoScenarios.all 一致,请重新生成")
+        for scenario in DemoScenarios.all {
+            #expect(doc.contains("`\(scenario.id)`"), "场景目录文档缺少 \(scenario.id)")
+        }
+    }
+}
