@@ -34,7 +34,7 @@ enum FilePreviewKind: Equatable {
 }
 
 /// 文件标签的显示模式:
-/// - Markdown 有三态:`live`(所见即所得,可直接编辑)/ `source`(源码)/ `preview`(只读阅读);
+/// - Markdown 有两态(对齐 Cursor):`source`(源码)/ `live`(阅读,渲染后的页面,可直接在上面编辑);
 /// - 其他可预览类型只有「源码」与「预览」两种,由工具条上的图标原地切换。
 enum FileViewMode: String, CaseIterable, Identifiable {
     case live, source, preview
@@ -42,7 +42,7 @@ enum FileViewMode: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .live: return String(localized: "编辑")
+        case .live: return String(localized: "阅读")
         case .source: return String(localized: "源码")
         case .preview: return String(localized: "阅读")
         }
@@ -56,7 +56,7 @@ enum FileViewMode: String, CaseIterable, Identifiable {
 
     /// 某类型可用的模式(Markdown 为三态,其余为两态)。
     static func available(for kind: FilePreviewKind) -> [FileViewMode] {
-        kind == .markdown ? [.live, .source, .preview] : [.source, .preview]
+        kind == .markdown ? [.source, .live] : [.source, .preview]
     }
 
     /// 某类型的默认模式:Markdown 默认所见即所得,其余默认预览。

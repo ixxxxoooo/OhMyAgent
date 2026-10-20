@@ -17,7 +17,7 @@ struct FileViewModeTests {
 
     @Test("Markdown 三态且默认所见即所得;其他类型两态且默认预览")
     func availableAndDefaults() {
-        #expect(FileViewMode.available(for: .markdown) == [.live, .source, .preview])
+        #expect(FileViewMode.available(for: .markdown) == [.source, .live])
         #expect(FileViewMode.available(for: .mermaid) == [.source, .preview])
         let store = makeStore()
         #expect(store.mode(for: "/a.md", kind: .markdown) == .live)
@@ -35,8 +35,11 @@ struct FileViewModeTests {
     @Test("选择会按类型持久化;非法存档回退默认")
     func persistence() {
         let store = makeStore()
+        store.set(.source, for: .markdown)
+        #expect(store.mode(for: "/b.md", kind: .markdown) == .source)
+        // 旧版本给 Markdown 存过 preview:不再可用,回退到阅读(live)
         store.set(.preview, for: .markdown)
-        #expect(store.mode(for: "/b.md", kind: .markdown) == .preview)
+        #expect(store.mode(for: "/b.md", kind: .markdown) == .live)
         // 非 Markdown 类型不可能是 live:即使存档里有也回退默认
         store.set(.live, for: .mermaid)
         #expect(store.mode(for: "/c.mmd", kind: .mermaid) == .preview)
