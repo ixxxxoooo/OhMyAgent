@@ -38,6 +38,8 @@ public enum DemoSeed {
     public static func workbenchState(infos: [DemoProjectInfo], now: Date = Date(), focus: String? = nil) -> WorkbenchState {
         var state = WorkbenchState()
         state.layout.rightVisible = false
+        // 性能实验室的会话标题带测试目的前缀,加宽左栏让标题尽量完整可读
+        state.layout.leftWidth = min(340, PanelMetrics.leftRange.upperBound)
         for (index, info) in infos.enumerated() {
             var entry = ProjectEntry(url: URL(fileURLWithPath: info.path), now: now.addingTimeInterval(-Double(index) * 3_600))
             entry.addedAt = now.addingTimeInterval(-Double(index + 3) * 86_400)
