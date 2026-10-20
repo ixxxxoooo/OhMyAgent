@@ -15,30 +15,26 @@ struct FileViewModeTests {
         return FileViewModeStore(defaults: defaults)
     }
 
-    @Test("Markdown 三态且默认所见即所得;其他类型两态且默认预览")
+    @Test("所有可预览类型都是源码/阅读两态,默认阅读")
     func availableAndDefaults() {
-        #expect(FileViewMode.available(for: .markdown) == [.source, .live])
+        #expect(FileViewMode.available(for: .markdown) == [.source, .preview])
         #expect(FileViewMode.available(for: .mermaid) == [.source, .preview])
         let store = makeStore()
-        #expect(store.mode(for: "/a.md", kind: .markdown) == .live)
+        #expect(store.mode(for: "/a.md", kind: .markdown) == .preview)
         #expect(store.mode(for: "/a.mmd", kind: .mermaid) == .preview)
     }
 
-    @Test("所见即所得与源码都显示编辑器,阅读隐藏;只有 Markdown 的 live 启用就地渲染")
-    func editorVisibilityAndMode() {
-        #expect(FileViewMode.source.showsEditor && !FileViewMode.live.showsEditor && !FileViewMode.preview.showsEditor)
+    @Test("源码显示编辑器,阅读隐藏")
+    func editorVisibility() {
+        #expect(FileViewMode.source.showsEditor && !FileViewMode.preview.showsEditor)
     }
 
-    @Test("选择会按类型持久化;非法存档回退默认")
+    @Test("选择会按类型持久化;旧存档里已移除的 live 回退默认")
     func persistence() {
         let store = makeStore()
         store.set(.source, for: .markdown)
         #expect(store.mode(for: "/b.md", kind: .markdown) == .source)
-        // 旧版本给 Markdown 存过 preview:不再可用,回退到阅读(live)
         store.set(.preview, for: .markdown)
-        #expect(store.mode(for: "/b.md", kind: .markdown) == .live)
-        // 非 Markdown 类型不可能是 live:即使存档里有也回退默认
-        store.set(.live, for: .mermaid)
-        #expect(store.mode(for: "/c.mmd", kind: .mermaid) == .preview)
+        #expect(store.mode(for: "/b.md", kind: .markdown) == .preview)
     }
 }

@@ -34,15 +34,14 @@ enum FilePreviewKind: Equatable {
 }
 
 /// 文件标签的显示模式:
-/// - Markdown 有两态(对齐 Cursor):`source`(源码)/ `live`(阅读,渲染后的页面,可直接在上面编辑);
-/// - 其他可预览类型只有「源码」与「预览」两种,由工具条上的图标原地切换。
+/// 所有可预览类型都只有「源码」与「阅读」两态,由工具条上的图标(眼睛 ⇄ 代码)原地切换;
+/// Markdown 的阅读页可直接点击块编辑(`EditableMarkdownPreview`)。
 enum FileViewMode: String, CaseIterable, Identifiable {
-    case live, source, preview
+    case source, preview
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .live: return String(localized: "阅读")
         case .source: return String(localized: "源码")
         case .preview: return String(localized: "阅读")
         }
@@ -51,19 +50,19 @@ enum FileViewMode: String, CaseIterable, Identifiable {
     /// 工具条图标:显示的是「点击后将切换到」的模式(源码 → 预览用眼睛,预览 → 源码用代码)。
     var toggleIcon: String { self == .preview ? "code" : "eye" }
 
-    /// 两态切换时的另一种模式(`live` 只出现在 Markdown 三态里,这里退回源码)。
+    /// 两态切换时的另一种模式。
     var other: FileViewMode { self == .preview ? .source : .preview }
 
     /// 某类型可用的模式(Markdown 为三态,其余为两态)。
     static func available(for kind: FilePreviewKind) -> [FileViewMode] {
-        kind == .markdown ? [.source, .live] : [.source, .preview]
+        [.source, .preview]
     }
 
-    /// 某类型的默认模式:Markdown 默认所见即所得,其余默认预览。
-    static func defaultMode(for kind: FilePreviewKind) -> FileViewMode { kind == .markdown ? .live : .preview }
+    /// 某类型的默认模式:阅读。
+    static func defaultMode(for kind: FilePreviewKind) -> FileViewMode { .preview }
 
     /// 编辑器是否可见(阅读页由渲染视图覆盖,只有源码模式显示编辑器)。
-    var showsEditor: Bool { self == .source }
+    var showsEditor: Bool { self != .preview }
 }
 
 /// 文件显示模式记忆:按文件类型(而非单个文件)持久化到 `UserDefaults`,
@@ -87,7 +86,7 @@ final class FileViewModeStore {
         let key = key(kind)
         if let stored = modes[key], FileViewMode.available(for: kind).contains(stored) { return stored }
         let saved = defaults.string(forKey: key).flatMap(FileViewMode.init(rawValue:))
-        // 存档里的模式必须是该类型可用的(例如旧版本给 Markdown 存过 preview/source,仍然有效;非 Markdown 不会有 live)
+        // 存档里的模式必须是该类型可用的(例如旧版本给 Markdown 存过 preview/source,仍然有效;旧版本的 live 已移除,解析不出即回退默认)
         if let saved, FileViewMode.available(for: kind).contains(saved) { return saved }
         return FileViewMode.defaultMode(for: kind)
     }

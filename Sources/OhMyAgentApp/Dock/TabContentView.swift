@@ -153,9 +153,11 @@ struct FileTabView: View {
                         .accessibilityHidden(!mode.showsEditor)
                         .overlay {
                             if mode == .preview, let previewKind {
-                                TextPreviewView(kind: previewKind, text: text)
-                            } else if mode == .live {
-                                EditableMarkdownPreview(text: text, isEditable: !doc.isReadOnly) { doc.text = $0 }
+                                if previewKind == .markdown {
+                                    EditableMarkdownPreview(text: text, isEditable: !doc.isReadOnly) { doc.text = $0 }
+                                } else {
+                                    TextPreviewView(kind: previewKind, text: text)
+                                }
                             }
                         }
                 } else if let failure = doc.loadError {
