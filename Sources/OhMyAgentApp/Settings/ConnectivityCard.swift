@@ -5,19 +5,23 @@ import ChatKit
 import DesignSystem
 import SwiftUI
 
-/// 连通性测试内容(放在设置分组卡片内,自身不带背景)。进入页面时自动测一次。
+/// 连通性测试内容(放在设置分组卡片内,自身不带背景)。默认不自动测试,点击「开始测试」后才发请求。
 struct ConnectivityCard: View {
     @State private var results: [String: ConnectivityResult] = [:]
     @State private var running = false
+    /// 是否已测试过(默认不自动测试,由用户点击开始)
+    @State private var tested = false
     private let targets = ConnectivityTarget.defaults
 
     private var reachableCount: Int {
         results.values.filter { if case .reachable = $0 { return true } else { return false } }.count
     }
 
-    /// 摘要文案:测试中 / N 个网站中 M 个可以访问。
+    /// 摘要文案:未测试 / 测试中 / N 个网站中 M 个可以访问。
     private var summary: String {
-        running ? String(localized: "测试中…") : String(localized: "\(targets.count) 个网站中 \(reachableCount) 个可以访问。")
+        if running { return String(localized: "测试中…") }
+        if !tested { return String(localized: "检查常用网站与模型服务能否访问及耗时。") }
+        return String(localized: "\(targets.count) 个网站中 \(reachableCount) 个可以访问。")
     }
 
     var body: some View {
@@ -29,7 +33,7 @@ struct ConnectivityCard: View {
                 }
                 Spacer()
                 Button { Task { await runTest() } } label: {
-                    Label("重新测试", om: "rotate-cw")
+                    if tested { Label("重新测试", om: "rotate-cw") } else { Label("开始测试", om: "circle-play") }
                 }
                 .buttonStyle(.omSecondary)
                 .disabled(running)
@@ -40,7 +44,6 @@ struct ConnectivityCard: View {
                 row(target)
             }
         }
-        .task { await runTest() }
     }
 
     private func row(_ target: ConnectivityTarget) -> some View {
@@ -50,7 +53,13 @@ struct ConnectivityCard: View {
                 .frame(width: 96, alignment: .leading)
             Text(verbatim: target.host).font(OMFonts.small).foregroundStyle(OMColors.tertiaryText)
             Spacer()
-            resultView(results[target.id] ?? .testing)
+            if let result = results[target.id] {
+                resultView(result)
+            } else if running {
+                OMSpinner(.small)
+            } else {
+                Text(verbatim: "—").font(OMFonts.body).foregroundStyle(OMColors.tertiaryText)
+            }
         }
         .padding(.vertical, OMSpacing.sm + 2)
     }
@@ -75,5 +84,6 @@ struct ConnectivityCard: View {
             await MainActor.run { results[id] = result }
         }
         running = false
+        tested = true
     }
 }
