@@ -22,4 +22,41 @@ public enum AgentErrorHints {
         }
         return nil
     }
+
+    /// 恢复(`session/load` / `session/resume`)失败的归类。
+    public enum RestoreFailure: Equatable, Sendable {
+        /// 引擎里没有这个会话(属于别的引擎、从未落盘的空会话、已被删除)
+        case notFound
+        /// 引擎启动/握手阶段就失败(命令找不到、进程退出)
+        case engineUnavailable
+        /// 其他错误
+        case other
+    }
+
+    /// 把恢复失败的错误归类。
+    /// - Parameter error: 恢复请求抛出的错误
+    /// - Returns: 失败类别
+    public static func classifyRestore(_ error: Error) -> RestoreFailure {
+        if let rpc = error as? JSONRPCError, rpc.code == -32002 { return .notFound }
+        var text = ((error as? JSONRPCError)?.message ?? error.localizedDescription).lowercased()
+        if let rpc = error as? JSONRPCError, let data = rpc.data { text += " " + "\(data)".lowercased() }
+        let notFoundMarkers = ["valid session id", "session not found", "no conversation found", "unknown session", "does not exist", "no session"]
+        if notFoundMarkers.contains(where: text.contains) { return .notFound }
+        if text.contains("no such file") || text.contains("broken pipe") || text.contains("connection closed") { return .engineUnavailable }
+        return .other
+    }
+
+    /// 恢复失败时给用户的中文说明。
+    /// - Parameter error: 恢复请求抛出的错误
+    /// - Returns: 面向用户的说明
+    public static func restoreMessage(for error: Error) -> String {
+        switch classifyRestore(error) {
+        case .notFound:
+            return String(localized: "当前引擎找不到这个会话:它可能属于其他引擎、从未发送过消息,或已被删除。")
+        case .engineUnavailable:
+            return String(localized: "引擎已退出或无法启动,没能恢复这个会话。请到「设置 → Agent」检查命令是否可用后重试。")
+        case .other:
+            return String(localized: "打开会话失败:\(error.localizedDescription)")
+        }
+    }
 }

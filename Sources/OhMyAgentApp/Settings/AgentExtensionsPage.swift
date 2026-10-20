@@ -108,7 +108,13 @@ struct AgentExtensionsPage: View {
         }
         .sheet(item: $draft) { item in AgentEditSheet(draft: item) { draft = nil } }
         .sheet(item: $mcpDraft) { item in MCPAgentEditSheet(entry: item) { mcpDraft = nil } }
-        .task { path = ProcessInfo.processInfo.environment["PATH"] ?? "" ; registry.reload() }
+        .task {
+            // 用登录 shell 的 PATH(GUI 进程自己的 PATH 很短,会把已安装的命令误报为「找不到」)
+            path = ProcessInfo.processInfo.environment["PATH"] ?? ""
+            registry.reload()
+            let environment = await Toolchain.shared.resolve().environment
+            if let login = environment["PATH"], !login.isEmpty { path = login }
+        }
     }
 
     // MARK: - 分区

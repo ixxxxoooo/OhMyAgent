@@ -2637,3 +2637,5 @@
 "表格" = "Table";
 "全屏" = "Full screen";
 "还原窗口" = "Restore window";
+"引擎已退出或无法启动,没能恢复这个会话。请到「设置 → Agent」检查命令是否可用后重试。" = "The agent exited or failed to start, so this session could not be restored. Check that the command works in Settings → Agent and try again.";
+"当前引擎找不到这个会话:它可能属于其他引擎、从未发送过消息,或已被删除。" = "This engine cannot find the session. It may belong to another engine, never had a message, or was deleted.";

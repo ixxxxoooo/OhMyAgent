@@ -154,17 +154,39 @@ public struct GenericACPProvider: AgentProvider {
     ///   - executable: 可执行文件路径或命令名
     ///   - arguments: 启动参数
     static func applyOpenCodeOverrides(_ env: inout [String: String], executable: String, arguments: [String]) {
-        guard (executable as NSString).lastPathComponent == "opencode", arguments.contains("acp"),
+        guard isOpenCode(executable), arguments.contains("acp"),
               env["OPENCODE_CONFIG_CONTENT"] == nil else { return }
         env["OPENCODE_CONFIG_CONTENT"] = #"{"permission":{"question":"deny"}}"#
     }
 
-    /// 在 PATH 中解析可执行文件。
-    public static func resolve(_ command: String, path: String) -> String? {
+    /// 可执行文件是否是 OpenCode(`opencode`、本机改名的 `opencode2` 等带数字后缀的变体)。
+    static func isOpenCode(_ executable: String) -> Bool {
+        let name = (executable as NSString).lastPathComponent
+        guard name.hasPrefix("opencode") else { return false }
+        return name.dropFirst("opencode".count).allSatisfy(\.isNumber)
+    }
+
+    /// 登录 shell 的 PATH 之外常见的安装目录(GUI 应用拿到的 PATH 往往不含它们)。
+    public static func fallbackDirectories(home: String = NSHomeDirectory()) -> [String] {
+        ["\(home)/.local/bin", "\(home)/.opencode/bin", "\(home)/.bun/bin", "/opt/homebrew/bin", "/usr/local/bin"]
+    }
+
+    /// 在 PATH 中解析可执行文件;找不到时再查常见安装目录。
+    /// `opencode` 找不到时会尝试本机常见的改名 `opencode2`。
+    /// - Parameters:
+    ///   - command: 命令名或绝对路径
+    ///   - path: PATH(冒号分隔)
+    ///   - fallbacks: PATH 之外的兜底目录(测试可注入)
+    /// - Returns: 可执行文件的绝对路径;找不到为 nil
+    public static func resolve(_ command: String, path: String, fallbacks: [String] = fallbackDirectories()) -> String? {
         if command.hasPrefix("/") { return command }
-        for dir in path.split(separator: ":") {
-            let candidate = "\(dir)/\(command)"
-            if FileManager.default.isExecutableFile(atPath: candidate) { return candidate }
+        let names = command == "opencode" ? ["opencode", "opencode2"] : [command]
+        let directories = path.split(separator: ":").map(String.init) + fallbacks
+        for name in names {
+            for dir in directories {
+                let candidate = "\(dir)/\(name)"
+                if FileManager.default.isExecutableFile(atPath: candidate) { return candidate }
+            }
         }
         return nil
     }

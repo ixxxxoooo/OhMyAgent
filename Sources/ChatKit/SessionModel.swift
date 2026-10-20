@@ -1469,12 +1469,9 @@ public final class SessionModel {
                     : try await client.resumeSession(sessionId: summary.sessionId, cwd: cwd, mcpServers: servers, additionalDirectories: dirs, meta: meta)
                 self?.configOptions = setup.configOptions.isEmpty ? (self?.configOptions ?? []) : setup.configOptions
             } catch {
-                if let rpc = error as? JSONRPCError, rpc.code == -32002 {
-                    // Agent 报「会话不存在」:通常是会话属于别的引擎(会话数据由各引擎自己保存),或已被删除
-                    self?.timeline.appendNotice(String(localized: "当前引擎找不到这个会话:它可能属于其他引擎,或已被删除。"), isError: true)
-                } else {
-                    self?.timeline.appendNotice(String(localized: "打开会话失败:\(error.localizedDescription)"), isError: true)
-                }
+                // 按失败类别给出明确说明;「找不到」多半是从未落盘的空会话,登记后从列表隐藏,避免反复点到
+                self?.timeline.appendNotice(AgentErrorHints.restoreMessage(for: error), isError: true)
+                if AgentErrorHints.classifyRestore(error) == .notFound { EmptySessionRegistry.hide(summary.sessionId) }
                 self?.log.warning("打开历史会话失败", ["target": String(summary.sessionId.prefix(8)), "error": "\(error)"])
             }
             await self?.settleEvents()
