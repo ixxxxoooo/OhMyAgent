@@ -101,29 +101,28 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         }
     }
 
-    /// 菜单栏图标:系统 template 星形(仅 alpha 有效,由菜单栏按明暗与壁纸着色)。
+    /// 菜单栏图标:品牌标记「Oh 环 · 运行点」的 template 版(开口圆环 + 右上缺口里的实心点;
+    /// 仅 alpha 有效,由菜单栏按明暗与壁纸着色)。几何与 `Scripts/make-icon.swift` 一致。
+    /// - Returns: 18×18pt 的 template 图像
     static func templateIcon() -> NSImage {
         let size = NSSize(width: 18, height: 18)
         let image = NSImage(size: size, flipped: false) { _ in
-            NSColor.black.setFill() // ui-lint:allow template 图像仅取 alpha,由系统着色
-            starPath(center: NSPoint(x: 8.2, y: 9.8), radius: 7.2).fill()
-            starPath(center: NSPoint(x: 13.6, y: 14.2), radius: 3.0).fill()
+            let center = NSPoint(x: 9, y: 9)
+            let radius: CGFloat = 6.2
+            NSColor.black.set() // ui-lint:allow template 图像仅取 alpha,由系统着色
+            let ring = NSBezierPath()
+            ring.appendArc(withCenter: center, radius: radius, startAngle: 2, endAngle: 78, clockwise: true)
+            ring.lineWidth = 2
+            ring.lineCapStyle = .round
+            ring.stroke()
+            let angle = 40 * CGFloat.pi / 180
+            let dot = NSPoint(x: center.x + radius * cos(angle), y: center.y + radius * sin(angle))
+            let dotRadius: CGFloat = 2.1
+            NSBezierPath(ovalIn: NSRect(x: dot.x - dotRadius, y: dot.y - dotRadius, width: dotRadius * 2, height: dotRadius * 2)).fill()
             return true
         }
         image.isTemplate = true
         return image
-    }
-
-    private static func starPath(center: NSPoint, radius: CGFloat) -> NSBezierPath {
-        let path = NSBezierPath()
-        let waist = radius * 0.16
-        path.move(to: NSPoint(x: center.x, y: center.y + radius))
-        path.curve(to: NSPoint(x: center.x + radius, y: center.y), controlPoint1: NSPoint(x: center.x + waist, y: center.y + waist), controlPoint2: NSPoint(x: center.x + waist, y: center.y + waist))
-        path.curve(to: NSPoint(x: center.x, y: center.y - radius), controlPoint1: NSPoint(x: center.x + waist, y: center.y - waist), controlPoint2: NSPoint(x: center.x + waist, y: center.y - waist))
-        path.curve(to: NSPoint(x: center.x - radius, y: center.y), controlPoint1: NSPoint(x: center.x - waist, y: center.y - waist), controlPoint2: NSPoint(x: center.x - waist, y: center.y - waist))
-        path.curve(to: NSPoint(x: center.x, y: center.y + radius), controlPoint1: NSPoint(x: center.x - waist, y: center.y + waist), controlPoint2: NSPoint(x: center.x - waist, y: center.y + waist))
-        path.close()
-        return path
     }
 
     // MARK: 菜单
