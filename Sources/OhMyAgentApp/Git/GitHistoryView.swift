@@ -101,9 +101,15 @@ struct GitHistoryTabView: View {
             guard scopeKey == key, limit == requested else { return .stale }
             hasMore = commits.count >= requested && requested < 5000
             // 文件历史是被过滤的子序列,不画泳道;整库历史才画图
-            rows = relative == nil ? GitGraph.layout(commits) : commits.map {
-                GitGraphRow(commit: $0, column: 0, color: 0, top: [], bottom: [], incoming: [], outgoing: [])
+            let laidOut: [GitGraphRow]
+            if relative == nil {
+                // 泳道布局随提交数线性增长(最多 5000 条),放到后台线程,不阻塞主线程
+                laidOut = await Task.detached(priority: .userInitiated) { GitGraph.layout(commits) }.value
+                guard scopeKey == key, limit == requested else { return .stale }
+            } else {
+                laidOut = commits.map { GitGraphRow(commit: $0, column: 0, color: 0, top: [], bottom: [], incoming: [], outgoing: []) }
             }
+            rows = laidOut
             errorMessage = nil
             if selected == nil || !rows.contains(where: { $0.commit.hash == selected }) { selected = rows.first?.commit.hash }
         } catch {
