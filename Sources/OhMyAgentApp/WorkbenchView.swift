@@ -75,8 +75,13 @@ struct WorkbenchView: View {
     private var workspaceBody: some View {
         HStack(spacing: 0) {
             ForEach(workbench.layout.visibleColumns(on: .left)) { panelColumn($0, side: .left) }
-            CenterColumn(workbench: workbench)
-                .frame(minWidth: CGFloat(PanelMetrics.centerMinimum), maxWidth: .infinity)
+            // GeometryReader 不向父级报告内容的固有最小宽度:中栏内部(标签条、输入区工具行)的刚性最小宽度
+            // 不会再把右栏挤窄,右栏因此能一直拖到只给中栏留 `centerMinimum`;超出的内容被裁掉。
+            GeometryReader { _ in
+                CenterColumn(workbench: workbench)
+            }
+            .frame(minWidth: CGFloat(PanelMetrics.centerMinimum), maxWidth: .infinity)
+            .clipped()
             // 右侧由内向外排列
             ForEach(workbench.layout.visibleColumns(on: .right).reversed()) { panelColumn($0, side: .right) }
         }
