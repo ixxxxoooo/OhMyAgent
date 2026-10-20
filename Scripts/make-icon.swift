@@ -1,6 +1,7 @@
 #!/usr/bin/env swift
 // @author ixxxxoooo
-// 程序化绘制 OhMyAgent 应用图标(macOS 图标规范:1024 画布,824 圆角方形主体 + 柔和投影),
+// 程序化绘制 OhMyAgent 应用图标(方案 B「Oh 环 · 运行点」,深墨底 + Liquid Glass 质感):
+// 1024 画布,824 超椭圆主体 + 柔和投影;纸白玻璃开口圆环 + Ember 玻璃运行点。
 // 输出 AppIcon.iconset 全部尺寸并交给 iconutil 生成 icns。
 // 用法: swift Scripts/make-icon.swift <输出目录>   (默认 build/icon)
 
@@ -9,121 +10,178 @@ import CoreGraphics
 import Foundation
 
 let outputDir = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "build/icon"
+let space = CGColorSpace(name: CGColorSpace.sRGB)!
+
+/// 十六进制 sRGB 颜色。
+/// - Parameters:
+///   - hex: 形如 0xF54E00 的颜色值
+///   - alpha: 不透明度
+/// - Returns: CGColor
+func rgb(_ hex: UInt32, _ alpha: CGFloat = 1) -> CGColor {
+    CGColor(red: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255,
+            blue: CGFloat(hex & 0xFF) / 255, alpha: alpha)
+}
+
+/// 由颜色与位置构造线性/径向渐变。
+/// - Parameter stops: (颜色, 位置) 列表
+/// - Returns: CGGradient
+func gradient(_ stops: [(CGColor, CGFloat)]) -> CGGradient {
+    CGGradient(colorsSpace: space, colors: stops.map(\.0) as CFArray, locations: stops.map(\.1))!
+}
 
 /// 超椭圆(squircle)路径:|x/a|^n + |y/a|^n = 1,n≈4.4 更接近 macOS 图标的连续曲率圆角。
+/// - Parameters:
+///   - rect: 外接矩形
+///   - n: 指数
+/// - Returns: 闭合路径
 func squirclePath(rect: CGRect, exponent n: CGFloat = 4.4) -> CGPath {
     let path = CGMutablePath()
     let a = rect.width / 2, b = rect.height / 2
-    let cx = rect.midX, cy = rect.midY
     let steps = 360
     for i in 0...steps {
         let t = CGFloat(i) / CGFloat(steps) * 2 * .pi
         let c = cos(t), s = sin(t)
-        let x = cx + a * (c < 0 ? -1 : 1) * pow(abs(c), 2 / n)
-        let y = cy + b * (s < 0 ? -1 : 1) * pow(abs(s), 2 / n)
+        let x = rect.midX + a * (c < 0 ? -1 : 1) * pow(abs(c), 2 / n)
+        let y = rect.midY + b * (s < 0 ? -1 : 1) * pow(abs(s), 2 / n)
         if i == 0 { path.move(to: CGPoint(x: x, y: y)) } else { path.addLine(to: CGPoint(x: x, y: y)) }
     }
     path.closeSubpath()
     return path
 }
 
-/// 四角星(星芒):四个尖角,边向中心内凹。
-func sparkPath(center: CGPoint, radius r: CGFloat, waist: CGFloat = 0.16) -> CGPath {
+/// 角度转弧度。
+func rad(_ degrees: CGFloat) -> CGFloat { degrees * .pi / 180 }
+
+// MARK: - 字形几何(y 轴向上,与设计稿 SVG 镜像)
+
+let center = CGPoint(x: 512, y: 512)
+let ringRadius: CGFloat = 230
+let ringWidth: CGFloat = 92
+let dotRadius: CGFloat = 72
+/// 运行点在右上 40°,圆环从 2° 顺时针绕到 78°,缺口留给运行点。
+let dotCenter = CGPoint(x: center.x + ringRadius * cos(rad(40)), y: center.y + ringRadius * sin(rad(40)))
+
+/// 开口圆环的中心线路径。
+func ringArc() -> CGPath {
     let p = CGMutablePath()
-    let top = CGPoint(x: center.x, y: center.y + r)
-    let right = CGPoint(x: center.x + r, y: center.y)
-    let bottom = CGPoint(x: center.x, y: center.y - r)
-    let left = CGPoint(x: center.x - r, y: center.y)
-    let k = r * waist
-    p.move(to: top)
-    p.addQuadCurve(to: right, control: CGPoint(x: center.x + k, y: center.y + k))
-    p.addQuadCurve(to: bottom, control: CGPoint(x: center.x + k, y: center.y - k))
-    p.addQuadCurve(to: left, control: CGPoint(x: center.x - k, y: center.y - k))
-    p.addQuadCurve(to: top, control: CGPoint(x: center.x - k, y: center.y + k))
-    p.closeSubpath()
+    p.addArc(center: center, radius: ringRadius, startAngle: rad(2), endAngle: rad(78), clockwise: true)
     return p
 }
 
+/// 圆环描边后的填充轮廓。
+/// - Parameter width: 描边宽度
+func ringOutline(width: CGFloat) -> CGPath {
+    ringArc().copy(strokingWithWidth: width, lineCap: .round, lineJoin: .round, miterLimit: 10)
+}
+
+/// 运行点圆形路径。
+func dotPath() -> CGPath {
+    CGPath(ellipseIn: CGRect(x: dotCenter.x - dotRadius, y: dotCenter.y - dotRadius,
+                             width: dotRadius * 2, height: dotRadius * 2), transform: nil)
+}
+
+/// 在路径内绘制自上而下的线性渐变。
+/// - Parameters:
+///   - ctx: 绘图上下文
+///   - path: 裁剪路径
+///   - g: 渐变
+///   - top: 渐变起点 y(上)
+///   - bottom: 渐变终点 y(下)
+func fill(_ ctx: CGContext, _ path: CGPath, _ g: CGGradient, top: CGFloat, bottom: CGFloat) {
+    ctx.saveGState()
+    ctx.addPath(path)
+    ctx.clip()
+    ctx.drawLinearGradient(g, start: CGPoint(x: 512, y: top), end: CGPoint(x: 512, y: bottom),
+                           options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
+    ctx.restoreGState()
+}
+
+/// 只绘制路径的投影(本体画到画布外,投影偏移回来),避免半透明玻璃透出底色。
+/// - Parameters:
+///   - ctx: 绘图上下文
+///   - path: 投影形状
+///   - offsetY: 投影纵向偏移(向下为负)
+///   - blur: 模糊半径
+///   - color: 投影颜色
+func shadowOnly(_ ctx: CGContext, _ path: CGPath, offsetY: CGFloat, blur: CGFloat, color: CGColor) {
+    let away: CGFloat = 4000
+    ctx.saveGState()
+    ctx.setShadow(offset: CGSize(width: -away * ctx.ctm.a, height: offsetY * ctx.ctm.d), blur: blur * ctx.ctm.a, color: color)
+    ctx.translateBy(x: away, y: 0)
+    ctx.addPath(path)
+    ctx.setFillColor(rgb(0x000000))
+    ctx.fillPath()
+    ctx.restoreGState()
+}
+
 /// 渲染指定像素尺寸的图标。
+/// - Parameter pixels: 输出边长(像素)
+/// - Returns: 图像
 func render(pixels: Int) -> CGImage {
-    let space = CGColorSpace(name: CGColorSpace.sRGB)!
     let ctx = CGContext(data: nil, width: pixels, height: pixels, bitsPerComponent: 8, bytesPerRow: 0, space: space,
                         bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
-    let scale = CGFloat(pixels) / 1024
-    ctx.scaleBy(x: scale, y: scale)
+    ctx.scaleBy(x: CGFloat(pixels) / 1024, y: CGFloat(pixels) / 1024)
     ctx.interpolationQuality = .high
     ctx.setShouldAntialias(true)
 
     let body = CGRect(x: 100, y: 100, width: 824, height: 824)
     let shape = squirclePath(rect: body)
 
-    // 1. 投影
+    // 1. 图标投影
+    shadowOnly(ctx, shape, offsetY: -14, blur: 30, color: rgb(0x000000, 0.42))
+
+    // 2. 深墨主体:上暖灰 → 下近黑,顶部柔光
+    fill(ctx, shape, gradient([(rgb(0x34312E), 0), (rgb(0x1E1C1B), 0.55), (rgb(0x121111), 1)]), top: body.maxY, bottom: body.minY)
     ctx.saveGState()
-    ctx.setShadow(offset: CGSize(width: 0, height: -14), blur: 28, color: CGColor(gray: 0, alpha: 0.38))
     ctx.addPath(shape)
-    ctx.setFillColor(CGColor(gray: 0, alpha: 1))
-    ctx.fillPath()
+    ctx.clip()
+    ctx.drawRadialGradient(gradient([(rgb(0xFFFFFF, 0.10), 0), (rgb(0xFFFFFF, 0), 1)]),
+                           startCenter: CGPoint(x: 512, y: 724), startRadius: 0,
+                           endCenter: CGPoint(x: 512, y: 724), endRadius: 520, options: [])
+
+    // 3. 运行点的 Ember 辉光与字形落影
+    shadowOnly(ctx, dotPath(), offsetY: 0, blur: 90, color: rgb(0xF54E00, 0.65))
+    let glyph = CGMutablePath()
+    glyph.addPath(ringOutline(width: ringWidth))
+    glyph.addPath(dotPath())
+    shadowOnly(ctx, glyph, offsetY: -26, blur: 48, color: rgb(0x000000, 0.5))
+
+    // 4. 玻璃圆环与 Ember 玻璃运行点
+    fill(ctx, ringOutline(width: ringWidth), gradient([(rgb(0xFFFFFF, 0.95), 0), (rgb(0xE9E4DC, 0.62), 1)]), top: 764, bottom: 244)
+    fill(ctx, dotPath(), gradient([(rgb(0xFF9A5C), 0), (rgb(0xF65A10), 0.5), (rgb(0xD93E00), 1)]), top: 764, bottom: 244)
+
+    // 5. 顶部高光(上移的细描边,向下淡出)
+    let spec = gradient([(rgb(0xFFFFFF, 0.85), 0), (rgb(0xFFFFFF, 0), 1)])
+    ctx.saveGState()
+    ctx.translateBy(x: 0, y: 6)
+    ctx.setAlpha(0.75)
+    fill(ctx, ringOutline(width: ringWidth * 0.32), spec, top: 764, bottom: 404)
+    // 运行点高光只保留在圆内,避免外圈出现灰边
+    ctx.translateBy(x: 0, y: -6)
+    ctx.addPath(dotPath())
+    ctx.clip()
+    ctx.translateBy(x: 0, y: 6)
+    ctx.setAlpha(0.55)
+    fill(ctx, dotPath().copy(strokingWithWidth: 22, lineCap: .round, lineJoin: .round, miterLimit: 10), spec, top: 764, bottom: 404)
+    ctx.restoreGState()
     ctx.restoreGState()
 
-    // 2. 主体渐变(左上紫 → 中蓝 → 右下青)
+    // 6. 玻璃边缘:上亮、中段隐去、底部微亮
     ctx.saveGState()
     ctx.addPath(shape)
     ctx.clip()
-    let colors = [
-        CGColor(red: 0.36, green: 0.22, blue: 0.96, alpha: 1),
-        CGColor(red: 0.15, green: 0.39, blue: 0.93, alpha: 1),
-        CGColor(red: 0.05, green: 0.65, blue: 0.91, alpha: 1),
-    ] as CFArray
-    let gradient = CGGradient(colorsSpace: space, colors: colors, locations: [0, 0.55, 1])!
-    ctx.drawLinearGradient(gradient, start: CGPoint(x: body.minX, y: body.maxY), end: CGPoint(x: body.maxX, y: body.minY), options: [])
-
-    // 3. 顶部柔光(玻璃高光)
-    let gloss = CGGradient(colorsSpace: space, colors: [CGColor(gray: 1, alpha: 0.30), CGColor(gray: 1, alpha: 0)] as CFArray, locations: [0, 1])!
-    ctx.drawRadialGradient(gloss, startCenter: CGPoint(x: body.midX - 120, y: body.maxY + 40), startRadius: 0,
-                           endCenter: CGPoint(x: body.midX - 120, y: body.maxY + 40), endRadius: 620, options: [])
-    // 底部暗角,增加体积感
-    let vignette = CGGradient(colorsSpace: space, colors: [CGColor(gray: 0, alpha: 0), CGColor(gray: 0, alpha: 0.22)] as CFArray, locations: [0, 1])!
-    ctx.drawLinearGradient(vignette, start: CGPoint(x: body.midX, y: body.midY), end: CGPoint(x: body.midX, y: body.minY), options: [])
-
-    // 4. 星芒:主星 + 副星,带柔和发光
-    let main = sparkPath(center: CGPoint(x: 500, y: 500), radius: 270, waist: 0.14)
-    let small = sparkPath(center: CGPoint(x: 700, y: 690), radius: 92, waist: 0.14)
-    for (path, glow) in [(main, CGFloat(60)), (small, CGFloat(30))] {
-        ctx.saveGState()
-        ctx.setShadow(offset: .zero, blur: glow, color: CGColor(red: 0.75, green: 0.85, blue: 1, alpha: 0.75))
-        ctx.addPath(path)
-        ctx.setFillColor(CGColor(gray: 1, alpha: 1))
-        ctx.fillPath()
-        ctx.restoreGState()
-        ctx.saveGState()
-        ctx.addPath(path)
-        ctx.clip()
-        let fill = CGGradient(colorsSpace: space, colors: [CGColor(gray: 1, alpha: 1), CGColor(red: 0.80, green: 0.89, blue: 1, alpha: 1)] as CFArray, locations: [0, 1])!
-        let box = path.boundingBox
-        ctx.drawLinearGradient(fill, start: CGPoint(x: box.minX, y: box.maxY), end: CGPoint(x: box.maxX, y: box.minY), options: [])
-        ctx.restoreGState()
-    }
-    // 小圆点点缀(像 Agent 的"运行指示")
-    ctx.setFillColor(CGColor(gray: 1, alpha: 0.85))
-    ctx.fillEllipse(in: CGRect(x: 292, y: 262, width: 34, height: 34))
-    ctx.restoreGState()
-
-    // 5. 内描边(上亮下暗),模拟玻璃边缘
-    ctx.saveGState()
-    ctx.addPath(shape)
-    ctx.clip()
-    ctx.addPath(shape)
-    ctx.setLineWidth(5)
-    let rim = CGGradient(colorsSpace: space, colors: [CGColor(gray: 1, alpha: 0.55), CGColor(gray: 1, alpha: 0.05)] as CFArray, locations: [0, 1])!
-    ctx.replacePathWithStrokedPath()
-    ctx.clip()
-    ctx.drawLinearGradient(rim, start: CGPoint(x: body.midX, y: body.maxY), end: CGPoint(x: body.midX, y: body.minY), options: [])
+    let rim = shape.copy(strokingWithWidth: 10, lineCap: .round, lineJoin: .round, miterLimit: 10)
+    fill(ctx, rim, gradient([(rgb(0xFFFFFF, 0.38), 0), (rgb(0xFFFFFF, 0.06), 0.35), (rgb(0xFFFFFF, 0.02), 0.8), (rgb(0xFFFFFF, 0.14), 1)]),
+         top: body.maxY, bottom: body.minY)
     ctx.restoreGState()
 
     return ctx.makeImage()!
 }
 
 /// 写 PNG。
+/// - Parameters:
+///   - image: 图像
+///   - url: 目标路径
 func writePNG(_ image: CGImage, to url: URL) {
     let rep = NSBitmapImageRep(cgImage: image)
     let data = rep.representation(using: .png, properties: [:])!
