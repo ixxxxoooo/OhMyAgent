@@ -146,8 +146,8 @@ struct AppearancePage: View {
     @AppStorage(ClientPrefs.Key.toolDensity) private var toolDensityRaw = ToolDensity.standard.rawValue
     @AppStorage(ClientPrefs.Key.chatCodeWrap) private var codeWrap = false
     @AppStorage(FontSmoothing.preferenceKey) private var fontSmoothing = FontSmoothing.system.rawValue
-    @AppStorage(ClientPrefs.Key.smoothWheel) private var smoothWheel = false
-    @AppStorage(ClientPrefs.Key.smoothWheelLevel) private var smoothWheelLevel = SmoothWheelLevel.standard.rawValue
+    @AppStorage(ClientPrefs.Key.smoothWheel) private var smoothWheel = true
+    @AppStorage(ClientPrefs.Key.smoothWheelLevel) private var smoothWheelLevel = SmoothWheelLevel.light.rawValue
     @State private var smoothingAtLaunch = FontSmoothing.current().rawValue
     @Bindable private var workbench = AppEnvironment.shared.workbench
     @State private var themeFilter = ""

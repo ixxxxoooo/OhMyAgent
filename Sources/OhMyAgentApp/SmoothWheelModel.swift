@@ -28,10 +28,10 @@ enum SmoothWheelLevel: String, CaseIterable, Identifiable {
         }
     }
 
-    /// 解析偏好值,无法识别时回退标准档。
+    /// 解析偏好值,无法识别时回退轻快档(默认档)。
     /// - Parameter raw: 存储的字符串
     /// - Returns: 档位
-    static func resolve(_ raw: String) -> SmoothWheelLevel { SmoothWheelLevel(rawValue: raw) ?? .standard }
+    static func resolve(_ raw: String) -> SmoothWheelLevel { SmoothWheelLevel(rawValue: raw) ?? .light }
 }
 
 /// 逐帧位移模型:累计「待滚动」的剩余位移,每帧按指数衰减吐出整数像素。

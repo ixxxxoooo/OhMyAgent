@@ -25,8 +25,8 @@ final class SmoothWheel: NSObject {
     private var link: CADisplayLink?
     private var lastTimestamp: CFTimeInterval = 0
 
-    /// 是否开启(读偏好,默认关闭)。
-    private var isEnabled: Bool { UserDefaults.standard.bool(forKey: ClientPrefs.Key.smoothWheel) }
+    /// 是否开启(读偏好,默认开启)。
+    private var isEnabled: Bool { UserDefaults.standard.object(forKey: ClientPrefs.Key.smoothWheel) as? Bool ?? true }
 
     /// 当前档位。
     private var level: SmoothWheelLevel {

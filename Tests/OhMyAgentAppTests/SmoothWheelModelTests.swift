@@ -52,9 +52,9 @@ struct SmoothWheelModelTests {
         #expect(!model.isActive)
     }
 
-    @Test("档位解析:未知值回退标准")
+    @Test("档位解析:未知值回退轻快(默认档)")
     func levelResolve() {
         #expect(SmoothWheelLevel.resolve("soft") == .soft)
-        #expect(SmoothWheelLevel.resolve("???") == .standard)
+        #expect(SmoothWheelLevel.resolve("???") == .light)
     }
 }
