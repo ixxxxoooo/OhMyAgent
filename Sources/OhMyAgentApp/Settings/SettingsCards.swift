@@ -62,6 +62,7 @@ struct SettingsCard<Content: View>: View {
                 }
             }
             .background(OMColors.card, in: RoundedRectangle(cornerRadius: OMRadius.card, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: OMRadius.card, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
         }
     }
 }

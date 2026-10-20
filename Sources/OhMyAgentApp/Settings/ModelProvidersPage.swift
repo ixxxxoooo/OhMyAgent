@@ -129,6 +129,7 @@ struct ModelProvidersPage: View {
                 .padding(.horizontal, 10)
                 .frame(height: 26)
                 .background(OMPillShape().fill(selected ? OMColors.selectedFill : OMColors.subtleFill))
+                .overlay(OMPillShape().strokeBorder(selected ? OMColors.accent.opacity(0.6) : OMColors.hairline.opacity(0.6), lineWidth: selected ? 1 : 0.5))
                                 .contentShape(OMPillShape())
         }
         .buttonStyle(.plain)

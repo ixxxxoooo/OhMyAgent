@@ -95,6 +95,7 @@ struct SettingsForm<Content: View>: View {
                                     .padding(.vertical, OMSpacing.sm)
                             }
                             .background(OMColors.card, in: RoundedRectangle(cornerRadius: OMRadius.card, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: OMRadius.card, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
                             section.footer
                                 .font(OMFonts.caption)
                                 .foregroundStyle(OMColors.secondaryText)
@@ -118,6 +119,7 @@ extension View {
         scrollContentBackground(.hidden)
             .padding(8)
             .background(OMColors.surface, in: RoundedRectangle(cornerRadius: OMMetrics.controlRadius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: OMMetrics.controlRadius, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
     }
 
     /// 设置页右侧内容区统一背景:隐藏系统分组表单/列表自带的底色,铺 `OMColors.surface`,避免上下色差。
