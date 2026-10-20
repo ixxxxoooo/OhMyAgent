@@ -100,7 +100,7 @@ add "editor-file" 10 "OMA_OPEN_FILE=$ATLAS/Sources/AtlasCore/Router.swift;OMA_OP
 add "editor-split-right" 10 "OMA_OPEN_FILE=$ATLAS/README.md;OMA_SPLIT=right"
 add "editor-mermaid" 10 "OMA_OPEN_MERMAID=graph TD\\nA[开始]-->B{判断}\\nB-->C[结束]"
 add "terminal-tab" 12 "OMA_OPEN_TERMINAL=1;OMA_TERM_INPUT=git status\\n"
-add "bottom-panel" 8 "OMA_SHOW_BOTTOM=1;OMA_BOTTOM_PANE=terminal"
+add "right-terminal-tab" 8 "OMA_SHOW_TERMINAL=1;OMA_SHOW_RIGHT=1"
 # 5) 设置页
 for p in general appearance shortcuts agent providers prompts network permissions trust agentExtensions editor terminal usage privacy advanced diagnostics; do
   add "settings-$p" 8 "OMA_OPEN_SETTINGS=1;OMA_SETTINGS_PAGE=$p"

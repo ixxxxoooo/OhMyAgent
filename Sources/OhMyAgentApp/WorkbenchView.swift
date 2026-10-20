@@ -297,7 +297,7 @@ struct WorkbenchView: View {
                 ExplorerActions.perform(sources: Array(parts.dropFirst()), into: parts[0], workbench: workbench)
             }
         }
-        // 调试:面板摆放(OMA_TERMINAL_PLACEMENT=bottom|right|left|editor、OMA_SIDEBAR_SIDE/OMA_TOOLS_SIDE=left|right、OMA_SHOW_TERMINAL=1)
+        // 调试:面板摆放(OMA_SIDEBAR_SIDE/OMA_TOOLS_SIDE=left|right)、OMA_SHOW_TERMINAL=1(右栏开终端标签)、OMA_SHOW_OUTPUT=1(右栏开输出标签)
         if let value = env["OMA_SIDEBAR_SIDE"].flatMap(PanelSide.init(rawValue:)) { workbench.setSidebarSide(value) }
         if let value = env["OMA_TOOLS_SIDE"].flatMap(PanelSide.init(rawValue:)) { workbench.setToolsSide(value) }
         if env["OMA_SHOW_TERMINAL"] != nil { workbench.showTerminal() }
