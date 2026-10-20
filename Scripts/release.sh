@@ -28,8 +28,7 @@ if [[ -n "${OMA_BUILD:-}" ]]; then /usr/libexec/PlistBuddy -c "Set :CFBundleVers
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"
 BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Contents/Info.plist")"
 
-# 3. ACP 适配器已由 bundle.sh 经 Scripts/stage-adapter.sh 裁剪并放入 Resources/acp(约 32MB,不含平台二进制,依赖系统 node 与 claude)
-[[ -f "$APP/Contents/Resources/acp/node_modules/@agentclientprotocol/claude-agent-acp/dist/index.js" ]] || { echo "错误:产物缺少内置适配器"; exit 1; }
+# 3. Claude ACP 适配器是编进应用本体的原生 Swift 实现(ClaudeAgentKit),无需额外资源;运行只依赖本机 claude
 
 # 4. 签名:先签内嵌可执行文件,最后签 app 本体(不使用 --deep)
 SIGN_ARGS=(--force --sign "$IDENTITY" --options runtime --entitlements "$ENTITLEMENTS")

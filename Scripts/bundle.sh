@@ -29,10 +29,6 @@ if [[ "$MODE" == "dev" ]]; then
 fi
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 for lproj in Resources/*.lproj(N); do cp -R "$lproj" "$APP/Contents/Resources/"; done
-# 内置 ACP 适配器:缺依赖时自动安装并裁剪,拷入 Resources/acp(应用据此免配置直接连接 Claude Code)
-Scripts/stage-adapter.sh
-mkdir -p "$APP/Contents/Resources/acp"
-rsync -a --delete --exclude='.lock-hash' build/acp-stage/ "$APP/Contents/Resources/acp/"
 IDENTITY="${OMA_SIGN_IDENTITY:-OhMyAgent Local Dev}"
 if ! security find-identity -v -p codesigning | grep -q "\"$IDENTITY\""; then
   echo "警告:未找到签名证书 \"$IDENTITY\",退回临时签名(运行 Scripts/make-signing-cert.sh 创建)"

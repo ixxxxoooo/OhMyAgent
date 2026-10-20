@@ -1,6 +1,5 @@
 .build/
 .swiftpm/
-Vendor/acp/node_modules/
 build/
 *.xcuserstate
 .DS_Store

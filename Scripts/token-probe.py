@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # @author ixxxxoooo
 # token 消耗探针(问题:每次发消息是不是在重复发送上下文?):
-# 启动本地假 Anthropic 网关(Scripts/mock-anthropic.py --log),让真实的 claude-agent-acp 适配器 + 本机 claude
+# 启动本地假 Anthropic 网关(Scripts/mock-anthropic.py --log),让原生 Claude ACP 适配器(ClaudeACPHost) + 本机 claude
 # 连到它,连续发 N 条很短的消息,统计「每条消息到底触发了几次上游请求、请求体多大、有没有 cache_control 缓存断点」。
 # 不消耗任何真实 token。用法:
 #   Scripts/token-probe.py [--turns 8] [--claude ~/.local/bin/claude]
@@ -39,9 +39,10 @@ def main():
     parser.add_argument("--claude", default=shutil.which("claude") or os.path.expanduser("~/.local/bin/claude"))
     options = parser.parse_args()
 
-    adapter = os.path.join(ROOT, "build/acp-stage/node_modules/@agentclientprotocol/claude-agent-acp/dist/index.js")
-    if not os.path.exists(adapter):
-        adapter = os.path.join(ROOT, "Vendor/acp/node_modules/@agentclientprotocol/claude-agent-acp/dist/index.js")
+    bin_dir = subprocess.run(["swift", "build", "--show-bin-path"], cwd=ROOT, capture_output=True, text=True).stdout.strip().splitlines()[-1]
+    host = os.path.join(bin_dir, "ClaudeACPHost")
+    if not os.path.exists(host):
+        sys.exit(f"找不到 {host},请先 swift build --product ClaudeACPHost")
     work = tempfile.mkdtemp(prefix="oma-token-")
     log = os.path.join(work, "upstream.jsonl")
     mock = subprocess.Popen([sys.executable, os.path.join(ROOT, "Scripts/mock-anthropic.py"), "--port", str(options.port), "--log", log],
@@ -54,7 +55,7 @@ def main():
     rows = []
     agent = None
     try:
-        agent = probe.Agent(shutil.which("node") or "node", [adapter], work, env=env)
+        agent = probe.Agent(host, ["--claude", options.claude], work, env=env)
         agent.call("initialize", {"protocolVersion": 1, "clientCapabilities": {"fs": {"readTextFile": True, "writeTextFile": False}}}, timeout=30)
         created = agent.call("session/new", {"cwd": work, "mcpServers": []}, timeout=60)
         session_id = created.get("result", {}).get("sessionId")

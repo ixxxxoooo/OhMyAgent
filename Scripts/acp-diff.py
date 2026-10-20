@@ -21,7 +21,10 @@ import threading
 import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-NODE_ENTRY = os.path.join(ROOT, "Vendor/acp/node_modules/@agentclientprotocol/claude-agent-acp/dist/index.js")
+# Node 版适配器只用于迁移期对照,不在仓库内:装在 OMA_NODE_ADAPTER(默认 ~/Library/Caches/OhMyAgent-dev/node-adapter,
+# 目录里 `npm i @agentclientprotocol/claude-agent-acp` 即可)
+NODE_ADAPTER = os.environ.get("OMA_NODE_ADAPTER", os.path.expanduser("~/Library/Caches/OhMyAgent-dev/node-adapter"))
+NODE_ENTRY = os.path.join(NODE_ADAPTER, "node_modules/@agentclientprotocol/claude-agent-acp/dist/index.js")
 TOOL_ID = re.compile(r"toolu_[0-9A-Za-z]+")
 UUID = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 
@@ -412,7 +415,7 @@ def main():
     env["CLAUDE_CODE_EXECUTABLE"] = claude
     node = shutil.which("node")
     if not node or not os.path.exists(NODE_ENTRY):
-        sys.exit("缺少 node 或 Vendor/acp(差分对照仅在迁移期使用)")
+        sys.exit(f"缺少 node 或 Node 版适配器({NODE_ENTRY});仅迁移期对照用,可设 OMA_NODE_ADAPTER")
     bin_path = options.swift_bin
     if not bin_path:
         found = subprocess.run(["swift", "build", "--show-bin-path"], cwd=ROOT, capture_output=True, text=True).stdout.strip().splitlines()
