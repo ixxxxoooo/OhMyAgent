@@ -12,124 +12,22 @@ import SwiftUI
 import UniformTypeIdentifiers
 import WorkbenchKit
 
-/// 侧栏中的一行会话(由当前会话与历史缓存合并而来)。
-struct SidebarSession: Identifiable, Equatable {
-    var id: String { "\(projectID)#\(sessionId ?? uid ?? "new")" }
-    let projectID: String
-    /// 协议会话 ID;尚未产生消息的新对话为 nil(不可置顶/归档)
-    let sessionId: String?
-    let uid: String?
-    let title: String
-    let updatedAt: Date?
-    let isCurrent: Bool
-    let isRunning: Bool
-    /// 会话所属 Agent;只在属于「别的引擎」时才有值(点击时据此切回原引擎打开;界面不显示引擎名)
-    var foreignAgentID: String?
-}
-
-extension WorkbenchModel {
-    /// 项目的全部会话行:**只读持久化缓存**(`ProjectEntry.sessions`),按「创建时间」倒序,
-    /// 与当前引擎、连接状态、引擎历史刷新都无关——切换引擎、点击会话、会话有新活动时顺序都不跳动。
-    /// 当前会话若是尚未产生内容的空白对话,只在该项目被选中时显示为顶部的「新对话」。
-    @MainActor
-    func sidebarSessions(for project: ProjectEntry) -> [SidebarSession] {
-        let model = sessions[project.id]
-        // 该项目下所有已打开的会话(含尚无内容的空白新对话):点了「新对话」就是真实存在的会话,不随选中项目变化而消失
-        let openModels = conversations.filter { $0.key.projectID == project.id }.map(\.value)
-        // 只有存在已打开会话时才需要按 ID 查缓存条目(避免为 400 条缓存会话白建字典)
-        let cache = openModels.isEmpty ? [:] : Dictionary(project.sessions.map { ($0.sessionId, $0) }, uniquingKeysWith: { first, _ in first })
-        let currentAgent = model?.descriptor.id
-        let deleted = Set(project.deletedSessions)
-        let openIDs = Set(openModels.compactMap(\.sessionId))
-        var rows: [(key: Date, row: SidebarSession)] = project.sessions.compactMap { item in
-            guard !openIDs.contains(item.sessionId), !EmptySessionRegistry.isHidden(item.sessionId), !deleted.contains(item.sessionId) else { return nil }
-            let displayDate = Self.parseDate(item.updatedAt) ?? Self.parseDate(item.createdAt) ?? Self.parseDate(item.firstSeenAt)
-            return (item.stableKey, SidebarSession(
-                projectID: project.id, sessionId: item.sessionId, uid: nil,
-                title: item.title ?? String(localized: "未命名对话"),
-                updatedAt: displayDate, isCurrent: false, isRunning: false,
-                foreignAgentID: item.agentId.flatMap { $0 != currentAgent ? $0 : nil }
-            ))
-        }
-        for open in openModels where !deleted.contains(open.sessionId ?? "") {
-            let cached = open.sessionId.flatMap { cache[$0] }
-            let key = cached?.stableKey ?? .distantFuture
-            rows.append((key, SidebarSession(
-                projectID: project.id, sessionId: open.sessionId, uid: open.uid,
-                title: open.sessionTitle ?? cached?.title ?? String(localized: "新对话"),
-                updatedAt: nil, isCurrent: open === model, isRunning: open.isRunning
-            )))
-        }
-        // 稳定排序:创建时间倒序(新对话 .distantFuture 排在最前);同键按原始相对顺序全序兜底
-        return rows.enumerated().sorted { lhs, rhs in
-            if lhs.element.key != rhs.element.key {
-                return lhs.element.key > rhs.element.key
-            }
-            return lhs.offset < rhs.offset
-        }.map(\.element.row)
-    }
-}
-
 /// 左栏根视图。
 struct ProjectTreeView: View {
-    @Bindable var workbench: WorkbenchModel
+    let workbench: WorkbenchModel
     @State private var showArchived = false
-
-    /// 所有项目中已置顶的会话。
-    private var pinned: [SidebarSession] {
-        // 只有登记了置顶会话的项目才需要构造完整会话行(其余项目由各自的 ProjectGroup 构造),避免每次 body 对全部项目重复排序
-        workbench.projects.filter { !$0.pinnedSessions.isEmpty }.flatMap { project in
-            workbench.sidebarSessions(for: project).filter { item in
-                guard let id = item.sessionId else { return false }
-                return project.pinnedSessions.contains(id)
-            }
-        }
-    }
+    /// 已点开「显示更多」的列表键
+    @State private var expandedMore: Set<String> = []
 
     var body: some View {
         let _ = PanelToggleProbe.count("tree")
+        // 行数据(快照)在这里一次性生成;滚动只改窗口,不会重算
+        let rows = workbench.sidebarRows(showArchived: showArchived, expandedMore: expandedMore)
         VStack(spacing: 0) {
             // 顶部 35pt:红绿灯与侧栏开关浮层所在区域,可拖动窗口
             Color.clear.frame(height: TitlebarMetrics.height).background(WindowDragArea())
             navigation
-            ScrollView {
-                // 行数有限(每项目最多预览 5 条),用普通 VStack:LazyVStack 在悬停/选中重排时按估算高度布局,会让整列抖动
-                VStack(alignment: .leading, spacing: 2) {
-                    if !pinned.isEmpty {
-                        SectionTitle(title: "置顶")
-                        ForEach(pinned) { item in
-                            SessionLine(workbench: workbench, item: item, mode: .pinned)
-                        }
-                    }
-                    generalSection
-                    SectionTitle(title: "工作区") {
-                        if !workbench.workspaceProjects.isEmpty {
-                            let collapsed = workbench.allProjectsCollapsed
-                            SectionIconButton(
-                                icon: collapsed ? "chevrons-up-down" : "chevrons-down-up",
-                                label: collapsed ? String(localized: "展开全部项目") : String(localized: "折叠全部项目")
-                            ) { workbench.setAllProjectsCollapsed(!collapsed) }
-                        }
-                        filterMenu
-                        addProjectMenu
-                    }
-                    // 「工作区」标题行同时是拖动手柄:拖到窗口左/右半边即可把项目栏换到那一侧
-                    .terminalDragHandle(workbench, panel: .sidebar)
-                    if workbench.workspaceProjects.isEmpty {
-                        Text("添加一个项目目录,或把文件夹拖到这里。")
-                            .font(OMFonts.small)
-                            .foregroundStyle(OMColors.tertiaryText)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                    }
-                    ForEach(workbench.orderedProjects) { project in
-                        ProjectGroup(workbench: workbench, project: project, showArchived: showArchived)
-                    }
-                }
-                .padding(.horizontal, 8)
-                .padding(.bottom, 16)
-            }
-            .scrollIndicators(.never)
+            SidebarWindowedList(rows: rows) { row in rowView(row) }
             footer
         }
         .dropDestination(for: URL.self) { urls, _ in
@@ -141,15 +39,59 @@ struct ProjectTreeView: View {
         }
     }
 
-    // MARK: 会话区
-
-    /// 会话区:不绑定项目的通用对话(ChatGPT 式问答),位于「工作区」之上。
+    /// 单行内容(窗口内才会被调用)。
     @ViewBuilder
-    private var generalSection: some View {
-        SectionTitle(title: "会话") {
-            SectionIconButton(icon: "message-circle-plus", label: String(localized: "新会话(无需项目)")) { workbench.newGeneralConversation() }
+    private func rowView(_ row: SidebarRow) -> some View {
+        switch row.kind {
+        case .title(.pinned):
+            SectionTitle(title: "置顶")
+        case .title(.general):
+            SectionTitle(title: "会话") {
+                SectionIconButton(icon: "message-circle-plus", label: String(localized: "新会话(无需项目)")) { workbench.newGeneralConversation() }
+            }
+        case .title(.workspace):
+            workspaceTitle
+        case .session(let item, let mode, let siblings, let index):
+            SessionLine(workbench: workbench, item: item, mode: mode, siblings: siblings, index: index)
+        case .hint(let kind, let indent):
+            Group {
+                switch kind {
+                case .noGeneral: Text("还没有会话,直接提问即可")
+                case .noWorkspace: Text("添加一个项目目录,或把文件夹拖到这里。")
+                case .noSessions: Text("暂无会话")
+                }
+            }
+            .font(OMFonts.small)
+            .foregroundStyle(OMColors.tertiaryText)
+            .lineLimit(1)
+            .padding(.leading, indent)
+        case .more(let key, let expanded, let remaining, let indent):
+            Button(expanded ? String(localized: "收起") : String(localized: "显示更多(还有 \(remaining) 条)")) {
+                if expandedMore.contains(key) { expandedMore.remove(key) } else { expandedMore.insert(key) }
+            }
+            .buttonStyle(.plain)
+            .font(OMFonts.small)
+            .foregroundStyle(OMColors.secondaryText)
+            .padding(.leading, indent)
+        case .project(let project, let count):
+            ProjectHeaderRow(workbench: workbench, project: project, count: count)
         }
-        GeneralSessionList(workbench: workbench, showArchived: showArchived)
+    }
+
+    /// 「工作区」标题行(含折叠全部、筛选、添加项目);同时是拖动手柄:拖到窗口左/右半边即可把项目栏换到那一侧。
+    private var workspaceTitle: some View {
+        SectionTitle(title: "工作区") {
+            if !workbench.workspaceProjects.isEmpty {
+                let collapsed = workbench.allProjectsCollapsed
+                SectionIconButton(
+                    icon: collapsed ? "chevrons-up-down" : "chevrons-down-up",
+                    label: collapsed ? String(localized: "展开全部项目") : String(localized: "折叠全部项目")
+                ) { workbench.setAllProjectsCollapsed(!collapsed) }
+            }
+            filterMenu
+            addProjectMenu
+        }
+        .terminalDragHandle(workbench, panel: .sidebar)
     }
 
     // MARK: 顶部主操作
@@ -312,114 +254,22 @@ private struct NavRow: View {
     }
 }
 
-/// 会话区的会话列表:每次最多预览 5 条,其余走「显示更多」;置顶的会话在顶部「置顶」分区。
-private struct GeneralSessionList: View {
-    private static let previewCount = 5
-
-    let workbench: WorkbenchModel
-    let showArchived: Bool
-    @State private var showAll = false
-
-    private var rows: [SidebarSession] {
-        guard let entry = workbench.projects.first(where: \.isChatArea) else { return [] }
-        return workbench.sidebarSessions(for: entry).filter { item in
-            guard let id = item.sessionId else { return true }
-            if entry.pinnedSessions.contains(id) { return false }
-            return showArchived || !entry.archivedSessions.contains(id)
-        }
-    }
-
-    /// 列表里排在 `item` 之后、已有会话 ID 的行(用于「归档下方全部」)。
-    static func idsBelow(_ item: SidebarSession, in all: [SidebarSession]) -> [String] {
-        guard let index = all.firstIndex(where: { $0.id == item.id }) else { return [] }
-        return all[(index + 1)...].compactMap(\.sessionId)
-    }
-
-    var body: some View {
-        let all = rows
-        let visible = showAll ? all : Array(all.prefix(Self.previewCount))
-        VStack(alignment: .leading, spacing: 2) {
-            if all.isEmpty {
-                Text("还没有会话,直接提问即可")
-                    .font(OMFonts.small)
-                    .foregroundStyle(OMColors.tertiaryText)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-            }
-            ForEach(visible) { item in
-                SessionLine(workbench: workbench, item: item, mode: .general, below: Self.idsBelow(item, in: all))
-            }
-            if all.count > Self.previewCount {
-                Button(showAll ? String(localized: "收起") : String(localized: "显示更多(还有 \(all.count - Self.previewCount) 条)")) {
-                    omWithAnimation(.snappy(duration: 0.18)) { showAll.toggle() }
-                }
-                .buttonStyle(.plain)
-                .font(OMFonts.small)
-                .foregroundStyle(OMColors.secondaryText)
-                .padding(.leading, 8)
-                .padding(.vertical, 4)
-            }
-        }
-    }
-}
-
-/// 工作区分组:标题行(文件夹图标 + 名称 + 会话数/悬停「+」,点击折叠)+ 会话行。
-private struct ProjectGroup: View {
-    /// 每个分组默认展示的会话条数,超出走「显示更多」
-    private static let previewCount = 5
-
+/// 工作区分组标题行(文件夹图标 + 名称 + 会话数/悬停「+」,点击折叠);其下的会话行由展平的行数组单独挂载。
+private struct ProjectHeaderRow: View {
     let workbench: WorkbenchModel
     let project: ProjectEntry
-    let showArchived: Bool
+    let count: Int
     @State private var hovering = false
-    @State private var showAll = false
 
     private var isSelected: Bool { workbench.selectedProjectID == project.id }
     private var expanded: Bool { !project.collapsed }
 
-    /// 本项目要在树中展示的会话(排除置顶,按开关决定是否含已归档)。
-    private var rows: [SidebarSession] {
-        workbench.sidebarSessions(for: project).filter { item in
-            if let id = item.sessionId {
-                if project.pinnedSessions.contains(id) { return false }
-                if project.archivedSessions.contains(id) && !showArchived { return false }
-            }
-            return true
-        }
-    }
-
     var body: some View {
         let _ = PanelToggleProbe.count("sidebar.group")
-        let all = rows
-        VStack(alignment: .leading, spacing: 2) {
-            header(count: all.count)
-            if expanded {
-                if all.isEmpty {
-                    Text("暂无会话")
-                        .font(OMFonts.small)
-                        .foregroundStyle(OMColors.tertiaryText)
-                        .padding(.leading, 16)
-                        .padding(.vertical, 4)
-                }
-                let visible = showAll ? all : Array(all.prefix(Self.previewCount))
-                ForEach(visible) { item in
-                    SessionLine(workbench: workbench, item: item, mode: .tree, below: GeneralSessionList.idsBelow(item, in: all))
-                }
-                if all.count > Self.previewCount {
-                    Button(showAll ? String(localized: "收起") : String(localized: "显示更多(还有 \(all.count - Self.previewCount) 条)")) {
-                        omWithAnimation(.snappy(duration: 0.18)) { showAll.toggle() }
-                    }
-                    .buttonStyle(.plain)
-                    .font(OMFonts.small)
-                    .foregroundStyle(OMColors.secondaryText)
-                    .padding(.leading, 16)
-                    .padding(.vertical, 4)
-                }
-            }
-        }
+        header
     }
 
-    private func header(count: Int) -> some View {
+    private var header: some View {
         HStack(spacing: 6) {
             ProjectIconView(icon: project.icon, directory: workbench.projectIconDirectory, expanded: expanded, isSelected: isSelected)
             Text(project.name)
@@ -539,13 +389,19 @@ enum SidebarRelativeTime {
 }
 
 /// 会话行:状态点 + 渐隐标题 + 固定 76pt 保留区(相对时间 ⇄ 悬停时的置顶/归档按钮),对齐 kuku 的 SessionRow。
-private struct SessionLine: View {
-    enum Mode { case tree, pinned, general }
+struct SessionLine: View {
+    enum Mode: Equatable { case tree, pinned, general }
     let workbench: WorkbenchModel
     let item: SidebarSession
     let mode: Mode
+    /// 同列表全部会话 ID 与本行位置:右键「归档下方全部」时才取后缀(各行共享同一数组,不逐行复制)
+    var siblings: [String?] = []
+    var index = 0
     /// 列表中排在本行下方的会话 ID(用于「归档下方全部」)
-    var below: [String] = []
+    private var below: [String] {
+        guard index + 1 < siblings.count else { return [] }
+        return siblings[(index + 1)...].compactMap { $0 }
+    }
     @State private var hovering = false
 
     private var isSelected: Bool { item.isCurrent && workbench.selectedProjectID == item.projectID }
@@ -721,6 +577,75 @@ struct AttentionDot: View {
             OMSessionDot(.running, size: 8).accessibilityLabel("运行中")
         case .needsInput:
             OMSessionDot(.waiting, size: 8).accessibilityLabel("等待处理")
+        }
+    }
+}
+
+/// 项目栏滚动窗口:以 32pt 为桶量化偏移,避免每个像素的滚动都触发刷新。
+private struct SidebarScrollSpan: Equatable {
+    var bucket = 0
+    var viewport = 800
+}
+
+/// 窗口化的项目栏列表:只挂载可见窗口(上下各多 6 行)内的行,窗口外用占位撑出完整滚动范围。
+/// 各行高度固定(见 `SidebarRow.height`),位置由 `SidebarRowLayout` 前缀和换算,
+/// 因此 50 个项目、上千条会话展开时的挂载与滚动成本只与可见行数相关。
+struct SidebarWindowedList<Content: View>: View {
+    private static var bucketSize: Int { 32 }
+
+    let rows: [SidebarRow]
+    @ViewBuilder let content: (SidebarRow) -> Content
+    @State private var span = SidebarScrollSpan()
+
+    var body: some View {
+        let layout = SidebarRowLayout(heights: rows.map(\.cellHeight), bottomInset: 16)
+        let range = layout.window(offset: Double(span.bucket * Self.bucketSize), viewport: Double(span.viewport))
+        ScrollView {
+            // 自定义 Layout:行高已知,按前缀和直接摆放,省掉 VStack 对每个弹性子视图的多轮尺寸探测
+            SidebarRowsLayout(leading: layout.leadingHeight(for: range), total: layout.totalHeight) {
+                ForEach(rows[range]) { row in
+                    content(row)
+                        .frame(maxWidth: .infinity, minHeight: row.height, maxHeight: row.height, alignment: .leading)
+                        .layoutValue(key: SidebarRowHeightKey.self, value: row.cellHeight)
+                }
+            }
+            .padding(.horizontal, 8)
+        }
+        .scrollIndicators(.never)
+        .onScrollGeometryChange(for: SidebarScrollSpan.self) { geometry in
+            let size = Double(Self.bucketSize)
+            return SidebarScrollSpan(
+                bucket: Int(max(0, Double(geometry.contentOffset.y)) / size),
+                viewport: Int((Double(geometry.containerSize.height) / size).rounded(.up)) * Self.bucketSize
+            )
+        } action: { _, new in
+            span = new
+        }
+    }
+}
+
+/// 每行的占位高度(含行间距),由行视图经 `layoutValue` 提供给 `SidebarRowsLayout`。
+private struct SidebarRowHeightKey: LayoutValueKey {
+    static let defaultValue: Double = 30
+}
+
+/// 项目栏窗口化布局:只摆放已挂载的窗口内的行,从 `leading` 起顺序排列,整体高度固定为 `total`
+/// (窗口外的行不存在,上下的空白由 `leading` 与 `total` 撑出)。
+private struct SidebarRowsLayout: Layout {
+    let leading: Double
+    let total: Double
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        CGSize(width: proposal.width ?? 200, height: total)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY + leading
+        for subview in subviews {
+            let cell = subview[SidebarRowHeightKey.self]
+            subview.place(at: CGPoint(x: bounds.minX, y: y), anchor: .topLeading,
+                          proposal: ProposedViewSize(width: bounds.width, height: max(0, cell - 2)))
+            y += cell
         }
     }
 }

@@ -2,7 +2,8 @@
 // 项目栏流畅度基准钩子(仅脚本化验证用,不影响正常使用):
 // `OMA_SIDEBAR_SWEEP=scroll,expand,hover,status,unrelated|all`,配合 `OMA_DEMO_SIDEBAR_PROJECTS=50` 的多项目压力数据。
 // - idle:空转对照组(只有驱动循环本身的开销,用于扣除基线);
-// - scroll:对项目栏的 `NSScrollView` 逐帧上下滚动;
+// - scroll:对项目栏的 `NSScrollView` 逐帧上下滚动(猛甩:约 150pt/帧,压力上限);
+// - gentle:同上但慢速(约 25pt/帧,接近日常浏览);
 // - expand:反复「折叠全部 ⇄ 展开全部」;
 // - hover:合成鼠标移动(会移动真实光标,需窗口在前台)扫过整列;
 // - status:每帧翻转一个会话的注意力状态(模拟运行中/空闲更新);
@@ -20,7 +21,7 @@ import WorkbenchKit
 enum SidebarSweepPlan {
     /// 基准项目。
     enum Kind: String, CaseIterable {
-        case idle, scroll, expand, hover, status, unrelated
+        case idle, scroll, gentle, expand, hover, status, unrelated
     }
 
     /// 解析 `OMA_SIDEBAR_SWEEP`。
@@ -105,7 +106,8 @@ enum SidebarBenchmarkHooks {
         for kind in kinds {
             switch kind {
             case .idle: await idle()
-            case .scroll: await scroll(workbench)
+            case .scroll: await scroll(workbench, kind: .scroll)
+            case .gentle: await scroll(workbench, kind: .gentle)
             case .expand: await expand(workbench, projects: projects)
             case .hover: await hover(workbench)
             case .status: await status()
@@ -169,7 +171,7 @@ enum SidebarBenchmarkHooks {
         }
     }
 
-    private static func scroll(_ workbench: WorkbenchModel) async {
+    private static func scroll(_ workbench: WorkbenchModel, kind: SidebarSweepPlan.Kind) async {
         guard let root = mainWindow?.contentView, let scroll = sidebarScrollView(in: root, width: workbench.layout.leftWidth),
               let document = scroll.documentView else {
             Log.perf.warning("项目栏基准:找不到项目栏滚动视图", ["kind": "scroll"])
@@ -180,8 +182,11 @@ enum SidebarBenchmarkHooks {
             Log.perf.warning("项目栏基准:内容不足以滚动", ["kind": "scroll", "travel": String(format: "%.0f", travel)])
             return
         }
-        await measure(.scroll, extra: ["travel": String(format: "%.0f", travel)]) {
-            for offset in SweepPlan.zigzag(low: 0, high: travel, steps: 90, cycles: 3) {
+        // 猛甩跑满全程;慢速只扫前 3000pt,每帧约 25pt
+        let high = kind == .gentle ? min(travel, 3000) : travel
+        let steps = kind == .gentle ? 120 : 90
+        await measure(kind, extra: ["travel": String(format: "%.0f", high)]) {
+            for offset in SweepPlan.zigzag(low: 0, high: high, steps: steps, cycles: 3) {
                 scroll.contentView.scroll(to: NSPoint(x: 0, y: offset))
                 scroll.reflectScrolledClipView(scroll.contentView)
                 await nextFrame()
@@ -193,6 +198,15 @@ enum SidebarBenchmarkHooks {
 
     private static func expand(_ workbench: WorkbenchModel, projects: Int) async {
         let original = workbench.allProjectsCollapsed
+        // 行快照生成耗时(纯数据,不含视图挂载):展开全部状态下连续生成 5 次取平均
+        workbench.setAllProjectsCollapsed(false)
+        try? await Task.sleep(for: .milliseconds(500))
+        let clock = ContinuousClock()
+        let started = clock.now
+        var rowCount = 0
+        for _ in 0..<5 { rowCount = workbench.sidebarRows(showArchived: false, expandedMore: []).count }
+        let builderMs = Double((clock.now - started).components.attoseconds) / 5e15
+        Log.perf.info("项目栏基准:行快照", ["rows": "\(rowCount)", "avgMs": String(format: "%.2f", builderMs)])
         await measure(.expand, extra: ["projects": "\(projects)", "toggles": "12"]) {
             for index in 0..<12 {
                 workbench.setAllProjectsCollapsed(index % 2 == 0)
