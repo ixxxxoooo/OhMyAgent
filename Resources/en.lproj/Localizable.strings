@@ -2717,3 +2717,7 @@
 "连通性" = "Connectivity";
 "测试" = "Test";
 "延迟" = "Latency";
+"OhMyAgent 图标" = "OhMyAgent icon";
+"版本 %@ (%lld)" = "Version %@ (%lld)";
+"检查常用网站与模型服务能否访问及耗时。" = "Checks whether common sites and model services are reachable, and how fast.";
+"开始测试" = "Start test";
