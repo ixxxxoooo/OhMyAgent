@@ -230,17 +230,23 @@ struct SettingsView: View {
             .background(RoundedRectangle(cornerRadius: OMRadius.control).fill(OMColors.hoverFill))
             .padding(.horizontal, 12)
             .padding(.bottom, 8)
-            List(selection: $router.page) {
-                ForEach(filteredGroups, id: \.title) { group in
-                    Section(LocalizedStringKey(group.title)) {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    ForEach(filteredGroups, id: \.title) { group in
+                        Text(LocalizedStringKey(group.title))
+                            .font(OMFonts.small)
+                            .foregroundStyle(OMColors.tertiaryText)
+                            .padding(.horizontal, 10)
+                            .padding(.top, 12)
+                            .padding(.bottom, 4)
                         ForEach(group.pages) { page in
-                            Label(page.title, om: page.icon).tag(page)
+                            SettingsSidebarRow(page: page, selected: router.page == page) { router.page = page }
                         }
                     }
                 }
+                .padding(.horizontal, 10)
+                .padding(.bottom, 12)
             }
-            .listStyle(.sidebar)
-            .scrollContentBackground(.hidden)
         }
         .background(SidebarBackground())
     }
@@ -288,5 +294,30 @@ struct SettingsView: View {
         case .advanced: AdvancedPage(model: model)
         case .diagnostics: DiagnosticsPage(center: center)
         }
+    }
+}
+
+/// 设置页左栏的一行:选中态取主题 `selectedFill`,不用系统列表的强调蓝(窗口激活/失活时颜色不再变化)。
+private struct SettingsSidebarRow: View {
+    let page: SettingsPage
+    let selected: Bool
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Label(page.title, om: page.icon)
+                .font(OMFonts.body)
+                .foregroundStyle(OMColors.primaryText)
+                .padding(.horizontal, 10)
+                .frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous)
+                        .fill(selected ? OMColors.selectedFill : (hovering ? OMColors.hoverFill : Color.clear))
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
     }
 }
