@@ -88,8 +88,8 @@ private struct EqualHalves: Layout {
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         guard subviews.count == 3 else { return .zero }
-        let widest = max(subviews[0].sizeThatFits(.unspecified).width, subviews[2].sizeThatFits(.unspecified).width)
-        let total = proposal.width ?? (widest * 2 + divider)
+        // 不向叶子询问 `.unspecified` 理想宽度:叶子对不同宽度反复测量会留下过期的版式状态(行号栏与正文错位)
+        let total = proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? 960
         let side = sideWidth(total)
         let height = max(subviews[0].sizeThatFits(ProposedViewSize(width: side, height: nil)).height,
                          subviews[2].sizeThatFits(ProposedViewSize(width: side, height: nil)).height)

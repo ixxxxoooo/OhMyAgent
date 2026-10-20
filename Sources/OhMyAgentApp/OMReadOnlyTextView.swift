@@ -170,6 +170,13 @@ class OMReadOnlyTextView: NSTextView {
     /// 选择中枢(`SelectionHub`)当前画在本叶子上的高亮范围。
     var hubRange: NSRange?
 
+    /// 文本容器原点恒为内边距。
+    /// 不折行的叶子容器宽度是 1_000_000,AppKit 在内容宽于视图时会把原点算成负数(并排 Diff 里长行一侧的正文因此左移、压住行号槽),
+    /// 所以这里不让它按容器与视图宽度差居中。
+    override var textContainerOrigin: NSPoint {
+        NSPoint(x: textContainerInset.width, y: textContainerInset.height)
+    }
+
     /// 属性键:附件(chip)字符复制时还原成的文本(如 `@"路径"` 记号)。
     static let copyTextKey = NSAttributedString.Key("omCopyText")
     /// 属性键:chip 对应的文件路径,单击在编辑区打开。
