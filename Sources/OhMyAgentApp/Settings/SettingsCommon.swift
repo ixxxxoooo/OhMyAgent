@@ -72,6 +72,22 @@ struct SettingsLabeledContentStyle: LabeledContentStyle {
     }
 }
 
+/// 卡片行里的开关样式:标题在左、小号开关靠右(与卡片页 `SettingsToggleRow` 一致)。
+struct SettingsSwitchToggleStyle: ToggleStyle {
+    /// - Parameter configuration: 标题与开关状态
+    /// - Returns: 左右分布的开关行
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(alignment: .center, spacing: OMSpacing.md) {
+            configuration.label
+            Spacer(minLength: OMSpacing.md)
+            Toggle("", isOn: configuration.$isOn)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.small)
+        }
+    }
+}
+
 /// 页面骨架:把 `Section` 渲染成与卡片页(`SettingsScroll`/`SettingsCard`)一致的分组卡片,
 /// 这样所有设置页的内容区宽度都由「外观 → 设置页宽度」统一控制(系统分组表单自身有宽度上限,不随档位变化)。
 struct SettingsForm<Content: View>: View {
@@ -88,11 +104,19 @@ struct SettingsForm<Content: View>: View {
                                 .foregroundStyle(OMColors.secondaryText)
                                 .padding(.horizontal, OMSpacing.xs)
                             VStack(alignment: .leading, spacing: 0) {
-                                section.content
-                                    .labeledContentStyle(SettingsLabeledContentStyle())
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.horizontal, OMSpacing.md)
-                                    .padding(.vertical, OMSpacing.sm)
+                                Group(subviews: section.content) { rows in
+                                    ForEach(rows.indices, id: \.self) { index in
+                                        if index > 0 {
+                                            Rectangle().fill(OMColors.hairline).frame(height: 0.5).padding(.horizontal, OMSpacing.md)
+                                        }
+                                        rows[index]
+                                            .labeledContentStyle(SettingsLabeledContentStyle())
+                                            .toggleStyle(SettingsSwitchToggleStyle())
+                                            .padding(.horizontal, OMSpacing.md)
+                                            .padding(.vertical, OMSpacing.sm + 2)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    }
+                                }
                             }
                             .background(OMColors.card, in: RoundedRectangle(cornerRadius: OMRadius.card, style: .continuous))
                             .overlay(RoundedRectangle(cornerRadius: OMRadius.card, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
