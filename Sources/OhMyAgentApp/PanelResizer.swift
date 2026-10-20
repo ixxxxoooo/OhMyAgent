@@ -25,11 +25,8 @@ struct PanelResizer: View {
         workbench.panelDrag.effective(dimension, committed: workbench.layout)
     }
 
-    /// 该维度当前允许的最大宽度:右栏随窗口宽度动态计算(保证中栏不被挤没),项目栏用静态范围。
-    private var maximumWidth: Double {
-        guard dimension == .rightWidth else { return dimension.range.upperBound }
-        return PanelMetrics.rightMax(window: TerminalDragState.shared.workspaceFrame.width, layout: workbench.layout)
-    }
+    /// 该维度允许的最大宽度:右栏不设人为上限(窗口放不下时由布局让出宽度,中栏保底 280),项目栏用静态范围。
+    private var maximumWidth: Double { dimension.range.upperBound }
 
     var body: some View {
         Rectangle()
