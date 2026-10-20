@@ -62,13 +62,8 @@ enum FileViewMode: String, CaseIterable, Identifiable {
     /// 某类型的默认模式:Markdown 默认所见即所得,其余默认预览。
     static func defaultMode(for kind: FilePreviewKind) -> FileViewMode { kind == .markdown ? .live : .preview }
 
-    /// 编辑器是否可见(只读阅读模式下隐藏编辑器)。
-    var showsEditor: Bool { self != .preview }
-
-    /// 编辑器的 Markdown 显示模式:所见即所得 → 就地渲染;源码 → 普通编辑器(不特殊处理)。
-    func markdownEditorMode(for kind: FilePreviewKind?) -> MarkdownEditorMode {
-        kind == .markdown && self == .live ? .live : .off
-    }
+    /// 编辑器是否可见(阅读页由渲染视图覆盖,只有源码模式显示编辑器)。
+    var showsEditor: Bool { self == .source }
 }
 
 /// 文件显示模式记忆:按文件类型(而非单个文件)持久化到 `UserDefaults`,

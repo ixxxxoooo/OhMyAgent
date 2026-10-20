@@ -26,10 +26,7 @@ struct FileViewModeTests {
 
     @Test("所见即所得与源码都显示编辑器,阅读隐藏;只有 Markdown 的 live 启用就地渲染")
     func editorVisibilityAndMode() {
-        #expect(FileViewMode.live.showsEditor && FileViewMode.source.showsEditor && !FileViewMode.preview.showsEditor)
-        #expect(FileViewMode.live.markdownEditorMode(for: .markdown) == .live)
-        #expect(FileViewMode.source.markdownEditorMode(for: .markdown) == .off)
-        #expect(FileViewMode.live.markdownEditorMode(for: .mermaid) == .off)
+        #expect(FileViewMode.source.showsEditor && !FileViewMode.live.showsEditor && !FileViewMode.preview.showsEditor)
     }
 
     @Test("选择会按类型持久化;非法存档回退默认")

@@ -124,7 +124,6 @@ struct FileTabView: View {
         let doc = store.document(for: path)
         let previewKind = FilePreviewKind.of(path: path)
         let mode = previewKind.map { FileViewModeStore.shared.mode(for: path, kind: $0) } ?? .source
-        let markdownMode = mode.markdownEditorMode(for: previewKind)
         let changesRevision = workbench.allSessions.reduce(0) { $0 + $1.changesRevision }
         let markers: [Int: LineMarker] = {
             guard let marks = agentMarks, doc.text == marks.text else { return [:] }
@@ -147,7 +146,6 @@ struct FileTabView: View {
                     CodeEditor(text: text, language: SyntaxLanguage.detect(path: path), isEditable: !doc.isReadOnly, revealLine: tab.line, markers: markers,
                                diagnostics: lsp?.diagnostics ?? [], features: lsp?.features ?? EditorLanguageFeatures(),
                                onReferenceSelection: { range in referenceSelection(range, text: doc.text ?? text) },
-                               markdownMode: markdownMode,
                                onChange: { newText in doc.text = newText })
                         .environment(\.tabIsActive, isActive && mode.showsEditor)
                         .opacity(mode.showsEditor ? 1 : 0)
@@ -156,6 +154,8 @@ struct FileTabView: View {
                         .overlay {
                             if mode == .preview, let previewKind {
                                 TextPreviewView(kind: previewKind, text: text)
+                            } else if mode == .live {
+                                EditableMarkdownPreview(text: text, isEditable: !doc.isReadOnly) { doc.text = $0 }
                             }
                         }
                 } else if let failure = doc.loadError {
