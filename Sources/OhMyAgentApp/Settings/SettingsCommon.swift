@@ -110,14 +110,14 @@ struct SettingsForm<Content: View>: View {
                                             Rectangle().fill(OMColors.hairline).frame(height: 0.5).padding(.horizontal, OMSpacing.md)
                                         }
                                         rows[index]
-                                            .labeledContentStyle(SettingsLabeledContentStyle())
-                                            .toggleStyle(SettingsSwitchToggleStyle())
                                             .padding(.horizontal, OMSpacing.md)
                                             .padding(.vertical, OMSpacing.sm + 2)
                                             .frame(maxWidth: .infinity, alignment: .leading)
                                     }
                                 }
                             }
+                            .labeledContentStyle(SettingsLabeledContentStyle())
+                            .toggleStyle(SettingsSwitchToggleStyle())
                             .background(OMColors.card, in: RoundedRectangle(cornerRadius: OMRadius.card, style: .continuous))
                             .overlay(RoundedRectangle(cornerRadius: OMRadius.card, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
                             section.footer
