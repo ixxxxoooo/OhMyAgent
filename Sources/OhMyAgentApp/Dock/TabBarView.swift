@@ -17,8 +17,32 @@ private enum TabMetrics {
     static let spacing: CGFloat = 4
     /// 标签文字最大宽度
     static let labelMaxWidth: CGFloat = 180
-    /// 标签最小宽度:标题再短也撑到这个宽度(对齐 Cursor)
-    static let minWidth: CGFloat = 84
+}
+
+/// 宽度夹取布局:先按理想宽度量子视图,超过 `maxWidth` 时以 `maxWidth` 重新提议宽度(文字据此截断),
+/// 汇报给父视图的宽度永远等于子视图实际占用宽度,不会再出现「frame 宽度小于内容」的溢出。
+private struct ClampedWidthLayout: Layout {
+    /// 允许的最大宽度
+    let maxWidth: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let child = subviews.first else { return .zero }
+        let ideal = child.sizeThatFits(.unspecified)
+        let limit = min(maxWidth, proposal.width ?? maxWidth)
+        if ideal.width <= limit { return ideal }
+        return child.sizeThatFits(ProposedViewSize(width: limit, height: proposal.height))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews.first?.place(at: bounds.origin, anchor: .topLeading, proposal: ProposedViewSize(width: bounds.width, height: bounds.height))
+    }
+}
+
+private extension View {
+    /// 把视图宽度夹在 `maxWidth` 以内(超出部分由子视图自行截断)。
+    func clampedWidth(_ maxWidth: CGFloat) -> some View {
+        ClampedWidthLayout(maxWidth: maxWidth) { self }
+    }
 }
 
 /// 标签栏。
@@ -177,7 +201,7 @@ struct TabItemView: View {
 
     /// 标签当前的状态填充(无填充为 nil);背景与标题渐隐覆盖层共用,保证两者颜色一致。
     private var tabFill: Color? {
-        isActive ? OMColors.selectedFill : (hovering ? OMColors.hoverFill : nil)
+        isActive ? (hovering ? OMColors.subtleFill : nil) : (hovering ? OMColors.pressedFill : OMColors.hoverFill)
     }
 
     var body: some View {
@@ -193,19 +217,19 @@ struct TabItemView: View {
                 .font(OMFonts.small)
                 .italic(tab.isPreview)
                 .lineLimit(1)
-                .frame(maxWidth: TabMetrics.labelMaxWidth, alignment: .leading)
-                .fixedSize(horizontal: true, vertical: false)
+                .truncationMode(.tail)
+                // 标题宽度先按理想宽度量,超过上限再按上限重新排版并截断(避免文字溢出标签外压住相邻标签)
+                .clampedWidth(TabMetrics.labelMaxWidth)
                 // 未预留位置的标签(非选中)悬停出现关闭按钮时,标题末端淡出避免重叠
                 .omFadeTrailingEdge(width: 40, base: OMColors.surface, fill: tabFill, enabled: hovering && !reservesTrailing)
         }
         // 选中/固定/有未保存点的标签右侧预留 16pt 位置,其余标签保持紧凑
         .padding(.leading, 8)
         .padding(.trailing, reservesTrailing ? 24 : 8)
-        .frame(minWidth: TabMetrics.minWidth)
         // 关闭按钮/状态点叠在标签右端,不单独占位
         .overlay(alignment: .trailing) { trailing.padding(.trailing, 6) }
         .frame(height: TabMetrics.height)
-        .foregroundStyle(isActive ? OMColors.primaryText : OMColors.secondaryText)
+        .foregroundStyle(isActive ? OMColors.secondaryText : OMColors.primaryText)
         .background(
             RoundedRectangle(cornerRadius: TabMetrics.radius, style: .continuous)
                 .fill(tabFill ?? Color.clear)
@@ -241,10 +265,10 @@ struct TabItemView: View {
     private var icon: some View {
         if case .file(let path) = tab.kind {
             OMFileIcon(name: (path as NSString).lastPathComponent, size: 14)
-                .opacity(isActive ? 1 : 0.75)
+                .opacity(isActive ? 0.75 : 1)
         } else {
             Image.om(tabIcon(tab.kind), size: 12)
-                .foregroundStyle(isActive ? OMColors.primaryText : OMColors.tertiaryText)
+                .foregroundStyle(isActive ? OMColors.tertiaryText : OMColors.primaryText)
         }
     }
 

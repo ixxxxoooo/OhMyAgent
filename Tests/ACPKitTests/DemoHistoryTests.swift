@@ -165,6 +165,17 @@ struct PerfLabScenarioTests {
     }
 }
 
+@Suite("标签标题压力会话")
+struct TabTitleStressHistoryTests {
+    @Test("perf-multitab 含短/中/超长中英混合三种标题,用于核对标签栏截断与对齐")
+    func titles() {
+        let titles = DemoHistory.all.filter { $0.project == "perf-multitab" }.map(\.title)
+        #expect(titles.contains("短"))
+        #expect(titles.contains("项目文档与代码一致性"))
+        #expect(titles.contains { $0.count > 40 && $0.contains("Mixed") })
+    }
+}
+
 @Suite("演示文档守卫")
 struct DemoDocsGuardTests {
     /// 读取仓库内的文档文本(按测试文件位置回溯到仓库根)。
