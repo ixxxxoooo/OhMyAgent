@@ -22,4 +22,11 @@ struct SidebarRelativeTimeTests {
         let first = SidebarRelativeTime.text(for: date, now: now)
         #expect(SidebarRelativeTime.text(for: date, now: now.addingTimeInterval(10)) == first)
     }
+
+    /// 紧凑文案去掉「前」/「ago」后缀,其余原样。
+    @Test func compactStripsSuffix() {
+        #expect(SidebarRelativeTime.compact("18分钟前") == "18分钟")
+        #expect(SidebarRelativeTime.compact("3d ago") == "3d")
+        #expect(SidebarRelativeTime.compact("刚刚") == "刚刚")
+    }
 }

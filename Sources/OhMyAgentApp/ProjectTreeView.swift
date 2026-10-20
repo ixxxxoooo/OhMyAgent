@@ -1,7 +1,7 @@
 // @author ixxxxoooo
 // 左栏(对齐 kuku 的 Sidebar):顶部 35pt 标题区(红绿灯与侧栏开关浮层) → 主操作(新对话/搜索/自定义)
 // → 「置顶」「工作区」两个分区 → 底部设置。分区标题行右侧放筛选菜单与添加工作区;
-// 分组标题:文件夹图标 + 名称 + 会话数(悬停换成「+」);会话行:状态点 + 渐隐标题 + 固定 56pt 保留区(相对时间 ⇄ 置顶/归档)。
+// 分组标题:文件夹图标 + 名称 + 会话数(悬停换成「+」);会话行:状态点 + 渐隐标题 + 固定 44pt 保留区(相对时间 ⇄ 置顶/归档)。
 
 import ACPKit
 import ChatKit
@@ -523,6 +523,18 @@ enum SidebarRelativeTime {
         cache[key] = text
         return text
     }
+
+    /// 紧凑展示文案:去掉「前」/「ago」后缀,侧栏右侧保留区可以更窄(对齐 Cursor 的「9h」)。
+    /// - Parameter text: `text(for:now:)` 的结果
+    /// - Returns: 例如「5 分钟」「3d」
+    static func compact(_ text: String) -> String {
+        var result = text
+        for suffix in ["前", " ago", "ago"] where result.hasSuffix(suffix) {
+            result.removeLast(suffix.count)
+            break
+        }
+        return result.trimmingCharacters(in: .whitespaces)
+    }
 }
 
 /// 会话行:状态点 + 渐隐标题 + 固定 76pt 保留区(相对时间 ⇄ 悬停时的置顶/归档按钮),对齐 kuku 的 SessionRow。
@@ -557,7 +569,7 @@ private struct SessionLine: View {
                 // 渐隐用背景色渐变覆盖层(不用 .mask:避免每行离屏渲染);底色 = 侧栏背景 + 当前行状态填充
                 .omFadeTrailingEdge(width: 24, base: OMColors.sidebar, fill: isSelected ? OMColors.selectedFill : (hovering ? OMColors.hoverFill : nil))
             trailing
-                .frame(width: 56, height: 20, alignment: .trailing)
+                .frame(width: 44, height: 20, alignment: .trailing)
         }
         .padding(.leading, mode == .tree ? 16 : 8)
         .padding(.trailing, 8)
@@ -598,7 +610,7 @@ private struct SessionLine: View {
         } else if let date = item.updatedAt {
             HStack(spacing: 4) {
                 if isPinned { Image.om("pin.fill", size: 9) }
-                Text(SidebarRelativeTime.text(for: date))
+                Text(SidebarRelativeTime.compact(SidebarRelativeTime.text(for: date)))
                     .monospacedDigit()
                     .lineLimit(1)
             }
