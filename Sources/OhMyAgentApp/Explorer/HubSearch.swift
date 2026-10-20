@@ -41,6 +41,16 @@ final class HubModel {
 
     /// 平铺的结果(键盘选择用)。
     var flatItems: [HubItem] { sections.flatMap(\.items) }
+    /// 当前选中项的 id(越界为 nil);只遍历到选中位置,不拼接整个数组。
+    var selectedItemID: HubItem.ID? {
+        var remaining = selection
+        guard remaining >= 0 else { return nil }
+        for section in sections {
+            if remaining < section.items.count { return section.items[remaining].id }
+            remaining -= section.items.count
+        }
+        return nil
+    }
 
     /// 打开搜索窗。
     /// - Parameters:
@@ -405,6 +415,8 @@ struct HubOverlay: View {
                 .font(OMFonts.body).foregroundStyle(OMColors.secondaryText)
                 .frame(maxWidth: .infinity).frame(height: 120)
         } else {
+            // 选中项 id 只算一次(原先每行都展开全部分区,O(N²))
+            let selectedID = hub.selectedItemID
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
@@ -418,11 +430,11 @@ struct HubOverlay: View {
                                     .accessibilityAddTraits(.isHeader)
                             }
                             ForEach(section.items) { item in
-                                HubRow(item: item, selected: isSelected(item))
+                                HubRow(item: item, selected: item.id == selectedID)
                                     .id(item.id)
                                     .onTapGesture { hub.run(item) }
                                     .accessibilityElement(children: .combine)
-                                    .accessibilityAddTraits(isSelected(item) ? [.isButton, .isSelected] : .isButton)
+                                    .accessibilityAddTraits(item.id == selectedID ? [.isButton, .isSelected] : .isButton)
                             }
                         }
                     }
@@ -456,11 +468,6 @@ struct HubOverlay: View {
         }
         let headers = sections.filter { !$0.title.isEmpty }.count
         return rowsHeight + CGFloat(headers) * 26 + 8
-    }
-
-    private func isSelected(_ item: HubItem) -> Bool {
-        let flat = hub.flatItems
-        return flat.indices.contains(hub.selection) && flat[hub.selection].id == item.id
     }
 
     // MARK: 底部提示
