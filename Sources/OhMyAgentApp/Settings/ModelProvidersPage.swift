@@ -21,15 +21,14 @@ struct ModelProvidersPage: View {
     var body: some View {
         VStack(spacing: 0) {
             topBar
-            Divider()
-            if let provider = selectedProvider, !isDraftSelected {
-                enableBar(provider)
-                Divider()
-            }
             detail
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .onAppear { model.reload() }
+        .onAppear {
+            model.reload()
+            // 默认展开第一个提供商的配置
+            if selection == nil { selection = model.snapshot.providers.first?.id }
+        }
         .sheet(isPresented: $importing) { OpenCodeImportSheet(model: model) { importing = false } }
     }
 
@@ -130,27 +129,10 @@ struct ModelProvidersPage: View {
                 .padding(.horizontal, 10)
                 .frame(height: 26)
                 .background(OMPillShape().fill(selected ? OMColors.selectedFill : OMColors.subtleFill))
-                .overlay(OMPillShape().strokeBorder(selected ? OMColors.accent.opacity(0.6) : OMColors.hairline.opacity(0.6), lineWidth: selected ? 1 : 0.5))
-                .contentShape(OMPillShape())
+                                .contentShape(OMPillShape())
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? [.isSelected] : [])
-    }
-
-    /// 详情上方的启用条:名称 + 启用开关。
-    private func enableBar(_ provider: ModelProvider) -> some View {
-        HStack(spacing: 8) {
-            BrandIconView(BrandIcon.resolve(providerPreset: provider.presetId, providerName: provider.name), size: 16)
-                .foregroundStyle(OMColors.secondaryText)
-            Text(provider.name).font(OMFonts.sectionTitle)
-            Text(provider.model).font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText).lineLimit(1)
-            Spacer()
-            Text("启用").font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
-            OMSwitch(String(localized: "启用 \(provider.name)"), isOn: Binding(get: { provider.isEnabled }, set: { model.setEnabled(provider.id, $0) }))
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(OMColors.surface)
     }
 
     /// 状态点颜色:停用灰、缺密钥橙、可用绿。

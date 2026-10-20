@@ -15,7 +15,7 @@ struct ModelMappingPage: View {
     @AppStorage(ClientPrefs.Key.optimizeModel) private var optimizeChoice = ""
 
     var body: some View {
-        Form {
+        SettingsForm {
             Section {
                 Note("给 Claude Code 里的每个模型槽位指定真实使用的模型。输入框里的模型选择器会显示这里选定的模型;未设置默认槽位时,沿用 ~/.claude 里的配置(也就是你在终端里使用的 claude)。")
                 if model.snapshot.providers.isEmpty {
@@ -52,8 +52,6 @@ struct ModelMappingPage: View {
                 }
             }
         }
-        .formStyle(.grouped)
-        .settingsSurface()
         .onAppear { model.reload() }
     }
 

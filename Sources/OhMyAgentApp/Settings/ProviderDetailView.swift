@@ -21,6 +21,8 @@ struct ProviderDetailView: View {
     @State private var showFetch = false
     @State private var newModelId = ""
     @State private var confirmDelete = false
+    /// 启用状态(立即写入设置,不走草稿保存)
+    @State private var enabled: Bool
 
     /// 创建详情。
     /// - Parameters:
@@ -35,20 +37,20 @@ struct ProviderDetailView: View {
         self.onSaved = onSaved
         self.onDelete = onDelete
         _draft = State(initialValue: initial)
+        _enabled = State(initialValue: initial.isEnabled)
         _keyText = State(initialValue: model.key(id: initial.id) ?? "")
     }
 
     private var preset: ProviderPreset? { ProviderPreset.all.first { $0.id == draft.presetId } }
 
     var body: some View {
-        Form {
+        SettingsForm {
+            if !isNew { enableSection }
             connectionSection
             modelsSection
             advancedSection
             actionsSection
         }
-        .formStyle(.grouped)
-        .settingsSurface()
         .sheet(isPresented: $showFetch) {
             ModelFetchSheet(provider: draft, key: keyText, existing: Set(draft.modelList.map(\.id))) { ids in
                 draft.mergeModels(ids)
@@ -62,6 +64,16 @@ struct ProviderDetailView: View {
             }
         } message: {
             Text("提供商配置与已保存的密钥都会被删除。")
+        }
+    }
+
+    // MARK: - 启用
+
+    /// 启用开关(名称已在顶部胶囊条显示,这里不再重复标题)。
+    private var enableSection: some View {
+        Section {
+            Toggle("启用此提供商", isOn: Binding(get: { enabled }, set: { enabled = $0; model.setEnabled(draft.id, $0) }))
+                .toggleStyle(.switch).controlSize(.small)
         }
     }
 

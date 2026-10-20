@@ -59,6 +59,19 @@ struct ScopeHeader: View {
     }
 }
 
+/// 卡片内的标签行样式:标签在左、内容靠右(系统样式只在 `Form` 里才右对齐)。
+struct SettingsLabeledContentStyle: LabeledContentStyle {
+    /// - Parameter configuration: 标签与内容
+    /// - Returns: 左右分布的行
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(alignment: .center, spacing: OMSpacing.md) {
+            configuration.label
+            Spacer(minLength: OMSpacing.md)
+            configuration.content
+        }
+    }
+}
+
 /// 页面骨架:把 `Section` 渲染成与卡片页(`SettingsScroll`/`SettingsCard`)一致的分组卡片,
 /// 这样所有设置页的内容区宽度都由「外观 → 设置页宽度」统一控制(系统分组表单自身有宽度上限,不随档位变化)。
 struct SettingsForm<Content: View>: View {
@@ -76,12 +89,12 @@ struct SettingsForm<Content: View>: View {
                                 .padding(.horizontal, OMSpacing.xs)
                             VStack(alignment: .leading, spacing: 0) {
                                 section.content
+                                    .labeledContentStyle(SettingsLabeledContentStyle())
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(.horizontal, OMSpacing.md)
                                     .padding(.vertical, OMSpacing.sm)
                             }
                             .background(OMColors.card, in: RoundedRectangle(cornerRadius: OMRadius.card, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: OMRadius.card, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
                             section.footer
                                 .font(OMFonts.caption)
                                 .foregroundStyle(OMColors.secondaryText)
@@ -105,7 +118,6 @@ extension View {
         scrollContentBackground(.hidden)
             .padding(8)
             .background(OMColors.surface, in: RoundedRectangle(cornerRadius: OMMetrics.controlRadius, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: OMMetrics.controlRadius, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
     }
 
     /// 设置页右侧内容区统一背景:隐藏系统分组表单/列表自带的底色,铺 `OMColors.surface`,避免上下色差。

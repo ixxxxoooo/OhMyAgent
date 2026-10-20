@@ -163,7 +163,6 @@ struct AppearancePage: View {
                 ThemeMiniWorkbench(package: appearance.themePackage)
                     .frame(height: 170)
                     .clipShape(RoundedRectangle(cornerRadius: OMMetrics.cardRadius, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: OMMetrics.cardRadius, style: .continuous).strokeBorder(OMColors.hairline))
                     .accessibilityLabel(Text("主题预览"))
 
                 HStack(spacing: 8) {
@@ -445,7 +444,6 @@ struct ThemeCardPublic: View {
                 ThemeMiniWorkbench(package: package)
                     .frame(height: 72)
                     .clipShape(RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
                 HStack(spacing: 4) {
                     Text(package.name).font(OMFonts.small).lineLimit(1)
                     Spacer(minLength: 0)
@@ -454,7 +452,7 @@ struct ThemeCardPublic: View {
             }
             .padding(6)
             .background(selected ? OMColors.selectedFill : Color.clear, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous).strokeBorder(selected ? OMColors.accent : OMColors.hairline.opacity(0.6), lineWidth: selected ? 1.5 : 0.5))
+            .overlay(RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous).strokeBorder(selected ? OMColors.accent : Color.clear, lineWidth: 1.5))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
