@@ -2687,7 +2687,6 @@
 "无法启动 claude:%@" = "Unable to launch claude: %@";
 "claude 命令超时" = "claude command timed out";
 "找不到可执行文件 %@" = "Executable not found: %@";
-"未实现的方法:%@" = "Method not implemented: %@";
 "不支持的鉴权方式:%@" = "Unsupported authentication method: %@";
 "缺少或非法的 sessionId" = "Missing or invalid sessionId";
 "缺少 modeId" = "Missing modeId";
@@ -2707,3 +2706,14 @@
 "claude 进程已退出:%@" = "The claude process exited: %@";
 "拖放" = "Drop";
 "启用此提供商" = "Enable this provider";
+"关于" = "About";
+"版本" = "Version";
+"原生 macOS 的 Agent 工作台,通过 ACP 接管本机已安装的 Claude Code。" = "A native macOS agent workbench that drives your locally installed Claude Code via ACP.";
+"连通性测试" = "Connectivity test";
+"重新测试" = "Test again";
+"测试中…" = "Testing…";
+"%lld 个网站中 %lld 个可以访问。" = "%2$lld of %1$lld sites reachable.";
+"检查更新" = "Check for updates";
+"连通性" = "Connectivity";
+"测试" = "Test";
+"延迟" = "Latency";

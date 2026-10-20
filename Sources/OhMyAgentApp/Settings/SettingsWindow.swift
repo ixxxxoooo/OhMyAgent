@@ -14,7 +14,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
     case agent, providers, modelMapping, prompts, network, permissions, trust, agentExtensions
     case mcp, skills, subagents, hooks, plugins, memory
     case editor, terminal, browser, sourceControl, codeIntelligence
-    case usage, privacy, advanced, diagnostics
+    case usage, privacy, advanced, diagnostics, about
     var id: String { rawValue }
 
     /// 设置搜索的附加关键词(页标题之外还能搜到的词)。
@@ -29,6 +29,8 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .providers: return ["provider", "api", "密钥", "key", "openai", "anthropic"]
         case .agentExtensions: return ["acp", "registry", "codex", "gemini", "pi", "opencode", "注册表"]
         case .shortcuts: return ["快捷键", "shortcut", "keybinding"]
+        case .about: return ["关于", "about", "版本", "version", "更新", "update", "升级", "检查更新"]
+        case .network: return ["网络", "代理", "proxy", "连通性", "测试", "connectivity", "ping", "延迟"]
         case .sourceControl: return ["git", "提交", "commit", "署名", "co-authored-by", "提交说明", "scm", "工作树", "worktree"]
         case .browser: return ["browser", "浏览器", "网页", "webview", "cookie", "审批", "localhost"]
         case .codeIntelligence: return ["lsp", "语言服务器", "诊断", "补全", "忽略", "ignore", "glob", "索引", "language server"]
@@ -48,7 +50,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         (String(localized: "客户端"), [.general, .appearance, .shortcuts]),
         ("Agent", [.agent, .providers, .modelMapping, .prompts, .network, .permissions, .trust, .agentExtensions]),
         (String(localized: "工作台"), [.editor, .terminal, .browser, .sourceControl, .codeIntelligence]),
-        (String(localized: "其他"), [.usage, .privacy, .advanced, .diagnostics]),
+        (String(localized: "其他"), [.usage, .privacy, .advanced, .diagnostics, .about]),
     ]
 
     var title: String {
@@ -79,6 +81,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .privacy: return String(localized: "隐私与遥测")
         case .advanced: return String(localized: "高级")
         case .diagnostics: return String(localized: "诊断")
+        case .about: return String(localized: "关于")
         }
     }
 
@@ -110,6 +113,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .privacy: return "hand.raised"
         case .advanced: return "wrench.and.screwdriver"
         case .diagnostics: return "stethoscope"
+        case .about: return "info"
         }
     }
 }
@@ -293,6 +297,7 @@ struct SettingsView: View {
         case .privacy: PrivacyPage(model: model)
         case .advanced: AdvancedPage(model: model)
         case .diagnostics: DiagnosticsPage(center: center)
+        case .about: AboutPage()
         }
     }
 }
