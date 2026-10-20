@@ -29,6 +29,8 @@ final class HubModel {
     private(set) var sections: [HubSection] = []
     @ObservationIgnored private weak var workbench: WorkbenchModel?
     @ObservationIgnored private var commands: [String: PaletteCommand] = [:]
+    /// 文件结果的接管处理(只对本次打开有效)
+    @ObservationIgnored private var fileOpener: ((String) -> Void)?
     /// 候选缓存:打开窗口时构建一次(文件索引完成后重建),输入时只做排序
     @ObservationIgnored private var candidates: [HubCandidate] = []
 
@@ -57,7 +59,9 @@ final class HubModel {
     ///   - segment: 初始分类
     ///   - workbench: 工作台
     ///   - query: 预填查询
-    func present(_ segment: HubSegment = .all, workbench: WorkbenchModel, query: String = "") {
+    ///   - fileOpener: 选中文件结果时的接管处理(Files 工作区借此原地打开);nil 表示打开为独立标签
+    func present(_ segment: HubSegment = .all, workbench: WorkbenchModel, query: String = "", fileOpener: ((String) -> Void)? = nil) {
+        self.fileOpener = fileOpener
         self.workbench = workbench
         self.segment = segment
         self.query = query
@@ -160,6 +164,8 @@ final class HubModel {
 
     /// 执行某一项并关闭窗口。
     func run(_ item: HubItem) {
+        let opener = fileOpener
+        fileOpener = nil
         let isTheme = if case .theme = item.candidate.action { true } else { false }
         if isTheme {
             // 用户显式选用该主题:提交并不再还原
@@ -173,7 +179,8 @@ final class HubModel {
         case .project(let path):
             _ = workbench.openProject(URL(fileURLWithPath: path))
         case .file(let root, let relative):
-            workbench.openFile((root as NSString).appendingPathComponent(relative), preview: false)
+            let path = (root as NSString).appendingPathComponent(relative)
+            if let opener { opener(path) } else { workbench.openFile(path, preview: false) }
         case .command(let id):
             commands[id]?.run()
         case .settings(let page):

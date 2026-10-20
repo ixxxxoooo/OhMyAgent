@@ -49,7 +49,7 @@ struct TabContentView: View {
             } else if let browserID = WorkbenchModel.browserID(fromTab: id) {
                 BrowserTabView(browserID: browserID, workspace: workbench.selectedProjectID ?? NSHomeDirectory()).id(browserID)
             } else if let pane = WorkbenchModel.toolsPane(fromTab: id) {
-                ToolsTabView(workbench: workbench, pane: pane)
+                ToolsTabView(workbench: workbench, tab: tab, pane: pane)
             } else if let canvasID = WorkbenchModel.canvasID(fromTab: id) {
                 CanvasTabView(canvasID: canvasID).id(canvasID)
             } else if let planPath = WorkbenchModel.planPath(fromTab: id) {
@@ -93,6 +93,10 @@ struct FileTabView: View {
     let workbench: WorkbenchModel
     let tab: WorkbenchTab
     let path: String
+    /// Files 工作区内嵌时的附加控件(← → 与收起资源管理器);普通文件标签为 nil
+    var filesControls: FilesHeaderControls?
+    /// 内嵌时面包屑下拉里点选文件的处理(原地打开);nil 表示按默认方式打开标签
+    var openInPlace: ((String) -> Void)?
     private let store = FileDocumentStore.shared
     /// 标签是否可见(保活的后台标签不做轮询)
     @Environment(\.tabIsActive) private var isActive
@@ -112,7 +116,15 @@ struct FileTabView: View {
     var body: some View {
         if let kind = FilePreviewKind.of(path: path), kind.isBinary {
             // 图片 / PDF:只有预览,不当作文本载入
-            BinaryPreviewTab(path: path, kind: kind)
+            VStack(spacing: 0) {
+                // 普通文件标签的图片/PDF 没有面包屑条;Files 工作区内嵌时需要它来承载 ← → 与收起按钮
+                if filesControls != nil {
+                    FileHeaderBar(
+                        path: path, projectRoot: projectRoot(), modes: [], mode: .source, onMode: { _ in }, currentText: { nil },
+                        onOpen: { target in openInPlace?(target) }, filesControls: filesControls)
+                }
+                BinaryPreviewTab(path: path, kind: kind)
+            }
         } else {
             textBody
         }
@@ -136,9 +148,12 @@ struct FileTabView: View {
                 mode: mode,
                 onMode: { mode in previewKind.map { FileViewModeStore.shared.set(mode, for: $0) } },
                 currentText: { doc.text },
-                onOpen: { workbench.openFile($0, preview: true) },
+                onOpen: { target in
+                    if let openInPlace { openInPlace(target) } else { workbench.openFile(target, preview: true) }
+                },
                 isComparing: comparing,
-                onToggleCompare: { comparing.toggle() }
+                onToggleCompare: { comparing.toggle() },
+                filesControls: filesControls
             )
             banner(doc)
             Group {

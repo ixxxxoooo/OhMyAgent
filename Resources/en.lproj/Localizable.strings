@@ -2670,3 +2670,9 @@
 "收起侧边面板" = "Hide Side Panel";
 "显示更早的 %lld 条" = "Show %lld earlier items";
 "新增标签" = "New Tab";
+"展开资源管理器" = "Show explorer";
+"收起资源管理器" = "Hide explorer";
+"调整资源管理器宽度" = "Resize explorer";
+"最近" = "Recent";
+"文件、文件夹…" = "Files, folders…";
+"搜索文件或文件夹" = "Search files or folders";

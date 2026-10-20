@@ -63,6 +63,10 @@ public struct WorkbenchLayout: Codable, Equatable, Sendable {
     public var terminalListWidth: Double = PanelMetrics.terminalListDefault
     /// 终端列表是否被用户手动折叠
     public var terminalListCollapsed = false
+    /// Files 工作区右侧资源管理器的宽度
+    public var filesTreeWidth: Double = PanelMetrics.filesTreeDefault
+    /// Files 工作区右侧资源管理器是否收起
+    public var filesTreeCollapsed = false
     /// 旧版本布局迁移信息(不持久化;读取旧状态文件时产生,由工作台启动时消费)
     public var legacyMigration: LegacyPanelMigration?
 
@@ -70,7 +74,7 @@ public struct WorkbenchLayout: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case leftVisible, rightVisible, leftWidth, rightWidth
-        case leftPane, placement, fileOpenTarget, terminalListWidth, terminalListCollapsed
+        case leftPane, placement, fileOpenTarget, terminalListWidth, terminalListCollapsed, filesTreeWidth, filesTreeCollapsed
     }
 
     /// 旧版本才有的键,只读取用于迁移。
@@ -96,6 +100,8 @@ public struct WorkbenchLayout: Codable, Equatable, Sendable {
         fileOpenTarget = (try? c.decodeIfPresent(OpenTarget.self, forKey: .fileOpenTarget)) ?? .right
         terminalListWidth = try c.decodeIfPresent(Double.self, forKey: .terminalListWidth) ?? PanelMetrics.terminalListDefault
         terminalListCollapsed = try c.decodeIfPresent(Bool.self, forKey: .terminalListCollapsed) ?? false
+        filesTreeWidth = try c.decodeIfPresent(Double.self, forKey: .filesTreeWidth) ?? PanelMetrics.filesTreeDefault
+        filesTreeCollapsed = try c.decodeIfPresent(Bool.self, forKey: .filesTreeCollapsed) ?? false
         // 迁移旧布局:底部/侧栏里可见的终端与输出、右栏正显示的工具视图,都变成右栏停靠区里的标签
         if let legacy = try? decoder.container(keyedBy: LegacyKeys.self) {
             let old = (try? legacy.decodeIfPresent(LegacyPlacement.self, forKey: .placement)) ?? nil
@@ -121,6 +127,7 @@ public struct WorkbenchLayout: Codable, Equatable, Sendable {
         leftWidth = min(max(leftWidth, PanelMetrics.leftRange.lowerBound), PanelMetrics.leftRange.upperBound)
         rightWidth = PanelDimension.rightWidth.clamp(rightWidth)
         terminalListWidth = min(max(terminalListWidth, PanelMetrics.terminalListRange.lowerBound), PanelMetrics.terminalListRange.upperBound)
+        filesTreeWidth = min(max(filesTreeWidth, PanelMetrics.filesTreeRange.lowerBound), PanelMetrics.filesTreeRange.upperBound)
         if !LeftPane.available.contains(leftPane) { leftPane = .sessions }
     }
 }

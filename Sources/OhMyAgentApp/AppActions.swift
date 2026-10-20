@@ -130,7 +130,7 @@ final class AppActions {
     func refreshDirtyFlags() {
         let workbench = AppEnvironment.shared.workbench
         for tab in workbench.allDockTabs {
-            if case .file(let path) = tab.kind {
+            if let path = FilesWorkspaceStore.shared.filePath(of: tab, project: workbench.selectedProjectID) {
                 workbench.setDirty(FileDocumentStore.shared.documents[path]?.isDirty ?? false, for: tab.id)
             }
         }
@@ -139,7 +139,7 @@ final class AppActions {
     /// 保存当前聚焦标签对应的文件。
     func saveActiveFile() {
         let workbench = AppEnvironment.shared.workbench
-        guard case .file(let path)? = workbench.focusedActiveTab?.kind else { return }
+        guard let tab = workbench.focusedActiveTab, let path = FilesWorkspaceStore.shared.filePath(of: tab, project: workbench.selectedProjectID) else { return }
         Task { _ = await FileDocumentStore.shared.save(path); refreshDirtyFlags() }
     }
 
@@ -150,7 +150,8 @@ final class AppActions {
 
     /// 是否存在可保存的当前文件(供菜单启用状态)。
     var canSaveActiveFile: Bool {
-        guard case .file(let path)? = AppEnvironment.shared.workbench.focusedActiveTab?.kind else { return false }
+        let workbench = AppEnvironment.shared.workbench
+        guard let tab = workbench.focusedActiveTab, let path = FilesWorkspaceStore.shared.filePath(of: tab, project: workbench.selectedProjectID) else { return false }
         return FileDocumentStore.shared.documents[path]?.isDirty ?? false
     }
 
@@ -168,7 +169,7 @@ final class AppActions {
     func requestCloseTab(_ id: UUID) {
         let workbench = AppEnvironment.shared.workbench
         guard let tab = workbench.anyTab(id) else { return }
-        guard case .file(let path) = tab.kind, let doc = FileDocumentStore.shared.documents[path], doc.isDirty else {
+        guard let path = FilesWorkspaceStore.shared.filePath(of: tab, project: workbench.selectedProjectID), let doc = FileDocumentStore.shared.documents[path], doc.isDirty else {
             workbench.closeTab(id)
             return
         }

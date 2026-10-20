@@ -67,6 +67,24 @@ struct PanelPlacementModelTests {
         #expect(layout.terminalListWidth == PanelMetrics.terminalListRange.lowerBound)
     }
 
+    @Test("Files 资源管理器宽度与收起状态可往返、被限制在范围内,旧状态文件取默认值")
+    func filesTreeLayout() throws {
+        var layout = WorkbenchLayout()
+        layout.filesTreeWidth = 300
+        layout.filesTreeCollapsed = true
+        let data = try JSONEncoder().encode(layout)
+        #expect(try JSONDecoder().decode(WorkbenchLayout.self, from: data) == layout)
+        layout.filesTreeWidth = 9999
+        layout.clamp()
+        #expect(layout.filesTreeWidth == PanelMetrics.filesTreeRange.upperBound)
+        layout.filesTreeWidth = 1
+        layout.clamp()
+        #expect(layout.filesTreeWidth == PanelMetrics.filesTreeRange.lowerBound)
+        let old = try JSONDecoder().decode(WorkbenchLayout.self, from: Data("{}".utf8))
+        #expect(old.filesTreeWidth == PanelMetrics.filesTreeDefault)
+        #expect(!old.filesTreeCollapsed)
+    }
+
     @Test("未知的摆放取值回落到默认值,不会让整个状态文件失效")
     func unknownValues() throws {
         let json = #"{"placement":{"sidebarSide":"up"}}"#

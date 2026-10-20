@@ -82,6 +82,8 @@ public final class WorkbenchModel {
     @ObservationIgnored public let warmPool = EngineWarmPool()
     /// 选中项目变化回调(应用层据此安排预热)。
     @ObservationIgnored public var onProjectSelected: (@MainActor (String) -> Void)?
+    /// 文件被打开(任何入口)时回调,应用层据此记录「最近文件」。
+    @ObservationIgnored public var onFileOpened: (@MainActor (String) -> Void)?
     /// 项目被移除后回调(应用层据此结束该项目的常驻终端进程)。
     @ObservationIgnored public var onProjectRemoved: (@MainActor (String) -> Void)?
     @ObservationIgnored public var makeAgentSession: (@MainActor (URL, String) -> SessionModel?)?
@@ -401,7 +403,8 @@ public final class WorkbenchModel {
     ///   - preview: 是否预览方式
     @discardableResult
     public func openFile(_ path: String, line: Int? = nil, preview: Bool = true, target: OpenTarget = .auto) -> UUID {
-        openTab(.file(path: path), title: (path as NSString).lastPathComponent, preview: preview, line: line, host: resolveHost(target))
+        onFileOpened?(path)
+        return openTab(.file(path: path), title: (path as NSString).lastPathComponent, preview: preview, line: line, host: resolveHost(target))
     }
 
     /// 打开单个文件的差异标签。

@@ -8,6 +8,8 @@ import WorkbenchKit
 /// 编辑区里的工具面板(文件 / 搜索 / Git),复用右栏同一套视图。
 struct ToolsTabView: View {
     @Bindable var workbench: WorkbenchModel
+    /// 承载本视图的标签
+    let tab: WorkbenchTab
     /// 要显示的右栏视图
     let pane: RightPane
 
@@ -16,7 +18,7 @@ struct ToolsTabView: View {
             switch pane {
             case .git: SCMView(workbench: workbench)
             case .search: SearchPaneView(workbench: workbench)
-            default: ExplorerView(workbench: workbench)
+            default: FilesWorkspaceView(workbench: workbench, tab: tab)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)

@@ -10,8 +10,19 @@ import OMLog
 import SwiftUI
 import WorkbenchKit
 
+/// 资源管理器的外部接管点:Files 工作区用它让「单击文件」在左侧内容区原地打开,并按自己的当前文件高亮。
+struct ExplorerHooks {
+    /// 单击文件(不含 ⌥ 点击):为 nil 时走默认的 `workbench.openFile(preview: true)`
+    var openFile: ((String) -> Void)?
+    /// 高亮的文件路径:为 nil 时取当前聚焦标签的文件
+    var activePath: String?
+    /// 资源管理器顶部工具条右侧的附加按钮(如「收起」)
+    var trailingAction: (icon: String, help: LocalizedStringKey, action: () -> Void)?
+}
+
 struct ExplorerView: View {
     let workbench: WorkbenchModel
+    var hooks = ExplorerHooks()
 
     /// 某根目录的 Git 装饰(随状态轮询更新;非仓库时为空)
     fileprivate static func decorations(forRoot root: String) -> GitDecorationIndex {
@@ -20,7 +31,7 @@ struct ExplorerView: View {
 
     var body: some View {
         if let project = workbench.selectedProject {
-            ExplorerProjectView(projectID: project.id, projectName: project.name, extraFolders: project.extraFolders, workbench: workbench)
+            ExplorerProjectView(projectID: project.id, projectName: project.name, extraFolders: project.extraFolders, workbench: workbench, hooks: hooks)
                 .id(project.id)
         } else {
             OMEmptyState { Label("没有项目", om: "folder", size: 28) } description: { Text("添加一个项目后,这里会显示它的文件。") }
@@ -40,6 +51,7 @@ private struct ExplorerProjectView: View {
     let projectName: String
     let extraFolders: [String]
     let workbench: WorkbenchModel
+    let hooks: ExplorerHooks
     private let model = ExplorerModel.shared
     @State private var tree = ExplorerTree()
     @State private var window = ExplorerScrollWindow()
@@ -63,6 +75,7 @@ private struct ExplorerProjectView: View {
                 toolButton("folder-plus", "新建文件夹") { ExplorerActions.create(in: projectID, directory: true, workbench: workbench) }
                 toolButton("chevrons-down-up", "折叠全部文件夹") { model.collapseAll() }
                 toolButton("refresh-cw", "刷新") { model.bump(); WorkspaceIndexModel.shared.refresh(root: projectID) }
+                if let trailing = hooks.trailingAction { toolButton(trailing.icon, trailing.help, action: trailing.action) }
             }
             .padding(.horizontal, 10).padding(.vertical, 6)
             ScrollView {
@@ -115,7 +128,7 @@ private struct ExplorerProjectView: View {
         VStack(alignment: .leading, spacing: 0) {
             Color.clear.frame(height: CGFloat(range.lowerBound) * Self.rowHeight)
             ForEach(visible) { item in
-                ExplorerTreeRow(item: item, project: projectID, tree: tree, workbench: workbench,
+                ExplorerTreeRow(item: item, project: projectID, tree: tree, workbench: workbench, openFile: hooks.openFile,
                                 decoration: item.isRootHeader ? nil : decorations[item.root]?.kind(for: item.entry.path),
                                 isActive: !item.entry.isDirectory && activePath == item.entry.path,
                                 isDropTarget: dropRowID == item.id)
@@ -126,6 +139,7 @@ private struct ExplorerProjectView: View {
     }
 
     private var activeFilePath: String? {
+        if let path = hooks.activePath { return path }
         if case .file(let path)? = workbench.focusedActiveTab?.kind { return path }
         return nil
     }
@@ -144,6 +158,8 @@ private struct ExplorerTreeRow: View {
     let project: String
     let tree: ExplorerTree
     let workbench: WorkbenchModel
+    /// 单击文件的外部接管(见 `ExplorerHooks.openFile`)
+    let openFile: ((String) -> Void)?
     let decoration: GitDecorationKind?
     let isActive: Bool
     /// 拖入的文件正悬停在本行(放置目标高亮)
@@ -154,7 +170,11 @@ private struct ExplorerTreeRow: View {
         ExplorerRow(depth: item.depth, name: entry.name, isDirectory: entry.isDirectory, expanded: item.isExpanded,
                     chevron: entry.isDirectory ? (item.isExpanded ? "chevron-down" : "chevron-right") : nil,
                     isActive: isActive, decoration: decoration, isDropTarget: isDropTarget) {
-            if entry.isDirectory { tree.toggle(entry.path) } else { workbench.openFile(entry.path, preview: true, target: NSEvent.modifierFlags.contains(.option) ? workbench.oppositeTarget : .auto) }
+            if entry.isDirectory { tree.toggle(entry.path); return }
+            let optionHeld = NSEvent.modifierFlags.contains(.option)
+            // 被接管时:普通单击交给外部(原地打开);⌥ 点击仍按「反向位置」独立打开
+            if let openFile, !optionHeld { openFile(entry.path) }
+            else { workbench.openFile(entry.path, preview: true, target: optionHeld ? workbench.oppositeTarget : .auto) }
         }
         .simultaneousGesture(TapGesture(count: 2).onEnded { if !entry.isDirectory { workbench.openFile(entry.path, preview: false) } })
         // 拖到输入框 = 引用 @路径;拖到标签栏/内容区 = 打开;拖到资源管理器的文件夹 = 移动(附加文件夹根不可拖)
@@ -380,7 +400,9 @@ enum ExplorerActions {
         !name.isEmpty && !name.contains("/") && name != "." && name != ".."
     }
 
-    static func create(in directory: String, directory isDirectory: Bool, workbench: WorkbenchModel) {
+    /// 新建文件或文件夹。
+    /// - Parameter onCreated: 新建的是文件时的回调(Files 工作区借此原地打开);nil 时按默认方式打开标签
+    static func create(in directory: String, directory isDirectory: Bool, workbench: WorkbenchModel, onCreated: ((String) -> Void)? = nil) {
         guard let name = prompt(title: isDirectory ? String(localized: "新建文件夹") : String(localized: "新建文件"), validate: nameError), isValidName(name) else { return }
         let target = (directory as NSString).appendingPathComponent(name)
         Task {
@@ -397,7 +419,7 @@ enum ExplorerActions {
             Log.editor.info("资源管理器新建", ["path": target, "dir": "\(isDirectory)"])
             ExplorerModel.shared.bump()
             WorkspaceIndexModel.shared.refresh(root: workbench.selectedProjectID)
-            if !isDirectory { workbench.openFile(target, preview: false) }
+            if !isDirectory { if let onCreated { onCreated(target) } else { workbench.openFile(target, preview: false) } }
         }
     }
 
@@ -418,6 +440,9 @@ enum ExplorerActions {
                 if case .file(let p) = tab.kind { return p == source || p.hasPrefix(source + "/") }
                 return false
             }
+            // Files 工作区与「最近文件」里指向旧路径的记录一并清除
+            FilesWorkspaceStore.shared.forget(source)
+            RecentStore.removeFiles(at: source)
             ExplorerModel.shared.bump()
             WorkspaceIndexModel.shared.refresh(root: workbench.selectedProjectID)
         }
@@ -437,6 +462,9 @@ enum ExplorerActions {
                 if case .file(let p) = tab.kind { return p == source || p.hasPrefix(source + "/") }
                 return false
             }
+            // Files 工作区与「最近文件」里指向旧路径的记录一并清除
+            FilesWorkspaceStore.shared.forget(source)
+            RecentStore.removeFiles(at: source)
             ExplorerModel.shared.bump()
             WorkspaceIndexModel.shared.refresh(root: workbench.selectedProjectID)
         }

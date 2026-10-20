@@ -8,6 +8,17 @@ import IconKit
 import SwiftUI
 import WorkbenchKit
 
+/// Files 工作区在面包屑条上附加的控件:← → 文件导航与右侧资源管理器的收起/展开。
+struct FilesHeaderControls {
+    var canGoBack: Bool
+    var canGoForward: Bool
+    var onBack: () -> Void
+    var onForward: () -> Void
+    /// 右侧资源管理器当前是否收起
+    var treeCollapsed: Bool
+    var onToggleTree: () -> Void
+}
+
 /// 文件面包屑工具条。
 struct FileHeaderBar: View {
     /// 文件绝对路径
@@ -25,30 +36,60 @@ struct FileHeaderBar: View {
     /// 是否正在「对比 HEAD」;`onToggleCompare` 为 nil 时不显示该按钮
     var isComparing = false
     var onToggleCompare: (() -> Void)?
+    /// Files 工作区附加控件;nil 表示普通文件标签
+    var filesControls: FilesHeaderControls?
 
     @State private var copied = false
     /// 当前展开下拉的面包屑段(绝对路径)
     @State private var openedSegment: String?
 
     var body: some View {
-        HStack(spacing: 10) {
-            breadcrumb
-            Spacer(minLength: 8)
-            if modes.count > 1 {
-                HeaderIconButton(icon: mode.toggleIcon, help: mode == .preview ? "切换到源码" : "切换到预览", tint: nil) { onMode(mode.other) }
-            }
-            if let onToggleCompare {
-                HeaderIconButton(icon: "file-diff", help: isComparing ? "返回编辑器" : "对比 HEAD(Git 差异)", tint: isComparing ? OMColors.accent : nil, action: onToggleCompare)
-            }
-            iconButton(copied ? "check" : "copy", help: copied ? "已复制" : "复制内容", tint: copied ? OMColors.success : nil) { copy() }
-            iconButton("folder-open", help: "在 Finder 中显示") {
-                NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+        Group {
+            if filesControls == nil {
+                row(compact: false)
+            } else {
+                // Files 工作区的内容区可能很窄:放不下时去掉次要按钮(对比/复制/Finder),保证面包屑与 ← → 可见
+                ViewThatFits(in: .horizontal) {
+                    row(compact: false)
+                    row(compact: true)
+                }
             }
         }
         .padding(.horizontal, 14)
         .frame(height: 30)
         // 与内容区同色(OMColors.surface),不再画底部分隔线
         .background(OMColors.surface)
+    }
+
+    /// 一行内容。
+    /// - Parameter compact: 紧凑模式:省略对比、复制与在 Finder 中显示
+    private func row(compact: Bool) -> some View {
+        HStack(spacing: 10) {
+            if let controls = filesControls {
+                HStack(spacing: 0) {
+                    HeaderIconButton(icon: "arrow-left", help: "后退", tint: nil, isEnabled: controls.canGoBack, action: controls.onBack)
+                    HeaderIconButton(icon: "arrow-right", help: "前进", tint: nil, isEnabled: controls.canGoForward, action: controls.onForward)
+                }
+            }
+            breadcrumb
+            Spacer(minLength: 8)
+            if modes.count > 1 {
+                HeaderIconButton(icon: mode.toggleIcon, help: mode == .preview ? "切换到源码" : "切换到预览", tint: nil) { onMode(mode.other) }
+            }
+            if !compact {
+                if let onToggleCompare {
+                    HeaderIconButton(icon: "file-diff", help: isComparing ? "返回编辑器" : "对比 HEAD(Git 差异)", tint: isComparing ? OMColors.accent : nil, action: onToggleCompare)
+                }
+                iconButton(copied ? "check" : "copy", help: copied ? "已复制" : "复制内容", tint: copied ? OMColors.success : nil) { copy() }
+                iconButton("folder-open", help: "在 Finder 中显示") {
+                    NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+                }
+            }
+            if let controls = filesControls {
+                HeaderIconButton(icon: controls.treeCollapsed ? "panel-right" : "panel-right-close",
+                                 help: controls.treeCollapsed ? "展开资源管理器" : "收起资源管理器", tint: nil, action: controls.onToggleTree)
+            }
+        }
     }
 
     // MARK: 面包屑
@@ -99,6 +140,7 @@ private struct HeaderIconButton: View {
     let icon: String
     let help: LocalizedStringKey
     let tint: Color?
+    var isEnabled = true
     let action: () -> Void
     @State private var hovering = false
 
@@ -111,6 +153,8 @@ private struct HeaderIconButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .opacity(isEnabled ? 1 : 0.4)
         .onHover { hovering = $0 }
         .omTooltip(help)
         .accessibilityLabel(help)

@@ -59,6 +59,7 @@ final class AppEnvironment {
         }
         // 切换项目后,为新项目重新安排预热
         workbench.onProjectSelected = { [weak self] _ in self?.scheduleEngineWarmup(delay: .seconds(2)) }
+        workbench.onFileOpened = { path in RecentStore.recordFile(path) }
         workbench.onProjectRemoved = { root in TerminalStore.shared.remove(WorkbenchModel.residentTerminalID(root: root)) }
     }
 

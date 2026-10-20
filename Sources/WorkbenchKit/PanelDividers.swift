@@ -28,6 +28,9 @@ public enum PanelMetrics {
     /// 终端面板内右侧「终端列表」的宽度范围与默认值
     public static let terminalListRange: ClosedRange<Double> = 120...320
     public static let terminalListDefault: Double = 180
+    /// Files 工作区右侧资源管理器的宽度范围与默认值
+    public static let filesTreeRange: ClosedRange<Double> = 200...480
+    public static let filesTreeDefault: Double = 260
 
     /// 某一侧栏允许的宽度范围。
     public static func range(for side: PanelSide) -> ClosedRange<Double> {
