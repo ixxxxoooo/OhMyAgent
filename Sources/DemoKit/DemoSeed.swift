@@ -17,14 +17,25 @@ public enum DemoSeed {
         let focus = environment["OMA_DEMO_PROJECT"].flatMap { $0.isEmpty ? nil : $0 }
         try DemoClaudeHome.write(home: paths.home, atlasPath: paths.project("atlas-web").path)
         try DemoCanvas.write(home: paths.home, projectPath: paths.project("atlas-web").path, now: now)
+        let stress = DemoSidebarStress.spec(environment: environment)
         if !FileManager.default.fileExists(atPath: paths.workbenchFile.path) {
-            try WorkbenchStore(fileURL: paths.workbenchFile).save(workbenchState(infos: infos, now: now, focus: focus))
+            var state = workbenchState(infos: infos, now: now, focus: focus)
+            if let stress { try DemoSidebarStress.apply(to: &state, spec: stress, paths: paths, now: now) }
+            try WorkbenchStore(fileURL: paths.workbenchFile).save(state)
             Log.app.info("演示工作台状态已预置", ["file": paths.workbenchFile.path, "projects": "\(infos.count)"])
         } else if let focus {
             // 显式指定了启动项目(如导览脚本固定用 atlas-web):覆盖已落盘状态里的选中项目
             let store = WorkbenchStore(fileURL: paths.workbenchFile)
             if var state = store.load(), let target = infos.first(where: { $0.name == focus }), state.selectedProjectID != target.path {
                 state.selectedProjectID = target.path
+                try store.save(state)
+            }
+        }
+        // 项目栏压力数据:对已落盘的状态也追加(幂等),便于不重置沙盒直接复测
+        if let stress, FileManager.default.fileExists(atPath: paths.workbenchFile.path) {
+            let store = WorkbenchStore(fileURL: paths.workbenchFile)
+            if var state = store.load() {
+                try DemoSidebarStress.apply(to: &state, spec: stress, paths: paths, now: now)
                 try store.save(state)
             }
         }

@@ -43,7 +43,7 @@ enum SweepPlan {
 
 /// 连续帧间隔采样器:`start` 后每个显示帧记录一次间隔,`stop` 时汇总。
 @MainActor
-private final class SweepSampler: NSObject {
+final class SweepSampler: NSObject {
     private var link: CADisplayLink?
     private var last: CFTimeInterval = 0
     private var intervals: [Double] = []

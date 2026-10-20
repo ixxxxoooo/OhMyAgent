@@ -389,6 +389,7 @@ private struct ProjectGroup: View {
     }
 
     var body: some View {
+        let _ = PanelToggleProbe.count("sidebar.group")
         let all = rows
         VStack(alignment: .leading, spacing: 2) {
             header(count: all.count)
@@ -553,6 +554,7 @@ private struct SessionLine: View {
     private var projectName: String { workbench.projects.first { $0.id == item.projectID }?.name ?? "" }
 
     var body: some View {
+        let _ = PanelToggleProbe.count("sidebar.row")
         HStack(spacing: 8) {
             SessionStatusDot(uid: item.isCurrent ? item.uid : nil, isRunning: item.isRunning)
                 .frame(width: 10, height: 10)

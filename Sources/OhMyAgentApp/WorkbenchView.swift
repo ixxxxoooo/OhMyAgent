@@ -369,6 +369,8 @@ struct WorkbenchView: View {
         }
         // 调试(流畅度基准):OMA_RESIZE_SWEEP / OMA_DRAG_SWEEP / OMA_SCROLL_SWEEP,见 ResizeBenchmarkHooks
         await ResizeBenchmarkHooks.runIfRequested(env: env, workbench: workbench)
+        // 调试(项目栏基准):OMA_SIDEBAR_SWEEP=scroll,expand,hover,status,unrelated|all,见 SidebarBenchmarkHooks
+        await SidebarBenchmarkHooks.runIfRequested(env: env, workbench: workbench)
         // 启动稍后按间隔检查一次工作树数量(超限时询问是否清理;演示模式不触发)
         if env["OMA_DEMO"] == nil {
             Task { @MainActor in
