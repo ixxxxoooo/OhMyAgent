@@ -122,4 +122,41 @@ struct RightDockTests {
         #expect(model.rightDock.groups.count == 3)
         _ = a
     }
+
+    @Test("工具视图以侧边面板展开:可收起、改宽度、切换视图;同一视图全局唯一")
+    func sidePanelLifecycle() throws {
+        let (model, _) = makeModel()
+        model.showRight(.files)
+        let group = try #require(model.rightDock.groupWithSidePanel(.files))
+        #expect(model.layout.rightVisible && group.sidePanel?.collapsed == false)
+        model.mutateDock(.right) { $0.toggleSidePanelCollapsed(in: group.id) }
+        #expect(model.rightDock.group(group.id)?.sidePanel?.collapsed == true)
+        // 再次显示即展开
+        model.showRight(.files)
+        #expect(model.rightDock.group(group.id)?.sidePanel?.collapsed == false)
+        model.mutateDock(.right) { $0.setSidePanelWidth(9_999, in: group.id) }
+        #expect(model.rightDock.group(group.id)?.sidePanel?.width == GroupSidePanel.widthRange.upperBound)
+        // 切换为 Git:同一组原地换视图并保留宽度
+        let width = model.rightDock.group(group.id)?.sidePanel?.width
+        model.showRight(.git)
+        #expect(model.rightDock.group(group.id)?.sidePanel?.pane == .git && model.rightDock.group(group.id)?.sidePanel?.width == width)
+        // 拖成标签前先移除面板,保证唯一
+        model.removeSidePanels(of: .git)
+        #expect(model.rightDock.groupWithSidePanel(.git) == nil)
+    }
+
+    @Test("带侧边面板的空组不会被折叠;侧边面板随布局落盘还原")
+    func sidePanelKeepsGroupAndPersists() throws {
+        let (model, url) = makeModel()
+        model.showRight(.files)
+        let tab = model.openFile("/tmp/a.swift", preview: false, target: .right)
+        model.mutateDock(.right) { $0.drop(tab, onGroup: $0.focusedGroupID, zone: .right) }
+        #expect(model.rightDock.groups.count == 1)
+        model.closeAnyTab(tab)
+        #expect(model.rightDock.groupWithSidePanel(.files) != nil)
+        model.saveInBackground()
+        for _ in 0..<50 where !FileManager.default.fileExists(atPath: url.path) { Thread.sleep(forTimeInterval: 0.05) }
+        let (restored, _) = makeModel(file: url)
+        #expect(restored.rightDock.groupWithSidePanel(.files) != nil)
+    }
 }

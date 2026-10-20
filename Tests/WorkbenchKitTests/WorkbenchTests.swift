@@ -181,14 +181,14 @@ struct WorkbenchTests {
         _ = try #require(model.openProject(env.dirs[0]))
         model.showTerminal()
         #expect(model.isTerminalShown)
-        // 在右栏同组打开资源管理器:终端仍在标签条里,但没有显示
-        model.showRight(.files)
+        // 在右栏同组打开另一个标签(输出):终端仍在标签条里,但没有显示
+        model.showOutput()
         #expect(!model.isTerminalShown)
         model.toggleTerminal()
         #expect(model.isTerminalShown)
         model.toggleTerminal()
         #expect(!model.isTerminalShown)
-        #expect(model.rightDock.allTabs.contains { $0.kind == .preview(id: WorkbenchModel.toolsTabPrefix + "files") })
+        #expect(model.isOutputShown)
         model.shutdownAll()
     }
 
@@ -226,7 +226,8 @@ struct WorkbenchTests {
         model.layout.rightVisible = false
         model.showRight(.git)
         #expect(model.layout.rightVisible)
-        #expect(model.rightDock.allTabs.contains { $0.kind == .preview(id: WorkbenchModel.toolsTabPrefix + "git") })
+        // 工具视图作为右栏聚焦组的侧边面板展开
+        #expect(model.rightDock.groupWithSidePanel(.git) != nil)
         model.toggleCollapsed(a)
         #expect(model.projects[0].collapsed)
         let history = (0..<40).map { SessionSummary(sessionId: "s\($0)", cwd: a, title: "会话\($0)", updatedAt: nil) }

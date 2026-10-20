@@ -2666,3 +2666,5 @@
 "中栏" = "Center";
 "点击会话里的文件、Plan 或资源管理器条目时在这里打开,方便与会话左右对照;右键菜单可单次指定位置。" = "Clicked files, plans and explorer items open here so you can compare side by side with the chat; the context menu picks a side for one open (⌥-click also flips it).";
 "向下拆分" = "Split Down";
+"展开侧边面板" = "Show Side Panel";
+"收起侧边面板" = "Hide Side Panel";

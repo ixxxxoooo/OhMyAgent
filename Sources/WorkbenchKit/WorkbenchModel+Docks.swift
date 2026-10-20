@@ -79,7 +79,7 @@ public extension WorkbenchModel {
     func applyLegacyMigration() {
         guard let migration = layout.legacyMigration else { return }
         layout.legacyMigration = nil
-        if let pane = migration.rightPane { openTab(.preview(id: Self.toolsTabPrefix + pane.rawValue), title: Self.toolsPaneTitle(pane), host: .right) }
+        if let pane = migration.rightPane { showRight(pane) }
         if migration.showTerminal { openTab(.terminal(id: residentTerminalID), title: String(localized: "终端"), host: .right) }
         if migration.showOutput { openTab(.preview(id: Self.outputTabID), title: String(localized: "输出"), host: .right) }
         if migration.showTerminal || migration.showOutput { layout.rightVisible = true }
@@ -92,6 +92,16 @@ public extension WorkbenchModel {
         case .right: return .right
         case .editor: return .center
         case .auto: return layout.fileOpenTarget == .editor ? .center : .right
+        }
+    }
+
+    /// 移除两个停靠区里某个视图的侧边面板(它被拖成标签时调用,保证同一视图全局只有一处)。
+    /// - Parameter pane: 工具视图
+    func removeSidePanels(of pane: RightPane) {
+        for host in [DockHost.center, .right] {
+            for group in dock(host).groups where group.sidePanel?.pane == pane {
+                mutateDock(host) { $0.removeSidePanel(in: group.id) }
+            }
         }
     }
 

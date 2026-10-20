@@ -85,6 +85,7 @@ final class DockDrag {
         }
         guard text.hasPrefix(toolsPrefix), let pane = RightPane(rawValue: String(text.dropFirst(toolsPrefix.count))),
               RightPane.available.contains(pane) else { return nil }
+        workbench.removeSidePanels(of: pane)
         return workbench.openToolsTab(pane, title: WorkbenchModel.toolsPaneTitle(pane))
     }
 
@@ -179,18 +180,26 @@ struct TabGroupView: View {
 
     var body: some View {
         let _ = PanelToggleProbe.count("tabGroup")
-        VStack(spacing: 0) {
-            TabBarView(
-                workbench: workbench, group: group, isFocused: isFocused,
-                leadingInset: insets.leading, trailingInset: insets.trailing
-            )
-            GeometryReader { proxy in
-                content(size: proxy.size)
-                    .frame(width: proxy.size.width, height: proxy.size.height)
-                    .clipped()
-                    // 拖拽结束后(松手在别处、被取消)落点高亮可能没收到 dropExited,以拖拽状态兜底清除
-                    .overlay { DropOverlay(zone: DockDrag.shared.hasPayload ? zone : nil).allowsHitTesting(false) }
-                    .onDrop(of: [.plainText, .fileURL], delegate: GroupDropDelegate(workbench: workbench, host: host, groupID: group.id, size: proxy.size, zone: $zone))
+        let panel = group.sidePanel
+        let panelShown = panel.map { !$0.collapsed } ?? false
+        HStack(spacing: 0) {
+            VStack(spacing: 0) {
+                TabBarView(
+                    workbench: workbench, group: group, isFocused: isFocused,
+                    leadingInset: insets.leading, trailingInset: panelShown ? 0 : insets.trailing,
+                    sidePanelCollapsed: host == .right ? (panel?.collapsed ?? true) : nil
+                )
+                GeometryReader { proxy in
+                    content(size: proxy.size)
+                        .frame(width: proxy.size.width, height: proxy.size.height)
+                        .clipped()
+                        // 拖拽结束后(松手在别处、被取消)落点高亮可能没收到 dropExited,以拖拽状态兜底清除
+                        .overlay { DropOverlay(zone: DockDrag.shared.hasPayload ? zone : nil).allowsHitTesting(false) }
+                        .onDrop(of: [.plainText, .fileURL], delegate: GroupDropDelegate(workbench: workbench, host: host, groupID: group.id, size: proxy.size, zone: $zone))
+                }
+            }
+            if let panel, panelShown {
+                GroupSidePanelView(workbench: workbench, groupID: group.id, panel: panel, trailingInset: edges.top && edges.right ? insets.trailing : 0)
             }
         }
         .contentShape(Rectangle())
