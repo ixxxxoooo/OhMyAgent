@@ -1,7 +1,7 @@
 // @author ixxxxoooo
 // 左栏(对齐 kuku 的 Sidebar):顶部 35pt 标题区(红绿灯与侧栏开关浮层) → 主操作(新对话/搜索/自定义)
 // → 「置顶」「工作区」两个分区 → 底部设置。分区标题行右侧放筛选菜单与添加工作区;
-// 分组标题:文件夹图标 + 名称 + 会话数(悬停换成「+」);会话行:状态点 + 渐隐标题 + 固定 76pt 保留区(相对时间 ⇄ 置顶/归档)。
+// 分组标题:文件夹图标 + 名称 + 会话数(悬停换成「+」);会话行:状态点 + 渐隐标题 + 固定 56pt 保留区(相对时间 ⇄ 置顶/归档)。
 
 import ACPKit
 import ChatKit
@@ -557,7 +557,7 @@ private struct SessionLine: View {
                 // 渐隐用背景色渐变覆盖层(不用 .mask:避免每行离屏渲染);底色 = 侧栏背景 + 当前行状态填充
                 .omFadeTrailingEdge(width: 24, base: OMColors.sidebar, fill: isSelected ? OMColors.selectedFill : (hovering ? OMColors.hoverFill : nil))
             trailing
-                .frame(width: 76, height: 20, alignment: .trailing)
+                .frame(width: 56, height: 20, alignment: .trailing)
         }
         .padding(.leading, mode == .tree ? 16 : 8)
         .padding(.trailing, 8)
