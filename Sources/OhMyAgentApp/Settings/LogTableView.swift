@@ -34,6 +34,7 @@ struct LogTableView: NSViewRepresentable {
         table.delegate = context.coordinator
         context.coordinator.table = table
         context.coordinator.observeTheme()
+        context.coordinator.observeWidth()
 
         let scroll = NSScrollView()
         scroll.documentView = table
@@ -69,10 +70,19 @@ final class LogTableCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
     weak var table: NSTableView?
     private(set) var rows: [LogEntry] = []
     private var themeObserver: (any NSObjectProtocol)?
-    private var rowHeight: CGFloat { ceil(14 * OMScale.ui) + 4 }
+    private var lineHeight: CGFloat { ceil(14 * OMScale.ui) }
+    /// 行高缓存(日志条目 id → 高度),列宽变化时清空
+    private var heightCache: [UInt64: CGFloat] = [:]
+    private var cachedWidth: CGFloat = 0
+    private var frameObserver: (any NSObjectProtocol)?
+    /// 单元格左右内边距合计(文字可用宽度 = 列宽 - 该值)
+    private static let horizontalInset: CGFloat = 12
+
+    private var font: NSFont { NSFont.monospacedSystemFont(ofSize: 11 * OMScale.ui, weight: .regular) }
 
     isolated deinit {
         if let themeObserver { NotificationCenter.default.removeObserver(themeObserver) }
+        if let frameObserver { NotificationCenter.default.removeObserver(frameObserver) }
     }
 
     /// 主题切换时整表重载(颜色取自令牌)。
@@ -80,6 +90,39 @@ final class LogTableCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
         themeObserver = NotificationCenter.default.addObserver(forName: ThemeRuntime.didChange, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.table?.reloadData() }
         }
+    }
+
+    /// 监听表格宽度变化:宽度变了换行位置随之变,需要重算行高。
+    func observeWidth() {
+        guard let table else { return }
+        table.postsFrameChangedNotifications = true
+        frameObserver = NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification, object: table, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.widthChanged() }
+        }
+    }
+
+    private func widthChanged() {
+        guard let table, abs(table.bounds.width - cachedWidth) > 0.5 else { return }
+        heightCache.removeAll(keepingCapacity: true)
+        table.noteHeightOfRows(withIndexesChanged: IndexSet(0..<rows.count))
+    }
+
+    /// 某条日志在当前列宽下换行后的行高。
+    /// - Parameter entry: 日志条目
+    /// - Returns: 行高(至少一行)
+    private func height(of entry: LogEntry) -> CGFloat {
+        let width = max(40, (table?.bounds.width ?? 400) - Self.horizontalInset)
+        if abs(width + Self.horizontalInset - cachedWidth) > 0.5 { heightCache.removeAll(keepingCapacity: true); cachedWidth = width + Self.horizontalInset }
+        if let cached = heightCache[entry.id] { return cached }
+        let style = NSMutableParagraphStyle()
+        style.lineBreakMode = .byCharWrapping
+        let rect = (entry.line as NSString).boundingRect(
+            with: NSSize(width: width, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: [.font: font, .paragraphStyle: style])
+        let value = max(lineHeight, ceil(rect.height)) + 4
+        heightCache[entry.id] = value
+        return value
     }
 
     /// 应用新的行集合:纯尾部追加走增量插入,其余整表重载。
@@ -104,7 +147,9 @@ final class LogTableCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
 
     func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
 
-    func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat { rowHeight }
+    func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
+        rows.indices.contains(row) ? height(of: rows[row]) : lineHeight + 4
+    }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         guard rows.indices.contains(row) else { return nil }
@@ -114,15 +159,14 @@ final class LogTableCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
         } else {
             cell = NSTextField(labelWithString: "")
             cell.identifier = Self.cellID
-            cell.lineBreakMode = .byTruncatingTail
-            cell.maximumNumberOfLines = 1
-            cell.cell?.truncatesLastVisibleLine = true
+            cell.lineBreakMode = .byCharWrapping
+            cell.maximumNumberOfLines = 0
+            cell.cell?.wraps = true
         }
         let entry = rows[row]
-        cell.font = NSFont.monospacedSystemFont(ofSize: 11 * OMScale.ui, weight: .regular)
+        cell.font = font
         cell.textColor = NSColor(Self.color(for: entry.level))
         cell.stringValue = entry.line
-        cell.toolTip = entry.line
         return cell
     }
 
