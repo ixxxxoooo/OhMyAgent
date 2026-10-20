@@ -130,7 +130,7 @@ struct WorkbenchView: View {
             .reduce(0.0) { $0 + workbench.panelDrag.effective(PanelDimension(column: $1), committed: layout) + 1 }
         let width = min(stored, max(0, total - PanelMetrics.centerMinimum - others - 1))
         let defaultWidth = column == .sidebar ? PanelMetrics.leftDefault : PanelMetrics.rightDefault
-        if side == .right { PanelResizer(workbench: workbench, dimension: dimension, side: side, defaultWidth: defaultWidth).zIndex(1).transition(panelTransition(side)) }
+        if side == .right { PanelResizer(workbench: workbench, dimension: dimension, side: side, defaultWidth: defaultWidth).zIndex(2).transition(panelTransition(side)) }
         Group {
             switch column {
             case .sidebar:
@@ -146,7 +146,7 @@ struct WorkbenchView: View {
         // 滑出时面板仍盖在(已一次性扩宽的)中栏之上,否则会被后绘制的中栏遮住而「瞬间消失」
         .zIndex(1)
         .transition(panelTransition(side))
-        if side == .left { PanelResizer(workbench: workbench, dimension: dimension, side: side, defaultWidth: defaultWidth).zIndex(1).transition(panelTransition(side)) }
+        if side == .left { PanelResizer(workbench: workbench, dimension: dimension, side: side, defaultWidth: defaultWidth).zIndex(2).transition(panelTransition(side)) }
     }
 
     /// 导航历史的触发信号:聚焦组的激活标签与标签总数(关闭标签时需要清理历史)。

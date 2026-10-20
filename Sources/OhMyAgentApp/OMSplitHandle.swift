@@ -124,6 +124,8 @@ final class SplitHandleNSView: NSView {
     private var dragStart: CGPoint?
     /// 是否已越过起拖阈值并回调过 `onBegan`(单击/双击不触发拖动回调)
     private var began = false
+    /// 本次按下是否为第二次连击(仅在没有发生拖动的松手时才算双击)
+    private var pendingDoubleClick = false
 
     override var mouseDownCanMoveWindow: Bool { false }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
@@ -159,10 +161,8 @@ final class SplitHandleNSView: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
-        if event.clickCount >= 2 {
-            onDoubleClick?()
-            return
-        }
+        // 双击放到松手时判定:连续两次拖动(第二次按下系统计为 clickCount=2)不应被当作双击吞掉,否则第二次拖不动
+        pendingDoubleClick = event.clickCount >= 2
         dragStart = NSEvent.mouseLocation
         began = false
         axis.cursor.set()
@@ -180,7 +180,12 @@ final class SplitHandleNSView: NSView {
         onChanged(delta)
     }
 
-    override func mouseUp(with event: NSEvent) { finishDrag() }
+    override func mouseUp(with event: NSEvent) {
+        let isDoubleClick = pendingDoubleClick && !began && dragStart != nil
+        pendingDoubleClick = false
+        finishDrag()
+        if isDoubleClick { onDoubleClick?() }
+    }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
