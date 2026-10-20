@@ -53,6 +53,18 @@ public extension View {
     }
 }
 
+/// 玻璃着色解析。
+public enum OMGlassTint {
+    /// 显式着色优先;否则按主题风格 `glassTint` 用强调色轻度着色(0 = 不着色,保持旧外观)。
+    /// - Parameter tint: 调用方传入的着色
+    /// - Returns: 实际用于 `glassEffect` 的着色
+    public static func resolve(_ tint: Color?) -> Color? {
+        if let tint { return tint }
+        let amount = ThemeRuntime.style.glassTint
+        return amount > 0 ? OMColors.accent.opacity(amount) : nil
+    }
+}
+
 /// 玻璃修饰器。主题风格 `allowsGlass == false`(纸感)时与「减少透明度」一样走不透明回退。
 struct OMGlassModifier<S: Shape>: ViewModifier {
     let shape: S
@@ -66,7 +78,7 @@ struct OMGlassModifier<S: Shape>: ViewModifier {
         content
             .background {
                 if useGlass {
-                    shape.fill(.clear).glassEffect(.regular.tint(tint).interactive(interactive), in: shape)
+                    shape.fill(.clear).glassEffect(.regular.tint(OMGlassTint.resolve(tint)).interactive(interactive), in: shape)
                 } else {
                     shape.fill(OMColors.opaqueChrome)
                 }
@@ -87,7 +99,7 @@ struct OMGlassLabelModifier<S: Shape>: ViewModifier {
 
     func body(content: Content) -> some View {
         if policy.useGlass && ThemeRuntime.style.allowsGlass {
-            content.glassEffect(.regular.tint(tint), in: shape)
+            content.glassEffect(.regular.tint(OMGlassTint.resolve(tint)), in: shape)
         } else {
             content
                 .background {

@@ -79,6 +79,37 @@ struct ThemePackageTests {
         #expect(ThemeGroup.allCases.contains(.opencode) && ThemeGroup.opencode.title == "OpenCode")
     }
 
+    @Test("OhMyAgent 品牌主题:深浅各一套,取自图标配色并开启 Liquid Glass 与 Ember 着色")
+    func brandThemes() throws {
+        let group = ThemePackage.all.filter { $0.group == .brand }
+        #expect(Set(group.map(\.id)) == ["oma-ink-glass", "oma-paper-glass"])
+        #expect(ThemeGroup.allCases.contains(.brand) && ThemeGroup.brand.title == "OhMyAgent")
+        let ink = try #require(ThemePackage.find("oma-ink-glass").palette)
+        let paper = try #require(ThemePackage.find("oma-paper-glass").palette)
+        // 图标同款:深墨底 + 纸白文字;浅色反过来
+        #expect(ink.surface.hexString == "#1B1A19" && ink.foreground.hexString == "#F3F1EC")
+        #expect(paper.foreground.hexString == "#1B1A19")
+        // Ember 系强调色(红分量占优)
+        for palette in [ink, paper] {
+            #expect(palette.accent.red > 0.9 && palette.accent.blue < 0.1)
+            #expect(palette.style.allowsGlass && palette.style.glassTint > 0)
+            #expect(!palette.style.flatCards)
+        }
+    }
+
+    @Test("玻璃着色:显式着色优先,主题 glassTint 为 0 时不着色,品牌主题自动着色")
+    func glassTint() {
+        withRuntime(ThemePackage.find("paper-light")) {
+            #expect(OMGlassTint.resolve(nil) == nil)
+        }
+        withRuntime(ThemePackage.find("oma-ink-glass")) {
+            #expect(OMGlassTint.resolve(nil) != nil)
+        }
+        withRuntime(ThemePackage.find("oma-ink-glass")) {
+            #expect(OMGlassTint.resolve(.clear) == .clear)
+        }
+    }
+
     @Test("强调色优先级:用户选择 > 主题默认 > 系统")
     func accentPriority() {
         withRuntime(.system) {

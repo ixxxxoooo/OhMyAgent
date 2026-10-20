@@ -265,6 +265,8 @@ public enum ThemeGroup: String, CaseIterable, Sendable {
     case system
     /// Cursor 纸感(默认主题,规范见 AGENTS.md 4.4)
     case paper
+    /// OhMyAgent 品牌主题(取自应用图标:深墨 + 纸白 + Ember,Liquid Glass)
+    case brand
     case cursor, anthropic, claudeCode, opencode
     /// 经典配色(Nord、Dracula、Solarized 等社区流行方案)
     case classic
@@ -275,6 +277,7 @@ public enum ThemeGroup: String, CaseIterable, Sendable {
         switch self {
         case .system: return String(localized: "系统")
         case .paper: return String(localized: "纸感")
+        case .brand: return "OhMyAgent"
         case .cursor: return "Cursor"
         case .anthropic: return "Anthropic"
         case .claudeCode: return "Claude Code"
@@ -395,6 +398,41 @@ extension ThemePackage {
         $0.outline = ThemeRGB(hex: 0x3F3E36)
         $0.selection = ThemeRGB(hex: 0x8BC4F8)
         $0.style = ThemeStyle(strokeScale: 0.75, allowsGlass: false, radiusSet: .paper, primaryButton: .accent, selectionTint: .accent, flatCards: true)
+    })
+
+    // OhMyAgent 品牌系:配色取自应用图标(深墨 #1B1A19、纸白 #F3F1EC、Ember 运行点),开启 Liquid Glass 并以 Ember 轻度着色
+    /// 墨玻璃(深色):图标同款深墨底,玻璃浮层带一点 Ember 暖色。
+    static let brandInkGlass = ThemePackage(id: "oma-ink-glass", name: String(localized: "OhMyAgent 墨玻璃"), group: .brand, tone: .dark, palette: .make(.darkBase) {
+        $0.setBackgrounds(surface: 0x1B1A19, card: 0x252321, gutter: 0x1F1E1C, currentLine: 0x2C2926, sidebar: 0x131211)
+        $0.editorForeground = ThemeRGB(hex: 0xF3F1EC); $0.gutterForeground = ThemeRGB(hex: 0x77736C)
+        $0.accent = ThemeRGB(hex: 0xF65A10); $0.accent2 = ThemeRGB(hex: 0x7FB4E8)
+        $0.accentText = ThemeRGB(hex: 0xFF8A4C)
+        $0.success = ThemeRGB(hex: 0x5FB48F); $0.danger = ThemeRGB(hex: 0xFF6F7D); $0.warning = ThemeRGB(hex: 0xE6A847)
+        $0.actionWarm = ThemeRGB(hex: 0xC08532); $0.actionPositive = ThemeRGB(hex: 0x34785C)
+        $0.diffAdded = $0.surface.mixed(with: $0.success, 0.16); $0.diffRemoved = $0.surface.mixed(with: $0.danger, 0.16)
+        $0.setSyntax(keyword: 0xFF9A5C, string: 0x9FD4A6, comment: 0x77736C, number: 0xC9A7F0, type: 0xE6C07B, function: 0x8EC5F0, property: 0xD8CFC2)
+        $0.onAccent = ThemeRGB(hex: 0x1B1A19)
+        $0.outline = ThemeRGB(hex: 0x3A3734)
+        $0.selection = ThemeRGB(hex: 0x6A3A1E)
+        $0.secondaryTextColor = ThemeRGB(hex: 0xA8A39A); $0.tertiaryTextColor = ThemeRGB(hex: 0x77736C)
+        $0.style = ThemeStyle(cornerScale: 1.15, strokeScale: 0.85, shadowScale: 1.1, glassTint: 0.06, fillScale: 1.05)
+    })
+
+    /// 纸玻璃(浅色):图标纸白作底、深墨文字,同一套 Ember 强调与玻璃着色。
+    static let brandPaperGlass = ThemePackage(id: "oma-paper-glass", name: String(localized: "OhMyAgent 纸玻璃"), group: .brand, tone: .light, palette: .make(.lightBase) {
+        $0.setBackgrounds(surface: 0xF6F4EF, card: 0xEFECE6, gutter: 0xF0EDE7, currentLine: 0xEBE7DF, sidebar: 0xEAE7E0)
+        $0.editorForeground = ThemeRGB(hex: 0x1B1A19); $0.gutterForeground = ThemeRGB(hex: 0x8A867E)
+        $0.accent = ThemeRGB(hex: 0xF54E00); $0.accent2 = ThemeRGB(hex: 0x2F6FB3)
+        $0.accentText = ThemeRGB(hex: 0xC23E00)
+        $0.success = ThemeRGB(hex: 0x34785C); $0.danger = ThemeRGB(hex: 0xCF2D56); $0.warning = ThemeRGB(hex: 0x8F6118)
+        $0.actionWarm = ThemeRGB(hex: 0xC08532); $0.actionPositive = ThemeRGB(hex: 0x34785C)
+        $0.diffAdded = $0.surface.mixed(with: $0.success, 0.13); $0.diffRemoved = $0.surface.mixed(with: $0.danger, 0.11)
+        $0.setSyntax(keyword: 0xC23E00, string: 0x2F7A4F, comment: 0x8A867E, number: 0x7A4FB8, type: 0x8A6A1A, function: 0x1F5FA8, property: 0x5E5A53)
+        $0.onAccent = ThemeRGB(hex: 0xFBFAF7)
+        $0.outline = ThemeRGB(hex: 0xD3CFC7)
+        $0.selection = ThemeRGB(hex: 0xFFC9A8)
+        $0.secondaryTextColor = ThemeRGB(hex: 0x66625B); $0.tertiaryTextColor = ThemeRGB(hex: 0x9E9A92)
+        $0.style = ThemeStyle(cornerScale: 1.15, strokeScale: 0.85, shadowScale: 1.0, glassTint: 0.05, fillScale: 1.0)
     })
 
     // Cursor 系
@@ -623,6 +661,7 @@ extension ThemePackage {
     public static let builtin: [ThemePackage] = [
         system,
         paperLight, paperDark,
+        brandInkGlass, brandPaperGlass,
         cursorLight, cursorLightColorblind, cursorDark, cursorDarkHC,
         anthropicLight, anthropicDark,
         claudeDark, claudeLight, claudeDarkDaltonized, claudeLightDaltonized, claudeDarkANSI, claudeLightANSI,
