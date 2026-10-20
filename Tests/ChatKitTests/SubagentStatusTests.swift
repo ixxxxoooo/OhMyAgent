@@ -112,3 +112,55 @@ struct SubagentLastLineTests {
         #expect(SubagentStatus.lastLine(big) == "行19999")
     }
 }
+
+/// 异步启动的子 Agent:工具结果先返回(状态完成),子 Agent 仍在后台运行,直到回合结束。
+@MainActor
+@Suite("异步子代理")
+struct AsyncSubagentTests {
+    private func launchAsync(_ store: TimelineStore) -> TimelineEntry {
+        let tool = ToolCall(toolCallId: "a1", name: "Agent", title: "后台审查", kind: .other, status: .inProgress,
+                            rawInput: ["description": "后台审查", "subagent_type": "Explore"])
+        store.apply(.toolCall(tool))
+        // 适配器的完成更新:状态 completed + toolResponse 标记 async_launched
+        store.apply(.toolCallUpdate(toolCallId: "a1", raw: [
+            "status": "completed",
+            "_meta": ["claudeCode": ["toolResponse": ["status": "async_launched", "isAsync": .bool(true)]]],
+        ]))
+        return store.entries.last!
+    }
+
+    @Test("异步启动后工具已完成,但子代理仍显示后台运行并进任务坞")
+    func stillRunning() throws {
+        let store = TimelineStore()
+        let entry = launchAsync(store)
+        #expect(entry.tool?.status == .completed)
+        #expect(entry.tool?.asyncRunning == true)
+        let status = try #require(SubagentStatus.make(entry: entry))
+        #expect(status.phase == .backgroundRunning && status.isActive)
+        #expect(store.runningBackgroundSubagents().count == 1)
+        #expect(store.runningForegroundSubagentCount() == 0)
+    }
+
+    @Test("后续的普通更新不会清掉异步标记;回合结束后才变为已完成")
+    func clearsAtTurnEnd() throws {
+        let store = TimelineStore()
+        let entry = launchAsync(store)
+        store.apply(.toolCallUpdate(toolCallId: "a1", raw: ["title": "后台审查 · 更新"]))
+        #expect(entry.tool?.asyncRunning == true)
+        store.finishTurn()
+        #expect(entry.tool?.asyncRunning == false)
+        let status = try #require(SubagentStatus.make(entry: entry))
+        #expect(status.phase == .completed)
+        #expect(store.runningBackgroundSubagents().isEmpty)
+    }
+
+    @Test("同步子代理没有异步标记,完成即完成")
+    func syncUnaffected() throws {
+        let store = TimelineStore()
+        store.apply(.toolCall(ToolCall(toolCallId: "s1", name: "Task", title: "x", kind: .other, status: .inProgress)))
+        store.apply(.toolCallUpdate(toolCallId: "s1", raw: ["status": "completed"]))
+        let entry = try #require(store.entries.last)
+        #expect(entry.tool?.asyncRunning == false)
+        #expect(try #require(SubagentStatus.make(entry: entry)).phase == .completed)
+    }
+}

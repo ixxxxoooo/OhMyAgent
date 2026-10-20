@@ -46,9 +46,10 @@ public struct SubagentStatus: Sendable, Equatable {
     public static func make(entry: TimelineEntry) -> SubagentStatus? {
         guard let tool = entry.tool else { return nil }
         let child = entry.childStore?.entries ?? []
-        let background = tool.rawInput?["run_in_background"]?.boolValue == true
+        let background = tool.rawInput?["run_in_background"]?.boolValue == true || tool.asyncRunning
         let phase: Phase
         switch tool.status {
+        case .completed where tool.asyncRunning: phase = .backgroundRunning
         case .completed: phase = .completed
         case .failed: phase = .failed
         case .pending, .inProgress:
@@ -115,9 +116,9 @@ extension TimelineStore {
     /// 顶层时间线里仍在运行的前台子代理数量:父会话在等它们(后台子代理不算)。
     public func runningForegroundSubagentCount() -> Int {
         entries.reduce(0) { total, entry in
-            guard entry.kind == .tool, let tool = entry.tool, !tool.status.isTerminal else { return total }
+            guard entry.kind == .tool, let tool = entry.tool, tool.isSubagentRunning else { return total }
             guard entry.childStore != nil || ToolPresentation.isSubagentLaunch(tool) else { return total }
-            return tool.rawInput?["run_in_background"]?.boolValue == true ? total : total + 1
+            return tool.runsInBackground ? total : total + 1
         }
     }
 
@@ -125,8 +126,16 @@ extension TimelineStore {
     /// - Returns: 条目与嵌套深度
     public func runningBackgroundSubagents() -> [(entry: TimelineEntry, depth: Int)] {
         subagentEntries().filter { item in
-            guard let tool = item.entry.tool, !tool.status.isTerminal else { return false }
-            return tool.rawInput?["run_in_background"]?.boolValue == true
+            guard let tool = item.entry.tool, tool.isSubagentRunning else { return false }
+            return tool.runsInBackground
         }
     }
+}
+
+extension ToolCall {
+    /// 子 Agent 是否仍在运行:工具调用未终结,或异步启动后仍在后台跑。
+    public var isSubagentRunning: Bool { !status.isTerminal || asyncRunning }
+
+    /// 是否后台运行:入参声明 `run_in_background`,或适配器标记为异步启动。
+    public var runsInBackground: Bool { rawInput?["run_in_background"]?.boolValue == true || asyncRunning }
 }

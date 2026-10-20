@@ -158,6 +158,10 @@ public struct ToolCall: Sendable, Hashable, Identifiable {
     public var parentToolCallId: String?
     /// 首个 `tool_call` 里带的终端事件(`_meta.terminal_info`);增量更新里的事件由会话直接从原始 JSON 解析
     public var terminalEvent: ToolTerminalEvent?
+    /// 异步子 Agent 仍在后台运行:Claude Code 的 Agent/Task 工具异步启动时,工具结果立刻返回(状态为完成),
+    /// 子 Agent 实际还在跑。适配器在 `_meta.claudeCode.toolResponse` 里标记 `isAsync` / `status: async_launched`;
+    /// 回合结束(适配器会等后台子 Agent 跑完才结束回合)或取消时由时间线清除。
+    public var asyncRunning = false
 
     public init(toolCallId: String, name: String? = nil, title: String = "", kind: ToolKind = .other, status: ToolStatus = .pending, content: [ToolCallContent] = [], locations: [ToolLocation] = [], rawInput: JSONValue? = nil, rawOutput: JSONValue? = nil) {
         self.toolCallId = toolCallId
@@ -186,8 +190,15 @@ public struct ToolCall: Sendable, Hashable, Identifiable {
         )
         parentToolCallId = json["_meta"]?["claudeCode"]?["parentToolUseId"]?.stringValue
         terminalEvent = ToolTerminalEvent.parse(json["_meta"])
+        if Self.isAsyncLaunch(json["_meta"]) { asyncRunning = true }
         if name == nil { name = json["_meta"]?["claudeCode"]?["toolName"]?.stringValue }
         if name == nil { name = ToolInputNormalizer.toolName(fromTitle: title) }
+    }
+
+    /// `_meta` 是否标记了异步启动(子 Agent 在后台继续运行)。
+    static func isAsyncLaunch(_ meta: JSONValue?) -> Bool {
+        guard let response = meta?["claudeCode"]?["toolResponse"] else { return false }
+        return response["isAsync"]?.boolValue == true || response["status"]?.stringValue == "async_launched"
     }
 
     static func parseLocations(_ json: JSONValue?) -> [ToolLocation] {
@@ -213,6 +224,7 @@ public struct ToolCall: Sendable, Hashable, Identifiable {
             if json["status"] == nil, !status.isTerminal { status = .completed }
         }
         if let value = json["_meta"]?["claudeCode"]?["parentToolUseId"]?.stringValue { parentToolCallId = value }
+        if Self.isAsyncLaunch(json["_meta"]) { asyncRunning = true }
         if name == nil, let value = json["_meta"]?["claudeCode"]?["toolName"]?.stringValue { name = value }
         if name == nil { name = ToolInputNormalizer.toolName(fromTitle: title) }
     }

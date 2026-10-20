@@ -75,7 +75,7 @@ struct SubagentTabView: View {
             Image.om(SubagentIcon.symbol(for: agentType), size: 14).foregroundStyle(OMColors.accent)
             Text(tool.title).font(OMFonts.body.weight(.medium)).lineLimit(1)
             if let agentType { Text(verbatim: agentType).font(OMFonts.small).foregroundStyle(OMColors.tertiaryText) }
-            if tool.status.isTerminal {
+            if !tool.isSubagentRunning {
                 OMTag(tool.status == .failed ? String(localized: "失败") : String(localized: "已完成"), tint: tool.status == .failed ? OMColors.danger : OMColors.success)
             } else {
                 OMTag(String(localized: "运行中"), tint: OMColors.accent)
@@ -117,7 +117,7 @@ struct SubagentStatusFooter: View {
 
     var body: some View {
         Group {
-            if tool.status.isTerminal { finished } else { running }
+            if !tool.isSubagentRunning { finished } else { running }
         }
         .padding(.horizontal, 16)
         .frame(height: 34)

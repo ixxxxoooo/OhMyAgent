@@ -341,12 +341,30 @@ public final class TimelineStore {
     public func finishTurn(aborted: Bool = false) {
         finishStreaming()
         for entry in entries where entry.kind == .tool {
+            // 回合结束:后台子 Agent 已跑完(适配器等它们结束才结束回合)或被取消,清除异步运行标记
+            if var tool = entry.tool, tool.asyncRunning {
+                tool.asyncRunning = false
+                entry.tool = tool
+                onToolChange?(tool)
+            }
+            entry.childStore?.finishAsyncMarkers()
             guard let tool = entry.tool, !tool.status.isTerminal else { continue }
             var updated = tool
             updated.status = aborted ? .failed : .completed
             entry.tool = updated
             if entry.finishedAt == nil { entry.finishedAt = Date() }
             onToolChange?(updated)
+        }
+    }
+
+    /// 递归清除子存储里的异步运行标记(嵌套子 Agent)。
+    func finishAsyncMarkers() {
+        for entry in entries where entry.kind == .tool {
+            if var tool = entry.tool, tool.asyncRunning {
+                tool.asyncRunning = false
+                entry.tool = tool
+            }
+            entry.childStore?.finishAsyncMarkers()
         }
     }
 
@@ -364,6 +382,9 @@ public final class TimelineStore {
         case .toolCall(let call):
             finishStreaming()
             if let existing = toolIndex[call.toolCallId] {
+                var call = call
+                // 整体替换时保留已记录的异步运行标记
+                if existing.tool?.asyncRunning == true { call.asyncRunning = true }
                 existing.tool = call
                 if call.status.isTerminal, existing.finishedAt == nil { existing.finishedAt = Date() }
                 onToolChange?(call)
