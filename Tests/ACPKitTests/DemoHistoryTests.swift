@@ -26,8 +26,8 @@ struct DemoHistoryTests {
             let list = DemoHistory.sessions(forProject: name)
             #expect(list.count >= 6, "\(name) 会话数 \(list.count)")
             #expect(list.contains { $0.pinned })
-            // 标题必须以 [性能]/[渲染]/[多标签] 开头,写明测什么
-            #expect(list.allSatisfy { $0.title.hasPrefix("[") }, "\(name) 存在没有标注测试目的的会话")
+            // 标题必须以 [性能]/[渲染]/[多标签] 开头,写明测什么;标签标题压力会话(提问以「标签标题压力」开头)刻意用真实风格的标题,豁免
+            #expect(list.allSatisfy { $0.title.hasPrefix("[") || $0.prompt.hasPrefix("标签标题压力") }, "\(name) 存在没有标注测试目的的会话")
         }
         for name in projects {
             let list = DemoHistory.sessions(forProject: name)

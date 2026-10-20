@@ -33,6 +33,7 @@ struct EditableMarkdownPreview: View {
                 // 文末空白:点击进入末尾追加
                 Color.clear.frame(height: 120).contentShape(Rectangle())
                     .onTapGesture { if editing != nil { commit() } }
+                    .accessibilityHidden(true)
             }
             .environment(\.markdownDocument, true)
             .frame(maxWidth: 820, alignment: .leading)
@@ -66,6 +67,8 @@ struct EditableMarkdownPreview: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .onTapGesture { begin(index, source: source) }
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("点击编辑此段")
     }
 
     /// 标题块上方额外留白(块间距 16 之外补足到 28 / 20)。
