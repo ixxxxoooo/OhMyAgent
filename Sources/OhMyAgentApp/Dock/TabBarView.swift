@@ -79,6 +79,8 @@ struct TabBarView: View {
                     HStack(spacing: TabMetrics.spacing) {
                         ForEach(Array(group.tabs.enumerated()), id: \.element.id) { index, tab in
                             TabItemView(workbench: workbench, group: group, tab: tab, isActive: tab.id == group.activeID, isFocused: isFocused)
+                                // 标签保持打开时的理想宽度,不随其它标签增减被压缩(放不下时由标签条横向滚动)
+                                .fixedSize(horizontal: true, vertical: false)
                                 .id(tab.id)
                                 .onDrop(of: [.plainText, .fileURL], delegate: TabStripDropDelegate(workbench: workbench, host: host, groupID: group.id, index: index))
                         }
