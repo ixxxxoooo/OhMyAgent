@@ -19,6 +19,10 @@ struct SubagentTabView: View {
     @AppStorage(ClientPrefs.Key.chatWidth) private var chatWidth = ChatWidth.standard.rawValue
     @AppStorage(ClientPrefs.Key.chatWidthCustom) private var chatWidthCustom = ChatWidth.customDefault
     @AppStorage(ClientPrefs.Key.toolDensity) private var toolDensityRaw = ToolDensity.standard.rawValue
+    /// 窗口内渲染的最近展示单元数:长子任务只挂载尾部,更早的折在顶部按钮里
+    @State private var visibleItems = SubagentTabView.pageItems
+    /// 每页展示单元数
+    private static let pageItems = 120
 
     var body: some View {
         if let model = workbench.sessions[projectID],
@@ -33,7 +37,13 @@ struct SubagentTabView: View {
                             SubagentPromptCard(prompt: prompt)
                         }
                         if let child = entry.childStore, !child.entries.isEmpty {
-                            ForEach(TimelineGrouping.group(child.entries, density: ToolDensity(rawValue: toolDensityRaw) ?? .standard)) { item in
+                            let items = TimelineGrouping.group(child.entries, density: ToolDensity(rawValue: toolDensityRaw) ?? .standard)
+                            let hidden = max(items.count - visibleItems, 0)
+                            if hidden > 0 {
+                                Button("显示更早的 \(hidden) 条") { visibleItems += SubagentTabView.pageItems }
+                                    .buttonStyle(.omPlain)
+                            }
+                            ForEach(hidden > 0 ? Array(items.suffix(visibleItems)) : items) { item in
                                 TimelineItemView(item: item)
                             }
                         } else {
