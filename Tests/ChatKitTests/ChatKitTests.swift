@@ -666,7 +666,15 @@ struct AgentIntegrationTests {
         let prepared = await model.prepareMCPServers(registry: registry, environment: ["PATH": ""])
         #expect(prepared.bridge == nil)
         #expect(prepared.servers.count == 1)
-        #expect(prepared.servers.first == .stdio(name: "agent_codex", command: "codex", args: ["mcp-server"], env: [:]))
+        // 命令解析带兜底目录:本机装了 codex 时会解析为绝对路径,未装则保持原名,两者都合法
+        guard case .stdio(let name, let command, let args, let env)? = prepared.servers.first else {
+            Issue.record("第一个服务器应是 stdio")
+            return
+        }
+        #expect(name == "agent_codex")
+        #expect(command == "codex" || command.hasSuffix("/codex"))
+        #expect(args == ["mcp-server"])
+        #expect(env.isEmpty)
     }
 
     @Test("Bridge 的打开文件与选区工具作用于会话模型")
