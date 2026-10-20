@@ -206,6 +206,12 @@ struct SettingsView: View {
                 await SettingsSweepProbe.run(router: router, rounds: rounds)
             }
         }
+        .task {
+            // 调试:OMA_SETTINGS_SWEEP=轮数 依次切换全部设置页并记录首帧耗时
+            if let rounds = ProcessInfo.processInfo.environment["OMA_SETTINGS_SWEEP"].flatMap(Int.init) {
+                await SettingsSweepProbe.run(router: router, rounds: rounds)
+            }
+        }
         .onDisappear { model.stop(); center.stop() }
     }
 
