@@ -24,7 +24,6 @@ final class SmoothWheel: NSObject {
     private weak var window: NSWindow?
     private var link: CADisplayLink?
     private var lastTimestamp: CFTimeInterval = 0
-    private var phaseStarted = false
 
     /// 是否开启(读偏好,默认关闭)。
     private var isEnabled: Bool { UserDefaults.standard.bool(forKey: ClientPrefs.Key.smoothWheel) }
@@ -98,14 +97,12 @@ final class SmoothWheel: NSObject {
         let dt = lastTimestamp == 0 ? 1.0 / 60 : min(now - lastTimestamp, Self.maxFrameTime)
         lastTimestamp = now
         let step = model.advance(dt: dt, tau: level.tau)
-        if step.x != 0 || step.y != 0 { post(dx: step.x, dy: step.y, phase: phaseStarted ? 2 : 1) }
-        if step.x != 0 || step.y != 0 { phaseStarted = true }
+        if step.x != 0 || step.y != 0 { post(dx: step.x, dy: step.y) }
         if !model.isActive { finish() }
     }
 
-    /// 结束一轮:补一个 ended 阶段事件并停止刷新。
+    /// 结束一轮:停止刷新。
     private func finish() {
-        if phaseStarted { post(dx: 0, dy: 0, phase: 4) }
         stopLink()
     }
 
@@ -119,15 +116,13 @@ final class SmoothWheel: NSObject {
     private func stopLink() {
         link?.invalidate()
         link = nil
-        phaseStarted = false
     }
 
     /// 合成并投递一个连续滚动事件。
     /// - Parameters:
     ///   - dx: 横向像素
     ///   - dy: 纵向像素
-    ///   - phase: CG 滚动阶段(1 开始 / 2 变化 / 4 结束)
-    private func post(dx: Int, dy: Int, phase: Int64) {
+    private func post(dx: Int, dy: Int) {
         guard let window, let cg = template?.copy() else { stopLink(); return }
         // 以原事件拷贝为底(保留窗口归属),把位移写进连续滚动用的各个字段
         cg.setIntegerValueField(.eventSourceUserData, value: Self.marker)
@@ -138,7 +133,8 @@ final class SmoothWheel: NSObject {
         cg.setIntegerValueField(.scrollWheelEventPointDeltaAxis2, value: Int64(dx))
         cg.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: Double(dy))
         cg.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2, value: Double(dx))
-        cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: phase)
+        // 不带滚动阶段:带阶段的事件会触发 NSScrollView 的弹性过冲,边缘会越界回弹;无阶段则与普通滚轮一样在顶/底停住
+        cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: 0)
         cg.setIntegerValueField(.scrollWheelEventMomentumPhase, value: 0)
         guard let synthetic = NSEvent(cgEvent: cg) else { return }
         window.sendEvent(synthetic)
