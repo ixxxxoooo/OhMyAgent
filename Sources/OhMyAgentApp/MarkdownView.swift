@@ -238,9 +238,10 @@ struct CodeBlockView: View {
 struct TableBlockView: View {
     let header: [String]
     let rows: [[String]]
+    @Environment(\.markdownDocument) private var document
 
     var body: some View {
-        TableTextLeaf(header: header, rows: rows)
+        TableTextLeaf(header: header, rows: rows, roomy: document)
             .omSolidCard()
     }
 }

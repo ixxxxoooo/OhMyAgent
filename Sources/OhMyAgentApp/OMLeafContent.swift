@@ -148,8 +148,11 @@ enum OMLeafContent {
     ///   - header: 表头
     ///   - rows: 数据行
     /// - Returns: 富文本
-    static func table(header: [String], rows: [[String]]) -> NSAttributedString {
-        let size = 11.5 * OMScale.ui
+    static func table(header: [String], rows: [[String]], roomy: Bool = false) -> NSAttributedString {
+        // 文档排版(整页阅读):字号 13.5、列间距 28、行间距 12;会话里保持紧凑
+        let size = (roomy ? 13.5 : 11.5) * OMScale.ui
+        let columnGap: CGFloat = roomy ? 28 : tableColumnGap
+        let rowGap: CGFloat = roomy ? 12 : 6
         let columns = max(header.count, rows.map(\.count).max() ?? 0)
         guard columns > 0 else { return NSAttributedString() }
         func cell(_ source: String, weight: NSFont.Weight) -> NSAttributedString {
@@ -165,7 +168,7 @@ enum OMLeafContent {
         var stops: [NSTextTab] = []
         var position: CGFloat = 0
         for width in widths.dropLast() {
-            position += width + tableColumnGap
+            position += width + columnGap
             stops.append(NSTextTab(textAlignment: .left, location: position))
         }
         let result = NSMutableAttributedString()
@@ -173,7 +176,7 @@ enum OMLeafContent {
             let style = NSMutableParagraphStyle()
             style.tabStops = stops
             style.defaultTabInterval = 0
-            style.paragraphSpacing = last ? 0 : 6
+            style.paragraphSpacing = last ? 0 : rowGap
             style.lineBreakMode = .byClipping
             let piece = NSMutableAttributedString()
             for (index, text) in line.enumerated() {

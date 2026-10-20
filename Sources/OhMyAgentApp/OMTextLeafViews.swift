@@ -115,16 +115,19 @@ struct DiffTextLeaf: View {
 struct TableTextLeaf: View {
     let header: [String]
     let rows: [[String]]
+    /// 宽松排版(文档阅读页)
+    var roomy = false
 
     var body: some View {
         var hasher = Hasher()
         hasher.combine(header)
         hasher.combine(rows)
         hasher.combine(OMLeafStyle.current)
+        hasher.combine(roomy)
         return OMTextLeaf(
             signature: hasher.finalize(),
-            config: OMTextLeafConfig(wrap: false, inset: NSSize(width: 10, height: 10))
-        ) { OMLeafContent.table(header: header, rows: rows) }
+            config: OMTextLeafConfig(wrap: false, inset: NSSize(width: roomy ? 16 : 10, height: roomy ? 14 : 10), persistentScroller: true)
+        ) { OMLeafContent.table(header: header, rows: rows, roomy: roomy) }
         .accessibilityLabel(String(localized: "表格"))
     }
 }

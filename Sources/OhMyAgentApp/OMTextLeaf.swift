@@ -15,6 +15,8 @@ struct OMTextLeafConfig: Equatable {
     var inset = NSSize.zero
     /// 额外的右侧留白(不属于内边距,如 Diff 的行尾 8pt)
     var trailingPadding: CGFloat = 0
+    /// 不折行且内容超宽时,是否常驻显示水平滚动条(表格用:否则滚动条只在滚动时才出现,用户不知道可以横向滚动)
+    var persistentScroller = false
 }
 
 /// 叶子宿主视图:自动折行时直接放文本视图;不折行时放进只允许水平滚动的滚动视图。
@@ -75,6 +77,14 @@ final class OMLeafScrollView: NSScrollView {
         horizontalScrollElasticity = .none
         horizontalScroller = OMScroller()
         borderType = .noBorder
+    }
+
+    /// 是否常驻滚动条(仅内容超宽时出现,占用底部一条高度);否则为悬浮自动隐藏。
+    var persistentScroller = false {
+        didSet {
+            guard persistentScroller != oldValue else { return }
+            scrollerStyle = persistentScroller ? .legacy : .overlay
+        }
     }
 
     required init?(coder: NSCoder) { nil }
@@ -173,7 +183,10 @@ final class OMTextLeafCoordinator {
         }
         measurePasses += 1
         measuredWidth = width
-        measured = CGSize(width: width, height: fit.height + inset.height * 2)
+        // 常驻滚动条且内容超宽:底部多留一条滚动条的高度,避免盖住最后一行
+        let overflow = !config.wrap && config.persistentScroller && host.contentSize.width > width + 0.5
+        let reserve = overflow ? OMScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy) : 0
+        measured = CGSize(width: width, height: fit.height + inset.height * 2 + reserve)
         measuredEdits = edits
         return measured
     }
@@ -207,6 +220,7 @@ struct OMTextLeaf: NSViewRepresentable {
         let view = host.textView
         view.copyTransform = copyTransform
         view.onPlainClick = onPlainClick
+        host.scrollView?.persistentScroller = config.persistentScroller
         if view.textContainerInset != config.inset { view.textContainerInset = config.inset }
         context.coordinator.applySelection(selectionColor, to: view)
         context.coordinator.apply(to: view, signature: signature, build: build)
