@@ -96,6 +96,10 @@ public enum ClientPrefs {
         public static let scrollbarVisibility = "appearance.scrollbarVisibility"
         /// 工具调用详细程度(`ToolDensity`):compact / standard / detailed
         public static let toolDensity = ToolDensity.preferenceKey
+        /// 鼠标滚轮平滑滚动(默认关闭;触控板不受影响)
+        public static let smoothWheel = "appearance.smoothWheel"
+        /// 平滑档位(`SmoothWheelLevel`):light / standard / soft
+        public static let smoothWheelLevel = "appearance.smoothWheelLevel"
         /// 聊天代码块自动换行(默认关闭,横向滚动)
         public static let chatCodeWrap = "chat.codeWrap"
         /// 提交时附带 `Co-authored-by: OhMyAgent` 署名(默认关闭)

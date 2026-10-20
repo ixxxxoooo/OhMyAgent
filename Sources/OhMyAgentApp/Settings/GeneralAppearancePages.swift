@@ -146,6 +146,8 @@ struct AppearancePage: View {
     @AppStorage(ClientPrefs.Key.toolDensity) private var toolDensityRaw = ToolDensity.standard.rawValue
     @AppStorage(ClientPrefs.Key.chatCodeWrap) private var codeWrap = false
     @AppStorage(FontSmoothing.preferenceKey) private var fontSmoothing = FontSmoothing.system.rawValue
+    @AppStorage(ClientPrefs.Key.smoothWheel) private var smoothWheel = false
+    @AppStorage(ClientPrefs.Key.smoothWheelLevel) private var smoothWheelLevel = SmoothWheelLevel.standard.rawValue
     @State private var smoothingAtLaunch = FontSmoothing.current().rawValue
     @Bindable private var workbench = AppEnvironment.shared.workbench
     @State private var themeFilter = ""
@@ -304,6 +306,20 @@ struct AppearancePage: View {
                     }
                 }
                 Note("控制文字笔画粗细(对应 macOS 的 AppleFontSmoothing,只影响本应用):「关闭」最细,「强」最粗;「跟随系统」沿用系统设置。").footnote()
+            }
+            SettingsCard("平滑滚动") {
+                SettingsRow("鼠标滚轮平滑滚动") {
+                    Toggle("", isOn: $smoothWheel).labelsHidden().toggleStyle(.switch).controlSize(.small)
+                }
+                if smoothWheel {
+                    SettingsRow("平滑程度") {
+                        Picker("", selection: $smoothWheelLevel) {
+                            ForEach(SmoothWheelLevel.allCases) { Text(LocalizedStringKey($0.title)).tag($0.rawValue) }
+                        }
+                        .labelsHidden().pickerStyle(.segmented).fixedSize()
+                    }
+                }
+                Note("把鼠标滚轮「一格一跳」的滚动变成连续的平滑滚动,只作用于本应用,无需额外权限;触控板不受影响,立即生效。").footnote()
             }
             SettingsCard("等待动画(Spinner Verbs)") {
                 ForEach(WorkingVerbStyle.allCases) { style in

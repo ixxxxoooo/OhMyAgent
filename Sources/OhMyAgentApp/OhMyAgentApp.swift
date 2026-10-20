@@ -176,6 +176,8 @@ struct OhMyAgentApp: App {
         UserDefaults.standard.register(defaults: ["NSAutoFillHeuristicControllerEnabled": false])
         // 字体平滑偏好(AppleFontSmoothing)须早于任何文本控件创建
         FontSmoothing.applyAtLaunch()
+        // 鼠标滚轮平滑(应用内,是否生效由偏好决定)
+        MainActor.assumeIsolated { SmoothWheel.shared.start() }
         Log.bootstrap(process: "app")
         PerfSession.markStart()
         LaunchTrace.mark("App 初始化")

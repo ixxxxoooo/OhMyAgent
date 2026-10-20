@@ -2676,3 +2676,10 @@
 "最近" = "Recent";
 "文件、文件夹…" = "Files, folders…";
 "搜索文件或文件夹" = "Search files or folders";
+
+"平滑滚动" = "Smooth Scrolling";
+"鼠标滚轮平滑滚动" = "Smooth mouse wheel scrolling";
+"平滑程度" = "Smoothness";
+"轻快" = "Snappy";
+"柔和" = "Soft";
+"把鼠标滚轮「一格一跳」的滚动变成连续的平滑滚动,只作用于本应用,无需额外权限;触控板不受影响,立即生效。" = "Turns the step-by-step mouse wheel into continuous smooth scrolling. Applies to this app only and needs no extra permission; trackpads are unaffected. Takes effect immediately.";
