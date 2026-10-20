@@ -110,7 +110,6 @@ struct WorkbenchTests {
         model.layout.leftVisible = false
         model.layout.rightVisible = true
         model.layout.leftWidth = 300
-        model.layout.bottomHeight = 333
         model.saveNow()
         model.shutdownAll()
 
@@ -120,7 +119,6 @@ struct WorkbenchTests {
         #expect(restored.layout.leftVisible == false)
         #expect(restored.layout.rightVisible == true)
         #expect(restored.layout.leftWidth == 300)
-        #expect(restored.layout.bottomHeight == 333)
         #expect(restored.selectedProject?.name == "beta")
         restored.shutdownAll()
     }
@@ -138,132 +136,78 @@ struct WorkbenchTests {
         var state = WorkbenchState()
         state.layout.leftWidth = 5
         state.layout.rightWidth = 9999
-        state.layout.bottomHeight = -1
         state.projects = [ProjectEntry(url: env.dirs[0]), ProjectEntry(url: env.root.appendingPathComponent("已删除"))]
         try env.store.save(state)
         let model = makeModel(env.store)
-        #expect(model.layout.leftWidth == 200 && model.layout.rightWidth == 800 && model.layout.bottomHeight == 120)
+        #expect(model.layout.leftWidth == 200 && model.layout.rightWidth == PanelDimension.rightWidth.clamp(9999))
         #expect(model.projects.count == 1)
         model.shutdownAll()
     }
 
-    @Test("终端在编辑区:每个项目各一个终端标签,显隐只作用于当前项目;移除项目会回调")
-    func editorTerminalsPerProject() throws {
+    @Test("终端是右栏标签:每个项目各一个,显隐只作用于当前项目;移除项目会回调")
+    func rightTerminalsPerProject() throws {
         let env = try makeEnvironment()
         defer { try? FileManager.default.removeItem(at: env.root) }
         let model = makeModel(env.store)
         var removed: [String] = []
         model.onProjectRemoved = { removed.append($0) }
         let alpha = try #require(model.openProject(env.dirs[0]))
-        model.setTerminalPlacement(.editor)
         model.showTerminal()
+        #expect(model.layout.rightVisible)
         let beta = try #require(model.openProject(env.dirs[1]))
         #expect(!model.isTerminalShown)
         model.showTerminal()
         #expect(model.isTerminalShown)
-        #expect(model.dock.allTabs.contains { $0.kind == .terminal(id: "bottom:" + alpha) })
+        #expect(model.rightDock.allTabs.contains { $0.kind == .terminal(id: "bottom:" + alpha) })
         #expect(WorkbenchModel.residentTerminalRoot("bottom:" + beta) == beta)
-        // 拖动时取当前项目的终端标签
-        let moving = try #require(model.openPanelTab(.terminal))
-        #expect(model.dock.allTabs.first { $0.id == moving }?.kind == .terminal(id: "bottom:" + beta))
         // 隐藏当前项目的终端不影响另一个项目
         model.hideTerminal()
         #expect(!model.isTerminalShown)
-        #expect(model.dock.allTabs.contains { $0.kind == .terminal(id: "bottom:" + alpha) })
+        #expect(model.rightDock.allTabs.contains { $0.kind == .terminal(id: "bottom:" + alpha) })
         model.removeProject(alpha)
         #expect(removed == [alpha])
     }
 
-    @Test("终端并入工具栏但被文件页盖住时,⌘J 一次就把它切到最前面")
-    func toggleMergedTerminal() throws {
+    @Test("终端被别的标签盖住时,⌘J 一次就把它切到最前面;再按一次关闭")
+    func toggleCoveredTerminal() throws {
         let env = try makeEnvironment()
         defer { try? FileManager.default.removeItem(at: env.root) }
         let model = makeModel(env.store)
         _ = try #require(model.openProject(env.dirs[0]))
-        model.setTerminalPlacement(.right)
         model.showTerminal()
-        #expect(model.layout.isMergedIntoTools(.terminal) && model.isTerminalShown)
-        // 用户切到「文件」页:终端仍在标签条里,但没有显示
-        model.layout.toolsPanel = nil
+        #expect(model.isTerminalShown)
+        // 在右栏同组打开资源管理器:终端仍在标签条里,但没有显示
+        model.showRight(.files)
         #expect(!model.isTerminalShown)
         model.toggleTerminal()
-        #expect(model.isTerminalShown && model.layout.toolsPanel == .terminal)
+        #expect(model.isTerminalShown)
         model.toggleTerminal()
-        #expect(!model.isTerminalShown && !model.layout.terminalVisible)
+        #expect(!model.isTerminalShown)
+        #expect(model.rightDock.allTabs.contains { $0.kind == .preview(id: WorkbenchModel.toolsTabPrefix + "files") })
+        model.shutdownAll()
     }
 
-    @Test("终端在各位置间移动:显示状态保持,终端标识不变,旧位置被清理,摆放持久化")
-    func terminalPlacementMigration() throws {
+    @Test("右栏摆放持久化,恢复默认布局")
+    func placementPersistence() throws {
         let env = try makeEnvironment()
         defer { try? FileManager.default.removeItem(at: env.root) }
         let model = makeModel(env.store)
-        let project = try #require(model.openProject(env.dirs[0]))
-        let terminalID = model.residentTerminalID
-        #expect(terminalID == "bottom:" + project)
-
-        // 底部 → 编辑区:底部面板关闭,出现同一标识的终端标签
+        _ = try #require(model.openProject(env.dirs[0]))
         model.showTerminal()
-        #expect(model.isTerminalShown && model.layout.bottomPane == .terminal)
-        model.setTerminalPlacement(.editor)
-        #expect(model.layout.bottomVisible == false && model.layout.bottomPane == .output)
-        #expect(model.dock.allTabs.contains { $0.kind == .terminal(id: terminalID) })
-        #expect(model.isTerminalShown)
-
-        // 编辑区 → 右栏:标签关闭,侧栏显示
-        model.setTerminalPlacement(.right)
-        #expect(!model.dock.allTabs.contains { $0.kind == .terminal(id: terminalID) })
-        // 工具栏默认在右侧:终端并入工具栏标签条,不另起一列
-        #expect(model.layout.terminalVisible && model.layout.isMergedIntoTools(.terminal) && model.layout.toolsPanel == .terminal)
-
-        // 右栏 → 底部:侧栏隐藏,底部面板显示终端
-        model.setTerminalPlacement(.bottom)
-        #expect(!model.layout.terminalVisible)
-        #expect(model.layout.bottomVisible && model.layout.bottomPane == .terminal)
-
-        // 未显示的终端移动后仍保持未显示
-        model.hideTerminal()
-        model.setTerminalPlacement(.left)
-        #expect(!model.isTerminalShown)
-
-        // 持久化
         model.setSidebarSide(.right)
         model.setToolsSide(.left)
         model.saveNow()
         model.shutdownAll()
         let restored = makeModel(env.store)
-        #expect(restored.layout.placement == PanelPlacement(terminal: .left, sidebarSide: .right, toolsSide: .left))
+        #expect(restored.layout.placement == PanelPlacement(sidebarSide: .right, toolsSide: .left))
+        // 右栏标签随状态恢复
+        #expect(restored.rightDock.allTabs.contains { $0.kind == .terminal(id: "bottom:" + env.dirs[0].standardizedFileURL.path) })
 
-        // 恢复默认布局
         restored.layout.leftWidth = 400
         restored.resetLayout()
         #expect(restored.layout.placement == PanelPlacement())
         #expect(restored.layout.leftWidth == PanelMetrics.leftDefault)
         restored.shutdownAll()
-    }
-
-    @Test("切换终端:底部沿用整个底部面板显隐,其他位置只切换终端")
-    func terminalToggle() throws {
-        let env = try makeEnvironment()
-        defer { try? FileManager.default.removeItem(at: env.root) }
-        let model = makeModel(env.store)
-        _ = model.openProject(env.dirs[0])
-        model.toggleTerminal()
-        #expect(model.layout.bottomVisible)
-        model.toggleTerminal()
-        #expect(!model.layout.bottomVisible)
-
-        model.setTerminalPlacement(.left)
-        model.toggleTerminal()
-        #expect(model.layout.terminalVisible && !model.layout.bottomVisible)
-        model.toggleTerminal()
-        #expect(!model.layout.terminalVisible)
-
-        model.setTerminalPlacement(.editor)
-        model.toggleTerminal()
-        #expect(model.isTerminalShown)
-        model.toggleTerminal()
-        #expect(!model.isTerminalShown)
-        model.shutdownAll()
     }
 
     @Test("折叠、面板切换与历史缓存")
@@ -272,17 +216,12 @@ struct WorkbenchTests {
         defer { try? FileManager.default.removeItem(at: env.root) }
         let model = makeModel(env.store)
         let a = try #require(model.openProject(env.dirs[0]))
-        model.toggleLeft(); model.toggleRight(); model.toggleBottom()
-        #expect(!model.layout.leftVisible && model.layout.rightVisible && model.layout.bottomVisible)
+        model.toggleLeft(); model.toggleRight()
+        #expect(!model.layout.leftVisible && model.layout.rightVisible)
         model.layout.rightVisible = false
         model.showRight(.git)
-        #expect(model.layout.rightVisible && model.layout.rightPane == .git)
-        // 已下线的旧视图被校正回「文件」
-        model.layout.rightPane = .plan
-        model.layout.clamp()
-        #expect(model.layout.rightPane == .files)
-        model.showBottom(.output)
-        #expect(model.layout.bottomVisible)
+        #expect(model.layout.rightVisible)
+        #expect(model.rightDock.allTabs.contains { $0.kind == .preview(id: WorkbenchModel.toolsTabPrefix + "git") })
         model.toggleCollapsed(a)
         #expect(model.projects[0].collapsed)
         let history = (0..<40).map { SessionSummary(sessionId: "s\($0)", cwd: a, title: "会话\($0)", updatedAt: nil) }
@@ -595,7 +534,7 @@ struct PanelMetricsTests {
         #expect(PanelMetrics.clamp(100, side: .left) == 200)
         #expect(PanelMetrics.clamp(900, side: .left) == 520)
         #expect(PanelMetrics.clamp(100, side: .right) == 240)
-        #expect(PanelMetrics.clamp(2000, side: .right) == 800)
+        #expect(PanelMetrics.clamp(2000, side: .right) == 2000)
         #expect(PanelMetrics.clamp(300, side: .left) == 300)
     }
 

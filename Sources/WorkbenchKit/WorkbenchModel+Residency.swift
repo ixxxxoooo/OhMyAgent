@@ -19,7 +19,6 @@ extension WorkbenchModel {
                 keys.insert(ConversationKey(projectID: projectID, slot: slot))
             }
         }
-        for chat in layout.dockedChats { keys.insert(ConversationKey(projectID: chat.projectID, slot: chat.slot)) }
         return keys
     }
 

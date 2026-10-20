@@ -12,25 +12,14 @@ public enum PanelDimension: CaseIterable, Hashable, Sendable {
     case leftWidth
     /// 工具栏宽度
     case rightWidth
-    /// 终端侧栏宽度
-    case terminalWidth
-    /// 输出侧栏宽度
-    case outputWidth
-    /// 底部面板高度
-    case bottomHeight
     /// 终端面板内右侧终端列表的宽度
     case terminalListWidth
-
-    /// 底部面板高度的允许范围。
-    public static let bottomHeightRange: ClosedRange<Double> = 120...600
 
     /// 该维度允许的取值范围。
     public var range: ClosedRange<Double> {
         switch self {
         case .leftWidth: PanelMetrics.leftRange
         case .rightWidth: PanelMetrics.rightRange
-        case .terminalWidth, .outputWidth: PanelMetrics.terminalRange
-        case .bottomHeight: Self.bottomHeightRange
         case .terminalListWidth: PanelMetrics.terminalListRange
         }
     }
@@ -41,8 +30,6 @@ public enum PanelDimension: CaseIterable, Hashable, Sendable {
         switch column {
         case .sidebar: self = .leftWidth
         case .tools: self = .rightWidth
-        case .terminal: self = .terminalWidth
-        case .output: self = .outputWidth
         }
     }
 
@@ -52,9 +39,6 @@ public enum PanelDimension: CaseIterable, Hashable, Sendable {
         switch self {
         case .leftWidth: layout.leftWidth
         case .rightWidth: layout.rightWidth
-        case .terminalWidth: layout.terminalWidth
-        case .outputWidth: layout.outputWidth
-        case .bottomHeight: layout.bottomHeight
         case .terminalListWidth: layout.terminalListWidth
         }
     }
@@ -69,9 +53,6 @@ public enum PanelDimension: CaseIterable, Hashable, Sendable {
         switch self {
         case .leftWidth: layout.leftWidth = clamped
         case .rightWidth: layout.rightWidth = clamped
-        case .terminalWidth: layout.terminalWidth = clamped
-        case .outputWidth: layout.outputWidth = clamped
-        case .bottomHeight: layout.bottomHeight = clamped
         case .terminalListWidth: layout.terminalListWidth = clamped
         }
     }
@@ -95,9 +76,6 @@ public final class PanelDragState {
 
     private var leftWidth: Double?
     private var rightWidth: Double?
-    private var terminalWidth: Double?
-    private var outputWidth: Double?
-    private var bottomHeight: Double?
     private var terminalListWidth: Double?
 
     /// 正在拖动的维度(不参与观察,供 AppKit 侧的实时缩放门控读取)。
@@ -122,9 +100,6 @@ public final class PanelDragState {
         switch dimension {
         case .leftWidth: leftWidth
         case .rightWidth: rightWidth
-        case .terminalWidth: terminalWidth
-        case .outputWidth: outputWidth
-        case .bottomHeight: bottomHeight
         case .terminalListWidth: terminalListWidth
         }
     }
@@ -172,9 +147,6 @@ public final class PanelDragState {
         switch dimension {
         case .leftWidth: leftWidth = value
         case .rightWidth: rightWidth = value
-        case .terminalWidth: terminalWidth = value
-        case .outputWidth: outputWidth = value
-        case .bottomHeight: bottomHeight = value
         case .terminalListWidth: terminalListWidth = value
         }
     }

@@ -240,35 +240,6 @@ struct TabItemView: View {
         }
     }
 
-    /// 终端/输出标签的「移到…」菜单:把它们从编辑区放回底部或左右侧栏(与标题条拖动等价)。
-    @OMMenuBuilder
-    private var panelMoveEntries: [MenuEntry] {
-        if let item = panelItem {
-            OMMenuDivider()
-            for zone in item.allowedZones.filter({ $0 != .editor }) {
-                OMMenuItem(verbatim: Self.moveTitle(item: item, zone: zone), icon: zone == .left ? "panel-left" : (zone == .bottom ? "panel-bottom" : "panel-right")) { omWithAnimation { _ = workbench.place(item, in: zone) } }
-            }
-        }
-    }
-
-    /// 标签对应的可摆放面板(仅终端标签与输出标签)。
-    private var panelItem: PanelItem? {
-        switch tab.kind {
-        case .terminal, .agentTerminal: return .terminal
-        case .preview(let id): return id == WorkbenchModel.outputTabID ? .output : nil
-        default: return nil
-        }
-    }
-
-    private static func moveTitle(item: PanelItem, zone: PanelZone) -> String {
-        switch zone {
-        case .bottom: return String(localized: "移到底部面板")
-        case .left: return String(localized: "移到左侧栏")
-        case .right: return String(localized: "移到右侧栏")
-        case .editor: return String(localized: "移到编辑区")
-        }
-    }
-
     /// 本标签右侧的标签 ID。
     private var rightIDs: Set<UUID> {
         guard let index = group.tabs.firstIndex(where: { $0.id == tab.id }) else { return [] }
@@ -300,7 +271,13 @@ struct TabItemView: View {
             workbench.syncSelectionFromDock()
         }
         OMMenuItem(verbatim: workbench.dock(host).maximizedGroupID == group.id ? String(localized: "还原布局") : String(localized: "最大化此组"), icon: "maximize-2") { workbench.mutateDock(host) { $0.toggleMaximize(group: group.id) } }
-        panelMoveEntries
+        OMMenuItem(verbatim: host == .right ? String(localized: "移到中栏") : String(localized: "移到右栏"), icon: host == .right ? "panel-top" : "panel-right") {
+            omWithAnimation {
+                if host == .center { workbench.layout.rightVisible = true }
+                _ = workbench.moveTab(tab.id, toHost: host == .right ? .center : .right)
+                workbench.syncSelectionFromDock()
+            }
+        }
         if case .file(let path) = tab.kind {
             OMMenuDivider()
             OMMenuItem("在 Finder 中显示", icon: "folder-open") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }

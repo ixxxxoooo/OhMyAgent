@@ -2653,3 +2653,9 @@
 "子进程" = "Child Processes";
 "当前 %@ MB · 阶段 %@" = "Now %@ MB · Phase %@";
 "演示模式:数据来自沙盒,Agent 为脚本化演示 Agent,不会触碰真实项目与账号。点击打开「演示指标」" = "Demo mode: data comes from the sandbox and the Agent is a scripted demo Agent; real projects and accounts are untouched. Click to open Demo Metrics.";
+"移到中栏" = "Move to Center";
+"移到右栏" = "Move to Right Panel";
+"右栏为空" = "Right panel is empty";
+"打开文件、终端或资源管理器,它们会以标签显示在这里" = "Files, terminals and the explorer open here as tabs";
+"资源管理器" = "Explorer";
+"右栏停靠区" = "Right Dock";

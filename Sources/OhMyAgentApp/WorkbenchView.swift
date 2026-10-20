@@ -115,7 +115,7 @@ struct WorkbenchView: View {
         // 宽度取「拖动中临时值,否则已提交值」:拖动期间 layout 不变,只有被拖动的这一列重新布局
         let dimension = PanelDimension(column: column)
         let width = workbench.panelDrag.effective(dimension, committed: workbench.layout)
-        let defaultWidth = column == .sidebar ? PanelMetrics.leftDefault : (column == .tools ? PanelMetrics.rightDefault : PanelMetrics.terminalDefault)
+        let defaultWidth = column == .sidebar ? PanelMetrics.leftDefault : PanelMetrics.rightDefault
         if side == .right { PanelResizer(workbench: workbench, dimension: dimension, side: side, defaultWidth: defaultWidth).zIndex(1).transition(panelTransition(side)) }
         Group {
             switch column {
@@ -124,15 +124,9 @@ struct WorkbenchView: View {
                     .id(appearance.renderKey)
                     .background(SidebarBackground())
             case .tools:
-                RightPaneView(workbench: workbench)
-                    .id(appearance.themeRevision)
-            case .terminal:
-                TerminalSidePanel(workbench: workbench)
-            case .output:
-                OutputSidePanel(workbench: workbench)
+                RightDockView(workbench: workbench)
             }
         }
-        .panelDropZone(side == .left ? .left : .right, workbench: workbench)
         // 窗口放不下「面板 + 中栏最小宽度」时面板让出宽度(而不是把整个工作区撑出窗口、右上角开关被挤出可视区)
         .frame(minWidth: 0, idealWidth: CGFloat(width), maxWidth: CGFloat(width))
         .clipped()
@@ -304,7 +298,6 @@ struct WorkbenchView: View {
             }
         }
         // 调试:面板摆放(OMA_TERMINAL_PLACEMENT=bottom|right|left|editor、OMA_SIDEBAR_SIDE/OMA_TOOLS_SIDE=left|right、OMA_SHOW_TERMINAL=1)
-        if let value = env["OMA_TERMINAL_PLACEMENT"].flatMap(TerminalPlacement.init(rawValue:)) { workbench.setTerminalPlacement(value) }
         if let value = env["OMA_SIDEBAR_SIDE"].flatMap(PanelSide.init(rawValue:)) { workbench.setSidebarSide(value) }
         if let value = env["OMA_TOOLS_SIDE"].flatMap(PanelSide.init(rawValue:)) { workbench.setToolsSide(value) }
         if env["OMA_SHOW_TERMINAL"] != nil { workbench.showTerminal() }
@@ -339,8 +332,7 @@ struct WorkbenchView: View {
             }
         }
         if env["OMA_SHOW_RIGHT"] != nil { workbench.layout.rightVisible = true }
-        if env["OMA_SHOW_BOTTOM"] != nil { workbench.layout.bottomVisible = true }
-        if let pane = env["OMA_BOTTOM_PANE"].flatMap(BottomPane.init(rawValue:)) { workbench.layout.bottomPane = pane }
+        if env["OMA_SHOW_OUTPUT"] != nil { workbench.showOutput(); workbench.layout.rightVisible = true }
         if env["OMA_OPEN_SETTINGS"] != nil {
             workbench.openSettings()
         }
@@ -371,7 +363,7 @@ struct WorkbenchView: View {
     }
 }
 
-/// 中栏:停靠区(标签组与分屏)+ 底部面板。
+/// 中栏:停靠区(标签组与分屏)。
 struct CenterColumn: View {
     @Bindable var workbench: WorkbenchModel
     private let appearance = AppearanceModel.shared
@@ -381,16 +373,6 @@ struct CenterColumn: View {
         VStack(spacing: 0) {
             DockView(workbench: workbench)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            if workbench.layout.bottomVisible {
-                BottomPanelView(workbench: workbench)
-            } else if DockDrag.shared.panel != nil || DockDrag.shared.tabID.flatMap({ workbench.panelItem(forTab: $0) }) != nil {
-                // 底部栏已收起时,拖动面板标签期间出现落点条,可把标签放回底部
-                Text("放到此处,移到底部面板")
-                    .font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
-                    .frame(maxWidth: .infinity).frame(height: 32)
-                    .background(OMColors.surface)
-                    .panelDropZone(.bottom, workbench: workbench)
-            }
         }
         // 主题/强调色变化时整体重建,令牌颜色立即生效(终端进程由 TerminalStore 持有,不受影响)
         .id(appearance.themeRevision)

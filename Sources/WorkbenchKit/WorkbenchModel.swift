@@ -130,6 +130,7 @@ public final class WorkbenchModel {
         pendingRestores = Dictionary(records.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
         dock = (state.dock ?? DockLayout()).restoredForLaunch(projectIDs: aliveIDs, keepChats: Set(pendingRestores.keys))
         rightDock = (state.rightDock ?? DockLayout()).restoredForLaunch(projectIDs: aliveIDs, keepChats: Set(pendingRestores.keys), keepsPanels: true)
+        applyLegacyMigration()
         self.healSessionCreationDates()
         log.info("工作台状态已加载", ["projects": "\(alive.count)", "selected": selected ?? "-"])
         if !unavailableProjects.isEmpty {
@@ -187,7 +188,7 @@ public final class WorkbenchModel {
         let alive = Set(allDockTabs.compactMap { tab -> ConversationKey? in
             if case .chat(let projectID, let slot) = tab.kind { return ConversationKey(projectID: projectID, slot: slot) }
             return nil
-        } + layout.dockedChats.map { ConversationKey(projectID: $0.projectID, slot: $0.slot) })
+        })
         for key in conversations.keys where !alive.contains(key) {
             conversations[key]?.shutdown()
             conversations[key] = nil
@@ -1131,138 +1132,58 @@ public final class WorkbenchModel {
     public var panelToggleStamp: PanelToggleStamp?
 
     public func toggleLeft() { panelToggleStamp = PanelToggleStamp(name: "left", at: .now); layout.leftVisible.toggle() }
-    public func toggleRight() { panelToggleStamp = PanelToggleStamp(name: "right", at: .now); layout.rightVisible.toggle() }
-    public func toggleBottom() { layout.bottomVisible.toggle() }
+    public func toggleRight() {
+        panelToggleStamp = PanelToggleStamp(name: "right", at: .now)
+        layout.rightVisible.toggle()
+        // 右栏停靠区还没有任何标签时,展开即放一个资源管理器,避免出现空栏
+        if layout.rightVisible, rightDock.allTabs.isEmpty { openToolsTab(.files, title: Self.toolsPaneTitle(.files)) }
+    }
 
-    /// 显示右栏并切换到某视图。
+    /// 显示右栏并打开某个工具面板标签(文件 / 搜索 / Git)。
+    /// - Parameter pane: 工具面板
     public func showRight(_ pane: RightPane) {
-        layout.rightPane = pane
+        guard RightPane.available.contains(pane) else { layout.rightVisible = true; return }
+        let tab = openToolsTab(pane, title: Self.toolsPaneTitle(pane))
+        activateAnyTab(tab)
         layout.rightVisible = true
     }
 
+    /// 工具面板的标签标题。
+    /// - Parameter pane: 工具面板
+    public nonisolated static func toolsPaneTitle(_ pane: RightPane) -> String {
+        switch pane {
+        case .files: return String(localized: "文件")
+        case .search: return String(localized: "搜索")
+        case .git: return String(localized: "Git")
+        case .changes: return String(localized: "改动")
+        case .plan: return String(localized: "计划")
+        case .outline: return String(localized: "大纲")
+        case .problems: return String(localized: "问题")
+        case .terminal: return String(localized: "终端")
+        }
+    }
+
     // MARK: 面板摆放
-
-    /// 项目级常驻终端的标识(与终端存储一致;面板位置变化时进程保持存活)。
-    public var residentTerminalID: String { "bottom:" + (selectedProjectID ?? NSHomeDirectory()) }
-
-    /// 从常驻终端标识取出项目根(不是常驻终端标识为 nil)。
-    /// - Parameter terminalID: 终端标识(`bottom:<项目根>`)
-    /// - Returns: 项目根目录
-    public static func residentTerminalRoot(_ terminalID: String) -> String? {
-        terminalID.hasPrefix("bottom:") ? String(terminalID.dropFirst("bottom:".count)) : nil
-    }
-
-    /// 编辑区中的常驻终端标签(终端放在编辑区时存在;每个项目最多一个)。
-    var residentTerminalTabs: [WorkbenchTab] {
-        dock.allTabs.filter { if case .terminal(let id) = $0.kind { return id.hasPrefix("bottom:") } else { return false } }
-    }
-
-    /// 当前项目在编辑区中的常驻终端标签。
-    var currentResidentTerminalTab: WorkbenchTab? {
-        let id = residentTerminalID
-        return dock.allTabs.first { $0.kind == .terminal(id: id) }
-    }
-
-    /// 终端当前是否显示在界面上(编辑区摆放时看当前项目的终端标签)。
-    public var isTerminalShown: Bool {
-        switch layout.placement.terminal {
-        case .bottom: return layout.bottomVisible && layout.bottomPane == .terminal
-        case .left, .right:
-            // 并入工具栏时:还要它正显示在工具栏最前面(否则 ⌘J 会把被盖住的终端直接移除,要按两次才显示)
-            return layout.terminalVisible && (!layout.isMergedIntoTools(.terminal) || layout.isFrontInTools(.terminal))
-        case .editor: return currentResidentTerminalTab != nil
-        }
-    }
-
-    /// 显示终端(按当前摆放位置)。
-    public func showTerminal() {
-        switch layout.placement.terminal {
-        case .bottom: showBottom(.terminal)
-        case .left, .right: layout.terminalVisible = true; revealInTools(.terminal)
-        case .editor:
-            let id = residentTerminalID
-            let tab = dock.open(.terminal(id: id), title: String(localized: "终端"))
-            mode = .workspace
-            dock.activate(tab)
-            syncSelectionFromDock()
-        }
-    }
-
-    /// 隐藏终端(进程保持存活;编辑区终端标签会被关闭,进程仍由终端存储保留)。
-    /// - Parameter root: 编辑区摆放时要关闭哪个项目的终端标签(默认当前项目;其他项目的终端标签不受影响)
-    public func hideTerminal(root: String? = nil) {
-        switch layout.placement.terminal {
-        case .bottom: layout.bottomVisible = false
-        case .left, .right: layout.terminalVisible = false
-        case .editor:
-            let id = root.map { "bottom:" + $0 } ?? residentTerminalID
-            for tab in residentTerminalTabs where tab.kind == .terminal(id: id) { dock.close(tab.id) }
-            syncSelectionFromDock()
-        }
-    }
-
-    /// 切换终端显隐(⌘J):终端在底部时与旧行为一致(整个底部面板显隐)。
-    public func toggleTerminal() {
-        if layout.placement.terminal == .bottom { toggleBottom(); return }
-        if isTerminalShown { hideTerminal() } else { showTerminal() }
-    }
-
-    /// 把终端移动到新位置:保持其显示状态与进程(终端标识不变),并清理旧位置的残留。
-    /// - Parameter target: 目标位置
-    public func setTerminalPlacement(_ target: TerminalPlacement) {
-        var next = layout.placement
-        next.terminal = target
-        applyPlacement(next)
-    }
 
     /// 设置项目栏所在侧。
     public func setSidebarSide(_ side: PanelSide) {
         var next = layout.placement
         next.sidebarSide = side
-        applyPlacement(next)
+        layout.placement = next
     }
 
-    /// 设置工具栏(文件/搜索/Git)所在侧。
+    /// 设置工具栏(右栏停靠区)所在侧。
     public func setToolsSide(_ side: PanelSide) {
         var next = layout.placement
         next.toolsSide = side
-        applyPlacement(next)
+        layout.placement = next
     }
 
-    /// 恢复默认布局:终端在底部,项目栏在左,工具栏在右,各面板恢复默认尺寸。
+    /// 恢复默认布局:项目栏在左,右栏停靠区在右,各面板恢复默认尺寸。
     public func resetLayout() {
-        applyPlacement(PanelPlacement())
+        layout.placement = PanelPlacement()
         layout.leftWidth = PanelMetrics.leftDefault
         layout.rightWidth = PanelMetrics.rightDefault
-        layout.terminalWidth = PanelMetrics.terminalDefault
-        layout.outputWidth = PanelMetrics.terminalDefault
-        layout.bottomHeight = 240
-    }
-
-    /// 应用新的摆放配置;终端/输出位置变化时迁移其显示状态。
-    private func applyPlacement(_ next: PanelPlacement) {
-        let terminalWasShown = isTerminalShown
-        let outputWasShown = isOutputShown
-        let oldTerminal = layout.placement.terminal
-        let oldOutput = layout.placement.output
-        guard next != layout.placement else { return }
-        layout.placement = next
-        if next.terminal != oldTerminal {
-            // 清理旧位置:编辑区标签关闭(不进入「最近关闭」),底部/侧栏显隐复位
-            if oldTerminal == .editor { for tab in residentTerminalTabs { dock.close(tab.id) } }
-            if oldTerminal == .bottom, layout.bottomPane == .terminal { layout.bottomPane = .output; layout.bottomVisible = false }
-            if oldTerminal.isSide { layout.terminalVisible = false }
-        }
-        if next.output != oldOutput {
-            if oldOutput == .editor { for tab in outputTabs { dock.close(tab.id) } }
-            if oldOutput == .bottom, layout.bottomPane == .output { layout.bottomPane = .terminal; layout.bottomVisible = layout.bottomVisible && next.terminal == .bottom }
-            if oldOutput.isSide { layout.outputVisible = false }
-        }
-        layout.clamp()
-        if next.terminal != oldTerminal, terminalWasShown { showTerminal() }
-        if next.output != oldOutput, outputWasShown { showOutput() }
-        if next.terminal != oldTerminal || next.output != oldOutput { syncSelectionFromDock() }
-        layout.clamp()
     }
 
     // MARK: 自动化页
@@ -1273,10 +1194,8 @@ public final class WorkbenchModel {
     /// 打开(或切到)自动化页标签。
     @discardableResult
     public func openAutomation() -> UUID {
-        mode = .workspace
-        let tab = dock.open(.preview(id: Self.automationTabID), title: String(localized: "自动化"))
-        dock.activate(tab)
-        syncSelectionFromDock()
+        let tab = openTab(.preview(id: Self.automationTabID), title: String(localized: "自动化"))
+        activateAnyTab(tab)
         return tab
     }
 
@@ -1293,10 +1212,8 @@ public final class WorkbenchModel {
     @discardableResult
     public func openCustomize(filter: String? = nil) -> UUID {
         if let filter { customizeFilter = filter }
-        mode = .workspace
-        let tab = dock.open(.preview(id: Self.customizeTabID), title: String(localized: "自定义"))
-        dock.activate(tab)
-        syncSelectionFromDock()
+        let tab = openTab(.preview(id: Self.customizeTabID), title: String(localized: "自定义"))
+        activateAnyTab(tab)
         return tab
     }
 
@@ -1306,11 +1223,9 @@ public final class WorkbenchModel {
     /// 打开(或激活)演示指标标签。
     @discardableResult
     public func openDemoMetrics() -> UUID {
-        mode = .workspace
-        let tab = dock.open(.preview(id: Self.demoMetricsTabID), title: String(localized: "演示指标"))
-        dock.keepOpen(tab)
-        dock.activate(tab)
-        syncSelectionFromDock()
+        let tab = openTab(.preview(id: Self.demoMetricsTabID), title: String(localized: "演示指标"))
+        mutateDock(host(of: tab) ?? .center) { $0.keepOpen(tab) }
+        activateAnyTab(tab)
         return tab
     }
 
@@ -1331,10 +1246,8 @@ public final class WorkbenchModel {
     ///   - title: 标签标题
     @discardableResult
     public func openCanvas(id: String, title: String) -> UUID {
-        mode = .workspace
-        let tab = dock.open(.preview(id: Self.canvasTabPrefix + id), title: title)
-        dock.activate(tab)
-        syncSelectionFromDock()
+        let tab = openTab(.preview(id: Self.canvasTabPrefix + id), title: title)
+        activateAnyTab(tab)
         return tab
     }
 
@@ -1354,11 +1267,9 @@ public final class WorkbenchModel {
     ///   - path: 计划文件(`*.plan.md`)的绝对路径
     ///   - title: 标签标题
     @discardableResult
-    public func openPlan(path: String, title: String) -> UUID {
-        mode = .workspace
-        let tab = dock.open(.preview(id: Self.planTabPrefix + path), title: title)
-        dock.activate(tab)
-        syncSelectionFromDock()
+    public func openPlan(path: String, title: String, target: OpenTarget = .auto) -> UUID {
+        let tab = openTab(.preview(id: Self.planTabPrefix + path), title: title, host: resolveHost(target))
+        activateAnyTab(tab)
         return tab
     }
 
@@ -1367,9 +1278,21 @@ public final class WorkbenchModel {
     ///   - path: 计划文件绝对路径
     ///   - title: 标签标题
     @discardableResult
-    public func openPlanBeside(path: String, title: String) -> UUID {
+    public func openPlanBeside(path: String, title: String, target: OpenTarget = .auto) -> UUID {
+        let kind = TabKind.preview(id: Self.planTabPrefix + path)
+        if let existing = existingTab(for: kind) {
+            mutateDock(existing.host) { $0.open(kind, title: title, preview: true) }
+            return existing.tab.id
+        }
+        if resolveHost(target) == .right {
+            // 放进右栏,焦点留在会话(中栏),方便左右对照
+            let focused = focusedHost
+            let tab = openTab(kind, title: title, preview: true, host: .right)
+            focusedHost = focused
+            return tab
+        }
         mode = .workspace
-        let tab = dock.openBeside(.preview(id: Self.planTabPrefix + path), title: title, of: dock.focusedGroupID, preview: true, keepFocus: true)
+        let tab = dock.openBeside(kind, title: title, of: dock.focusedGroupID, preview: true, keepFocus: true)
         scheduleSave()
         return tab
     }
@@ -1390,21 +1313,13 @@ public final class WorkbenchModel {
     ///   - id: 浏览器标签 id
     ///   - title: 标签标题
     ///   - activate: 是否切到该标签(Agent 在后台打开页面时为 false,不抢焦点)
-    /// - Returns: 浏览器在编辑区里的标签 ID;放在右侧栏时为 nil
+    /// - Returns: 浏览器标签 ID
     @discardableResult
     public func openBrowser(id: String, title: String, activate: Bool = true) -> UUID? {
-        mode = .workspace
         let kind = TabKind.preview(id: Self.browserTabPrefix + id)
-        if let existing = dock.tab(for: kind) {
-            if activate {
-                dock.activate(existing.id)
-                syncSelectionFromDock()
-            }
-            scheduleSave()
-            return existing.id
-        }
-        showSidebarBrowser(id: id)
-        return nil
+        let tab = openTab(kind, title: title, host: .right)
+        if activate { activateAnyTab(tab) }
+        return tab
     }
 
     // MARK: 工具面板标签(右栏的文件 / 搜索 / Git 拖进编辑区)
@@ -1425,10 +1340,7 @@ public final class WorkbenchModel {
     /// - Returns: 标签 ID
     @discardableResult
     public func openToolsTab(_ pane: RightPane, title: String) -> UUID {
-        mode = .workspace
-        let tab = dock.open(.preview(id: Self.toolsTabPrefix + pane.rawValue), title: title)
-        scheduleSave()
-        return tab
+        openTab(.preview(id: Self.toolsTabPrefix + pane.rawValue), title: title, host: .right)
     }
 
     /// 更新浏览器标签标题(页面标题变化时)。
@@ -1436,14 +1348,14 @@ public final class WorkbenchModel {
     ///   - id: 浏览器标签 id
     ///   - title: 新标题
     public func setBrowserTitle(id: String, title: String) {
-        guard let tab = dock.allTabs.first(where: { $0.kind == .preview(id: Self.browserTabPrefix + id) }) else { return }
-        dock.setTitle(title, for: tab.id)
+        guard let (host, tab) = existingTab(for: .preview(id: Self.browserTabPrefix + id)) else { return }
+        mutateDock(host) { $0.setTitle(title, for: tab.id) }
     }
 
     /// 浏览器标签当前是否仍在编辑区里。
     /// - Parameter id: 浏览器标签 id
     public func isBrowserOpen(id: String) -> Bool {
-        layout.sidebarBrowserID == id || dock.allTabs.contains { $0.kind == .preview(id: Self.browserTabPrefix + id) }
+        existingTab(for: .preview(id: Self.browserTabPrefix + id)) != nil
     }
 
     // MARK: 输出面板
@@ -1451,79 +1363,6 @@ public final class WorkbenchModel {
     /// 输出面板在编辑区里的标签标识(放在编辑区时作为预览类标签)。
     public nonisolated static let outputTabID = "oma-output"
 
-    /// 编辑区中的输出标签。
-    var outputTabs: [WorkbenchTab] {
-        dock.allTabs.filter { $0.kind == .preview(id: Self.outputTabID) }
-    }
-
-    /// 输出面板当前是否显示在界面上。
-    public var isOutputShown: Bool {
-        switch layout.placement.output {
-        case .bottom: return layout.bottomVisible && layout.bottomPane == .output
-        case .left, .right:
-            return layout.outputVisible && (!layout.isMergedIntoTools(.output) || layout.isFrontInTools(.output))
-        case .editor: return !outputTabs.isEmpty
-        }
-    }
-
-    /// 显示输出面板(按当前摆放位置)。
-    public func showOutput() {
-        switch layout.placement.output {
-        case .bottom: showBottom(.output)
-        case .left, .right: layout.outputVisible = true; revealInTools(.output)
-        case .editor:
-            let tab = dock.open(.preview(id: Self.outputTabID), title: String(localized: "输出"))
-            mode = .workspace
-            dock.activate(tab)
-            syncSelectionFromDock()
-        }
-    }
-
-    /// 隐藏输出面板。
-    public func hideOutput() {
-        switch layout.placement.output {
-        case .bottom: if layout.bottomPane == .output { layout.bottomVisible = false }
-        case .left, .right: layout.outputVisible = false
-        case .editor:
-            for tab in outputTabs { dock.close(tab.id) }
-            syncSelectionFromDock()
-        }
-    }
-
-    /// 切换输出面板显隐。
-    public func toggleOutput() {
-        if isOutputShown { hideOutput() } else { showOutput() }
-    }
-
-    /// 把输出面板移动到新位置。
-    /// - Parameter target: 目标位置
-    public func setOutputPlacement(_ target: TerminalPlacement) {
-        var next = layout.placement
-        next.output = target
-        applyPlacement(next)
-    }
-
-    /// 显示底部面板并切换到某视图。
-    public func showBottom(_ pane: BottomPane) {
-        layout.bottomPane = pane
-        layout.bottomVisible = true
-    }
-
-    /// 拖拽调整工具栏图标顺序。
-    /// - Parameters:
-    ///   - pane: 被拖动的视图
-    ///   - target: 落点所在视图;nil 表示移到末尾
-    public func moveRightPane(_ pane: RightPane, onto target: RightPane?) {
-        layout.rightPaneOrder = PaneOrder.moved(layout.rightPaneOrder, item: pane, onto: target)
-    }
-
-    /// 拖拽调整底部面板标签顺序。
-    /// - Parameters:
-    ///   - pane: 被拖动的视图
-    ///   - target: 落点所在视图;nil 表示移到末尾
-    public func moveBottomPane(_ pane: BottomPane, onto target: BottomPane?) {
-        layout.bottomPaneOrder = PaneOrder.moved(layout.bottomPaneOrder, item: pane, onto: target)
-    }
 
     // MARK: 持久化
 

@@ -136,22 +136,21 @@ enum ResizeBenchmarkHooks {
         Log.perf.info("基准阶段", ["phase": "窗口缩放结束"])
     }
 
-    /// 拖分栏扫描(`sidebar`/`tools`/`bottom` 与 `PanelResizer` 同一写入路径:拖动中只写临时值,结束提交;`dock` 逐帧提交比例)。
+    /// 拖分栏扫描(`sidebar`/`tools` 与 `PanelResizer` 同一写入路径:拖动中只写临时值,结束提交;`dock` 逐帧提交比例)。
     private static func dragSweep(kind: String, workbench: WorkbenchModel) async {
         guard let view = mainWindow?.contentView else {
             Log.perf.warning("拖分栏基准:没有可用的主窗口")
             return
         }
         // 先把要拖的面板显示出来并等布局稳定,再开始采样(面板首次挂载的开销不计入拖动)
-        if kind == "bottom" { workbench.layout.bottomVisible = true }
         if kind == "tools" { workbench.layout.rightVisible = true }
         try? await Task.sleep(for: .seconds(1))
         Log.perf.info("基准阶段", ["phase": "拖分栏开始", "kind": kind])
         let start = ContinuousClock.now
         let sampler = SweepSampler(view: view)
         switch kind {
-        case "sidebar", "tools", "bottom":
-            let dimension: PanelDimension = kind == "sidebar" ? .leftWidth : (kind == "tools" ? .rightWidth : .bottomHeight)
+        case "sidebar", "tools":
+            let dimension: PanelDimension = kind == "sidebar" ? .leftWidth : .rightWidth
             let base = dimension.committed(in: workbench.layout)
             let values = SweepPlan.zigzag(low: dimension.clamp(base - 120), high: dimension.clamp(base + 120), steps: 30, cycles: 3)
             for value in values {

@@ -1,6 +1,6 @@
 // @author ixxxxoooo
-// 外观页的「布局」编辑器:一个迷你工作台示意图,把「项目栏 / 工具栏 / 终端 / 输出」小卡片拖到
-// 左栏、右栏、底部或编辑区即可摆放;与直接拖动面板标题条共用同一套落点逻辑(WorkbenchModel.place)。
+// 外观页的「布局」编辑器:一个迷你工作台示意图,把「项目栏 / 右栏停靠区」小卡片拖到
+// 左侧或右侧即可摆放;终端、输出、文件预览等是右栏停靠区里的标签,不再单独摆放。
 
 import DesignSystem
 import IconKit
@@ -15,17 +15,15 @@ struct LayoutDragEditor: View {
     private enum Metrics {
         static let sideWidth: CGFloat = 120
         static let height: CGFloat = 176
-        static let bottomHeight: CGFloat = 56
         static let gap: CGFloat = 6
     }
 
     var body: some View {
         HStack(spacing: Metrics.gap) {
             zoneView(.left).frame(width: Metrics.sideWidth)
-            VStack(spacing: Metrics.gap) {
-                zoneView(.editor)
-                zoneView(.bottom).frame(height: Metrics.bottomHeight)
-            }
+            RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous)
+                .strokeBorder(OMColors.hairline, lineWidth: 0.5)
+                .overlay { Text("编辑区").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText) }
             zoneView(.right).frame(width: Metrics.sideWidth)
         }
         .frame(height: Metrics.height)
@@ -42,15 +40,10 @@ struct LayoutDragEditor: View {
             RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous)
                 .fill(isTargeted ? OMColors.selectedFill : OMColors.card)
             RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous)
-                .strokeBorder(isTargeted ? OMColors.accent : OMColors.hairline, style: StrokeStyle(lineWidth: isTargeted ? 1.5 : 0.5, dash: zone == .editor ? [] : [4, 3]))
+                .strokeBorder(isTargeted ? OMColors.accent : OMColors.hairline, style: StrokeStyle(lineWidth: isTargeted ? 1.5 : 0.5, dash: [4, 3]))
             VStack(alignment: .leading, spacing: 4) {
                 Text(Self.title(zone)).font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
-                if zone.side == nil {
-                    // 底部与编辑区较宽,卡片横向排列
-                    HStack(spacing: 4) { ForEach(items) { chip($0) } }
-                } else {
-                    ForEach(items) { chip($0) }
-                }
+                ForEach(items) { chip($0) }
                 Spacer(minLength: 0)
             }
             .padding(8)
@@ -75,7 +68,7 @@ struct LayoutDragEditor: View {
         .background(OMColors.selectedFill, in: RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))
         .foregroundStyle(OMColors.accent)
         .draggable(item.payload)
-        .omTooltip(item.allowedZones.count == 2 ? String(localized: "拖到左栏或右栏") : String(localized: "拖到左栏、右栏、底部或编辑区"))
+        .omTooltip(String(localized: "拖到左栏或右栏"))
         .accessibilityLabel(Self.title(item))
         .accessibilityHint(String(localized: "拖动到其它区域可更换位置"))
     }
@@ -84,17 +77,13 @@ struct LayoutDragEditor: View {
         switch zone {
         case .left: return String(localized: "左栏")
         case .right: return String(localized: "右栏")
-        case .bottom: return String(localized: "底部")
-        case .editor: return String(localized: "编辑区")
         }
     }
 
     private static func title(_ item: PanelItem) -> String {
         switch item {
         case .sidebar: return String(localized: "项目栏")
-        case .tools: return String(localized: "文件 / Git")
-        case .terminal: return String(localized: "终端")
-        case .output: return String(localized: "输出")
+        case .tools: return String(localized: "右栏停靠区")
         }
     }
 
@@ -102,8 +91,6 @@ struct LayoutDragEditor: View {
         switch item {
         case .sidebar: return "panel-left"
         case .tools: return "panel-right"
-        case .terminal: return "square-terminal"
-        case .output: return "file-text"
         }
     }
 }

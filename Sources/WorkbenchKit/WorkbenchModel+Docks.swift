@@ -75,6 +75,16 @@ public extension WorkbenchModel {
         rightDock.retargetFiles(from: source, to: destination)
     }
 
+    /// 旧布局(底部面板/终端侧栏/工具栏单视图)迁移:可见的终端、输出、工具视图变成右栏停靠区里的标签。启动时调用一次。
+    func applyLegacyMigration() {
+        guard let migration = layout.legacyMigration else { return }
+        layout.legacyMigration = nil
+        if let pane = migration.rightPane { openTab(.preview(id: Self.toolsTabPrefix + pane.rawValue), title: Self.toolsPaneTitle(pane), host: .right) }
+        if migration.showTerminal { openTab(.terminal(id: residentTerminalID), title: String(localized: "终端"), host: .right) }
+        if migration.showOutput { openTab(.preview(id: Self.outputTabID), title: String(localized: "输出"), host: .right) }
+        if migration.showTerminal || migration.showOutput { layout.rightVisible = true }
+    }
+
     /// 把打开位置偏好换算成停靠区(`.auto` 取设置项「文件默认打开位置」)。
     /// - Parameter target: 打开位置偏好
     func resolveHost(_ target: OpenTarget) -> DockHost {

@@ -151,7 +151,8 @@ extension WorkbenchLayout {
     /// - Parameter column: 面板列
     /// - Returns: 前缘与后缘的让位宽度
     func titlebarInsets(for column: PanelColumn) -> (leading: CGFloat, trailing: CGFloat) {
-        guard column != .sidebar, let side = side(of: column), visibleColumns(on: side).first == column else { return (0, 0) }
+        let side = side(of: column)
+        guard column != .sidebar, visibleColumns(on: side).first == column else { return (0, 0) }
         return side == .left
             ? (TitlebarMetrics.leftClusterWidth(toggles: toggleCount(on: .left)), 0)
             : (0, TitlebarMetrics.rightClusterWidth(toggles: toggleCount(on: .right)))

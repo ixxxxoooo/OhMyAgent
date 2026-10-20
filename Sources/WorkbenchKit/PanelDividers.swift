@@ -8,15 +8,23 @@ public enum PanelSide: String, Codable, Equatable, Sendable {
     case left, right
 }
 
-/// 面板尺寸范围与默认值(对齐 kuku:左栏 200–520(须容纳顶部浮层的 198pt),右栏 240–800)。
+/// 面板尺寸范围与默认值(对齐 kuku:左栏 200–520(须容纳顶部浮层的 198pt);右栏下限 240,上限随窗口宽度动态计算,见 `rightMax`)。
 public enum PanelMetrics {
     public static let leftRange: ClosedRange<Double> = 200...520
-    public static let rightRange: ClosedRange<Double> = 240...800
+    /// 右栏宽度的静态范围:下限 240;上限仅作持久化的兜底(10000),实际可拖到多宽取决于窗口(`rightMax`)。
+    public static let rightRange: ClosedRange<Double> = 240...10_000
+    /// 右栏拖宽时中栏至少保留的宽度
+    public static let centerMinimum: Double = 320
     public static let leftDefault: Double = 260
     public static let rightDefault: Double = 340
-    /// 终端侧栏宽度范围与默认值(终端放到左/右侧时使用)
-    public static let terminalRange: ClosedRange<Double> = 240...900
-    public static let terminalDefault: Double = 420
+    /// 右栏当前窗口下允许的最大宽度:窗口宽度减去(可见的)项目栏宽度与中栏最小宽度,且不小于下限。
+    /// - Parameters:
+    ///   - window: 窗口(工作区)宽度
+    ///   - sidebar: 项目栏占用的宽度(收起时为 0)
+    /// - Returns: 右栏最大宽度
+    public static func rightMax(window: Double, sidebar: Double) -> Double {
+        max(rightRange.lowerBound, window - sidebar - centerMinimum)
+    }
     /// 终端面板内右侧「终端列表」的宽度范围与默认值
     public static let terminalListRange: ClosedRange<Double> = 120...320
     public static let terminalListDefault: Double = 180

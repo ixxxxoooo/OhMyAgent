@@ -20,117 +20,108 @@ public enum LeftPane: String, Codable, CaseIterable, Sendable {
     public static var available: [LeftPane] { [.sessions] }
 }
 
-/// 右栏视图。
+/// 右栏视图(文件 / 搜索 / Git)。它们是右栏停靠区里的工具面板标签(`oma-tools:<rawValue>`)。
 public enum RightPane: String, Codable, CaseIterable, Sendable {
     case changes, plan, outline, problems, files, search, git, terminal
 
-    /// 右栏分段顺序:文件、搜索、Git。
-    /// 旧版本的 `changes`(本轮改动)并入 Git 页,`plan` 由输入区上方的待办条承担,`terminal` 与底部面板/终端标签重复,故不再提供。
+    /// 可用的工具面板:文件、搜索、Git。
+    /// 旧版本的 `changes`(本轮改动)并入 Git 页,`plan` 由输入区上方的待办条承担,`terminal` 现为独立的终端标签,故不再提供。
     public static var available: [RightPane] { [.files, .search, .git] }
 }
 
-/// 底部面板视图。
-public enum BottomPane: String, Codable, CaseIterable, Sendable {
-    case terminal, output, problems
+/// 旧版本布局(底部面板 / 终端侧栏 / 工具栏单视图)迁移到右栏停靠区所需的信息;只在读取旧状态文件时产生,启动时由工作台消费。
+public struct LegacyPanelMigration: Equatable, Sendable {
+    /// 旧布局里终端是否可见(且不在编辑区)
+    public var showTerminal = false
+    /// 旧布局里输出是否可见(且不在编辑区)
+    public var showOutput = false
+    /// 旧布局里右栏正显示的工具视图(右栏可见时)
+    public var rightPane: RightPane?
 
-    public static var available: [BottomPane] { [.terminal, .output] }
+    public init(showTerminal: Bool = false, showOutput: Bool = false, rightPane: RightPane? = nil) {
+        self.showTerminal = showTerminal
+        self.showOutput = showOutput
+        self.rightPane = rightPane
+    }
+
+    /// 是否没有任何需要迁移的内容。
+    public var isEmpty: Bool { !showTerminal && !showOutput && rightPane == nil }
 }
 
 /// 工作台布局。
 public struct WorkbenchLayout: Codable, Equatable, Sendable {
     public var leftVisible = true
     public var rightVisible = false
-    public var bottomVisible = false
     public var leftWidth: Double = PanelMetrics.leftDefault
     public var rightWidth: Double = PanelMetrics.rightDefault
-    public var bottomHeight: Double = 240
     public var leftPane: LeftPane = .sessions
-    public var rightPane: RightPane = .files
-    public var bottomPane: BottomPane = .output
-    /// 工具栏图标(文件/搜索/Git)的显示顺序,可拖拽调整
-    public var rightPaneOrder: [RightPane] = RightPane.available
-    /// 底部面板标签(终端/输出)的显示顺序,可拖拽调整
-    public var bottomPaneOrder: [BottomPane] = BottomPane.available
-    /// 停靠到底部面板/工具栏里的会话(不持久化:会话本身随应用重启重建)
-    public var dockedChats: [PanelChat] = []
-    /// 底部面板当前选中的会话(nil 表示显示终端/输出)
-    public var activeBottomChat: String?
-    /// 工具栏当前选中的会话(nil 表示显示文件/搜索/Git)
-    public var activeToolsChat: String?
-    /// 停靠在右侧栏里的浏览器标签 id(不持久化:网页随应用重启重建;nil 表示没有)
-    public var sidebarBrowserID: String?
-    /// 并入工具栏标签条的终端/输出当前选中项(不持久化;nil 表示显示文件/搜索/Git)
-    public var toolsPanel: PanelItem?
-    /// 右侧栏当前是否显示浏览器(优先于文件/搜索/Git)
-    public var sidebarBrowserActive = false
-    /// 各面板的摆放位置(终端位置、项目栏与工具栏所在侧)
+    /// 各面板的摆放位置(项目栏与右栏所在侧)
     public var placement = PanelPlacement()
-    /// 终端侧栏是否可见(终端放到左/右侧时有效)
-    public var terminalVisible = false
-    /// 终端侧栏宽度
-    public var terminalWidth: Double = PanelMetrics.terminalDefault
-    /// 输出侧栏是否可见(输出放到左/右侧时有效)
-    public var outputVisible = false
-    /// 输出侧栏宽度
-    public var outputWidth: Double = PanelMetrics.terminalDefault
     /// 文件/Plan 点击时的默认打开位置(右栏或中栏编辑区;`.auto` 视为右栏)
     public var fileOpenTarget: OpenTarget = .editor
     /// 终端面板内右侧终端列表的宽度(≥2 个终端时出现)
     public var terminalListWidth: Double = PanelMetrics.terminalListDefault
     /// 终端列表是否被用户手动折叠
     public var terminalListCollapsed = false
+    /// 旧版本布局迁移信息(不持久化;读取旧状态文件时产生,由工作台启动时消费)
+    public var legacyMigration: LegacyPanelMigration?
 
     public init() {}
 
     private enum CodingKeys: String, CodingKey {
-        case leftVisible, rightVisible, bottomVisible, leftWidth, rightWidth, bottomHeight
-        case leftPane, rightPane, bottomPane, rightPaneOrder, bottomPaneOrder, placement, terminalVisible, terminalWidth, outputVisible, outputWidth
-        case terminalListWidth, terminalListCollapsed, fileOpenTarget
+        case leftVisible, rightVisible, leftWidth, rightWidth
+        case leftPane, placement, fileOpenTarget, terminalListWidth, terminalListCollapsed
     }
 
-    /// 容错解码:新增字段缺失或取值未知时使用默认值,旧版本状态文件可继续读取。
+    /// 旧版本才有的键,只读取用于迁移。
+    private enum LegacyKeys: String, CodingKey {
+        case bottomVisible, bottomPane, rightPane, terminalVisible, outputVisible, placement
+    }
+
+    /// 旧版 `placement` 里终端/输出的摆放(只读 `editor` 判断)。
+    private struct LegacyPlacement: Decodable {
+        var terminal: String?
+        var output: String?
+    }
+
+    /// 容错解码:新增字段缺失或取值未知时使用默认值,旧版本状态文件可继续读取(并产生迁移信息)。
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         leftVisible = try c.decodeIfPresent(Bool.self, forKey: .leftVisible) ?? true
         rightVisible = try c.decodeIfPresent(Bool.self, forKey: .rightVisible) ?? false
-        bottomVisible = try c.decodeIfPresent(Bool.self, forKey: .bottomVisible) ?? false
         leftWidth = try c.decodeIfPresent(Double.self, forKey: .leftWidth) ?? PanelMetrics.leftDefault
         rightWidth = try c.decodeIfPresent(Double.self, forKey: .rightWidth) ?? PanelMetrics.rightDefault
-        bottomHeight = try c.decodeIfPresent(Double.self, forKey: .bottomHeight) ?? 240
         leftPane = (try? c.decodeIfPresent(LeftPane.self, forKey: .leftPane)) ?? .sessions
-        rightPane = (try? c.decodeIfPresent(RightPane.self, forKey: .rightPane)) ?? .files
-        bottomPane = (try? c.decodeIfPresent(BottomPane.self, forKey: .bottomPane)) ?? .output
-        rightPaneOrder = PaneOrder.normalized((try? c.decodeIfPresent([RightPane].self, forKey: .rightPaneOrder)) ?? [], all: RightPane.available)
-        bottomPaneOrder = PaneOrder.normalized((try? c.decodeIfPresent([BottomPane].self, forKey: .bottomPaneOrder)) ?? [], all: BottomPane.available)
         placement = (try? c.decodeIfPresent(PanelPlacement.self, forKey: .placement)) ?? PanelPlacement()
-        terminalVisible = try c.decodeIfPresent(Bool.self, forKey: .terminalVisible) ?? false
-        terminalWidth = try c.decodeIfPresent(Double.self, forKey: .terminalWidth) ?? PanelMetrics.terminalDefault
-        outputVisible = try c.decodeIfPresent(Bool.self, forKey: .outputVisible) ?? false
-        outputWidth = try c.decodeIfPresent(Double.self, forKey: .outputWidth) ?? PanelMetrics.terminalDefault
+        fileOpenTarget = (try? c.decodeIfPresent(OpenTarget.self, forKey: .fileOpenTarget)) ?? .editor
         terminalListWidth = try c.decodeIfPresent(Double.self, forKey: .terminalListWidth) ?? PanelMetrics.terminalListDefault
         terminalListCollapsed = try c.decodeIfPresent(Bool.self, forKey: .terminalListCollapsed) ?? false
-        fileOpenTarget = (try? c.decodeIfPresent(OpenTarget.self, forKey: .fileOpenTarget)) ?? .editor
+        // 迁移旧布局:底部/侧栏里可见的终端与输出、右栏正显示的工具视图,都变成右栏停靠区里的标签
+        if let legacy = try? decoder.container(keyedBy: LegacyKeys.self) {
+            let old = (try? legacy.decodeIfPresent(LegacyPlacement.self, forKey: .placement)) ?? nil
+            let terminalPlace = old?.terminal ?? "bottom", outputPlace = old?.output ?? "bottom"
+            let bottomVisible = (try? legacy.decodeIfPresent(Bool.self, forKey: .bottomVisible)) ?? false
+            let bottomPane = (try? legacy.decodeIfPresent(String.self, forKey: .bottomPane)) ?? "output"
+            let terminalVisible = (try? legacy.decodeIfPresent(Bool.self, forKey: .terminalVisible)) ?? false
+            let outputVisible = (try? legacy.decodeIfPresent(Bool.self, forKey: .outputVisible)) ?? false
+            var migration = LegacyPanelMigration()
+            if terminalPlace == "bottom" { migration.showTerminal = bottomVisible && bottomPane == "terminal" }
+            else if terminalPlace != "editor" { migration.showTerminal = terminalVisible }
+            if outputPlace == "bottom" { migration.showOutput = bottomVisible && bottomPane == "output" }
+            else if outputPlace != "editor" { migration.showOutput = outputVisible }
+            if rightVisible, let raw = try? legacy.decodeIfPresent(String.self, forKey: .rightPane), let pane = RightPane(rawValue: raw), RightPane.available.contains(pane) {
+                migration.rightPane = pane
+            }
+            legacyMigration = migration.isEmpty ? nil : migration
+        }
     }
 
-    /// 限制各尺寸在合理范围内(防止损坏的状态文件导致不可见的面板),并校正与摆放位置相关的状态。
+    /// 限制各尺寸在合理范围内(防止损坏的状态文件导致不可见的面板)。
     public mutating func clamp() {
         leftWidth = min(max(leftWidth, PanelMetrics.leftRange.lowerBound), PanelMetrics.leftRange.upperBound)
-        rightWidth = min(max(rightWidth, PanelMetrics.rightRange.lowerBound), PanelMetrics.rightRange.upperBound)
-        terminalWidth = min(max(terminalWidth, PanelMetrics.terminalRange.lowerBound), PanelMetrics.terminalRange.upperBound)
-        outputWidth = min(max(outputWidth, PanelMetrics.terminalRange.lowerBound), PanelMetrics.terminalRange.upperBound)
+        rightWidth = PanelDimension.rightWidth.clamp(rightWidth)
         terminalListWidth = min(max(terminalListWidth, PanelMetrics.terminalListRange.lowerBound), PanelMetrics.terminalListRange.upperBound)
-        bottomHeight = min(max(bottomHeight, 120), 600)
-        rightPaneOrder = PaneOrder.normalized(rightPaneOrder, all: RightPane.available)
-        bottomPaneOrder = PaneOrder.normalized(bottomPaneOrder, all: BottomPane.available)
         if !LeftPane.available.contains(leftPane) { leftPane = .sessions }
-        if !RightPane.available.contains(rightPane) { rightPane = .files }
-        if !BottomPane.available.contains(bottomPane) { bottomPane = .output }
-        // 底部面板只显示摆放在底部的面板;没有任何面板在底部时,底部面板不可见
-        if placement.terminal != .bottom && bottomPane == .terminal { bottomPane = .output }
-        if placement.output != .bottom && bottomPane == .output && placement.terminal == .bottom { bottomPane = .terminal }
-        if placement.terminal != .bottom && placement.output != .bottom && !dockedChats.contains(where: { $0.host == .bottom }) { bottomVisible = false }
-        if !placement.terminal.isSide { terminalVisible = false }
-        if !placement.output.isSide { outputVisible = false }
     }
 }
 

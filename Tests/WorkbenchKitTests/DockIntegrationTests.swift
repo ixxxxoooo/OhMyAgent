@@ -26,20 +26,19 @@ struct DockIntegrationTests {
         return (model, ids, root, store)
     }
 
-    @Test("浏览器默认在右侧栏打开,可移到编辑区分屏;工具面板标签可解析")
-    func browserOpensInSidebarAndToolsTab() throws {
+    @Test("浏览器默认在右栏停靠区打开,可移到中栏;工具面板标签可解析")
+    func browserOpensInRightDockAndToolsTab() throws {
         let (model, _, _, _) = try makeModel()
         let groups = model.dock.groups.count
-        #expect(model.openBrowser(id: "b1", title: "浏览器") == nil)
+        let tab = try #require(model.openBrowser(id: "b1", title: "浏览器"))
         #expect(model.dock.groups.count == groups)
-        #expect(model.layout.rightVisible && model.layout.sidebarBrowserActive && model.layout.sidebarBrowserID == "b1")
+        #expect(model.layout.rightVisible && model.host(of: tab) == .right)
         #expect(model.isBrowserOpen(id: "b1"))
-        model.moveSidebarBrowserToEditor(title: "浏览器")
-        #expect(model.layout.sidebarBrowserID == nil)
-        #expect(model.dock.groups.count == groups + 1)
+        let moved = try #require(model.moveTab(tab, toHost: .center))
+        #expect(model.host(of: moved) == .center)
         #expect(model.isBrowserOpen(id: "b1"))
-        let tab = model.openToolsTab(.git, title: "Git")
-        #expect(model.dock.allTabs.contains { $0.id == tab })
+        let tools = model.openToolsTab(.git, title: "Git")
+        #expect(model.rightDock.allTabs.contains { $0.id == tools })
         #expect(WorkbenchModel.toolsPane(fromTab: WorkbenchModel.toolsTabPrefix + "git") == .git)
         #expect(WorkbenchModel.toolsPane(fromTab: "oma-browser:x") == nil)
     }

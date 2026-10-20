@@ -29,10 +29,10 @@ struct PanelDragStateTests {
     func commitWritesLayoutAndClears() {
         let state = PanelDragState()
         var layout = WorkbenchLayout()
-        state.update(333, for: .bottomHeight)
-        #expect(state.commit(.bottomHeight, to: &layout))
-        #expect(layout.bottomHeight == 333)
-        #expect(state.value(of: .bottomHeight) == nil)
+        state.update(555, for: .rightWidth)
+        #expect(state.commit(.rightWidth, to: &layout))
+        #expect(layout.rightWidth == 555)
+        #expect(state.value(of: .rightWidth) == nil)
         #expect(!state.isDragging)
     }
 
@@ -54,12 +54,12 @@ struct PanelDragStateTests {
         #expect(state.value(of: .leftWidth) == PanelMetrics.leftRange.lowerBound)
         state.update(99_999, for: .leftWidth)
         #expect(state.value(of: .leftWidth) == PanelMetrics.leftRange.upperBound)
-        state.update(.nan, for: .terminalWidth)
-        #expect(state.value(of: .terminalWidth) == PanelMetrics.terminalRange.lowerBound)
-        state.update(5, for: .bottomHeight)
-        #expect(state.value(of: .bottomHeight) == 120)
-        state.update(5_000, for: .bottomHeight)
-        #expect(state.value(of: .bottomHeight) == 600)
+        state.update(.nan, for: .rightWidth)
+        #expect(state.value(of: .rightWidth) == PanelMetrics.rightRange.lowerBound)
+        state.update(5, for: .rightWidth)
+        #expect(state.value(of: .rightWidth) == PanelMetrics.rightRange.lowerBound)
+        state.update(5_000, for: .rightWidth)
+        #expect(state.value(of: .rightWidth) == 5_000)
         state.update(1, for: .terminalListWidth)
         #expect(state.value(of: .terminalListWidth) == PanelMetrics.terminalListRange.lowerBound)
     }

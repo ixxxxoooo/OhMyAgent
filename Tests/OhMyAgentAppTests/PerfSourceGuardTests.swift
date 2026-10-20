@@ -73,7 +73,7 @@ struct PerfSourceGuardTests {
 
     @Test("DragGesture.onChanged 里禁止直接写 workbench.layout / workbench.dock(拖动中只能写临时状态,松手再提交)")
     func dragGestureDoesNotWriteLayout() throws {
-        for name in ["PanelResizer.swift", "BottomPanelView.swift", "Dock/DockView.swift", "Terminal/TerminalPanelView.swift"] {
+        for name in ["PanelResizer.swift", "Dock/DockView.swift", "Terminal/TerminalPanelView.swift"] {
             let lines = try Self.codeLines(name)
             var inChanged = false
             var offenders: [Int] = []

@@ -34,7 +34,6 @@ final class DockDrag {
             self?.tabID = nil
             self?.toolsPane = nil
             self?.session = nil
-            self?.panel = nil
         }
     }
     nonisolated static let prefix = "oma-tab:"
@@ -64,17 +63,7 @@ final class DockDrag {
     }
 
     /// 是否有可落下的拖拽(标签、右栏视图或侧栏会话)。
-    var hasPayload: Bool { tabID != nil || toolsPane != nil || session != nil || panel != nil }
-
-    /// 正在被拖拽的面板标签(底部/侧栏的终端、输出);落到编辑区时转成对应的编辑区标签再放入落点
-    var panel: PanelItem?
-
-    /// 开始拖拽面板标签;沿用标签拖拽的复位逻辑。
-    /// - Parameter item: 被拖拽的面板
-    func beginPanel(_ item: PanelItem) {
-        panel = item
-        begin(UUID())
-    }
+    var hasPayload: Bool { tabID != nil || toolsPane != nil || session != nil }
 
     /// 把拖拽载荷解析成编辑区里的标签 ID:标签载荷直接解析,右栏视图载荷则打开对应的工具面板标签。
     /// - Parameters:
@@ -94,12 +83,9 @@ final class DockDrag {
             }
             return workbench.dock.focusedGroup?.activeID
         }
-        if let item = PanelItem.parse(payload: text), item == .terminal || item == .output {
-            return workbench.openPanelTab(item)
-        }
         guard text.hasPrefix(toolsPrefix), let pane = RightPane(rawValue: String(text.dropFirst(toolsPrefix.count))),
               RightPane.available.contains(pane) else { return nil }
-        return workbench.openToolsTab(pane, title: RightPaneView.title(pane))
+        return workbench.openToolsTab(pane, title: WorkbenchModel.toolsPaneTitle(pane))
     }
 
     /// 由拖拽载荷字符串解析标签 ID。
@@ -139,7 +125,7 @@ func tabIcon(_ kind: TabKind) -> String {
         if id == WorkbenchModel.demoMetricsTabID { return "gauge" }
         if WorkbenchModel.canvasID(fromTab: id) != nil { return "chart-column" }
         if WorkbenchModel.browserID(fromTab: id) != nil { return "globe" }
-        if let pane = WorkbenchModel.toolsPane(fromTab: id) { return RightPaneView.icon(pane) }
+        if let pane = WorkbenchModel.toolsPane(fromTab: id) { return toolsPaneIcon(pane) }
         if WorkbenchModel.planPath(fromTab: id) != nil { return "list-todo" }
         return id == WorkbenchModel.outputTabID ? "file-text" : "eye"
     case .history: return "git-graph"
@@ -175,15 +161,28 @@ struct TabGroupView: View {
 
     private var isFocused: Bool { workbench.dock(host).focusedGroupID == group.id }
 
+    /// 标签栏为窗口顶部浮层(红绿灯、面板开关)让出的前/后边距:中栏在两侧都没有面板时才让位;
+    /// 右栏停靠区只在它是该侧最外侧可见列时让位。
+    private var insets: (leading: CGFloat, trailing: CGFloat) {
+        guard edges.top else { return (0, 0) }
+        let layout = workbench.layout
+        if host == .right {
+            let value = layout.titlebarInsets(for: .tools)
+            return (edges.left ? value.leading : 0, edges.right ? value.trailing : 0)
+        }
+        let leading = edges.left && layout.visibleColumns(on: .left).isEmpty
+            ? TitlebarMetrics.leftClusterWidth(toggles: layout.toggleCount(on: .left), collapsed: true) : 0
+        let trailing = edges.right && layout.visibleColumns(on: .right).isEmpty
+            ? TitlebarMetrics.rightClusterWidth(toggles: layout.toggleCount(on: .right)) : 0
+        return (leading, trailing)
+    }
+
     var body: some View {
         let _ = PanelToggleProbe.count("tabGroup")
         VStack(spacing: 0) {
             TabBarView(
                 workbench: workbench, group: group, isFocused: isFocused,
-                leadingInset: edges.top && edges.left && workbench.layout.visibleColumns(on: .left).isEmpty
-                    ? TitlebarMetrics.leftClusterWidth(toggles: workbench.layout.toggleCount(on: .left), collapsed: true) : 0,
-                trailingInset: edges.top && edges.right && workbench.layout.visibleColumns(on: .right).isEmpty
-                    ? TitlebarMetrics.rightClusterWidth(toggles: workbench.layout.toggleCount(on: .right)) : 0
+                leadingInset: insets.leading, trailingInset: insets.trailing
             )
             GeometryReader { proxy in
                 content(size: proxy.size)
@@ -228,6 +227,8 @@ struct TabGroupView: View {
             .onChange(of: group.tabs.map(\.id)) {
                 keepAlive.activate(group.activeID, in: group.tabs)
             }
+        } else if host == .right {
+            RightDockEmptyView(workbench: workbench)
         } else {
             WelcomeView(workbench: workbench)
         }
@@ -407,5 +408,24 @@ struct TabStripDropDelegate: DropDelegate {
             }
         }
         return true
+    }
+}
+
+/// 右栏没有任何标签时的空状态:提供常用入口(资源管理器、终端、输出、Git、搜索)。
+struct RightDockEmptyView: View {
+    let workbench: WorkbenchModel
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Text("右栏为空").font(OMFonts.body).foregroundStyle(OMColors.secondaryText)
+            Text("打开文件、终端或资源管理器,它们会以标签显示在这里").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
+            HStack(spacing: 8) {
+                Button { workbench.showRight(.files) } label: { Label("资源管理器", om: "folder") }
+                Button { workbench.showTerminal() } label: { Label("终端", om: "square-terminal") }
+                Button { workbench.showOutput() } label: { Label("输出", om: "file-text") }
+            }
+            .buttonStyle(.omSecondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
