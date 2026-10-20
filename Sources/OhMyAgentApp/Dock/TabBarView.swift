@@ -37,6 +37,9 @@ struct TabBarView: View {
     /// 右栏「+」新增标签菜单
     @State private var showAdd = false
 
+    /// 是否显示右栏「+」新增标签按钮。
+    private var showsAdd: Bool { host == .right && isMainGroup }
+
     /// 是否为第一个(主)标签组。
     private var isMainGroup: Bool { workbench.dock(host).groups.first?.id == group.id }
 
@@ -50,6 +53,10 @@ struct TabBarView: View {
                             TabItemView(workbench: workbench, group: group, tab: tab, isActive: tab.id == group.activeID, isFocused: isFocused)
                                 .id(tab.id)
                                 .onDrop(of: [.plainText, .fileURL], delegate: TabStripDropDelegate(workbench: workbench, host: host, groupID: group.id, index: index))
+                        }
+                        // 「+」紧跟最后一个标签;溢出后改为固定在最右侧,这里留等宽占位避免溢出判断来回抖动
+                        if showsAdd {
+                            if overflowing { Color.clear.frame(width: TabMetrics.height + 4, height: TabMetrics.height) } else { addButton }
                         }
                         Color.clear
                             .frame(minWidth: 24, maxWidth: .infinity)
@@ -78,7 +85,7 @@ struct TabBarView: View {
                     omWithAnimation(.snappy(duration: 0.2)) { proxy.scrollTo(id, anchor: .center) }
                 }
             }
-            if host == .right, isMainGroup { addButton }
+            if showsAdd, overflowing { addButton }
             if overflowing {
                 overflowButton
             }
