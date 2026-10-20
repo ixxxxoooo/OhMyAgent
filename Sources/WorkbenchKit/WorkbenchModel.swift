@@ -927,6 +927,12 @@ public final class WorkbenchModel {
             // 切换引擎不丢会话:旧引擎的会话记入缓存,侧栏里仍可见,点击时切回原引擎打开
             rememberSession(sessionId, title: old.sessionTitle, agentID: old.descriptor.id, for: id)
         }
+        // 被抛弃的空白会话:有些引擎(如 OpenCode)会把空会话也列出来,写墓碑避免侧栏里留下一条空记录
+        if let old = conversations[key], old.hasNoConversation, let sessionId = old.sessionId,
+           let index = projects.firstIndex(where: { $0.id == id }), !projects[index].deletedSessions.contains(sessionId) {
+            projects[index].deletedSessions.append(sessionId)
+            projects[index].sessions.removeAll { $0.sessionId == sessionId }
+        }
         conversations[key]?.shutdown()
         if let project = projects.first(where: { $0.id == id }) { model.additionalDirectories = project.extraFolders }
         wire(model, project: id)

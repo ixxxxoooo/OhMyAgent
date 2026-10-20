@@ -51,7 +51,7 @@ struct AgentMenu: View {
     }
 
     /// 当前项目内切换 Agent。
-    /// - 当前会话还是空白:原位替换成新引擎的空白会话(列表不变)。
+    /// - 当前会话还没有实质对话(只有系统提示也算):原位替换成新引擎的空白会话(列表不变),草稿与图片随之带过去。
     /// - 当前会话已有内容:保持它原样不动,在新标签里用新引擎开始新对话——
     ///   切换引擎不会让任何已有会话发生变化或消失。
     /// - Parameter descriptor: 目标 Agent
@@ -59,8 +59,8 @@ struct AgentMenu: View {
     static func switchAgent(to descriptor: AgentDescriptor) {
         let workbench = AppEnvironment.shared.workbench
         guard let id = workbench.selectedProjectID, let current = workbench.activeSession, descriptor.id != current.descriptor.id else { return }
-        Log.session.info("切换 Agent", ["project": id, "from": current.descriptor.id, "to": descriptor.id, "pristine": current.isPristine ? "yes" : "no"])
-        guard current.isPristine else {
+        Log.session.info("切换 Agent", ["project": id, "from": current.descriptor.id, "to": descriptor.id, "blank": current.hasNoConversation ? "yes" : "no"])
+        guard current.hasNoConversation else {
             workbench.newConversation(in: id, agentID: descriptor.id)
             return
         }
@@ -68,6 +68,9 @@ struct AgentMenu: View {
         let project = workbench.projects.first(where: { $0.id == id })
         let next = project.flatMap { workbench.takeWarmSession(agentID: descriptor.id, project: $0) }
             ?? AppEnvironment.makeSession(workspace: current.workspace, descriptor: descriptor)
+        // 输入框里写了一半的内容不丢:带到新引擎的会话里
+        next.draft = current.draft
+        next.attachments = current.attachments
         workbench.replaceSession(for: id, with: next)
     }
 }

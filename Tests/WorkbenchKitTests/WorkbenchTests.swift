@@ -422,6 +422,37 @@ struct WorkbenchTests {
         model.shutdownAll()
     }
 
+    @Test("只有系统提示的会话算空白:切换引擎原位替换,不多开标签")
+    func blankSessionReplacedInPlace() throws {
+        let env = try makeEnvironment()
+        defer { try? FileManager.default.removeItem(at: env.root) }
+        let model = makeModel(env.store)
+        let a = try #require(model.openProject(env.dirs[0]))
+        let current = try #require(model.sessions[a])
+        // 只有一条系统提示(例如认证/连接警告):仍然是空白对话
+        current.timeline.appendNotice("需要登录", severity: "warning")
+        #expect(current.hasNoConversation)
+        #expect(current.isPristine)
+        let tabsBefore = model.dock.allTabs.count
+        let descriptor = AgentDescriptor(id: "zz-blank-engine", name: "zz", kind: .genericACP, command: "/usr/bin/true")
+        model.replaceSession(for: a, with: SessionModel(workspace: env.dirs[0], descriptor: descriptor))
+        #expect(model.dock.allTabs.count == tabsBefore, "原位替换不应新增或遗留标签")
+        #expect(model.sessions[a]?.descriptor.id == "zz-blank-engine")
+        model.shutdownAll()
+    }
+
+    @Test("有用户消息的会话不算空白;草稿不影响「无对话」判定")
+    func blankDefinition() throws {
+        let session = SessionModel(workspace: FileManager.default.temporaryDirectory)
+        #expect(session.hasNoConversation && session.isPristine)
+        session.draft = "写到一半"
+        #expect(session.hasNoConversation, "只有草稿时仍可原位替换(草稿由调用方带走)")
+        #expect(!session.isPristine, "有草稿不是 pristine:不会被当成可丢弃的空标签")
+        session.draft = ""
+        session.timeline.appendUser("你好")
+        #expect(!session.hasNoConversation)
+    }
+
     @Test("导航历史由模型自己记录:不依赖视图的 onChange,连续激活也不丢记录")
     func navigationRecordedByModel() throws {
         let env = try makeEnvironment()

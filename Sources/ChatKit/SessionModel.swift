@@ -1325,7 +1325,11 @@ public final class SessionModel {
     }
 
     /// 会话是否还是「空白」的:没有任何消息、草稿与附件(新建标签时据此复用空白会话标签,避免堆出一排空标签)。
-    public var isPristine: Bool { timeline.entries.isEmpty && draft.isEmpty && attachments.isEmpty }
+    public var isPristine: Bool { hasNoConversation && draft.isEmpty && attachments.isEmpty }
+
+    /// 是否还没有实质对话:时间线里只有系统提示(连接/认证/警告等 notice)或为空,且不在回放历史。
+    /// 切换引擎时据此原位替换,不为「只有提示」的会话另开标签。
+    public var hasNoConversation: Bool { !isReplaying && timeline.entries.allSatisfy { $0.kind == .notice } }
 
     /// 开始新对话:复用同一 Agent 进程创建新的 ACP 会话,并清空时间线。
     public func newConversation() {
