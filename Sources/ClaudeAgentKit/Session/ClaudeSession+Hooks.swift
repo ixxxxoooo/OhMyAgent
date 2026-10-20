@@ -31,7 +31,7 @@ extension ClaudeSession {
             let response = input["tool_response"] ?? .null
             let toolUse = ToolUse(id: toolUseId, name: entry.name, input: input["tool_input"] ?? .null)
             let update = MessageTranslator.stamp(translator.renderer.hookResult(toolUse, toolResponse: response), parent: entry.parent)
-            await send(update)
+            await send(update, replacePinnedContent: true)
         case .postModelSwitch:
             guard input["hook_event_name"]?.stringValue == "PostModelSwitch" else { return }
             let source = input["source"]?.stringValue

@@ -126,4 +126,28 @@ struct HistoryTests {
         try store.rename(sessionId: id, title: "新标题", cwd: cwd)
         #expect(store.info(sessionId: id, cwd: cwd)?.summary == "新标题")
     }
+
+    @Test("转录读取:parentUuid 链穿过 attachment 条目也不断开(真实 claude 转录的形态)")
+    func chainThroughAttachments() throws {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("oma-transcript-att-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = TranscriptStore(configDirectory: root)
+        let cwd = "/Users/x/proj"
+        let directory = root.appendingPathComponent("projects").appendingPathComponent(TranscriptStore.projectDirectoryName(for: cwd))
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let id = UUID().uuidString.lowercased()
+        let lines = [
+            #"{"type":"attachment","uuid":"t0","parentUuid":null,"attachment":{"type":"skill_listing","content":"很长很长"}}"#,
+            #"{"type":"user","uuid":"u1","parentUuid":"t0","message":{"role":"user","content":"读文件"}}"#,
+            #"{"type":"attachment","uuid":"t1","parentUuid":"u1","attachment":{"type":"deferred_tools_delta"}}"#,
+            #"{"type":"assistant","uuid":"a1","parentUuid":"t1","message":{"id":"m1","role":"assistant","model":"claude-opus-4-7","content":[{"type":"tool_use","id":"tu1","name":"Read","input":{}}]}}"#,
+            #"{"type":"user","uuid":"u2","parentUuid":"a1","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"tu1","content":"x"}]}}"#,
+            #"{"type":"attachment","uuid":"t2","parentUuid":"u2","attachment":{"type":"x"}}"#,
+            #"{"type":"assistant","uuid":"a2","parentUuid":"t2","message":{"id":"m2","role":"assistant","model":"claude-opus-4-7","content":[{"type":"text","text":"完成"}]}}"#,
+            #"{"type":"system","uuid":"s1","parentUuid":"a2","subtype":"turn_duration"}"#,
+        ].joined(separator: "\n")
+        try lines.write(to: directory.appendingPathComponent("\(id).jsonl"), atomically: true, encoding: .utf8)
+        let messages = store.messages(sessionId: id, cwd: cwd)
+        #expect(messages.compactMap { $0["uuid"]?.stringValue } == ["u1", "a1", "u2", "a2"])
+    }
 }

@@ -131,6 +131,7 @@ extension ClaudeSession {
     func settleActive(_ outcome: PromptOutcome) async {
         guard let turn = active, !turn.settled else { return }
         if outcome.stopReason == "end_turn" { await closeUnfinishedToolCalls(cancelled: false) }
+        toolFields.clear()
         deliver(turn, outcome)
     }
 
@@ -162,6 +163,20 @@ extension ClaudeSession {
         }
         let pending = turns.filter { !$0.settled }
         active = uuids.lazy.compactMap { id in pending.first { $0.promptUuid == id } }.first ?? pending.first
+        if active != nil { resetTurnScratch() }
+    }
+
+    /// 回合激活时清空逐回合的用量与失败暂存(与 Node 版 `resetTurnScratch` 一致):
+    /// `prompt` 响应里的 `usage` 与 `_meta.quota` 只反映本回合花费。
+    func resetTurnScratch() {
+        usage.lastAssistantTotal = nil
+        usage.lastAssistantUsage = nil
+        usage.lastAssistantModel = nil
+        usage.accumulated = TokenTally()
+        usage.accumulatedByModel = [:]
+        lastAssistantError = nil
+        lastAssistantWasUsageLimit = false
+        lastRefusalExplanation = nil
     }
 
     /// 以错误结束当前回合。

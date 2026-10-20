@@ -63,6 +63,8 @@ let package = Package(
         // M0 spike
         .executableTarget(name: "ACPSpike", dependencies: ["ACPKit", "AgentHost"]),
         .executableTarget(name: "EditorSpike", dependencies: ["EditorKit"]),
+        // 原生 Claude 适配器的 stdio 宿主(差分对照与联调用,不随应用分发)
+        .executableTarget(name: "ClaudeACPHost", dependencies: ["ACPKit", "ClaudeAgentKit"]),
         // 测试
         .testTarget(name: "ProviderProxyKitTests", dependencies: ["ProviderProxyKit"]),
         .testTarget(name: "OMLogTests", dependencies: ["OMLog"]),

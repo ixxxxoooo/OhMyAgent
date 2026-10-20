@@ -44,6 +44,10 @@ actor ClaudeSession: ClaudeQueryDelegate {
     var autoFallbackWarnPending = false
     var autoFallbackWarned = false
     var rawCommands: [JSONValue] = []
+    /// 已发给客户端的工具调用字段,更新只带变化部分
+    var toolFields = ToolCallFieldTracker()
+    /// CLI 初始化响应里的账号信息(用于上报鉴权身份)
+    var account: JSONValue?
     var terminalCommands: [String] = []
     var userEffort: String?
 
@@ -152,7 +156,7 @@ actor ClaudeSession: ClaudeQueryDelegate {
             await query.close()
             self.query = nil
             if creation.resume != nil, message.contains("No conversation found") || message.contains("closed before response") {
-                throw JSONRPCError(code: -32002, message: "会话不存在:\(creation.resume ?? id)", data: ["sessionId": .string(creation.resume ?? id)])
+                throw JSONRPCError(code: -32002, message: "Resource not found: \(creation.resume ?? id)", data: ["uri": .string(creation.resume ?? id)])
             }
             log.error("初始化握手失败", error: error)
             throw JSONRPCError(code: JSONRPCError.internalError, message: message)
@@ -309,7 +313,14 @@ actor ClaudeSession: ClaudeQueryDelegate {
 
     // MARK: 发送辅助
 
-    func send(_ update: JSONValue) async {
+    /// - Parameter replacePinnedContent: PostToolUse 回写的终稿允许覆盖已固定的审批补丁
+    func send(_ update: JSONValue, replacePinnedContent: Bool = false) async {
+        var update = update
+        if let kind = update["sessionUpdate"]?.stringValue, kind == "tool_call" || kind == "tool_call_update" {
+            // 终态结果与 PostToolUse 回写可以覆盖已固定的审批补丁
+            let final = kind == "tool_call_update" && ["completed", "failed"].contains(update["status"]?.stringValue ?? "")
+            guard toolFields.apply(&update, replacePinnedContent: final || replacePinnedContent) else { return }
+        }
         await client.sessionUpdate(id, update)
     }
 

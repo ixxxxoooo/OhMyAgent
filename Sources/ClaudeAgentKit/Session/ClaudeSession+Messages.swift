@@ -428,6 +428,7 @@ extension ClaudeSession {
             }
             active = queued
         }
+        resetTurnScratch()
         if cancelled, !cancelledPrompts.contains(queued.promptUuid) {
             cancelled = false
             cancelledPrompts.removeAll()

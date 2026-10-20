@@ -43,6 +43,7 @@ public enum CLIRunner {
         process.standardError = err
         process.standardInput = FileHandle.nullDevice
         let collected = OutputCollector()
+        let timedOut = TimeoutFlag()
         out.fileHandleForReading.readabilityHandler = { handle in collected.appendOut(handle.availableData) }
         err.fileHandleForReading.readabilityHandler = { handle in collected.appendErr(handle.availableData) }
         let finished: Int32 = try await withCheckedThrowingContinuation { continuation in
@@ -53,12 +54,13 @@ public enum CLIRunner {
                 continuation.resume(throwing: CLIRunError.launchFailed(error.localizedDescription))
                 return
             }
-            DispatchQueue.global().asyncAfter(deadline: .now() + timeout) { if process.isRunning { process.terminate() } }
+            DispatchQueue.global().asyncAfter(deadline: .now() + timeout) { if process.isRunning { timedOut.set(); process.terminate() } }
         }
         out.fileHandleForReading.readabilityHandler = nil
         err.fileHandleForReading.readabilityHandler = nil
         collected.appendOut(out.fileHandleForReading.readDataToEndOfFile())
         collected.appendErr(err.fileHandleForReading.readDataToEndOfFile())
+        if timedOut.value { throw CLIRunError.timedOut }
         let result = collected.snapshot()
         return CLIRunResult(status: finished, stdout: result.out, stderr: result.err)
     }
@@ -75,4 +77,12 @@ private final class OutputCollector: @unchecked Sendable {
     func snapshot() -> (out: String, err: String) {
         lock.withLock { (String(decoding: out, as: UTF8.self), String(decoding: err, as: UTF8.self)) }
     }
+}
+
+/// 超时标记。
+private final class TimeoutFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var flag = false
+    func set() { lock.withLock { flag = true } }
+    var value: Bool { lock.withLock { flag } }
 }

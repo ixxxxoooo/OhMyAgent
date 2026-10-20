@@ -39,7 +39,11 @@ public enum RequestID: Sendable, Hashable, Codable, CustomStringConvertible {
 public struct JSONRPCError: Error, LocalizedError, Sendable, Codable, Hashable {
     /// 面向用户的错误描述:直接使用 Agent 返回的 `message`
     /// (否则界面只会显示「ACPKit.JSONRPCError 错误 1」这种毫无信息量的文案)。
-    public var errorDescription: String? { message }
+    /// 若 Agent 按 ACP 惯例把原因放在 `data.details`(内部错误的 message 只是 “Internal error”),一并展示。
+    public var errorDescription: String? {
+        if let details = data?["details"]?.stringValue, !details.isEmpty, !message.contains(details) { return "\(message): \(details)" }
+        return message
+    }
 
     /// 是否为「需要先认证」类错误:ACP 约定的 -32000,或消息明确表示未登录。
     public var isAuthRequired: Bool {

@@ -77,6 +77,7 @@ extension ClaudeSession {
         if let update = translator.ensureEmitted(ToolUse(id: id, name: name, input: input), parent: parent, previewContent: preview) {
             registerHook(for: update)
             await send(update)
+            if let preview { toolFields.pinContent(id, preview) }
         }
     }
 

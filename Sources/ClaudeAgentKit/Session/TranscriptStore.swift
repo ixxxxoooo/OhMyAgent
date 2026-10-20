@@ -201,11 +201,13 @@ public struct TranscriptStore: Sendable {
         var leaf: String?
         for lineData in data.split(separator: 0x0A, omittingEmptySubsequences: true) {
             guard Self.isChainCandidate(lineData), let value = JSONValue.parse(Data(lineData)) else { continue }
-            guard let type = value["type"]?.stringValue, type == "user" || type == "assistant" || type == "system",
+            // attachment/progress 条目同样串在 parentUuid 链上,必须收进来否则链会在第一个附件处断开
+            guard let type = value["type"]?.stringValue, ["user", "assistant", "system", "attachment", "progress"].contains(type),
                   let uuid = value["uuid"]?.nonEmptyString else { continue }
             if entries[uuid] == nil { order.append(uuid) }
-            entries[uuid] = value
-            if type != "system", value["isSidechain"]?.boolValue != true { leaf = uuid }
+            // 附件体可能很大(整份文件内容),链上只需要标识
+            entries[uuid] = (type == "attachment" || type == "progress") ? JSONValue.object(["type": .string(type), "uuid": .string(uuid), "parentUuid": value["parentUuid"] ?? .null]) : value
+            if type == "user" || type == "assistant", value["isSidechain"]?.boolValue != true { leaf = uuid }
         }
         var chain: [JSONValue] = []
         var cursor = leaf
@@ -221,7 +223,7 @@ public struct TranscriptStore: Sendable {
     private static func isChainCandidate(_ line: Data.SubSequence) -> Bool {
         guard line.count > 12 else { return false }
         // 大量 api-request 等元数据行不含这三种 type,先用字节扫描跳过
-        for marker in ["\"type\":\"user\"", "\"type\":\"assistant\"", "\"type\":\"system\""] {
+        for marker in ["\"type\":\"user\"", "\"type\":\"assistant\"", "\"type\":\"system\"", "\"type\":\"attachment\"", "\"type\":\"progress\""] {
             if line.range(of: Data(marker.utf8)) != nil { return true }
         }
         return false

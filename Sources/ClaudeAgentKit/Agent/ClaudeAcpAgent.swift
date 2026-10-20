@@ -19,6 +19,7 @@ public actor ClaudeAcpAgent: ACPRequestHandler {
     private let config: ClaudeAgentConfig
     private let log = Log.agent.with(["part": "acp-agent"])
     private var caps = ClientCaps()
+    private let auth: AuthStatusCenter
     private var live: [String: Live] = [:]
     private var pump: Task<Void, Never>?
     private var closedHandler: (@Sendable () -> Void)?
@@ -32,8 +33,10 @@ public actor ClaudeAcpAgent: ACPRequestHandler {
     ///   - config: 适配器配置
     public init(connection: ACPConnection, config: ClaudeAgentConfig) {
         self.connection = connection
-        self.link = ConnectionClientLink(connection: connection)
+        let link = ConnectionClientLink(connection: connection)
+        self.link = link
         self.config = config
+        self.auth = AuthStatusCenter(config: config, link: link)
     }
 
     /// 注册请求处理并启动连接;开始转发 `session/cancel` 等通知。
@@ -82,10 +85,19 @@ public actor ClaudeAcpAgent: ACPRequestHandler {
     // MARK: 请求分发
 
     public func handleRequest(method: String, params: JSONValue?) async throws -> JSONValue {
+        do {
+            return try await dispatch(method: method, params: params)
+        } catch let error as JSONRPCError where error.code == JSONRPCError.internalError && error.data == nil {
+            // 与 Node 版一致:普通异常以 “Internal error” + data.details 返回
+            throw JSONRPCError(code: JSONRPCError.internalError, message: "Internal error", data: ["details": .string(error.message)])
+        }
+    }
+
+    private func dispatch(method: String, params: JSONValue?) async throws -> JSONValue {
         let p = params ?? .object([:])
         switch method {
-        case "initialize": return initialize(p)
-        case "authenticate": return try authenticate(p)
+        case "initialize": return await initialize(p)
+        case "authenticate": return try await authenticate(p)
         case "logout": return try await logout()
         case "session/new": return try await newSession(p)
         case "session/load": return try await loadSession(p)
@@ -100,14 +112,17 @@ public actor ClaudeAcpAgent: ACPRequestHandler {
         case "_session/steering": return try await steering(p)
         case "_session/rename": return try await rename(p)
         default:
-            throw JSONRPCError(code: JSONRPCError.methodNotFound, message: "未实现的方法:\(method)")
+            throw JSONRPCError(code: JSONRPCError.methodNotFound, message: "\"Method not found\": \(method)", data: ["method": .string(method)])
         }
     }
 
     // MARK: 握手与鉴权
 
-    private func initialize(_ params: JSONValue) -> JSONValue {
+    private func initialize(_ params: JSONValue) async -> JSONValue {
         caps = ClientCaps(raw: params["clientCapabilities"] ?? .object([:]))
+        // 后台读取鉴权身份:不阻塞 initialize,结果经 `_auth/status_update` 推送
+        let center = auth
+        Task { await center.probeInBackground() }
         var methods: [JSONValue] = []
         if caps.terminalAuth || caps.raw.at("_meta", "terminal-auth")?.boolValue == true {
             methods.append(["id": "claude-ai-login", "name": "Claude Subscription", "description": "Use Claude subscription ", "type": "terminal",
@@ -122,7 +137,7 @@ public actor ClaudeAcpAgent: ACPRequestHandler {
         return [
             "protocolVersion": 1,
             "agentCapabilities": [
-                "_meta": ["claudeCode": ["promptQueueing": true]],
+                "_meta": ["claudeCode": ["promptQueueing": true], "authStatus": .object([:])],
                 "promptCapabilities": ["image": true, "embeddedContext": true],
                 "mcpCapabilities": ["http": true, "sse": true],
                 "auth": ["logout": .object([:])],
@@ -138,9 +153,13 @@ public actor ClaudeAcpAgent: ACPRequestHandler {
         ]
     }
 
-    private func authenticate(_ params: JSONValue) throws -> JSONValue {
+    private func authenticate(_ params: JSONValue) async throws -> JSONValue {
         let method = params["methodId"]?.stringValue
-        if method == "gateway" || method == "gateway-bedrock" { return .object([:]) }
+        if method == "gateway" || method == "gateway-bedrock" {
+            let baseUrl = params.at("_meta", "gateway", "baseUrl")?.stringValue
+            await auth.gatewayAuthenticated(baseUrl: baseUrl)
+            return .object([:])
+        }
         throw JSONRPCError(code: JSONRPCError.methodNotFound, message: "不支持的鉴权方式:\(method ?? "-")")
     }
 
@@ -156,6 +175,7 @@ public actor ClaudeAcpAgent: ACPRequestHandler {
             log.error("登出失败", error: error)
             throw JSONRPCError(code: JSONRPCError.internalError, message: "claude auth logout failed: \(error.localizedDescription)")
         }
+        await auth.afterLogout()
         return .object([:])
     }
 
@@ -187,6 +207,8 @@ public actor ClaudeAcpAgent: ACPRequestHandler {
         )
         try await session.boot(creation)
         live[id] = Live(session: session, fingerprint: spec.fingerprint)
+        await auth.publish(sessionAccount: await session.account)
+        await auth.probeInBackground()
         return session
     }
 
@@ -233,7 +255,7 @@ public actor ClaudeAcpAgent: ACPRequestHandler {
     private func resumeSession(_ params: JSONValue) async throws -> JSONValue {
         let id = try requireSessionId(params)
         let session = try await getOrCreate(params, sessionId: id)
-        return await setupResponse(session, includeSessionId: false)
+        return await setupResponse(session)
     }
 
     private func loadSession(_ params: JSONValue) async throws -> JSONValue {
@@ -248,7 +270,7 @@ public actor ClaudeAcpAgent: ACPRequestHandler {
         let output = await replay(transcript, sessionId: id, session: session, cwd: cwd)
         await session.adoptReplay(messageIdToUuid: output.messageIdToUuid)
         log.info("会话已加载", ["session": id, "messages": "\(transcript.count)", "ms": "\(Int((ContinuousClock.now - started).components.seconds * 1000))"])
-        return await setupResponse(session, includeSessionId: false)
+        return await setupResponse(session)
     }
 
     /// 回放历史为 `session/update`。
@@ -347,6 +369,8 @@ public actor ClaudeAcpAgent: ACPRequestHandler {
     private func prompt(_ params: JSONValue) async throws -> JSONValue {
         let session = try session(params)
         guard let blocks = params["prompt"]?.arrayValue else { throw JSONRPCError(code: JSONRPCError.invalidParams, message: "缺少 prompt") }
+        // 每次提问开头重读一次身份(发现终端里的登录/登出),不等待
+        await auth.probeInBackground()
         return try await session.prompt(blocks)
     }
 

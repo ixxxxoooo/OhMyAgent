@@ -54,6 +54,7 @@ extension ClaudeSession {
         fastDisabledReason = fastEnabled ? nil : FastModeOptions.normalizeReason(initResult["fast_mode_disabled_reason"]?.stringValue)
 
         rawCommands = initResult["commands"]?.arrayValue ?? []
+        account = initResult["account"]
         if let inferred = ModelCatalog.inferContextWindow(models.currentModelId, currentInfo?.displayName, currentInfo?.description, currentInfo?.value) {
             usage.contextWindowSize = inferred
         }
@@ -170,7 +171,7 @@ extension ClaudeSession {
     func setConfigOption(configId: String, value: JSONValue) async throws -> [JSONValue] {
         try requireOpen()
         guard let option = configOptions.first(where: { $0["id"]?.stringValue == configId }) else {
-            throw JSONRPCError(code: JSONRPCError.invalidParams, message: "Unknown config option: \(configId)")
+            throw JSONRPCError(code: JSONRPCError.internalError, message: "Unknown config option: \(configId)")
         }
         if configId == FastModeOptions.configId {
             guard let enabled = FastModeOptions.parse(value) else {
