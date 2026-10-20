@@ -18,6 +18,8 @@ let chatScrollSpace = "chatScroll"
 final class StickyUserState {
     /// 当前可见的最靠上条目的下标
     private(set) var topIndex: Int?
+    /// 视口内当前可见的条目数(-1 = 还没上报过;不参与观察)。0 且内容非空 = 视口空白,供 `TimelineBlankGuard` 自愈
+    @ObservationIgnored private(set) var visibleCount = -1
     /// 各用户消息行在滚动视口中的顶边 Y(不参与观察:每帧都在变)
     @ObservationIgnored private(set) var userMinY: [UUID: CGFloat] = [:]
     /// 视口是否贴在时间线最底部(锚点导航据此高亮:最后几条提问滚不到顶部,只能看视口是否已到底)
@@ -70,6 +72,7 @@ final class StickyUserState {
     /// 可见条目集合变化:取其中最靠上的一条。
     /// - Parameter ids: 可见条目 ID(分组的 ID 等于其首个条目的 ID)
     func updateVisible(_ ids: [UUID]) {
+        visibleCount = ids.count
         guard let timeline = model?.timeline else { return }
         // 经下标表取可见条目里最小的下标(O(可见数)),而不是对全部条目线性扫描
         let index = indexTable.minIndex(of: ids, in: timeline)

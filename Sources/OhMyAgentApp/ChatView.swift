@@ -28,6 +28,10 @@ struct ChatView: View {
     @State private var visibleTurns = TimelineWindow.defaultTurns
     /// 贴底滚动的帧内合并:内容高度变化与时间线修订号变化在同一回合触发时只 scrollTo 一次
     @State private var followScroll = FrameCoalescedAction()
+    /// 视口空白自愈(见 `TimelineBlankGuard`)
+    @State private var blankGuard = TimelineBlankGuard()
+    /// 标签是否可见:保活标签重新显示时检查一次空白
+    @Environment(\.tabIsActive) private var tabActive
     @AppStorage(ClientPrefs.Key.toolDensity) private var toolDensityRaw = ToolDensity.standard.rawValue
     /// 上下文用量面板是否展开
     @State private var usageOpen = ProcessInfo.processInfo.environment["OMA_USAGE_PANEL"] != nil   // 调试钩子:启动即展开
@@ -201,6 +205,9 @@ struct ChatView: View {
             let bottomNow = distance <= 4
             if sticky.atBottom != bottomNow { sticky.atBottom = bottomNow }
             if follow.pinned, old.contentHeight == metrics.contentHeight, distance <= 4 { sticky.followSuspended = false }
+            // 空白自愈:容器尺寸变化、或已经检测到视口没有可见条目时,等几何稳定后检查
+            let resized = blankGuard.record(offsetY: metrics.offsetY, contentHeight: metrics.contentHeight, containerHeight: metrics.containerHeight)
+            if resized || sticky.visibleCount <= 0 { scheduleBlankCheck() }
             // 顶/底淡出边缘(与上面共用一次几何回调,避免每帧三次闭包求值)
             edgeFade.update(TimelineEdgeFade.Edges(
                 top: metrics.offsetY > 2,
@@ -221,10 +228,41 @@ struct ChatView: View {
         .overlay(alignment: .leading) {
             ConversationAnchorRail(model: model, sticky: sticky, jump: anchorJump)
         }
+        .onChange(of: tabActive) { _, active in
+            if active { scheduleBlankCheck(after: .milliseconds(300)) } else { blankGuard.cancel() }
+        }
         .onAppear {
+            scheduleBlankCheck(after: .milliseconds(600))
             // 时间线挂载耗时:到下一个主循环(首轮布局之后)为止
             let span = Log.perf.span("时间线挂载", warnMs: 120, ["entries": "\(model.timeline.entries.count)"])
             DispatchQueue.main.async { span.end() }
+        }
+    }
+
+    /// 安排一次视口空白检查:仍空白时程序化轻推滚动位置,强制 `LazyVStack` 物化可见行。
+    private func scheduleBlankCheck(after delay: Duration = .milliseconds(400)) {
+        blankGuard.schedule(after: delay) { [blankGuard, sticky, model, follow, tabActive] in
+            guard tabActive else { return false }
+            let blank = TimelineBlankGuard.isBlank(visibleCount: sticky.visibleCount, hasEntries: !model.timeline.entries.isEmpty,
+                                                   containerHeight: blankGuard.containerHeight)
+            guard blank else { return false }
+            Log.perf.warning("时间线视口空白,自动轻推滚动位置自愈", [
+                "entries": "\(model.timeline.entries.count)", "content": "\(Int(blankGuard.contentHeight))",
+                "container": "\(Int(blankGuard.containerHeight))", "offset": "\(Int(blankGuard.offsetY))",
+            ])
+            let maxOffset = max(blankGuard.contentHeight - blankGuard.containerHeight, 0)
+            if follow.pinned {
+                // 先离开底部边缘一点点,再回到底部:真实的偏移变化才会让滚动容器重新计算可见区域
+                position.scrollTo(y: max(maxOffset - 1, 0))
+                await Task.yield()
+                position.scrollTo(edge: .bottom)
+            } else {
+                let current = min(blankGuard.offsetY, maxOffset)
+                position.scrollTo(y: current + (current >= maxOffset ? -1 : 1))
+                await Task.yield()
+                position.scrollTo(y: current)
+            }
+            return true
         }
     }
 
