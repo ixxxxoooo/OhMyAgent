@@ -116,8 +116,6 @@ struct SettingsForm<Content: View>: View {
                                     }
                                 }
                             }
-                            .labeledContentStyle(SettingsLabeledContentStyle())
-                            .toggleStyle(SettingsSwitchToggleStyle())
                             .background(OMColors.card, in: RoundedRectangle(cornerRadius: OMRadius.card, style: .continuous))
                             .overlay(RoundedRectangle(cornerRadius: OMRadius.card, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
                             section.footer
@@ -131,6 +129,9 @@ struct SettingsForm<Content: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, OMSpacing.lg)
             .padding(.vertical, OMSpacing.lg)
+            // 样式必须加在 `Group(sections:)` 之外:分解出的子视图在分解点解析环境,事后加在子视图或卡片容器上都不生效
+            .labeledContentStyle(SettingsLabeledContentStyle())
+            .toggleStyle(SettingsSwitchToggleStyle())
         }
         .settingsSurface()
     }
