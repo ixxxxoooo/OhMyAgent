@@ -16,7 +16,7 @@ public enum PanelMetrics {
     /// 右栏拖宽时中栏至少保留的宽度
     public static let centerMinimum: Double = 320
     public static let leftDefault: Double = 260
-    public static let rightDefault: Double = 340
+    public static let rightDefault: Double = 480
     /// 右栏当前窗口下允许的最大宽度:窗口宽度减去(可见的)项目栏宽度与中栏最小宽度,且不小于下限。
     /// - Parameters:
     ///   - window: 窗口(工作区)宽度
