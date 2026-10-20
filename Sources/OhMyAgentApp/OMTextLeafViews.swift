@@ -126,7 +126,7 @@ struct TableTextLeaf: View {
         hasher.combine(roomy)
         return OMTextLeaf(
             signature: hasher.finalize(),
-            config: OMTextLeafConfig(wrap: false, inset: NSSize(width: roomy ? 16 : 10, height: roomy ? 14 : 10), persistentScroller: true)
+            config: OMTextLeafConfig(wrap: false, inset: NSSize(width: roomy ? 16 : 10, height: roomy ? 14 : 10), persistentScroller: roomy)
         ) { OMLeafContent.table(header: header, rows: rows, roomy: roomy) }
         .accessibilityLabel(String(localized: "表格"))
     }
