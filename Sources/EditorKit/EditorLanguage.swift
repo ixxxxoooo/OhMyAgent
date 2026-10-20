@@ -74,6 +74,32 @@ public final class EditorTextView: NSTextView {
     /// 获得/失去键盘焦点(Markdown 就地渲染据此决定是否展开光标所在块)
     var onFocusChange: ((Bool) -> Void)?
 
+    /// 当前是否启用 Markdown 所见即所得交互(任务框点击、⌘ 点击链接、列表续行)
+    var markdownInteraction: (() -> Bool)?
+    /// 最近一次与文本一致的 Markdown 块布局(用于避开围栏代码里的伪任务框);可能为 nil
+    var markdownLayout: (() -> MarkdownLiveLayout?)?
+
+    /// 是否启用 Markdown 交互。
+    private var markdownInteractive: Bool { markdownInteraction?() ?? false }
+
+    /// 应用一次 Markdown 编辑:走标准的「询问 → 替换 → 通知」流程,撤销栈与文本回调都正常工作。
+    private func apply(_ edit: MarkdownEdit) {
+        guard shouldChangeText(in: edit.range, replacementString: edit.replacement) else { return }
+        textStorage?.replaceCharacters(in: edit.range, with: edit.replacement)
+        didChangeText()
+        setSelectedRange(NSRange(location: edit.caret, length: 0))
+    }
+
+    /// 列表项末尾回车:续出下一项,空项回车结束列表。
+    public override func insertNewline(_ sender: Any?) {
+        if isEditable, markdownInteractive, !hasMarkedText(),
+           let edit = MarkdownEditCommands.continueList(in: string, selection: selectedRange()) {
+            apply(edit)
+            return
+        }
+        super.insertNewline(sender)
+    }
+
     public override func becomeFirstResponder() -> Bool {
         let accepted = super.becomeFirstResponder()
         if accepted { onFocusChange?(true) }
@@ -164,6 +190,7 @@ public final class EditorTextView: NSTextView {
     // MARK: 跳转定义
 
     public override func mouseDown(with event: NSEvent) {
+        if markdownInteractive, handleMarkdownClick(event) { return }
         if event.modifierFlags.contains(.command), onJumpToDefinition != nil {
             let point = convert(event.locationInWindow, from: nil)
             if let (offset, _) = characterUnder(point) {
@@ -173,6 +200,25 @@ public final class EditorTextView: NSTextView {
         }
         cancelHover()
         super.mouseDown(with: event)
+    }
+
+    /// Markdown 点击:⌘ 点击链接用系统默认方式打开;单击任务框切换勾选。
+    /// - Returns: 事件是否已被消费
+    private func handleMarkdownClick(_ event: NSEvent) -> Bool {
+        let point = convert(event.locationInWindow, from: nil)
+        let offset = characterIndexForInsertion(at: point)
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if flags == .command, let target = MarkdownEditCommands.linkTarget(in: string, at: offset),
+           let url = URL(string: target), let scheme = url.scheme, ["http", "https", "mailto"].contains(scheme.lowercased()) {
+            NSWorkspace.shared.open(url)
+            return true
+        }
+        if isEditable, flags.isEmpty, event.clickCount == 1,
+           let edit = MarkdownEditCommands.toggleTask(in: string, at: offset, layout: markdownLayout?()) {
+            apply(edit)
+            return true
+        }
+        return false
     }
 
     public override func keyDown(with event: NSEvent) {

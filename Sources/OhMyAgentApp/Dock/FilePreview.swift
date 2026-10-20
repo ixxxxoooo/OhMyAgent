@@ -4,6 +4,7 @@
 
 import AppKit
 import DesignSystem
+import EditorKit
 import IconKit
 import Observation
 import PDFKit
@@ -32,29 +33,42 @@ enum FilePreviewKind: Equatable {
     var isBinary: Bool { self == .image || self == .pdf || self == .spreadsheet }
 }
 
-/// 文件标签的显示模式:只有「源码」与「预览」两种,由工具条上的图标原地切换。
+/// 文件标签的显示模式:
+/// - Markdown 有三态:`live`(所见即所得,可直接编辑)/ `source`(源码)/ `preview`(只读阅读);
+/// - 其他可预览类型只有「源码」与「预览」两种,由工具条上的图标原地切换。
 enum FileViewMode: String, CaseIterable, Identifiable {
-    case source, preview
+    case live, source, preview
     var id: String { rawValue }
 
     var title: String {
         switch self {
+        case .live: return String(localized: "编辑")
         case .source: return String(localized: "源码")
-        case .preview: return String(localized: "预览")
+        case .preview: return String(localized: "阅读")
         }
     }
 
     /// 工具条图标:显示的是「点击后将切换到」的模式(源码 → 预览用眼睛,预览 → 源码用代码)。
     var toggleIcon: String { self == .preview ? "code" : "eye" }
 
-    /// 另一种模式。
+    /// 两态切换时的另一种模式(`live` 只出现在 Markdown 三态里,这里退回源码)。
     var other: FileViewMode { self == .preview ? .source : .preview }
 
-    /// 某类型可用的模式。
-    static func available(for kind: FilePreviewKind) -> [FileViewMode] { [.source, .preview] }
+    /// 某类型可用的模式(Markdown 为三态,其余为两态)。
+    static func available(for kind: FilePreviewKind) -> [FileViewMode] {
+        kind == .markdown ? [.live, .source, .preview] : [.source, .preview]
+    }
 
-    /// 编辑器是否可见(预览模式下隐藏编辑器)。
+    /// 某类型的默认模式:Markdown 默认所见即所得,其余默认预览。
+    static func defaultMode(for kind: FilePreviewKind) -> FileViewMode { kind == .markdown ? .live : .preview }
+
+    /// 编辑器是否可见(只读阅读模式下隐藏编辑器)。
     var showsEditor: Bool { self != .preview }
+
+    /// 编辑器的 Markdown 显示模式:所见即所得 → 就地渲染;源码 → 普通编辑器(不特殊处理)。
+    func markdownEditorMode(for kind: FilePreviewKind?) -> MarkdownEditorMode {
+        kind == .markdown && self == .live ? .live : .off
+    }
 }
 
 /// 文件显示模式记忆:按文件类型(而非单个文件)持久化到 `UserDefaults`,
@@ -73,11 +87,14 @@ final class FileViewModeStore {
         "editor.viewMode." + String(String(describing: kind).prefix { $0 != "(" })
     }
 
-    /// 取某类型的模式;未设置时默认预览。
+    /// 取某类型的模式;未设置时用该类型的默认模式(Markdown 为所见即所得,其余为预览)。
     func mode(for path: String, kind: FilePreviewKind) -> FileViewMode {
         let key = key(kind)
-        if let stored = modes[key] { return stored }
-        return defaults.string(forKey: key).flatMap(FileViewMode.init(rawValue:)) ?? .preview
+        if let stored = modes[key], FileViewMode.available(for: kind).contains(stored) { return stored }
+        let saved = defaults.string(forKey: key).flatMap(FileViewMode.init(rawValue:))
+        // 存档里的模式必须是该类型可用的(例如旧版本给 Markdown 存过 preview/source,仍然有效;非 Markdown 不会有 live)
+        if let saved, FileViewMode.available(for: kind).contains(saved) { return saved }
+        return FileViewMode.defaultMode(for: kind)
     }
 
     /// 记录某类型的模式(对同类型的所有文件生效)。

@@ -34,7 +34,10 @@ struct FileHeaderBar: View {
         HStack(spacing: 10) {
             breadcrumb
             Spacer(minLength: 8)
-            if modes.count > 1 {
+            if modes.count > 2 {
+                // 三态(Markdown):所见即所得 / 源码 / 阅读
+                OMCompactSegmented(options: modes.map { (value: $0, title: $0.title) }, selection: mode, accessibilityName: String(localized: "显示模式"), onSelect: onMode)
+            } else if modes.count > 1 {
                 HeaderIconButton(icon: mode.toggleIcon, help: mode == .preview ? "切换到源码" : "切换到预览", tint: nil) { onMode(mode.other) }
             }
             if let onToggleCompare {

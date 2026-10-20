@@ -73,12 +73,12 @@ enum MentionChipImage {
         for piece in pieces {
             switch piece {
             case .text(let text):
-                result = result + Text(verbatim: text).font(font)
+                result = Text("\(result)\(Text(verbatim: text).font(font))")
             case .mention(let mention):
                 if let image = image(for: mention) {
-                    result = result + Text(Image(nsImage: image)).baselineOffset(-5)
+                    result = Text("\(result)\(Text(Image(nsImage: image)).baselineOffset(-5))")
                 } else {
-                    result = result + Text(verbatim: mention.token).font(font)
+                    result = Text("\(result)\(Text(verbatim: mention.token).font(font))")
                 }
             }
         }

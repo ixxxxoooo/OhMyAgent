@@ -125,7 +125,7 @@ struct FileTabView: View {
         let doc = store.document(for: path)
         let previewKind = FilePreviewKind.of(path: path)
         let mode = previewKind.map { FileViewModeStore.shared.mode(for: path, kind: $0) } ?? .source
-        let markdownMode: MarkdownEditorMode = .off
+        let markdownMode = mode.markdownEditorMode(for: previewKind)
         let changesRevision = workbench.allSessions.reduce(0) { $0 + $1.changesRevision }
         let markers: [Int: LineMarker] = {
             guard let marks = agentMarks, doc.text == marks.text else { return [:] }

@@ -117,6 +117,9 @@ public final class CodeEditorView: NSView {
             if focused, let self { CodeEditorView.lastFocused = self }
             self?.markdownSelectionDidChange(focus: focused)
         }
+        // Markdown 所见即所得的基础交互(任务框/链接/列表续行)仅在就地渲染模式下启用,且文本需可编辑(任务框与续行会改文本)
+        textView.markdownInteraction = { [weak self] in self?.markdownMode == .live && self?.language == .markdown }
+        textView.markdownLayout = { [weak self] in self?.markdown.layout }
         textView.isEditable = isEditable
         textView.isSelectable = true
         textView.isRichText = false
