@@ -1789,7 +1789,8 @@ public final class SessionModel {
                 if !updated.isEmpty { self?.configOptions = updated }
                 if let self, let previous {
                     let next = self.modelLabel(forValue: value)
-                    if next != previous { self.timeline.appendModelSwitch(from: previous, to: next) }
+                    // 新会话(时间线为空、输入框居中)不插分割线,避免输入框被顶离原位
+                    if next != previous, !self.timeline.entries.isEmpty { self.timeline.appendModelSwitch(from: previous, to: next) }
                 }
             } catch {
                 self?.timeline.appendNotice(String(localized: "设置失败:\(error.localizedDescription)"), isError: true)
