@@ -201,18 +201,13 @@ struct ChatView: View {
             let bottomNow = distance <= 4
             if sticky.atBottom != bottomNow { sticky.atBottom = bottomNow }
             if follow.pinned, old.contentHeight == metrics.contentHeight, distance <= 4 { sticky.followSuspended = false }
-        }
-        .onScrollGeometryChange(for: TimelineEdgeFade.Edges.self) { geometry in
-            TimelineEdgeFade.Edges(
-                top: geometry.contentOffset.y > 2,
-                bottom: geometry.contentOffset.y + geometry.containerSize.height < geometry.contentSize.height - 4
-            )
-        } action: { _, edges in
-            edgeFade.update(edges)
-        }
-        .onScrollGeometryChange(for: CGFloat.self) { $0.contentSize.height } action: { _, _ in
+            // 顶/底淡出边缘(与上面共用一次几何回调,避免每帧三次闭包求值)
+            edgeFade.update(TimelineEdgeFade.Edges(
+                top: metrics.offsetY > 2,
+                bottom: metrics.offsetY + metrics.containerHeight < metrics.contentHeight - 4
+            ))
             // 内容增高只需要「贴底时跟随」;放手状态下的新内容计数由修订号触发的路径负责
-            autoFollow(countsActivity: false)
+            if old.contentHeight != metrics.contentHeight { autoFollow(countsActivity: false) }
         }
         // 修订号监听放进 0 尺寸叶子视图:ChatView.body 不再依赖 revision(流式每批次都会变)
         .background { TimelineRevisionDriver(timeline: model.timeline) { autoFollow() } }
