@@ -160,4 +160,13 @@ struct StreamTranslatorTests {
         #expect(t.isFinished)
         #expect(t.consume(payload: "[DONE]").isEmpty)
     }
+
+    @Test("prompt_cache_key 只在显式传入时写入")
+    func promptCacheKey() throws {
+        let body = #"{"model":"m","max_tokens":10,"messages":[{"role":"user","content":"hi"}]}"#
+        let plain = object(try ProtocolMapping.openAIRequest(fromAnthropic: Data(body.utf8)).body)
+        #expect(plain["prompt_cache_key"] == nil)
+        let keyed = object(try ProtocolMapping.openAIRequest(fromAnthropic: Data(body.utf8), promptCacheKey: "oma-route-a").body)
+        #expect(keyed["prompt_cache_key"] as? String == "oma-route-a")
+    }
 }

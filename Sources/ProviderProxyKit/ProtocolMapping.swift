@@ -32,9 +32,11 @@ public enum ProtocolMapping {
     /// - Parameters:
     ///   - data: Anthropic 请求 JSON
     ///   - model: 覆盖发给上游的模型名(nil 沿用请求里的)
+    ///   - promptCacheKey: 提示缓存路由键(OpenAI 的 `prompt_cache_key`):同一路由的请求带同一个键,
+    ///     上游更容易把它们送到同一台机器,命中前缀缓存;nil 不写入(非 OpenAI 官方端点不发,避免严格网关拒收未知字段)
     /// - Returns: 映射结果
     /// - Throws: `ProxyMappingError.invalidRequest`
-    public static func openAIRequest(fromAnthropic data: Data, model override: String? = nil) throws -> MappedRequest {
+    public static func openAIRequest(fromAnthropic data: Data, model override: String? = nil, promptCacheKey: String? = nil) throws -> MappedRequest {
         guard let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
               let rawMessages = root["messages"] as? [[String: Any]] else { throw ProxyMappingError.invalidRequest }
         var messages: [[String: Any]] = []
@@ -59,6 +61,7 @@ public enum ProtocolMapping {
         let stream = (root["stream"] as? Bool) ?? false
         var out: [String: Any] = ["model": model, "messages": messages, "stream": stream]
         if stream { out["stream_options"] = ["include_usage": true] }
+        if let promptCacheKey, !promptCacheKey.isEmpty { out["prompt_cache_key"] = promptCacheKey }
         if let maxTokens = root["max_tokens"] as? Int, maxTokens > 0 { out["max_tokens"] = maxTokens }
         if let value = root["temperature"] as? Double { out["temperature"] = value }
         if let value = root["top_p"] as? Double { out["top_p"] = value }

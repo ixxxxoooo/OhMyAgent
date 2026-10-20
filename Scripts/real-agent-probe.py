@@ -22,9 +22,9 @@ import time
 class Agent:
     """一个以 stdio 通信的 ACP Agent 子进程。"""
 
-    def __init__(self, command, args, cwd):
+    def __init__(self, command, args, cwd, env=None):
         self.proc = subprocess.Popen(
-            [command, *args], cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            [command, *args], cwd=cwd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             text=True, bufsize=1)
         self.next_id = 1
         self.pending = {}
