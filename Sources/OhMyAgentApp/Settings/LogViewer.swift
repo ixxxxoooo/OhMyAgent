@@ -12,34 +12,50 @@ import SwiftUI
 @Observable
 final class LogViewerModel {
     private(set) var entries: [LogEntry] = []
-    var minLevel: LogLevel = .info
-    var category: LogCategory?
-    var search = ""
+    var minLevel: LogLevel = .info { didSet { if minLevel != oldValue { refilter() } } }
+    var category: LogCategory? { didSet { if category != oldValue { refilter() } } }
+    var search = "" { didSet { if search != oldValue { refilter() } } }
     var follow = true
     @ObservationIgnored private var task: Task<Void, Never>?
     private let capacity = 5000
 
-    /// 过滤后的条目。
-    var filtered: [LogEntry] {
-        let query = search.trimmingCharacters(in: .whitespaces).lowercased()
-        return entries.filter { entry in
-            entry.level >= minLevel
-                && (category == nil || entry.category == category)
-                && (query.isEmpty || entry.line.lowercased().contains(query))
-        }
+    /// 过滤后的条目(增量维护:追加时只检查新条目,过滤条件变化时才整体重算)。
+    private(set) var filtered: [LogEntry] = []
+    @ObservationIgnored private var queryLower = ""
+
+    /// 条目是否满足当前过滤条件。
+    private func matches(_ entry: LogEntry) -> Bool {
+        entry.level >= minLevel
+            && (category == nil || entry.category == category)
+            && (queryLower.isEmpty || entry.line.lowercased().contains(queryLower))
+    }
+
+    /// 过滤条件变化后整体重算。
+    private func refilter() {
+        queryLower = search.trimmingCharacters(in: .whitespaces).lowercased()
+        filtered = entries.filter(matches)
     }
 
     /// 开始订阅(先载入缓冲里的历史)。
     func start() {
         guard task == nil else { return }
         entries = LogSystem.shared.recent(limit: capacity)
+        refilter()
         let lastID = entries.last?.id ?? 0
         let stream = LogSystem.shared.stream()
         task = Task { [weak self] in
             for await entry in stream where entry.id > lastID {
                 guard let self else { return }
                 self.entries.append(entry)
-                if self.entries.count > self.capacity { self.entries.removeFirst(self.entries.count - self.capacity) }
+                if self.matches(entry) { self.filtered.append(entry) }
+                if self.entries.count > self.capacity {
+                    let dropped = self.entries.count - self.capacity
+                    self.entries.removeFirst(dropped)
+                    // 被挤出缓冲的最旧条目同步从过滤结果里剔除(按 id 单调递增)
+                    if let cutoff = self.entries.first?.id, let keep = self.filtered.firstIndex(where: { $0.id >= cutoff }), keep > 0 {
+                        self.filtered.removeFirst(keep)
+                    }
+                }
             }
         }
     }
@@ -84,33 +100,9 @@ struct LogViewerView: View {
             .font(OMFonts.small)
             .padding(.horizontal, 8).padding(.vertical, 4)
             Divider()
-            ScrollViewReader { proxy in
-                let rows = model.filtered
-                List(rows) { entry in
-                    Text(entry.line)
-                        .font(OMFonts.monoSmall)
-                        .foregroundStyle(color(for: entry.level))
-                        .textSelection(.enabled)
-                        .lineLimit(3)
-                        .id(entry.id)
-                        .listRowSeparator(.hidden)
-                }
-                .listStyle(.plain)
-                .onChange(of: rows.last?.id) { _, id in
-                    if model.follow, let id { proxy.scrollTo(id, anchor: .bottom) }
-                }
-            }
+            LogTableView(rows: model.filtered, follow: model.follow)
         }
         .onAppear { model.start() }
         .onDisappear { model.stop() }
-    }
-
-    private func color(for level: LogLevel) -> Color {
-        switch level {
-        case .debug: return OMColors.tertiaryText
-        case .info: return OMColors.primaryText
-        case .warning: return OMColors.warning
-        case .error: return OMColors.danger
-        }
     }
 }
