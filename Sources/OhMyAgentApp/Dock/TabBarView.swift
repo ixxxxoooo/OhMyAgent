@@ -42,7 +42,7 @@ struct TabBarView: View {
     @State private var showAdd = false
 
     /// 是否显示右栏「+」新增标签按钮。
-    private var showsAdd: Bool { host == .right && isMainGroup }
+    private var showsAdd: Bool { host == .right }
 
     /// 是否为第一个(主)标签组。
     private var isMainGroup: Bool { workbench.dock(host).groups.first?.id == group.id }
@@ -118,6 +118,8 @@ struct TabBarView: View {
         .omTooltip("新增标签")
         .accessibilityLabel("新增标签")
         .omPicker(isPresented: $showAdd, entries: Self.addEntries, selectedID: nil, placement: .below, width: 200, showsSearch: false) { entry in
+            // 先聚焦当前组,新标签落在点击「+」的这一组
+            workbench.mutateDock(host) { $0.focus(group: group.id) }
             AppActions.shared.addRightTab(entry.id)
         }
     }
@@ -193,11 +195,10 @@ struct TabItemView: View {
                 .lineLimit(1)
                 .frame(maxWidth: TabMetrics.labelMaxWidth, alignment: .leading)
                 .fixedSize(horizontal: true, vertical: false)
-                // 尾部有状态/关闭按钮时,标题末端淡出,避免与之重叠
-                // 渐隐用背景色渐变覆盖层(不用 .mask:避免每个标签离屏渲染);底色 = 标签栏背景 + 当前标签状态填充
-                .omFadeTrailingEdge(width: 60, base: OMColors.surface, fill: tabFill, enabled: showsTrailing)
         }
-        .padding(.horizontal, 8)
+        // 右侧固定留出关闭按钮/图钉的位置(16pt + 间距),标题不会与之重叠,悬停时标签宽度也不跳动
+        .padding(.leading, 8)
+        .padding(.trailing, 26)
         .frame(minWidth: TabMetrics.minWidth)
         // 关闭按钮/状态点叠在标签右端,不单独占位
         .overlay(alignment: .trailing) { trailing.padding(.trailing, 6) }
