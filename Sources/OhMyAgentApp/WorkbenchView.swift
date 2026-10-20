@@ -76,7 +76,7 @@ struct WorkbenchView: View {
         HStack(spacing: 0) {
             ForEach(workbench.layout.visibleColumns(on: .left)) { panelColumn($0, side: .left) }
             CenterColumn(workbench: workbench)
-                .frame(minWidth: 280, maxWidth: .infinity)
+                .frame(minWidth: CGFloat(PanelMetrics.centerMinimum), maxWidth: .infinity)
             // 右侧由内向外排列
             ForEach(workbench.layout.visibleColumns(on: .right).reversed()) { panelColumn($0, side: .right) }
         }
