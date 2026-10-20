@@ -19,8 +19,10 @@ let package = Package(
         .target(name: "OMLog"),
         // 协议层:JSON-RPC、ACP v1 模型、连接 actor
         .target(name: "ACPKit", dependencies: ["OMLog"]),
+        // Claude Code 原生 ACP 适配器:Swift 实现的进程内 Agent,经 stream-json 控制协议驱动本机 `claude`(替代 Node 版 claude-agent-acp)
+        .target(name: "ClaudeAgentKit", dependencies: ["ACPKit", "OMLog"]),
         // 宿主层:子进程、Agent 注册表、路径探测、Bridge
-        .target(name: "AgentHost", dependencies: ["ACPKit", "OMLog", "ProviderProxyKit"]),
+        .target(name: "AgentHost", dependencies: ["ACPKit", "ClaudeAgentKit", "OMLog", "ProviderProxyKit"]),
         // 配置层:读写 ~/.claude 与 .mcp.json 等
         .target(name: "ClaudeConfigKit", dependencies: ["OMLog"]),
         // Diff 与检查点
@@ -68,6 +70,7 @@ let package = Package(
         .testTarget(name: "AgentHostTests", dependencies: ["AgentHost", "ACPKit", "FakeAgent"]),
         .testTarget(name: "ChatKitTests", dependencies: ["ChatKit", "ACPKit", "AgentHost", "FakeAgent"]),
         .testTarget(name: "ClaudeConfigKitTests", dependencies: ["ClaudeConfigKit"]),
+        .testTarget(name: "ClaudeAgentKitTests", dependencies: ["ClaudeAgentKit", "ACPKit"]),
         .testTarget(name: "DemoKitTests", dependencies: ["DemoKit", "GitKit", "ClaudeConfigKit", "WorkbenchKit", "ACPKit"]),
         .testTarget(name: "DiffKitTests", dependencies: ["DiffKit"]),
         .testTarget(name: "GitKitTests", dependencies: ["GitKit", "DiffKit"]),
