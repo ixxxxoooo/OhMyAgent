@@ -72,8 +72,10 @@ struct ProviderDetailView: View {
     /// 启用开关(名称已在顶部胶囊条显示,这里不再重复标题)。
     private var enableSection: some View {
         Section {
-            Toggle("启用此提供商", isOn: Binding(get: { enabled }, set: { enabled = $0; model.setEnabled(draft.id, $0) }))
-                .toggleStyle(.switch).controlSize(.small)
+            LabeledContent("启用此提供商") {
+                Toggle("启用此提供商", isOn: Binding(get: { enabled }, set: { enabled = $0; model.setEnabled(draft.id, $0) }))
+                    .labelsHidden().toggleStyle(.switch).controlSize(.small)
+            }
         }
     }
 

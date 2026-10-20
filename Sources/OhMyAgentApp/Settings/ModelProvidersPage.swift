@@ -90,7 +90,8 @@ struct ModelProvidersPage: View {
             .buttonStyle(.omSecondary)
             .omTooltip("读取本机 OpenCode 的配置,确认后导入提供商与密钥")
         }
-        .padding(.horizontal, 12)
+        // 与下方卡片页同一左右边距(SettingsForm 的 OMSpacing.lg),宽度对齐
+        .padding(.horizontal, OMSpacing.lg)
         .padding(.vertical, 8)
         .background(OMColors.surface)
     }
