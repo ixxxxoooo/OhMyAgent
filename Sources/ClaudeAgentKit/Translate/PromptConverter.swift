@@ -119,6 +119,12 @@ enum Notices {
         return rest.isEmpty ? (first, nil) : (first, rest)
     }
 
+    /// 首字母大写。
+    static func sentenceCase(_ text: String) -> String {
+        guard let first = text.first else { return text }
+        return first.uppercased() + text.dropFirst()
+    }
+
     /// 折叠空白,用于识别重复文本。
     static func normalize(_ text: String) -> String {
         text.trimmingCharacters(in: .whitespacesAndNewlines).split(whereSeparator: \.isWhitespace).joined(separator: " ")

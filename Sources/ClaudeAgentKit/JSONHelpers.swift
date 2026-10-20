@@ -33,10 +33,11 @@ extension JSONValue {
     }
 
     /// 序列化为一行 UTF-8 JSON(键有序,斜杠不转义)。
+    /// - Parameter pretty: 是否缩进
     /// - Returns: 序列化数据;失败返回 nil
-    func serialized() -> Data? {
+    func serialized(pretty: Bool = false) -> Data? {
         let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        encoder.outputFormatting = pretty ? [.sortedKeys, .withoutEscapingSlashes, .prettyPrinted] : [.sortedKeys, .withoutEscapingSlashes]
         return try? encoder.encode(self)
     }
 
@@ -52,6 +53,12 @@ extension JSONValue {
     /// - Returns: 解析结果;失败返回 nil
     static func parse(_ text: String) -> JSONValue? {
         parse(Data(text.utf8))
+    }
+
+    /// 缩进 2 空格的可读 JSON 文本(用于展示)。
+    var prettyText: String {
+        guard let data = serialized(pretty: true) else { return jsonText }
+        return String(decoding: data, as: UTF8.self)
     }
 
     /// 紧凑 JSON 文本(键有序),用于传给 `claude` 的命令行参数。

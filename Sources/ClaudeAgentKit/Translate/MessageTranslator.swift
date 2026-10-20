@@ -146,7 +146,8 @@ struct MessageTranslator {
     /// - Parameters:
     ///   - message: SDK 消息
     ///   - forwardSubagentText: 是否转发子 Agent 的文本与思考
-    mutating func translateMessage(_ message: JSONValue, forwardSubagentText: Bool) -> [JSONValue] {
+    ///   - replay: 历史回放模式(用户文本也要回显,助手文本不做流式去重)
+    mutating func translateMessage(_ message: JSONValue, forwardSubagentText: Bool, replay: Bool = false) -> [JSONValue] {
         let type = message["type"]?.stringValue ?? ""
         let parent = message["parent_tool_use_id"]?.nonEmptyString
         let key = parent ?? ""
@@ -160,15 +161,15 @@ struct MessageTranslator {
         guard let content = inner["content"] else { return [] }
         if let text = content.stringValue {
             // 字符串内容:本地命令输出之外的纯文本用户消息不回显(由客户端自己渲染)
-            if type == "user" { return [] }
+            if type == "user", !replay { return [] }
             return translateBlocks([["type": "text", "text": .string(text)]], role: role, options: options)
         }
         guard let blocks = content.arrayValue else { return [] }
-        if type == "user", blocks.count == 1, blocks[0]["type"]?.stringValue == "text" { return [] }
+        if type == "user", !replay, blocks.count == 1, blocks[0]["type"]?.stringValue == "text" { return [] }
         var kept = blocks
         if type == "assistant" {
             if parent == nil || forwardSubagentText {
-                kept = Self.unstreamedRemainder(blocks, streamed: streamedBlocks[key] ?? [])
+                kept = replay ? blocks : Self.unstreamedRemainder(blocks, streamed: streamedBlocks[key] ?? [])
             } else {
                 kept = blocks.filter { !["text", "thinking"].contains($0["type"]?.stringValue ?? "") }
             }
@@ -195,6 +196,15 @@ struct MessageTranslator {
     /// 仍未返回结果的已上报工具调用 ID。
     var unfinishedToolCallIds: [String] {
         emittedToolCalls.sorted()
+    }
+
+    /// 权限/征询前确保工具卡已上报(与流式上报去重)。
+    /// - Returns: 首次上报时返回 `tool_call` 通知体,已上报返回 nil
+    mutating func ensureEmitted(_ toolUse: ToolUse, parent: String?, previewContent: [JSONValue]? = nil) -> JSONValue? {
+        toolUseCache[toolUse.id] = toolUseCache[toolUse.id] ?? toolUse
+        guard !emittedToolCalls.contains(toolUse.id) else { return nil }
+        emittedToolCalls.insert(toolUse.id)
+        return Self.stamp(renderer.toolCall(toolUse, cwd: cwd, previewContent: previewContent), parent: parent)
     }
 
     /// 查询缓存里的工具调用。
