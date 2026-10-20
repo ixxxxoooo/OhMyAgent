@@ -37,6 +37,9 @@ struct NetworkPage: View {
                 Note("0 表示使用默认值。对应 API_TIMEOUT_MS;网络较慢或模型响应久时可适当调大。")
             }
             Section {
+                ConnectivityCard()
+            }
+            Section {
                 Note("以上设置对新建或恢复的会话生效,已在运行的会话需要重新开始。")
             }
         }
