@@ -83,4 +83,15 @@ struct FloatingPanelGeometryTests {
         let grown = FloatingPanelGeometry.resized(frame, handle: .trailing, by: CGSize(width: 9000, height: 0), in: container)
         #expect(grown.maxX == container.width)
     }
+
+    @Test("窗口内全屏铺满容器并留边距,极小容器不出现负尺寸")
+    func expanded() {
+        let frame = FloatingPanelGeometry.expandedFrame(in: container)
+        #expect(frame == CGRect(x: 8, y: 8, width: 984, height: 684))
+        #expect(CGRect(origin: .zero, size: container).contains(frame))
+        let tiny = FloatingPanelGeometry.expandedFrame(in: CGSize(width: 10, height: 10))
+        #expect(tiny.width >= 0 && tiny.height >= 0)
+        let zero = FloatingPanelGeometry.expandedFrame(in: .zero)
+        #expect(zero.width == 0 && zero.height == 0)
+    }
 }

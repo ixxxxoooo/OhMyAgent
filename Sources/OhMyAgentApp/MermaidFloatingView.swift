@@ -55,6 +55,12 @@ enum FloatingPanelGeometry {
         return CGRect(x: (container.width - width) / 2, y: (container.height - height) / 2, width: width, height: height).clamped(to: container)
     }
 
+    /// 窗口内「全屏」的框:铺满容器,四周留一圈小边距。
+    static func expandedFrame(in container: CGSize, margin: CGFloat = 8) -> CGRect {
+        let inset = min(margin, max(min(container.width, container.height) / 4, 0))
+        return CGRect(x: inset, y: inset, width: max(container.width - inset * 2, 0), height: max(container.height - inset * 2, 0))
+    }
+
     /// 平移后的位置:标题栏始终保留在容器内(至少露出 80pt 宽、整条标题栏高度)。
     static func moved(_ frame: CGRect, by translation: CGSize, in container: CGSize, headerHeight: CGFloat) -> CGRect {
         var next = frame.offsetBy(dx: translation.width, dy: translation.height)
@@ -136,6 +142,9 @@ private struct MermaidFloatingPanel: View {
     @State private var copied = false
     @State private var moveStart: CGRect?
     @State private var resizeStart: CGRect?
+    /// 是否处于窗口内全屏;全屏前的框用于还原
+    @State private var isExpanded = false
+    @State private var restoreFrame: CGRect?
 
     private let headerHeight: CGFloat = 36
 
@@ -149,14 +158,19 @@ private struct MermaidFloatingPanel: View {
         .background(OMColors.surface, in: RoundedRectangle(cornerRadius: OMRadius.floating, style: .continuous))
         .clipShape(RoundedRectangle(cornerRadius: OMRadius.floating, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: OMRadius.floating, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 1))
-        .overlay { resizeHandles }
+        .overlay { resizeHandles.allowsHitTesting(!isExpanded) }
         .omFloatShadow(cornerRadius: OMRadius.floating)
         .position(x: frame.midX, y: frame.midY)
         .onAppear {
             frame = (store.frame ?? FloatingPanelGeometry.initialFrame(in: container)).clamped(to: container)
         }
-        .onChange(of: container) { _, size in frame = frame.clamped(to: size) }
-        .onChange(of: frame) { _, value in store.frame = value }
+        .onChange(of: container) { _, size in
+            frame = isExpanded ? FloatingPanelGeometry.expandedFrame(in: size) : frame.clamped(to: size)
+        }
+        // 全屏框不写回(下次打开仍沿用还原后的位置与大小)
+        .onChange(of: frame) { _, value in if !isExpanded { store.frame = value } }
+        // Esc:先退出全屏,再关闭
+        .background(Button("") { handleEscape() }.keyboardShortcut(.cancelAction).opacity(0).allowsHitTesting(false).accessibilityHidden(true))
         .task(id: item.id) { result = await renderMermaid(item.source) }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Mermaid 图表预览")
@@ -189,15 +203,15 @@ private struct MermaidFloatingPanel: View {
                 downloadMenu
                 separator
             }
+            iconButton(isExpanded ? "minimize-2" : "maximize-2", help: isExpanded ? "还原窗口" : "全屏", active: isExpanded) { toggleExpanded() }
             iconButton("x", help: "关闭") { store.dismiss() }
-                .keyboardShortcut(.cancelAction)
         }
         .padding(.horizontal, 8)
         .frame(height: headerHeight)
         .background(OMColors.surface)
         .contentShape(Rectangle())
         .gesture(moveGesture)
-        .onTapGesture(count: 2) { fitToWindow() }
+        .onTapGesture(count: 2) { toggleExpanded() }
     }
 
     private var separator: some View {
@@ -257,7 +271,7 @@ private struct MermaidFloatingPanel: View {
                         if autoFit { viewport.fit(scene: scene.size, in: size) }
                     },
                     onToggleFit: { toggleFit(scene) },
-                    onClose: { store.dismiss() }
+                    onClose: { handleEscape() }
                 )
             }
         case .failure(let error):
@@ -279,6 +293,27 @@ private struct MermaidFloatingPanel: View {
     private var currentScene: MScene? {
         if case .scene(let scene, _) = result { return scene }
         return nil
+    }
+
+    /// 切换窗口内全屏:进入时记下当前框,还原时回到该框;随后重新适应窗口。
+    private func toggleExpanded() {
+        omWithAnimation {
+            if isExpanded {
+                frame = (restoreFrame ?? FloatingPanelGeometry.initialFrame(in: container)).clamped(to: container)
+                restoreFrame = nil
+                isExpanded = false
+            } else {
+                restoreFrame = frame
+                isExpanded = true
+                frame = FloatingPanelGeometry.expandedFrame(in: container)
+            }
+        }
+        autoFit = true
+    }
+
+    /// Esc:全屏时先还原,否则关闭悬浮窗。
+    private func handleEscape() {
+        if isExpanded { toggleExpanded() } else { store.dismiss() }
     }
 
     private func zoom(by factor: Double) {
@@ -326,6 +361,7 @@ private struct MermaidFloatingPanel: View {
     private var moveGesture: some Gesture {
         DragGesture(minimumDistance: 3, coordinateSpace: .global)
             .onChanged { value in
+                guard !isExpanded else { return }
                 if moveStart == nil { moveStart = frame }
                 guard let start = moveStart else { return }
                 frame = FloatingPanelGeometry.moved(start, by: value.translation, in: container, headerHeight: headerHeight)

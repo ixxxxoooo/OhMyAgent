@@ -2635,3 +2635,5 @@
 "显示更早的 %lld 轮对话" = "Show %lld earlier turns";
 "显示更早的对话" = "Show earlier conversation";
 "表格" = "Table";
+"全屏" = "Full screen";
+"还原窗口" = "Restore window";
