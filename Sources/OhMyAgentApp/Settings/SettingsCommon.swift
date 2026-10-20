@@ -59,14 +59,42 @@ struct ScopeHeader: View {
     }
 }
 
-/// 页面骨架:分组表单 + 可选的顶部内容。
+/// 页面骨架:把 `Section` 渲染成与卡片页(`SettingsScroll`/`SettingsCard`)一致的分组卡片,
+/// 这样所有设置页的内容区宽度都由「外观 → 设置页宽度」统一控制(系统分组表单自身有宽度上限,不随档位变化)。
 struct SettingsForm<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        Form { content }
-            .formStyle(.grouped)
-            .settingsSurface()
+        ScrollView {
+            VStack(alignment: .leading, spacing: OMSpacing.xl) {
+                Group(sections: content) { sections in
+                    ForEach(sections) { section in
+                        VStack(alignment: .leading, spacing: OMSpacing.sm) {
+                            section.header
+                                .font(OMFonts.small)
+                                .foregroundStyle(OMColors.secondaryText)
+                                .padding(.horizontal, OMSpacing.xs)
+                            VStack(alignment: .leading, spacing: 0) {
+                                section.content
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, OMSpacing.md)
+                                    .padding(.vertical, OMSpacing.sm)
+                            }
+                            .background(OMColors.card, in: RoundedRectangle(cornerRadius: OMRadius.card, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: OMRadius.card, style: .continuous).strokeBorder(OMColors.hairline, lineWidth: 0.5))
+                            section.footer
+                                .font(OMFonts.caption)
+                                .foregroundStyle(OMColors.secondaryText)
+                                .padding(.horizontal, OMSpacing.xs)
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, OMSpacing.lg)
+            .padding(.vertical, OMSpacing.lg)
+        }
+        .settingsSurface()
     }
 }
 
