@@ -28,6 +28,7 @@ extension DemoScenarios {
         [
             DemoScenario(id: "perf-long-2000", group: "性能实验室", title: "2000 轮长会话:滚动、加载与跨叶子复制", summary: "2000 轮问答,每 10 轮一张终端卡、每 50 轮一个代码块;用于测会话加载、滚动与跨叶子选择复制(OMA_TIMELINE_TURNS 可调轮数)", build: perfLong),
             DemoScenario(id: "perf-long-mixed", group: "性能实验室", title: "800 轮混合内容:表格、图表、Mermaid、Diff 穿插", summary: "800 轮里按 8 种内容轮换:表格/折线图/Mermaid/代码/Diff/终端输出/待办/长段落", build: perfMixed),
+            DemoScenario(id: "table-gallery", group: "性能实验室", title: "表格画廊:窄表、宽表、对齐、长文本与行内样式", summary: "三列对齐(左/中/右)、18 列超宽表、含行内代码/粗体/链接的长单元格、单列表与只有表头的表、中英混排", build: tableGallery),
             DemoScenario(id: "perf-render-gallery", group: "性能实验室", title: "渲染画廊:大表格、全部图表与 Mermaid、多语言代码", summary: "60 行宽表格、折线/K 线/柱状图、7 种 Mermaid、12 种语言代码块、220 行大 Diff", build: perfRenderGallery),
         ]
     }
@@ -99,6 +100,48 @@ extension DemoScenarios {
         default:
             return [DemoSteps.say(String(repeating: "这是一段较长的解释文字,用于观察长段落折行、选择与滚动的开销。第 \(index) 轮的取舍是:先保证正确性,再逐步优化热点路径。", count: 6) + "\n", size: 96)]
         }
+    }
+
+    // MARK: 表格画廊
+
+    /// 构建表格画廊步骤:覆盖对齐语法、超宽横向滚动、折行单元格、行内样式与边界形状。
+    /// - Parameter c: 场景上下文
+    static func tableGallery(_ c: ScenarioContext) -> [ScenarioStep] {
+        let aligned = """
+        | 模块 | 数量 | 占比 | 状态 |
+        | :--- | ---: | :---: | --- |
+        | ACPKit | 128 | 12.5% | 稳定 |
+        | ChatKit | 2048 | 40.0% | 进行中 |
+        | DesignSystem | 7 | 0.3% | 稳定 |
+        """
+        let wideHeader = (1...18).map { "列 \($0)" }
+        let wideRows = (1...6).map { row in (1...18).map { "r\(row)c\($0)-\(($0 * row) % 7)" } }
+        let wide = ("| " + wideHeader.joined(separator: " | ") + " |\n| " + wideHeader.map { _ in "---" }.joined(separator: " | ") + " |\n"
+            + wideRows.map { "| " + $0.joined(separator: " | ") + " |" }.joined(separator: "\n"))
+        let rich = """
+        | 名称 | 说明 | 链接 |
+        | --- | --- | --- |
+        | `OMSplitHandle` | **统一**分栏手柄:光标由系统管理,悬停与拖动出现强调线;命中区 9pt,优先于内容里的 AppKit 视图。 | [文档](https://example.com/split) |
+        | `NSTextTable` | 原生表格排版,单元格内自动折行,列宽统一测量,*表头与行严格对齐*。 | [参考](https://example.com/table) |
+        | ~~旧制表位~~ | 已替换:制表位在混排字体下会偏差。 | - |
+        """
+        let single = "| 仅一列 |\n| --- |\n| 第一行 |\n| 第二行 |"
+        let headerOnly = "| 只有 | 表头 | 没有行 |\n| --- | --- | --- |"
+        let mixed = """
+        | Item | 描述 Description | Qty |
+        | --- | --- | ---: |
+        | Apple 苹果 | 新鲜的 fresh 苹果 | 12 |
+        | Banana 香蕉 | 一根很长很长的香蕉 a very long banana description to force wrapping inside the cell | 3 |
+        """
+        return DemoSteps.withUsage([
+            .user("把各种形状的表格都输出一遍,我要核对对齐与横向滚动"),
+            DemoSteps.say("## 1. 对齐(左 / 右 / 居中)\n\n\(aligned)\n\n", size: 80),
+            DemoSteps.say("## 2. 18 列超宽表(应出现横向滚动条)\n\n\(wide)\n\n", size: 80),
+            DemoSteps.say("## 3. 长文本与行内样式(单元格内折行)\n\n\(rich)\n\n", size: 80),
+            DemoSteps.say("## 4. 单列表与只有表头的表\n\n\(single)\n\n\(headerOnly)\n\n", size: 80),
+            DemoSteps.say("## 5. 中英混排\n\n\(mixed)\n\n", size: 80),
+            DemoSteps.say("表格画廊输出完毕。\n"),
+        ], used: 12_000)
     }
 
     // MARK: 渲染画廊

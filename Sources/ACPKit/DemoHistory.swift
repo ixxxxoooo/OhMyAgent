@@ -216,6 +216,7 @@ extension DemoHistory {
         ("[渲染] Markdown 全元素与多语言代码高亮", "输出覆盖所有 Markdown 元素的样例", 500, false, false, .scenario("markdown")),
         ("[渲染] 画布:统计卡/表格/图表的季度周报", "生成季度质量周报画布", 900, false, false, .scenario("canvas")),
         ("[渲染] 工具卡大 Diff:多文件读写与编辑", "梳理并整理路由层", 1_500, false, false, .scenario("tools-files")),
+        ("[渲染] 表格画廊:对齐/超宽横滚/折行单元格/边界形状", "把各种形状的表格都输出一遍,我要核对对齐与横向滚动", 1_700, false, false, .scenario("table-gallery")),
     ])
 
     static let perfMultiTab = make("perf-multitab", [

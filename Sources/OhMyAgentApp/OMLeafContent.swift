@@ -139,58 +139,114 @@ enum OMLeafContent {
 
     // MARK: 表格
 
-    /// 表格列之间的间距。
-    static let tableColumnGap: CGFloat = 16
+    /// 单元格文字区最小宽度(再短的内容也不窄于此)。
+    static let tableMinColumn: CGFloat = 40
+    /// 单元格文字区最大宽度:超过则在单元格内折行(与 GitHub/Typora 的「长文本折行、整表可横向滚动」一致)。
+    static let tableMaxColumn: CGFloat = 360
 
-    /// 表格的富文本:单元格以制表符分隔、列宽由制表位对齐,表头下方用分隔线;
-    /// 复制选区即得到「制表符 + 换行」分隔的文本(可直接粘贴进电子表格)。
+    /// 一张表的列宽方案:每列的文字区宽度与整表总宽(含单元格内边距)。
+    struct TableMetrics: Equatable {
+        /// 每列文字区宽度
+        var columnWidths: [CGFloat]
+        /// 单元格左右内边距(单侧)
+        var horizontalPadding: CGFloat
+        /// 整表总宽(各列文字区 + 两侧内边距之和)
+        var totalWidth: CGFloat { columnWidths.reduce(0) { $0 + $1 + horizontalPadding * 2 } }
+    }
+
+    /// 由各列单元格的自然(单行)宽度算出列宽方案:夹在 [最小, 最大] 之间,留 2pt 余量避免因取整被意外折行。
+    /// - Parameters:
+    ///   - naturalWidths: 每列最宽单元格的单行宽度
+    ///   - horizontalPadding: 单元格左右内边距(单侧)
+    /// - Returns: 列宽方案
+    static func tableMetrics(naturalWidths: [CGFloat], horizontalPadding: CGFloat) -> TableMetrics {
+        TableMetrics(
+            columnWidths: naturalWidths.map { min(max(ceil($0) + 2, tableMinColumn), tableMaxColumn) },
+            horizontalPadding: horizontalPadding
+        )
+    }
+
+    /// 表格的富文本:用 `NSTextTable` 排版(与 TextEdit/邮件同一套原生表格引擎),每个单元格是真正的表格单元:
+    /// 列宽统一测量一次(表头与各行共用)、过长内容在单元格内折行、表头有底色、行间有发丝分隔线、按列对齐。
+    /// 复制选区即得到「制表符 + 换行」分隔的文本(每个单元格结尾的换行在复制时还原为制表符/换行)。
     /// - Parameters:
     ///   - header: 表头
     ///   - rows: 数据行
+    ///   - aligns: 每列对齐(缺省按左对齐)
+    ///   - roomy: 宽松排版(文档阅读页:内边距更大)
     /// - Returns: 富文本
-    static func table(header: [String], rows: [[String]], roomy: Bool = false) -> NSAttributedString {
-        // 文档排版(整页阅读):字号与会话一致,只放宽列间距 28、行间距 12
+    static func table(header: [String], rows: [[String]], aligns: [MarkdownTableAlign] = [], roomy: Bool = false) -> NSAttributedString {
+        // 文档排版(整页阅读):字号与会话一致,只放宽单元格内边距
         let size = 11.5 * OMScale.ui
-        let columnGap: CGFloat = roomy ? 28 : tableColumnGap
-        let rowGap: CGFloat = roomy ? 12 : 6
+        let padH: CGFloat = roomy ? 14 : 10
+        let padV: CGFloat = roomy ? 8 : 5
         let columns = max(header.count, rows.map(\.count).max() ?? 0)
         guard columns > 0 else { return NSAttributedString() }
-        func cell(_ source: String, weight: NSFont.Weight) -> NSAttributedString {
-            tableCell(source, size: size, weight: weight)
-        }
-        let headerCells = (0..<columns).map { cell($0 < header.count ? header[$0] : "", weight: .medium) }
-        let bodyCells = rows.map { row in (0..<columns).map { cell($0 < row.count ? row[$0] : "", weight: .regular) } }
-        // 列宽 = 该列最宽单元格 + 列间距
-        var widths = [CGFloat](repeating: 0, count: columns)
+        let headerCells = (0..<columns).map { tableCell($0 < header.count ? header[$0] : "", size: size, weight: .medium) }
+        let bodyCells = rows.map { row in (0..<columns).map { tableCell($0 < row.count ? row[$0] : "", size: size, weight: .regular) } }
+        // 列宽:每列所有单元格(含表头)的单行自然宽度取最大
+        var natural = [CGFloat](repeating: 0, count: columns)
         for line in [headerCells] + bodyCells {
-            for (index, text) in line.enumerated() { widths[index] = max(widths[index], ceil(text.size().width)) }
-        }
-        var stops: [NSTextTab] = []
-        var position: CGFloat = 0
-        for width in widths.dropLast() {
-            position += width + columnGap
-            stops.append(NSTextTab(textAlignment: .left, location: position))
-        }
-        let result = NSMutableAttributedString()
-        func append(_ line: [NSAttributedString], rule: Bool, last: Bool) {
-            let style = NSMutableParagraphStyle()
-            style.tabStops = stops
-            style.defaultTabInterval = 0
-            style.paragraphSpacing = last ? 0 : rowGap
-            style.lineBreakMode = .byClipping
-            let piece = NSMutableAttributedString()
             for (index, text) in line.enumerated() {
-                if index > 0 { piece.append(NSAttributedString(string: "\t")) }
-                piece.append(text)
+                let width = text.length == 0 ? 0 : text.boundingRect(with: NSSize(width: 100_000, height: 10_000), options: [.usesLineFragmentOrigin, .usesFontLeading]).width
+                natural[index] = max(natural[index], width)
             }
-            if !last { piece.append(NSAttributedString(string: "\n")) }
-            piece.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: piece.length))
-            if rule { piece.addAttribute(omRuleBelowKey, value: NSColor(OMColors.hairline), range: NSRange(location: 0, length: piece.length)) }
-            result.append(piece)
         }
-        append(headerCells, rule: true, last: bodyCells.isEmpty)
-        for (index, line) in bodyCells.enumerated() { append(line, rule: false, last: index == bodyCells.count - 1) }
+        let metrics = tableMetrics(naturalWidths: natural, horizontalPadding: padH)
+        let table = NSTextTable()
+        table.numberOfColumns = columns
+        table.layoutAlgorithm = .fixedLayoutAlgorithm
+        table.collapsesBorders = true
+        table.hidesEmptyCells = false
+        table.setContentWidth(metrics.totalWidth, type: .absoluteValueType)
+
+        let lineColor = NSColor(OMColors.hairline)
+        let headerFill = NSColor(OMColors.subtleFill)
+        let result = NSMutableAttributedString()
+        let allLines = [headerCells] + bodyCells
+        for (row, line) in allLines.enumerated() {
+            let isHeader = row == 0
+            let isLastRow = row == allLines.count - 1
+            for (column, text) in line.enumerated() {
+                let block = NSTextTableBlock(table: table, startingRow: row, rowSpan: 1, startingColumn: column, columnSpan: 1)
+                block.setContentWidth(metrics.columnWidths[column], type: .absoluteValueType)
+                block.setWidth(padH, type: .absoluteValueType, for: .padding, edge: .minX)
+                block.setWidth(padH, type: .absoluteValueType, for: .padding, edge: .maxX)
+                block.setWidth(padV, type: .absoluteValueType, for: .padding, edge: .minY)
+                block.setWidth(padV, type: .absoluteValueType, for: .padding, edge: .maxY)
+                if !isLastRow {
+                    block.setWidth(isHeader ? 1 : 0.5, type: .absoluteValueType, for: .border, edge: .maxY)
+                    block.setBorderColor(lineColor, for: .maxY)
+                }
+                if isHeader { block.backgroundColor = headerFill }
+                block.verticalAlignment = .topAlignment
+
+                let style = NSMutableParagraphStyle()
+                style.textBlocks = [block]
+                style.lineBreakMode = .byWordWrapping
+                style.alignment = alignment(aligns.indices.contains(column) ? aligns[column] : .none)
+                let piece = NSMutableAttributedString(attributedString: text)
+                // 每个单元格以换行结尾(NSTextTable 要求一个单元格一个段落);复制时换行还原为制表符/行尾换行
+                let isLast = isLastRow && column == columns - 1
+                let terminator = NSAttributedString(string: "\n", attributes: [
+                    .font: NSFont.systemFont(ofSize: size), OMReadOnlyTextView.copyTextKey: isLast ? "" : (column == columns - 1 ? "\n" : "\t"),
+                ])
+                piece.append(terminator)
+                piece.addAttribute(.paragraphStyle, value: style, range: NSRange(location: 0, length: piece.length))
+                result.append(piece)
+            }
+        }
+        result.addAttribute(omIntrinsicWidthKey, value: metrics.totalWidth, range: NSRange(location: 0, length: 1))
         return result
+    }
+
+    /// Markdown 列对齐 → 段落对齐。
+    private static func alignment(_ align: MarkdownTableAlign) -> NSTextAlignment {
+        switch align {
+        case .center: return .center
+        case .right: return .right
+        case .left, .none: return .left
+        }
     }
 
     /// 表格单元格:行内 Markdown(粗体、斜体、删除线、链接、行内代码)→ 富文本。

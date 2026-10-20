@@ -118,7 +118,7 @@ struct MarkdownParserTests {
     @Test("有序列表、任务列表与表格")
     func listsAndTables() {
         let blocks = MarkdownParser.parse("1. 一\n2. 二\n\n- [x] 完成\n- [ ] 待办\n\n| 名称 | 值 |\n| --- | --- |\n| a | 1 |\n| b | 2 |")
-        guard case .list(let ordered) = blocks[0], case .list(let tasks) = blocks[1], case .table(let header, let rows) = blocks[2] else {
+        guard case .list(let ordered) = blocks[0], case .list(let tasks) = blocks[1], case .table(let header, let rows, _) = blocks[2] else {
             Issue.record("块类型不符: \(blocks)"); return
         }
         #expect(ordered.map(\.marker) == ["1.", "2."])

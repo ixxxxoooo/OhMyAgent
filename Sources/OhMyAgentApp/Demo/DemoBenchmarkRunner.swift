@@ -219,7 +219,7 @@ final class DemoBenchmarkRunner {
         }
         measure("render.table", detail: "60 行 × 7 列") {
             let parsed = MarkdownParser.parse(DemoRenderSamples.tableMarkdown)
-            if case .table(_, let rows)? = parsed.first { _ = rows.count }
+            if case .table(_, let rows, _)? = parsed.first { _ = rows.count }
         }
         measure("render.chart", detail: "折线 + 60 根 K 线") {
             for json in [DemoRenderSamples.lineChartJSON, DemoRenderSamples.candleChartJSON] { _ = try? CanvasParser.parseChart(Data(json.utf8)) }

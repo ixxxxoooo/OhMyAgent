@@ -17,6 +17,8 @@ struct OMTextLeafConfig: Equatable {
     var trailingPadding: CGFloat = 0
     /// 不折行且内容超宽时,是否常驻显示水平滚动条(表格用:否则滚动条只在滚动时才出现,用户不知道可以横向滚动)
     var persistentScroller = false
+    /// 不折行且内容比建议宽度窄时,叶子宽度收缩到内容宽度(表格:卡片贴合表格,而不是撑满整行)
+    var hugsContent = false
 }
 
 /// 叶子宿主视图:自动折行时直接放文本视图;不折行时放进只允许水平滚动的滚动视图。
@@ -186,7 +188,8 @@ final class OMTextLeafCoordinator {
         // 常驻滚动条且内容超宽:底部多留一条滚动条的高度,避免盖住最后一行
         let overflow = !config.wrap && config.persistentScroller && host.contentSize.width > width + 0.5
         let reserve = overflow ? OMScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy) : 0
-        measured = CGSize(width: width, height: fit.height + inset.height * 2 + reserve)
+        let reportedWidth = (!config.wrap && config.hugsContent) ? min(width, host.contentSize.width) : width
+        measured = CGSize(width: reportedWidth, height: fit.height + inset.height * 2 + reserve)
         measuredEdits = edits
         return measured
     }

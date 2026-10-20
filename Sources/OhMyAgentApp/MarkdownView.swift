@@ -184,8 +184,8 @@ struct MarkdownBlockView: View, Equatable {
             } else {
                 CodeBlockView(language: language, code: code)
             }
-        case .table(let header, let rows):
-            TableBlockView(header: header, rows: rows)
+        case .table(let header, let rows, let aligns):
+            TableBlockView(header: header, rows: rows, aligns: aligns)
         case .rule:
             Divider().padding(.vertical, 4)
         }
@@ -238,10 +238,13 @@ struct CodeBlockView: View {
 struct TableBlockView: View {
     let header: [String]
     let rows: [[String]]
+    var aligns: [MarkdownTableAlign] = []
     @Environment(\.markdownDocument) private var document
 
     var body: some View {
-        TableTextLeaf(header: header, rows: rows, roomy: document)
+        TableTextLeaf(header: header, rows: rows, aligns: aligns, roomy: document)
+            // 表头底色是矩形,按卡片圆角裁切,避免顶部两角溢出
+            .clipShape(RoundedRectangle(cornerRadius: OMMetrics.cardRadius, style: .continuous))
             .omSolidCard()
     }
 }

@@ -68,7 +68,8 @@ enum ScrollbarPolicy {
     }
 
     private static func walk(_ view: NSView, _ body: (NSScrollView) -> Void) {
-        if let scroll = view as? NSScrollView { body(scroll) }
+        // 表格等常驻滚动条的叶子自行管理样式(需始终可见),不受「滚动条」外观设置改写
+        if let scroll = view as? NSScrollView, (scroll as? OMLeafScrollView)?.persistentScroller != true { body(scroll) }
         for sub in view.subviews { walk(sub, body) }
     }
 }

@@ -16,6 +16,10 @@ let omGutterKey = NSAttributedString.Key("OMGutter")
 /// 段落下方分隔线标记(值为 `NSColor`):布局管理器在该段最后一个行片段下方画一条贯穿视图宽度的 0.5pt 线(表格表头用)。
 let omRuleBelowKey = NSAttributedString.Key("OMRuleBelow")
 
+/// 内容固有宽度标记(值为 `CGFloat`,设在首个字符上):`NSTextTable` 里右对齐/居中的单元格会让 `usedRect` 被撑到容器宽度,
+/// 测量时以这个已知的表格总宽为准。
+let omIntrinsicWidthKey = NSAttributedString.Key("OMIntrinsicWidth")
+
 /// 一行的行号槽描述(Diff 用):行号、符号与配色。实现 `isEqual` 以便增量更新时比较属性。
 final class OMGutterInfo: NSObject {
     /// 旧文件行号(为空时不画)
@@ -353,6 +357,10 @@ class OMReadOnlyTextView: NSTextView {
         if container.size.width != width { container.size = NSSize(width: width, height: CGFloat.greatestFiniteMagnitude) }
         layout.ensureLayout(for: container)
         let used = layout.usedRect(for: container)
-        return CGSize(width: ceil(used.maxX), height: ceil(used.height))
+        var usedWidth = ceil(used.maxX)
+        if let storage = textStorage, storage.length > 0, let intrinsic = storage.attribute(omIntrinsicWidthKey, at: 0, effectiveRange: nil) as? CGFloat {
+            usedWidth = min(usedWidth, ceil(intrinsic))
+        }
+        return CGSize(width: usedWidth, height: ceil(used.height))
     }
 }

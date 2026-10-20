@@ -3,6 +3,7 @@
 // 负责把业务参数折成「内容 + 样式」签名与富文本构造闭包。
 
 import AppKit
+import ChatKit
 import DesignSystem
 import DiffKit
 import SwiftUI
@@ -111,10 +112,12 @@ struct DiffTextLeaf: View {
     }
 }
 
-/// 表格叶子:制表位对齐的文本 + 表头分隔线,不折行,宽表在叶子内水平滚动;复制得到制表符分隔文本。
+/// 表格叶子:`NSTextTable` 原生表格排版,不折行(过长内容在单元格内折行),整表超宽时在叶子内常驻横向滚动条;复制得到制表符分隔文本。
 struct TableTextLeaf: View {
     let header: [String]
     let rows: [[String]]
+    /// 每列对齐
+    var aligns: [MarkdownTableAlign] = []
     /// 宽松排版(文档阅读页)
     var roomy = false
 
@@ -122,12 +125,14 @@ struct TableTextLeaf: View {
         var hasher = Hasher()
         hasher.combine(header)
         hasher.combine(rows)
+        hasher.combine(aligns)
         hasher.combine(OMLeafStyle.current)
         hasher.combine(roomy)
         return OMTextLeaf(
             signature: hasher.finalize(),
-            config: OMTextLeafConfig(wrap: false, inset: NSSize(width: roomy ? 16 : 10, height: roomy ? 14 : 10), persistentScroller: roomy)
-        ) { OMLeafContent.table(header: header, rows: rows, roomy: roomy) }
+            // 内边距由单元格自己带;超宽时一律常驻滚动条(悬浮滚动条只在滚动时才出现,用户不知道可以横向滚动)
+            config: OMTextLeafConfig(wrap: false, inset: .zero, persistentScroller: true, hugsContent: true)
+        ) { OMLeafContent.table(header: header, rows: rows, aligns: aligns, roomy: roomy) }
         .accessibilityLabel(String(localized: "表格"))
     }
 }

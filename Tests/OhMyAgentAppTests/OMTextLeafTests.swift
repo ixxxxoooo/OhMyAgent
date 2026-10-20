@@ -3,6 +3,7 @@
 
 import AppKit
 import DesignSystem
+import ChatKit
 import DiffKit
 import Foundation
 import Testing
@@ -163,34 +164,107 @@ struct OMTextLeafMeasureFallbackTests {
 @MainActor
 @Suite("表格文本叶子内容", .serialized)
 struct OMTableLeafContentTests {
-    @Test("单元格以制表符分隔、行以换行分隔,复制即得到 TSV(行内 Markdown 标记已去掉)")
+    /// 复制整段内容(与选区复制同一条路径)。
+    private func copied(_ text: NSAttributedString) -> String {
+        OMReadOnlyTextView.copyText(of: text, range: NSRange(location: 0, length: text.length), transform: nil)
+    }
+
+    @Test("复制得到 TSV:单元格以制表符分隔、行以换行分隔(行内 Markdown 标记已去掉)")
     func tsvText() {
         let text = OMLeafContent.table(header: ["模块", "说明"], rows: [["**核心**", "`ACPKit`"], ["界面", "SwiftUI"]])
-        #expect(text.string == "模块\t说明\n核心\tACPKit\n界面\tSwiftUI")
+        #expect(copied(text) == "模块\t说明\n核心\tACPKit\n界面\tSwiftUI")
     }
 
-    @Test("表头带下方分隔线标记,数据行没有")
-    func headerRule() {
-        let text = OMLeafContent.table(header: ["甲", "乙"], rows: [["1", "2"]])
-        #expect(text.attribute(omRuleBelowKey, at: 0, effectiveRange: nil) != nil)
-        #expect(text.attribute(omRuleBelowKey, at: text.length - 1, effectiveRange: nil) == nil)
-    }
-
-    @Test("制表位数 = 列数 - 1,且按列最宽单元格递增")
-    func tabStopsFollowColumnWidths() {
-        let text = OMLeafContent.table(header: ["a", "b", "c"], rows: [["很长很长很长的单元格", "x", "y"]])
-        guard let style = text.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle else {
-            Issue.record("缺少段落样式"); return
+    @Test("每个单元格是一个 NSTextTable 单元,表头与各行共用同一张表")
+    func sharesOneTable() {
+        let text = OMLeafContent.table(header: ["甲", "乙"], rows: [["1", "2"], ["3", "4"]])
+        var tables = Set<ObjectIdentifier>()
+        var cells = 0
+        text.enumerateAttribute(.paragraphStyle, in: NSRange(location: 0, length: text.length)) { value, _, _ in
+            guard let style = value as? NSParagraphStyle, let block = style.textBlocks.first as? NSTextTableBlock else { return }
+            tables.insert(ObjectIdentifier(block.table))
+            cells += 1
         }
-        #expect(style.tabStops.count == 2)
-        #expect(style.tabStops[0].location > 100, "第一列应按最宽的中文单元格撑开")
-        #expect(style.tabStops[1].location > style.tabStops[0].location)
+        #expect(tables.count == 1)
+        #expect(cells >= 6, "3 行 × 2 列至少 6 个单元(属性段合并时可能少于段落数,但不应少于行数×列数的一半)")
+    }
+
+    @Test("列宽取整列最宽单元格并夹在 [最小, 最大] 之间;表头与行使用同一列宽")
+    func columnMetrics() {
+        let metrics = OMLeafContent.tableMetrics(naturalWidths: [10, 120, 900], horizontalPadding: 10)
+        #expect(metrics.columnWidths[0] == OMLeafContent.tableMinColumn)
+        #expect(metrics.columnWidths[1] == 122)
+        #expect(metrics.columnWidths[2] == OMLeafContent.tableMaxColumn)
+        #expect(metrics.totalWidth == metrics.columnWidths.reduce(0, +) + 60)
     }
 
     @Test("行不足的数据行按空单元格补齐;空表返回空文本")
     func raggedAndEmpty() {
         let text = OMLeafContent.table(header: ["a", "b"], rows: [["1"]])
-        #expect(text.string == "a\tb\n1\t")
+        #expect(copied(text) == "a\tb\n1\t")
         #expect(OMLeafContent.table(header: [], rows: []).length == 0)
+    }
+
+    @Test("对齐语法映射到段落对齐")
+    func alignments() {
+        let text = OMLeafContent.table(header: ["l", "c", "r"], rows: [["1", "2", "3"]], aligns: [.left, .center, .right])
+        var found: [NSTextAlignment] = []
+        text.enumerateAttribute(.paragraphStyle, in: NSRange(location: 0, length: text.length)) { value, _, _ in
+            if let style = value as? NSParagraphStyle { found.append(style.alignment) }
+        }
+        #expect(found.contains(.center) && found.contains(.right) && found.contains(.left))
+    }
+
+    @Test("宽表排版后宽度约等于列宽之和(不被撑到 1e6 容器宽度),超宽单元格在单元格内折行")
+    func layoutWidth() {
+        let host = OMLeafHostView(wrap: false)
+        let long = String(repeating: "很长的单元格内容 ", count: 40)
+        let text = OMLeafContent.table(header: ["编号", "说明"], rows: [["1", long], ["2", "短"]])
+        host.textView.textStorage?.setAttributedString(text)
+        let size = host.textView.layoutSize(containerWidth: 1_000_000)
+        let maxTotal = OMLeafContent.tableMaxColumn + OMLeafContent.tableMinColumn + 40 + 80
+        #expect(size.width > 200 && size.width <= maxTotal, "宽度 \(size.width)")
+        #expect(size.height > 60, "长单元格应折成多行,高度 \(size.height)")
+    }
+}
+
+@MainActor
+@Suite("表格测量", .serialized)
+struct OMTableMeasureTests {
+    @Test("右对齐/居中列不会把测量宽度撑到容器宽度(以表格总宽为准)")
+    func alignedColumnsKeepIntrinsicWidth() {
+        let host = OMLeafHostView(wrap: false)
+        host.textView.textStorage?.setAttributedString(OMLeafContent.table(header: ["Item", "Qty"], rows: [["Apple", "12"]], aligns: [.none, .right]))
+        let size = host.textView.layoutSize(containerWidth: 1_000_000)
+        #expect(size.width < 400, "宽度 \(size.width)")
+    }
+
+    @Test("hugsContent:内容比建议宽度窄时叶子宽度贴合表格,超宽时等于建议宽度")
+    func hugsContent() {
+        let coordinator = OMTextLeafCoordinator()
+        let host = OMLeafHostView(wrap: false)
+        coordinator.apply(to: host.textView, signature: 1) { OMLeafContent.table(header: ["a", "b"], rows: [["1", "2"]]) }
+        let config = OMTextLeafConfig(wrap: false, inset: .zero, persistentScroller: true, hugsContent: true)
+        let narrow = coordinator.measuredSize(host, config: config, proposedWidth: 800)
+        #expect(narrow.width < 400, "宽度 \(narrow.width)")
+        let tight = coordinator.measuredSize(host, config: config, proposedWidth: 100)
+        #expect(tight.width == 100)
+    }
+}
+
+@Suite("Markdown 表格解析")
+struct MarkdownTableParseTests {
+    @Test("分隔行解析列对齐")
+    func aligns() {
+        let blocks = MarkdownParser.parse("| a | b | c | d |\n| :--- | :---: | ---: | --- |\n| 1 | 2 | 3 | 4 |")
+        guard case .table(_, _, let aligns) = blocks[0] else { Issue.record("应是表格"); return }
+        #expect(aligns == [.left, .center, .right, .none])
+    }
+
+    @Test("转义竖线不分列")
+    func escapedPipe() {
+        let blocks = MarkdownParser.parse("| a | b |\n| --- | --- |\n| x \\| y | z |")
+        guard case .table(_, let rows, _) = blocks[0] else { Issue.record("应是表格"); return }
+        #expect(rows == [["x | y", "z"]])
     }
 }

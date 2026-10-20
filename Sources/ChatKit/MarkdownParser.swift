@@ -13,6 +13,15 @@ public struct MarkdownListItem: Hashable, Sendable {
     public var checked: Bool?
 }
 
+/// 表格列对齐(来自分隔行 `:---` / `:---:` / `---:`)。
+public enum MarkdownTableAlign: Hashable, Sendable {
+    /// 未指定(按左对齐显示)
+    case none
+    case left
+    case center
+    case right
+}
+
 /// Markdown 块。
 public enum MarkdownBlock: Hashable, Sendable {
     case heading(level: Int, text: String)
@@ -20,7 +29,7 @@ public enum MarkdownBlock: Hashable, Sendable {
     case code(language: String?, code: String, isClosed: Bool)
     case list([MarkdownListItem])
     case quote(String)
-    case table(header: [String], rows: [[String]])
+    case table(header: [String], rows: [[String]], aligns: [MarkdownTableAlign])
     case rule
 }
 
@@ -164,6 +173,7 @@ public enum MarkdownParser {
             if trimmed.hasPrefix("|"), index + 1 < lines.count, isTableSeparator(lines[index + 1]) {
                 flushParagraph()
                 let header = splitRow(trimmed)
+                let aligns = tableAligns(lines[index + 1])
                 index += 2
                 var rows: [[String]] = []
                 while index < lines.count {
@@ -172,7 +182,7 @@ public enum MarkdownParser {
                     rows.append(splitRow(rowLine))
                     index += 1
                 }
-                add(.table(header: header, rows: rows), at: blockStart)
+                add(.table(header: header, rows: rows, aligns: aligns), at: blockStart)
                 continue
             }
 
@@ -256,11 +266,46 @@ public enum MarkdownParser {
         return trimmed.allSatisfy { "|-: ".contains($0) }
     }
 
+    /// 拆分表格行:`\|` 是单元格内的字面竖线(不分列),其余 `|` 为列分隔。
     private static func splitRow(_ line: String) -> [String] {
-        var cells = line.split(separator: "|", omittingEmptySubsequences: false).map { $0.trimmingCharacters(in: .whitespaces) }
-        if cells.first?.isEmpty == true { cells.removeFirst() }
-        if cells.last?.isEmpty == true { cells.removeLast() }
-        return cells
+        var cells: [String] = []
+        var current = ""
+        var escaped = false
+        for character in line {
+            if escaped {
+                // 只有 `\|` 被还原成竖线;其他转义保持原样交给行内解析
+                if character != "|" { current.append("\\") }
+                current.append(character)
+                escaped = false
+            } else if character == "\\" {
+                escaped = true
+            } else if character == "|" {
+                cells.append(current)
+                current = ""
+            } else {
+                current.append(character)
+            }
+        }
+        if escaped { current.append("\\") }
+        cells.append(current)
+        var trimmed = cells.map { $0.trimmingCharacters(in: .whitespaces) }
+        if trimmed.first?.isEmpty == true { trimmed.removeFirst() }
+        if trimmed.last?.isEmpty == true { trimmed.removeLast() }
+        return trimmed
+    }
+
+    /// 解析分隔行里每列的对齐方式。
+    /// - Parameter separator: 分隔行(如 `| :--- | ---: | :---: |`)
+    /// - Returns: 与列一一对应的对齐
+    static func tableAligns(_ separator: String) -> [MarkdownTableAlign] {
+        splitRow(separator.trimmingCharacters(in: .whitespaces)).map { cell in
+            switch (cell.hasPrefix(":"), cell.hasSuffix(":")) {
+            case (true, true): return .center
+            case (true, false): return .left
+            case (false, true): return .right
+            default: return .none
+            }
+        }
     }
 
     /// 解析列表项行(支持 `-`、`*`、`+`、`1.`、`1)` 与任务列表)。
