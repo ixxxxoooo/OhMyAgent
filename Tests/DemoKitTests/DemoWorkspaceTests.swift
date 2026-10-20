@@ -35,11 +35,34 @@ struct DemoWorkspaceTests {
     @Test("生成全部演示项目,Git 与非 Git 目录各就位")
     func projects() async throws {
         let (paths, infos) = try await Sandbox.shared.get()
-        #expect(infos.map(\.name) == ["atlas-web", "notes-cli", "merge-lab", "legacy-api", "empty-project"])
+        #expect(infos.map(\.name) == ["atlas-web", "notes-cli", "merge-lab", "legacy-api", "empty-project", "perf-longchat", "perf-render", "perf-multitab"])
         for info in infos { #expect(FileManager.default.fileExists(atPath: info.path)) }
         #expect(await GitRepository.discover(from: paths.project("legacy-api").path) == nil)
         #expect(await GitRepository.discover(from: paths.project("empty-project").path) == nil)
         #expect(await GitRepository.discover(from: paths.project("atlas-web").path) != nil)
+    }
+
+    /// 递归统计常规文件数(同步函数,避免在异步上下文里使用 NSEnumerator)。
+    private static func countFiles(in directory: URL) -> Int {
+        guard let enumerator = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: [.isRegularFileKey]) else { return 0 }
+        var count = 0
+        for case let url as URL in enumerator where (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true { count += 1 }
+        return count
+    }
+
+    @Test("性能实验室:perf-multitab 含 1 万文件的深层目录与 Git 历史,perf-render 有大素材")
+    func perfLab() async throws {
+        let (paths, _) = try await Sandbox.shared.get()
+        let deep = paths.project("perf-multitab/perf-fs")
+        #expect(Self.countFiles(in: deep) == DemoPerfProjects.deepFileCount)
+        let repo = GitRepository(root: paths.project("perf-multitab"))
+        #expect(try await repo.log(limit: 10).count == 3)
+        let status = try await repo.status()
+        #expect(status.changes.contains { $0.path == "docs/guide.md" })
+        let csv = try String(contentsOf: paths.project("perf-render/data/metrics.csv"), encoding: .utf8)
+        #expect(csv.split(separator: "\n").count == 3_001)
+        #expect(FileManager.default.fileExists(atPath: paths.project("perf-render/assets/logo.png").path))
+        #expect(FileManager.default.fileExists(atPath: paths.project("perf-longchat/README.md").path))
     }
 
     @Test("atlas-web:提交历史、作者、合并提交、分支与标签")

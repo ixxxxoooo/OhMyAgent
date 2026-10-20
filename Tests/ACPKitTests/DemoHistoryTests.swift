@@ -21,6 +21,14 @@ struct DemoHistoryTests {
     @Test("每个演示项目 8~12 条会话,ID 全局唯一,含置顶与归档")
     func catalogShape() {
         let projects = ["atlas-web", "notes-cli", "merge-lab", "legacy-api", "empty-project"]
+        let perfProjects = ["perf-longchat", "perf-render", "perf-multitab"]
+        for name in perfProjects {
+            let list = DemoHistory.sessions(forProject: name)
+            #expect(list.count >= 6, "\(name) 会话数 \(list.count)")
+            #expect(list.contains { $0.pinned })
+            // 标题必须以 [性能]/[渲染]/[多标签] 开头,写明测什么
+            #expect(list.allSatisfy { $0.title.hasPrefix("[") }, "\(name) 存在没有标注测试目的的会话")
+        }
         for name in projects {
             let list = DemoHistory.sessions(forProject: name)
             #expect((8...12).contains(list.count), "\(name) 会话数 \(list.count)")
@@ -29,7 +37,7 @@ struct DemoHistoryTests {
         }
         let ids = DemoHistory.all.map(\.id)
         #expect(Set(ids).count == ids.count)
-        #expect(Set(DemoHistory.all.map(\.project)) == Set(projects))
+        #expect(Set(DemoHistory.all.map(\.project)) == Set(projects + perfProjects))
     }
 
     @Test("引用的场景都存在")
@@ -125,5 +133,34 @@ struct DemoHistoryTests {
             if expected { #expect(Set(names).isSuperset(of: Set(DemoScenarios.all.map(\.commandName)))) }
             await client.close()
         }
+    }
+}
+
+@Suite("性能实验室场景")
+struct PerfLabScenarioTests {
+    @Test("轮数由 OMA_TIMELINE_TURNS 覆盖,非法值回退默认,上限 20000")
+    func turnCount() {
+        #expect(DemoScenarios.perfTurnCount(fallback: 2_000, environment: [:]) == 2_000)
+        #expect(DemoScenarios.perfTurnCount(fallback: 2_000, environment: ["OMA_TIMELINE_TURNS": "50"]) == 50)
+        #expect(DemoScenarios.perfTurnCount(fallback: 2_000, environment: ["OMA_TIMELINE_TURNS": "abc"]) == 2_000)
+        #expect(DemoScenarios.perfTurnCount(fallback: 2_000, environment: ["OMA_TIMELINE_TURNS": "-3"]) == 2_000)
+        #expect(DemoScenarios.perfTurnCount(fallback: 2_000, environment: ["OMA_TIMELINE_TURNS": "999999"]) == 20_000)
+    }
+
+    @Test("长会话与混合会话规模、工具 ID 不重复,画廊覆盖图表/Mermaid/Diff")
+    func shape() throws {
+        let ctx = ScenarioContext(cwd: "/tmp/x", sessionId: "s")
+        let long = try #require(DemoScenarios.scenario(named: "perf-long-2000")).build(ctx)
+        let users = long.filter { if case .user = $0 { return true } else { return false } }
+        #expect(users.count == DemoScenarios.perfTurnCount(fallback: DemoScenarios.perfLongTurns))
+        for id in ["perf-long-mixed", "perf-render-gallery"] {
+            let steps = try #require(DemoScenarios.scenario(named: id)).build(ctx)
+            var ids = Set<String>()
+            for case .tool(let tool) in steps { #expect(ids.insert(tool.id).inserted, "\(id) 工具 ID 重复:\(tool.id)") }
+            #expect(!steps.isEmpty)
+        }
+        let gallery = try #require(DemoScenarios.scenario(named: "perf-render-gallery")).build(ctx)
+        let text = gallery.compactMap { step -> String? in if case .text(let parts) = step { return parts.joined() } else { return nil } }.joined()
+        #expect(text.contains("```chart") && text.contains("```mermaid") && text.contains("| 模块 |"))
     }
 }

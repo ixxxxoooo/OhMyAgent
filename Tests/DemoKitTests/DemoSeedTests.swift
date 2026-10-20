@@ -25,13 +25,47 @@ struct DemoSeedTests {
         #expect(state.projects.count == infos.count)
         #expect(state.projects.first { $0.name == "atlas-web" }?.pinned == true)
         #expect(state.projects.first { $0.name == "empty-project" }?.collapsed == true)
-        #expect(state.selectedProjectID == state.projects.first?.id)
+        // 默认启动项目是性能实验室的多标签项目
+        #expect(state.selectedProjectID == state.projects.first { $0.name == "perf-multitab" }?.id)
         for project in state.projects {
-            #expect((8...12).contains(project.sessions.count))
+            let perf = project.name.hasPrefix("perf-")
+            #expect(perf ? project.sessions.count >= 6 : (8...12).contains(project.sessions.count))
             #expect(!project.pinnedSessions.isEmpty)
-            #expect(!project.archivedSessions.isEmpty)
+            #expect(perf || !project.archivedSessions.isEmpty)
             #expect(project.pinnedSessions.allSatisfy { id in project.sessions.contains { $0.sessionId == id } })
         }
+    }
+
+    @Test("perf-multitab 预置 dock:4 个会话标签 + 文件/对比/历史/blame,会话可恢复")
+    func multiTabDock() async throws {
+        let (paths, _) = try await Self.sandbox()
+        defer { try? FileManager.default.removeItem(at: paths.root) }
+        let state = try #require(WorkbenchStore(fileURL: paths.workbenchFile).load())
+        let dock = try #require(state.dock)
+        let kinds = dock.allTabs.map(\.kind)
+        #expect(dock.allTabs.count >= 12)
+        #expect(kinds.contains { if case .diff = $0 { return true } else { return false } })
+        #expect(kinds.contains { if case .history = $0 { return true } else { return false } })
+        #expect(kinds.contains { if case .blame = $0 { return true } else { return false } })
+        let slots = try #require(state.chatSlots)
+        #expect(slots.count == 4)
+        for slot in slots {
+            #expect(DemoHistory.session(id: slot.sessionId) != nil)
+            #expect(kinds.contains(.chat(projectID: slot.projectID, slot: slot.slot)))
+        }
+        // 所有文件标签的路径都真实存在(否则启动时会被清掉)
+        for case .file(let path) in kinds { #expect(FileManager.default.fileExists(atPath: path), "\(path)") }
+    }
+
+    @Test("OMA_DEMO_PROJECT 覆盖启动项目(导览固定 atlas-web),且不预置多标签 dock")
+    func focusOverride() async throws {
+        let (paths, infos) = try await Self.sandbox()
+        defer { try? FileManager.default.removeItem(at: paths.root) }
+        try DemoSeed.seed(paths: paths, infos: infos, environment: ["OMA_DEMO_PROJECT": "atlas-web"])
+        let state = try #require(WorkbenchStore(fileURL: paths.workbenchFile).load())
+        #expect(state.selectedProjectID == paths.project("atlas-web").path)
+        let fresh = DemoSeed.workbenchState(infos: infos, focus: "atlas-web")
+        #expect(fresh.dock == nil && fresh.chatSlots == nil)
     }
 
     @Test("已存在的工作台状态不会被再次预置覆盖")

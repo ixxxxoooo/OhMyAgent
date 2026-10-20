@@ -218,11 +218,11 @@ extension DemoScenarios {
 
     // MARK: 全量串联
 
-    /// 依次运行全部自动场景(不含终端、长占用等依赖客户端能力的场景)。
+    /// 依次运行全部自动场景(不含终端、长占用等依赖客户端能力的场景,也不含体量巨大的「性能实验室」场景)。
     static func runAll(_ c: ScenarioContext) -> [ScenarioStep] {
         let skipped: Set<String> = ["all", "terminal", "long-running", "states-streaming", "errors-premature-end"]
         var steps: [ScenarioStep] = []
-        for scenario in catalogScenarios where scenario.behavior == .auto && !skipped.contains(scenario.id) {
+        for scenario in catalogScenarios where scenario.behavior == .auto && !skipped.contains(scenario.id) && scenario.group != "性能实验室" {
             steps.append(DemoSteps.say("\n\n---\n**场景:\(scenario.title)**(`/demo-\(scenario.id)`)\n\n"))
             steps.append(contentsOf: scenario.build(c))
         }

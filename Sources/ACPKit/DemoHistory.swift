@@ -61,7 +61,7 @@ public struct DemoHistorySession: Sendable, Identifiable {
 /// 演示历史会话目录。
 public enum DemoHistory {
     /// 全部演示历史会话。
-    public static let all: [DemoHistorySession] = atlas + notes + mergeLab + legacy + emptyProject
+    public static let all: [DemoHistorySession] = atlas + notes + mergeLab + legacy + emptyProject + perfLongChat + perfRender + perfMultiTab
 
     /// 某个项目的历史会话(新→旧)。
     /// - Parameter project: 项目名
@@ -195,5 +195,36 @@ extension DemoHistory {
         ("你好", "你好", 4_200, false, false, .qa(["你好!这是一个空目录,告诉我你想做什么,我来帮你起步。"])),
         ("样式检查", "输出各种样式样例", 6_400, false, true, .scenario("roles")),
         ("评估许可证选择", "开源许可证选 MIT 还是 Apache-2.0?", 9_600, false, false, .scenario("tools-web-mcp")),
+    ])
+
+    // MARK: 性能实验室(标题以 [性能]/[渲染]/[多标签] 开头,直接写明测什么)
+
+    static let perfLongChat = make("perf-longchat", [
+        ("[性能] 2000 轮长会话:滚动、加载与跨叶子复制", "请逐轮检查各模块的处理函数(共 2000 轮)", 3, true, false, .scenario("perf-long-2000")),
+        ("[性能] 800 轮混合内容:表格/图表/Mermaid/Diff 穿插滚动", "按不同形式输出各模块的分析结果(共 800 轮)", 20, true, false, .scenario("perf-long-mixed")),
+        ("[性能] 单轮超长输出:2000 行终端 + 大 Diff + 超长代码块", "连续构建并展示完整输出", 90, false, false, .scenario("heavy-content")),
+        ("[性能] 用户长消息折叠与图片:选择与复制", "输出各种形式的用户消息", 240, false, false, .scenario("user-variants")),
+        ("[性能] 上下文用量与额度:大会话状态栏刷新", "核对这个长任务会用掉多少额度", 600, false, false, .scenario("usage-limits")),
+        ("[性能] 上下文压缩:长会话压缩前后对比", "上下文快满了,先压缩一下", 1_200, false, false, .scenario("context-compact")),
+    ])
+
+    static let perfRender = make("perf-render", [
+        ("[渲染] 综合画廊:宽表格/折线与K线/Mermaid/12 种语言/大 Diff", "把渲染相关的所有元素输出一遍,方便我对比渲染速度", 4, true, false, .scenario("perf-render-gallery")),
+        ("[渲染] Mermaid 全图种与不支持类型回退", "把各种图都画一遍", 30, false, false, .scenario("mermaid")),
+        ("[渲染] 内联图表:折线图与 K 线(均线/成交量)", "画折线图与 K 线", 80, false, false, .scenario("chart")),
+        ("[渲染] Markdown 边界:嵌套列表/宽表格/公式回退", "输出各种 Markdown 边界用例", 200, false, false, .scenario("markdown-edge")),
+        ("[渲染] Markdown 全元素与多语言代码高亮", "输出覆盖所有 Markdown 元素的样例", 500, false, false, .scenario("markdown")),
+        ("[渲染] 画布:统计卡/表格/图表的季度周报", "生成季度质量周报画布", 900, false, false, .scenario("canvas")),
+        ("[渲染] 工具卡大 Diff:多文件读写与编辑", "梳理并整理路由层", 1_500, false, false, .scenario("tools-files")),
+    ])
+
+    static let perfMultiTab = make("perf-multitab", [
+        ("[多标签] 主会话:多文件读写(联动源码/文档/CSV 标签)", "梳理并整理路由层", 2, true, false, .scenario("tools-files")),
+        ("[多标签] 子 Agent 并行审查:每个子 Agent 一个标签", "并行审查三个模块", 15, true, false, .scenario("subagents-parallel")),
+        ("[多标签] 终端与后台任务:多终端标签", "构建并启动后台服务", 60, false, false, .scenario("tools-shell")),
+        ("[多标签] 内置浏览器:看板排查与截图", "打开本地看板排查报错", 150, false, false, .scenario("tools-browser")),
+        ("[多标签] 计划批准:计划文档标签", "给出迁移计划", 400, false, false, .scenario("plan-approval")),
+        ("[多标签] 完整修复流程:改动汇总/对比/历史标签", "完整修复一个 Bug", 800, false, false, .scenario("showcase-tour")),
+        ("[多标签] 模型/引擎切换与恢复:同一会话换模型续聊", "我想换个模型继续这个会话", 1_400, false, false, .qa(["可以在输入框右下角切换模型或引擎;切换后会话会在新引擎里按历史恢复,不会重新创建。"])),
     ])
 }

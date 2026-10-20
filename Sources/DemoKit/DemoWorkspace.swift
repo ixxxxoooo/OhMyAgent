@@ -23,7 +23,7 @@ public struct DemoProjectInfo: Sendable, Equatable {
 /// 演示项目生成入口。
 public enum DemoWorkspace {
     /// 数据版本:改动生成内容时递增,旧沙盒会被自动重建。
-    public static let dataVersion = "1"
+    public static let dataVersion = "2"
 
     /// 全部演示项目(顺序即项目树里的默认顺序)。
     public static let catalog: [(name: String, git: Bool, summary: String)] = [
@@ -32,6 +32,9 @@ public enum DemoWorkspace {
         ("merge-lab", true, "合并冲突中:两个文件冲突"),
         ("legacy-api", false, "非 Git 目录:验证「不是仓库」空态"),
         ("empty-project", false, "空目录"),
+        ("perf-longchat", false, "性能实验室·超长会话:上千轮会话的滚动、加载、跨叶子复制与混合内容"),
+        ("perf-render", false, "性能实验室·渲染:大 Markdown、宽表格、图表、Mermaid 全图种、大 Diff"),
+        ("perf-multitab", true, "性能实验室·多标签:预置多会话/文件/对比/历史标签 + 1 万文件深层目录 perf-fs"),
     ]
 
     /// 生成(或复用)演示项目。
@@ -56,6 +59,9 @@ public enum DemoWorkspace {
             group.addTask { try await buildNotes(paths: paths) }
             group.addTask { try await buildMergeLab(paths: paths) }
             group.addTask { try buildLegacy(paths: paths) }
+            group.addTask { try DemoPerfProjects.buildLongChat(paths: paths) }
+            group.addTask { try DemoPerfProjects.buildRender(paths: paths) }
+            group.addTask { try await DemoPerfProjects.buildMultiTab(paths: paths) }
             try await group.waitForAll()
         }
         try dataVersion.write(to: paths.marker, atomically: true, encoding: .utf8)

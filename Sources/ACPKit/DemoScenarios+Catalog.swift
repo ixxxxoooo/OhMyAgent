@@ -36,6 +36,7 @@ extension DemoScenarios {
         list.append(contentsOf: mcpCatalogScenarios)
         list.append(contentsOf: moreToolScenarios)
         list.append(contentsOf: heavyScenarios)
+        list.append(contentsOf: perfLabScenarios)
         return list
     }()
 }

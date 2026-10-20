@@ -165,6 +165,7 @@ for entry in "${SELECTED[@]}"; do
   [[ -z "$first" || -z "$RESET" ]] && rm -f "$ROOT/support/workbench.json"
   args=(--env OMA_DEMO=1 --env "OMA_DEMO_ROOT=$ROOT" --env "OMA_PROJECT_ROOT=$PWD")
   if [[ -n "$first" && -n "$RESET" ]]; then args+=(--env OMA_DEMO_RESET=1); fi
+  args+=(--env "OMA_DEMO_PROJECT=${OMA_DEMO_PROJECT:-atlas-web}")   # 导览固定在 atlas-web(默认启动项目是性能实验室的 perf-multitab)
   [[ -n "${OMA_THEME:-}" ]] && args+=(--env "OMA_THEME=$OMA_THEME")   # 指定主题 id 做主题对比截图
   for kv in ${(s:;:)envs}; do
     args+=(--env "$kv")   # 值里的 \n 原样交给应用解释
