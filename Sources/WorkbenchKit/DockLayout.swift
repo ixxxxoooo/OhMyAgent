@@ -32,6 +32,28 @@ public enum TabKind: Codable, Hashable, Sendable {
     case blame(path: String)
 }
 
+
+public extension TabKind {
+    /// 两个标签是否指向同一内容:文件类标签按规范化路径(去掉 `..`、解析符号链接)比较,其余按相等比较。
+    /// 同一个文件从资源管理器、拖拽、搜索等入口带来的路径写法可能不同,不能只比字符串。
+    /// - Parameter other: 另一个标签内容
+    /// - Returns: 是否同一内容
+    func sameContent(as other: TabKind) -> Bool {
+        if self == other { return true }
+        switch (self, other) {
+        case (.file(let a), .file(let b)), (.diff(let a), .diff(let b)), (.blame(let a), .blame(let b)):
+            return Self.canonical(a) == Self.canonical(b)
+        default:
+            return false
+        }
+    }
+
+    /// 规范化文件路径(标准化并解析符号链接)。
+    private static func canonical(_ path: String) -> String {
+        URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath().path
+    }
+}
+
 /// 工作台标签。
 public struct WorkbenchTab: Codable, Hashable, Identifiable, Sendable {
     /// 终端标签的终端标识;其他类型为 nil。
@@ -179,7 +201,7 @@ public struct DockLayout: Codable, Equatable, Sendable {
     }
 
     /// 查找内容相同的标签。
-    public func tab(for kind: TabKind) -> WorkbenchTab? { allTabs.first { $0.kind == kind } }
+    public func tab(for kind: TabKind) -> WorkbenchTab? { allTabs.first { $0.kind.sameContent(as: kind) } }
 
     public func tab(_ id: UUID) -> WorkbenchTab? { allTabs.first { $0.id == id } }
 
