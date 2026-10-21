@@ -179,3 +179,74 @@ struct IDEMetricsTests {
         #expect(IDEMetrics.normalizedRoot("/tmp/a/../b") == IDEMetrics.normalizedRoot("/tmp/b"))
     }
 }
+
+@MainActor
+@Suite("IDE 编辑器标签")
+struct IDEEditorTabsTests {
+    private func make() -> IDEWindowModel { IDEWindowModel(snapshot: IDEWindowSnapshot(workspaceRoot: "/tmp")) }
+
+    @Test("单击预览会被下一个预览替换,固定后保留")
+    func previewReplacement() {
+        let model = make()
+        model.openFile("/tmp/a.swift")
+        model.openFile("/tmp/b.swift")
+        #expect(model.openFilePaths == ["/tmp/b.swift"])
+        model.openFile("/tmp/b.swift", preview: false)          // 双击固定
+        model.openFile("/tmp/c.swift")
+        #expect(model.openFilePaths == ["/tmp/b.swift", "/tmp/c.swift"])
+        #expect(model.activeFilePath == "/tmp/c.swift")
+    }
+
+    @Test("重复打开只聚焦不新增,并更新行号")
+    func reopenFocusesAndSetsLine() {
+        let model = make()
+        model.openFile("/tmp/a.swift", preview: false)
+        model.openFile("/tmp/b.swift", preview: false)
+        let id = model.openFile("/tmp/a.swift", line: 42, preview: false)
+        #expect(model.openFilePaths.count == 2)
+        #expect(model.activeFilePath == "/tmp/a.swift")
+        #expect(model.editor.tab(id ?? UUID())?.line == 42)
+    }
+
+    @Test("在侧边打开会新建分屏")
+    func openBesideSplits() {
+        let model = make()
+        model.openFile("/tmp/a.swift", preview: false)
+        model.openFile("/tmp/b.swift", preview: false, beside: true)
+        #expect(model.editor.groups.count == 2)
+        #expect(model.activeFilePath == "/tmp/b.swift")
+    }
+
+    @Test("文件或目录被删除时关闭其下的标签")
+    func closeUnderPath() {
+        let model = make()
+        for name in ["d/a.swift", "d/b.swift", "e.swift"] { model.openFile("/tmp/" + name, preview: false) }
+        model.closeFileTabs(under: "/tmp/d")
+        #expect(model.openFilePaths == ["/tmp/e.swift"])
+    }
+
+    @Test("重命名目录后其下标签改指新路径")
+    func retargetOnRename() {
+        let model = make()
+        model.openFile("/tmp/d/a.swift", preview: false)
+        model.retargetFileTabs(from: "/tmp/d", to: "/tmp/x")
+        #expect(model.openFilePaths == ["/tmp/x/a.swift"])
+    }
+
+    @Test("脏标记同步到指向该文件的标签")
+    func dirtyFlag() {
+        let model = make()
+        let id = model.openFile("/tmp/a.swift", preview: false)
+        model.setDirty(true, forFile: "/tmp/a.swift")
+        #expect(model.editor.tab(id ?? UUID())?.isDirty == true)
+        model.setDirty(false, forFile: "/tmp/a.swift")
+        #expect(model.editor.tab(id ?? UUID())?.isDirty == false)
+    }
+
+    @Test("空路径被忽略")
+    func emptyPath() {
+        let model = make()
+        #expect(model.openFile("") == nil)
+        #expect(model.editor.allTabs.isEmpty)
+    }
+}

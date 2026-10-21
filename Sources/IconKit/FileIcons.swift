@@ -38,6 +38,20 @@ public enum OMFileIconCatalog {
     }
 }
 
+public extension OMFileIconCatalog {
+    /// 彩色文件类型图标的 `NSImage`(AppKit 列表/表格用,带缓存)。
+    /// - Parameters:
+    ///   - name: 文件或文件夹名称
+    ///   - isDirectory: 是否文件夹
+    ///   - expanded: 文件夹是否展开
+    ///   - size: 边长(点)
+    /// - Returns: 图像;数据缺失返回 nil
+    @MainActor
+    static func nsImage(name: String, isDirectory: Bool = false, expanded: Bool = false, size: CGFloat = 16) -> NSImage? {
+        OMFileIconRenderer.image(icon: iconName(for: name, isDirectory: isDirectory, expanded: expanded), size: size)
+    }
+}
+
 /// 文件图标渲染器。
 enum OMFileIconRenderer {
     /// `NSCache` 本身线程安全,这里仅为满足 Sendable 检查而包装。
