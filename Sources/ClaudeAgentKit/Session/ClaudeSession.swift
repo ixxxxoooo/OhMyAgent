@@ -27,6 +27,8 @@ actor ClaudeSession: ClaudeQueryDelegate {
     var queryGeneration = 0
     /// 后台进行中的 MCP 服务器授权(同一时刻最多一个)
     var mcpAuthTask: Task<Void, Never>?
+    /// 首条消息前等待 MCP 连接落定的后台任务(见 `ClaudeSession+McpReady.swift`)
+    var mcpReadyTask: Task<Void, Never>?
     var closed = false
     var resumedFromHistory = false
 
@@ -167,6 +169,7 @@ actor ClaudeSession: ClaudeQueryDelegate {
         }
         resumedFromHistory = creation.resume != nil
         try await configure(initResult: initResult, initialMode: initialMode, resumedModel: resumedModel, isResume: creation.resume != nil)
+        startMcpReadyWait()
         log.info("会话已就绪", ["resume": creation.resume ?? "-", "model": models.currentModelId, "mode": currentMode, "ms": "\(OMLogger.milliseconds(since: started))"])
     }
 
@@ -319,6 +322,8 @@ actor ClaudeSession: ClaudeQueryDelegate {
         consumer = nil
         mcpAuthTask?.cancel()
         mcpAuthTask = nil
+        mcpReadyTask?.cancel()
+        mcpReadyTask = nil
         await query?.close()
         log.info("会话已关闭")
     }

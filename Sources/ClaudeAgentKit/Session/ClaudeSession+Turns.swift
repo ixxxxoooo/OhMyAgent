@@ -14,6 +14,9 @@ extension ClaudeSession {
     /// - Throws: 回合失败(鉴权失效、模型错误、进程退出)
     func prompt(_ blocks: [JSONValue]) async throws -> JSONValue {
         try requireOpen()
+        // 首条消息等 MCP 连接落定,避免第 2 轮提示缓存整段失效
+        await awaitMcpReady()
+        try requireOpen()
         if !turns.contains(where: { !$0.settled }) {
             cancelled = false
             cancelledPrompts.removeAll()
