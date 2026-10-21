@@ -162,6 +162,9 @@ struct TimelineGroupingTests {
         let pending = TimelineStore()
         pending.apply(.toolCall(ToolCall(toolCallId: "p1", name: "mcp__github__a", kind: .other, status: .completed)))
         pending.apply(.toolCall(ToolCall(toolCallId: "p2", name: "mcp__github__b", kind: .other, status: .pending)))
+        // 仅状态是 pending(刚发起)不算等待授权,照常并入分组;真正等授权才保持独立
+        #expect(TimelineGrouping.group(pending.entries).count == 1)
+        pending.setAwaitingPermission(true, forTool: "p2")
         #expect(TimelineGrouping.group(pending.entries).count == 2)
 
         let canvas = TimelineStore()
@@ -196,12 +199,17 @@ struct TimelineGroupingTests {
         #expect(group.style == .activity)
         #expect(group.summary == "编辑了 2 个文件、运行了 2 条命令")
 
-        // 等待授权(pending)的工具打断合并,保持可见
+        // 等待授权的工具打断合并,保持可见
         let t = TimelineStore()
         t.apply(.toolCall(ToolCall(toolCallId: "a", name: "Edit", kind: .edit, status: .completed)))
         t.apply(.toolCall(ToolCall(toolCallId: "b", name: "Edit", kind: .edit, status: .pending)))
         t.apply(.toolCall(ToolCall(toolCallId: "c", name: "Edit", kind: .edit, status: .completed)))
+        // 刚发起(pending)但无需授权:并入同一分组,不先单独露出一行再折进去(闪动回归)
+        #expect(TimelineGrouping.group(t.entries, density: .compact).count == 1)
+        t.setAwaitingPermission(true, forTool: "b")
         #expect(TimelineGrouping.group(t.entries, density: .compact).count == 3)
+        t.setAwaitingPermission(false, forTool: "b")
+        #expect(TimelineGrouping.group(t.entries, density: .compact).count == 1)
     }
 
     @Test("详细程度偏好:缺省与非法值回退标准,标题固定")

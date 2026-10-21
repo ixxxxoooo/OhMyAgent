@@ -44,6 +44,9 @@ public final class TimelineEntry: Identifiable {
     public var attachments: [ImageAttachment] = []
     /// 该用户消息是运行中引导进当前轮次的(`kind == .user`)
     public var isSteered = false
+    /// 工具正在等用户授权(`kind == .tool`):分组据此让它保持独立可见;
+    /// 仅「刚发起、状态还是等待中」的工具不算,否则会先单独露一行再折进分组而闪动。
+    public var awaitingPermission = false
 
     /// 用于显示的正文:用户消息带图片附件时,去掉 Claude Code 写在原文里的 `[Image #N]` 占位符
     /// (图片已作为缩略图显示,占位符只是噪音)。消息原文 `text` 不变,编辑重发仍用原文。
@@ -496,6 +499,17 @@ public final class TimelineStore {
             if let found = entry.childStore?.toolEntry(id: id) { return found }
         }
         return nil
+    }
+
+    /// 标记某工具是否在等待授权;状态变化时让分组重新计算。
+    /// - Parameters:
+    ///   - awaiting: 是否在等待授权
+    ///   - id: 工具调用 ID
+    public func setAwaitingPermission(_ awaiting: Bool, forTool id: String) {
+        guard let entry = toolIndex[id] ?? toolEntry(id: id), entry.awaitingPermission != awaiting else { return }
+        entry.awaitingPermission = awaiting
+        revision += 1
+        structureRevision += 1
     }
 
     /// 全部子 Agent 条目(深度优先,附带嵌套深度),用于侧栏缩进展示、任务坞与子 Agent 标签。

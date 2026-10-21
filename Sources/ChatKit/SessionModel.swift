@@ -1982,6 +1982,7 @@ public final class SessionModel {
         return await withCheckedContinuation { continuation in
             let prompt = PermissionPrompt(request: request, continuation: continuation)
             proposePlanIfNeeded(for: prompt)
+            timeline.setAwaitingPermission(true, forTool: prompt.tool.toolCallId)
             pendingPermissions.append(prompt)
         }
     }
@@ -2001,6 +2002,7 @@ public final class SessionModel {
             }
         }
         prompt.choose(optionId)
+        timeline.setAwaitingPermission(false, forTool: prompt.tool.toolCallId)
         pendingPermissions.removeAll { $0.id == prompt.id }
     }
 
@@ -2056,7 +2058,10 @@ public final class SessionModel {
     }
 
     private func cancelPendingPrompts() {
-        for prompt in pendingPermissions { prompt.cancel() }
+        for prompt in pendingPermissions {
+            prompt.cancel()
+            timeline.setAwaitingPermission(false, forTool: prompt.tool.toolCallId)
+        }
         pendingPermissions.removeAll()
         for prompt in pendingElicitations {
             prompt.cancel()

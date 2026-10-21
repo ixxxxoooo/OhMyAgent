@@ -608,11 +608,11 @@ public enum TimelineGrouping {
             if density != .compact {
                 guard presentation.category == .mcp else { return presentation.isExploration }
                 // MCP:等待授权的保持独立可见;画布工具要在行下方展示画布卡片,不并入分组
-                return tool.status != .pending && CanvasToolRef.of(tool) == nil
+                return !entry.awaitingPermission && CanvasToolRef.of(tool) == nil
                     && !tool.callsMcpTool(withPrefix: "canvas_")
             }
             // 精简档:等待授权/子 Agent/计划/思考类工具保持独立可见
-            if tool.status == .pending || entry.childStore != nil { return false }
+            if entry.awaitingPermission || entry.childStore != nil { return false }
             return ![.subagent, .plan, .think].contains(presentation.category)
         }
         /// 结束当前连续段:尾部的思考不并入分组。
