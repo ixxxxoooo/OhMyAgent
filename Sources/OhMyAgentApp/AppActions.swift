@@ -155,9 +155,16 @@ final class AppActions {
         return FileDocumentStore.shared.documents[path]?.isDirty ?? false
     }
 
-    /// ⌘W:关闭聚焦组的当前标签;固定标签不关闭;没有任何标签时才关闭窗口。
+    /// ⌘W:鼠标在某个标签组(编辑区/右栏)内时关闭该组的当前标签;固定标签不关闭;鼠标不在任何标签组内才关闭窗口。
     func closeActiveTabOrWindow() {
         let workbench = AppEnvironment.shared.workbench
+        guard let hit = DockFrameRegistry.shared.groupUnderMouse() else {
+            NSApp.keyWindow?.performClose(nil)
+            return
+        }
+        workbench.focusedHost = hit.host
+        workbench.mutateDock(hit.host) { $0.focus(group: hit.groupID) }
+        workbench.syncSelectionFromDock()
         if let tab = workbench.focusedActiveTab {
             if !tab.isPinned { requestCloseTab(tab.id) }
         } else {

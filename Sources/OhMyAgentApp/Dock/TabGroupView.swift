@@ -194,6 +194,10 @@ struct TabGroupView: View {
             }
         }
         .contentShape(Rectangle())
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
+            DockFrameRegistry.shared.update(group: group.id, host: host, frame: $0)
+        }
+        .onDisappear { DockFrameRegistry.shared.remove(group: group.id) }
         .simultaneousGesture(TapGesture().onEnded {
             workbench.focusedHost = host
             workbench.mutateDock(host) { $0.focus(group: group.id) }
