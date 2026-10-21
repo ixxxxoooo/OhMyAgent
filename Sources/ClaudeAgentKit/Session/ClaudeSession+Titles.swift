@@ -52,6 +52,12 @@ extension ClaudeSession {
             await publishTitle(custom, modified: info?.lastModified ?? Date())
             return
         }
+        // 客户端负责标题(`_meta.clientTitles`):不再用主模型重复生成,也不用摘要覆盖客户端标题
+        if spec.meta?["clientTitles"]?.boolValue == true {
+            titleSettled = true
+            titleContext = ""
+            return
+        }
         let fallback = info.flatMap { $0.summary.isEmpty ? nil : ($0.summary, $0.lastModified) }
         if !titleSettled, !cancelled, titleContext.trimmingCharacters(in: .whitespacesAndNewlines).count >= Self.minTitleContext {
             titleSettled = true

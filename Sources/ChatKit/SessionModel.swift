@@ -1006,10 +1006,30 @@ public final class SessionModel {
             options.appendPrompt = ([options.appendPrompt.trimmingCharacters(in: .whitespacesAndNewlines)] + extras).filter { !$0.isEmpty }.joined(separator: "\n\n")
         }
         let merged = options.merged(into: providerMeta ?? defaultGatewayMeta)
-        guard isPlainChat else { return merged }
+        guard isPlainChat else { return markClientTitles(merged) }
         // 无模型映射时才并入 settings.json 的 env;映射会话的变量已由提供商 `_meta` 给全
         let settingsEnv = providerMeta == nil ? plainChatSettingsEnv : [:]
-        return SessionOptions.plainChat(merged, systemPrompt: options.appendPrompt, settingsEnv: settingsEnv)
+        return markClientTitles(SessionOptions.plainChat(merged, systemPrompt: options.appendPrompt, settingsEnv: settingsEnv))
+    }
+
+    /// 标题由客户端负责(自己生成,或用户关闭了标题生成)时为 true:此时让适配器跳过 CLI 的标题请求,
+    /// 后者用主模型生成且会覆盖客户端标题,属于重复消耗。直连官方登录且「自动」时客户端没有可用网关,仍交给适配器。
+    var ownsTitleGeneration: Bool {
+        switch UtilityModels.choice(for: .title) {
+        case .off, .model: true
+        case .automatic: utilityGateway != nil
+        }
+    }
+
+    /// 在会话 `_meta` 里标记 `clientTitles`(客户端负责标题时)。
+    /// - Parameter meta: 原 `_meta`
+    /// - Returns: 带标记的 `_meta`;客户端不负责标题时原样返回
+    private func markClientTitles(_ meta: JSONValue?) -> JSONValue? {
+        guard ownsTitleGeneration else { return meta }
+        var object: [String: JSONValue] = [:]
+        if case .object(let existing)? = meta { object = existing }
+        object["clientTitles"] = true
+        return .object(object)
     }
     /// 纯文字会话(会话区):不带工具、MCP、CLAUDE.md、技能与 Claude Code 系统提示,只当普通聊天;须在连接前设置。
     public var isPlainChat = false
