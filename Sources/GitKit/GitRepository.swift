@@ -173,6 +173,14 @@ public struct GitRepository: Sendable {
         return output.stdout
     }
 
+    /// HEAD 中某文件的文本(行号栏改动标记的比较基准)。
+    /// - Parameter path: 相对仓库根的路径
+    /// - Returns: 文本;文件未被跟踪、不存在或为二进制时为 nil
+    public func committedText(path: String) async -> String? {
+        guard (try? validatePaths([path])) != nil, let data = await blob("HEAD:\(path)"), !Self.isBinary(data) else { return nil }
+        return String(decoding: data, as: UTF8.self)
+    }
+
     /// 计算单个文件的差异。
     /// - Parameters:
     ///   - path: 相对仓库根的路径

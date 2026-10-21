@@ -106,6 +106,9 @@ struct FileTabView: View {
     @State private var lsp: EditorLSPController?
     /// 最近一次 Agent 改动在新文件中新增的行(仅当文本仍等于 Agent 写入的内容时显示)
     @State private var agentMarks: AgentMarks?
+    /// 相对 HEAD 的改动标记(仅 IDE 窗口;按未保存的缓冲区内容计算)
+    @State private var gitMarks: [Int: LineMarker] = [:]
+    @State private var gutterTask: Task<Void, Never>?
     /// 是否在编辑区叠加显示「对比 HEAD」的 Git 差异(编辑器保持挂载,切回不丢状态)
     @State private var comparing = false
 
@@ -140,8 +143,9 @@ struct FileTabView: View {
         let mode = previewKind.map { FileViewModeStore.shared.mode(for: path, kind: $0) } ?? .source
         let changesRevision = workbench.allSessions.reduce(0) { $0 + $1.changesRevision }
         let markers: [Int: LineMarker] = {
-            guard let marks = agentMarks, doc.text == marks.text else { return [:] }
-            return Dictionary(uniqueKeysWithValues: marks.lines.map { ($0 - 1, LineMarker.agent) })
+            guard let marks = agentMarks, doc.text == marks.text else { return gitMarks }
+            // Agent 标记优先于 Git 标记
+            return gitMarks.merging(marks.lines.map { ($0 - 1, LineMarker.agent) }) { _, agent in agent }
         }()
         VStack(spacing: 0) {
             FileHeaderBar(
@@ -206,7 +210,12 @@ struct FileTabView: View {
         }
         .onChange(of: doc.text) { _, newText in
             if let newText { lsp?.textChanged(newText) }
+            refreshGutter(newText, delay: .milliseconds(350))
         }
+        .onChange(of: ideHost.flatMap { GitStore.shared.model(for: $0.root ?? "").status }) { _, _ in
+            refreshGutter(doc.text, delay: .milliseconds(200))
+        }
+        .onAppear { refreshGutter(doc.text, delay: .zero) }
         .onChange(of: lsp?.diagnostics ?? []) { _, items in
             // IDE 窗口:把诊断汇总到「问题」面板
             ideHost?.report(path, items, doc.text ?? "")
@@ -225,6 +234,40 @@ struct FileTabView: View {
             await store.checkExternalChange(path)
             // 工作区内由文件系统事件驱动;工作区之外(含切换项目后的旧项目文件)低频轮询磁盘修改时间
             await WorkspaceWatchCenter.shared.follow(path, poll: .seconds(2)) { await store.checkExternalChange(path) }
+        }
+    }
+
+    /// 重算相对 HEAD 的行号栏改动标记(IDE 窗口专用;防抖、后台计算、2MB 以上文件不计算)。
+    /// - Parameters:
+    ///   - text: 当前缓冲区文本
+    ///   - delay: 防抖时长
+    private func refreshGutter(_ text: String?, delay: Duration) {
+        guard let ideHost, let root = ideHost.root, let text, text.utf8.count <= 2_000_000 else {
+            if !gitMarks.isEmpty { gitMarks = [:] }
+            return
+        }
+        gutterTask?.cancel()
+        let path = path
+        gutterTask = Task {
+            if delay > .zero { try? await Task.sleep(for: delay) }
+            guard !Task.isCancelled else { return }
+            let git = GitStore.shared.model(for: root)
+            if git.repo == nil { await git.refresh(full: false) }
+            guard let repo = git.repo, let relative = repo.relativePath(of: path) else {
+                if !gitMarks.isEmpty { gitMarks = [:] }
+                return
+            }
+            let old = await repo.committedText(path: relative)
+            let marks = await Task.detached(priority: .utility) { LineDiff.gutterMarks(for: LineDiff.diff(old: old, new: text, context: 0)) }.value
+            guard !Task.isCancelled else { return }
+            let mapped = marks.mapValues { mark -> LineMarker in
+                switch mark {
+                case .added: .added
+                case .modified: .modified
+                case .removed: .removed
+                }
+            }
+            if mapped.count != gitMarks.count || mapped.contains(where: { gitMarks[$0.key] != $0.value }) { gitMarks = mapped }
         }
     }
 
