@@ -2732,3 +2732,12 @@
 "%@ 在 %@ 的额度已用完。请在输入框切换到其他模型或提供商,或等额度重置后再试。" = "%1$@ has used up its quota for %2$@. Switch to another model or provider in the composer, or try again after the quota resets.";
 "%@ 的额度已用完。请在输入框切换到其他模型或提供商,或等额度重置后再试。" = "%@ has used up its quota. Switch to another model or provider in the composer, or try again after the quota resets.";
 "引擎里已经没有这个会话(可能已被引擎清理),当前显示的是本地存档。" = "The engine no longer has this session (it may have been cleaned up); showing the local archive.";
+"会话存档" = "Session Archive";
+"本地存档" = "Local archive";
+"统计中…" = "Calculating…";
+"清空会话存档…" = "Clear Session Archive…";
+"打开过的会话会在本地保存一份记录,再次打开时直接显示,不必等待 Agent 回放;引擎侧有新内容时会在后台同步。存档不会因 Claude Code 清理旧会话而丢失;删除会话时会一并删除。清空后再次打开会话时会重新从 Agent 拉取。" = "Sessions you open are saved locally and shown instantly next time, without waiting for the agent to replay them; newer content on the engine side is synced in the background. The archive survives Claude Code cleaning up old sessions and is removed when you delete a session. After clearing, sessions are fetched from the agent again the next time you open them.";
+"未启用" = "Disabled";
+"%lld 个会话 · %@" = "%lld sessions · %@";
+"清空会话存档" = "Clear Session Archive";
+"将删除所有会话的本地存档;会话本身不受影响,再次打开时会重新从 Agent 拉取。" = "This deletes the local archive of every session. The sessions themselves are not affected and will be fetched from the agent again when opened.";

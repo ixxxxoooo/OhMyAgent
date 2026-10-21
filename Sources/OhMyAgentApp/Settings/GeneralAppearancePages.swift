@@ -62,6 +62,7 @@ struct GeneralPage: View {
                     .disabled(!hibernateEnabled)
                 Note("每个运行中的会话各占一个 Agent 进程(约 0.3~0.4 GB)。闲置过久或超出上限时,最久未用的空闲会话会休眠:对话记录保留,发送消息或开始输入时自动恢复(约 1~2 秒)。正在运行、等待确认或有后台任务(含 Agent 进程下仍在跑的 shell 命令)的会话不会休眠;关闭「启用会话休眠」后任何会话都不会休眠,内存占用会随会话数增长。")
             }
+            SessionArchiveSection()
             Section("Dock 与菜单栏") {
                 Toggle("在 Dock 中显示图标", isOn: $showDock)
                     .onChange(of: showDock) { _, value in
