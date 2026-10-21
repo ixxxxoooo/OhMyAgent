@@ -3,6 +3,7 @@
 // - `OMA_IDE=1`:启动后打开 IDE 窗口(根目录取 `OMA_IDE_ROOT`,否则取当前项目);
 // - `OMA_IDE_EXPAND=相对路径1|相对路径2`:打开后展开这些目录并定位到最后一个;
 // - `OMA_IDE_OPEN_FILE=路径[:行]`:打开后在编辑器里打开该文件(相对路径取工作区根);
+// - `OMA_IDE_SIDEBAR=explorer|search|scm`:启动后切到该侧栏视图;`OMA_IDE_QUERY=词` 预填搜索词(配合 search);
 // - `OMA_IDE_SWEEP=N`:开关/切换基准,重复 N 轮「冷开 → 切回 Agent → 热切到 IDE → 关闭」,
 //   perf 日志「IDE 窗口基准」记录每轮耗时与内存漂移(计划预算:热切换 ≤ 50ms、冷开 ≤ 250ms、20 轮漂移 ≤ 10MB)。
 
@@ -42,6 +43,8 @@ enum IDEDebugHooks {
             try? await Task.sleep(for: .milliseconds(300))
             if let last = paths.last { workspace.revealPath = last }
         }
+        if let raw = env["OMA_IDE_SIDEBAR"], let view = IDESidebarView(rawValue: raw) { workspace.model.selectSidebar(view) }
+        if let query = env["OMA_IDE_QUERY"], !query.isEmpty { workspace.search.root = base; workspace.search.query = query }
         if let raw = env["OMA_IDE_OPEN_FILE"], !raw.isEmpty {
             var path = raw
             var line: Int?

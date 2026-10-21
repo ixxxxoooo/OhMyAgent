@@ -44,6 +44,18 @@ public extension IDEWindowModel {
         return id
     }
 
+    /// 打开某文件的差异标签(已打开则聚焦)。
+    /// - Parameter path: 文件绝对路径(空串忽略)
+    /// - Returns: 标签标识
+    @discardableResult
+    func openDiff(_ path: String) -> UUID? {
+        guard !path.isEmpty else { return nil }
+        var layout = editor
+        let id = layout.open(.diff(path: path), title: (path as NSString).lastPathComponent + " ⇄", preview: true)
+        editor = layout
+        return id
+    }
+
     /// 关闭某标签。
     /// - Parameter tabID: 标签标识
     func closeTab(_ tabID: UUID) {

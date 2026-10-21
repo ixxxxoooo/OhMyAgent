@@ -177,12 +177,18 @@ struct IDEEditorGroupView: View {
     @ViewBuilder
     private func tabBody(_ tab: WorkbenchTab, active: Bool) -> some View {
         switch tab.kind {
+        case .chat, .subagent, .agentTerminal, .changes:
+            OMEmptyState { Label(tab.title, om: "file-text") } description: { Text("该类型的标签在 IDE 窗口中暂不支持") }
         case .file(let path):
-            FileTabView(workbench: AppEnvironment.shared.workbench, tab: tab, path: path)
+            // 文件、差异、历史、Blame、终端、预览等复用 Agent 窗口的同一套内容视图;环境值把脏标记与跳转改接到 IDE 窗口
+            TabContentView(workbench: AppEnvironment.shared.workbench, tab: tab)
+                .id(path)
                 .environment(\.tabIsActive, active && isFocused)
                 .environment(\.ideFileHost, workspace.fileHost)
         default:
-            OMEmptyState { Label(tab.title, om: "file-text") } description: { Text("该类型的标签在 IDE 窗口中暂不支持") }
+            TabContentView(workbench: AppEnvironment.shared.workbench, tab: tab)
+                .environment(\.tabIsActive, active && isFocused)
+                .environment(\.ideFileHost, workspace.fileHost)
         }
     }
 

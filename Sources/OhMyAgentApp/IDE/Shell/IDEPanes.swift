@@ -42,6 +42,10 @@ struct IDESidebarPane: View {
             Group {
                 if model.workspaceName != nil, model.sidebarView == .explorer {
                     IDEExplorerPane(workspace: workspace)
+                } else if model.workspaceName != nil, model.sidebarView == .scm {
+                    IDESCMPane(workspace: workspace)
+                } else if model.workspaceName != nil, model.sidebarView == .search {
+                    IDESearchPane(workspace: workspace, model: workspace.search)
                 } else if let name = model.workspaceName {
                     OMEmptyState {
                         Label(name, om: model.sidebarView.icon)

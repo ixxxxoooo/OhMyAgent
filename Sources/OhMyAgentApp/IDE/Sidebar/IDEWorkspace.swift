@@ -22,6 +22,8 @@ final class IDEWorkspace {
     var revealPath: String?
     /// 撤销栈(只记录本窗口资源管理器内的文件操作)
     @ObservationIgnored private(set) var history = FileOpHistory()
+    /// 全局搜索/替换模型(每窗口一份)
+    let search = IDESearchModel()
     /// 最近关闭的文件标签(供「重新打开已关闭的标签」)
     @ObservationIgnored var closedStack: [TabKind] = []
 
