@@ -351,10 +351,8 @@ private enum ExplorerMenu {
         let relative = entry.path.hasPrefix(root + "/") ? String(entry.path.dropFirst(root.count + 1)) : entry.path
         if !entry.isDirectory {
             OMMenuItem("打开", icon: "file-text") { workbench.openFile(entry.path, preview: false) }
-            let other = MainActor.assumeIsolated { workbench.oppositeTarget }
-            OMMenuItem(verbatim: other == .right ? String(localized: "在右栏打开") : String(localized: "在中栏打开"), icon: other == .right ? "panel-right" : "panel-top") {
-                workbench.openFile(entry.path, preview: false, target: other)
-            }
+            OMMenuItem("在中栏打开", icon: "panel-top") { workbench.openFile(entry.path, preview: false, target: .editor) }
+            OMMenuItem("在右栏打开", icon: "panel-right") { workbench.openFile(entry.path, preview: false, target: .right) }
         }
         OMMenuItem("新建文件…", icon: "file-plus") { ExplorerActions.create(in: parent, directory: false, workbench: workbench) }
         OMMenuItem("新建文件夹…", icon: "folder-plus") { ExplorerActions.create(in: parent, directory: true, workbench: workbench) }

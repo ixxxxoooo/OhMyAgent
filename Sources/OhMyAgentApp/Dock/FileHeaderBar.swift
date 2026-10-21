@@ -110,6 +110,18 @@ struct FileHeaderBar: View {
         }
         .font(OMFonts.monoSmall)
         .omTooltip(path)
+        // 文件名可拖到中栏标签条(与资源管理器条目同样以文件 URL 拖出),右键可直接在中栏打开
+        .onDrag { NSItemProvider(object: URL(fileURLWithPath: path) as NSURL) }
+        .omContextMenu {
+            OMMenuItem("在中栏打开", icon: "panel-top") {
+                MainActor.assumeIsolated { _ = AppEnvironment.shared.workbench.openFile(path, preview: false, target: .editor) }
+            }
+            OMMenuItem("在 Finder 中显示", icon: "folder-open") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }
+            OMMenuItem("拷贝路径", icon: "copy") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(path, forType: .string)
+            }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(String(localized: "文件路径"))
         .accessibilityValue(FileBreadcrumb.relativePath(path, root: projectRoot))
