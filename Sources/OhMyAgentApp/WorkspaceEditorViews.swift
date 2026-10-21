@@ -105,7 +105,6 @@ private struct WorkspaceEditorCard: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 6) {
                     Text(verbatim: (path as NSString).lastPathComponent).font(OMFonts.small).foregroundStyle(OMColors.primaryText).lineLimit(1)
-                    if !removable { Text("主文件夹").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText) }
                 }
                 Text(verbatim: (path as NSString).abbreviatingWithTildeInPath)
                     .font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText).lineLimit(1).truncationMode(.middle)

@@ -2172,7 +2172,6 @@
 "工作区名称" = "Workspace name";
 "添加文件夹…" = "Add Folder…";
 "新增或移除的文件夹对之后开启的会话生效;已在运行的会话需要重新打开。" = "Added or removed folders apply to sessions started afterwards; reopen running sessions to pick them up.";
-"主文件夹" = "Primary";
 "只能添加已存在的文件夹。" = "Only existing folders can be added.";
 "这个文件夹已经在工作区里了。" = "This folder is already in the workspace.";
 "它位于工作区已有的文件夹 %@ 之内,已被覆盖。" = "It is inside the workspace folder %@ and is already covered.";
@@ -2744,7 +2743,7 @@
 "从 Agent 重新同步" = "Resync from Agent";
 "添加工作区…" = "Add Workspace…";
 "添加工作区" = "Add Workspace";
-"选择一个或多个项目文件夹:第一个是主文件夹,Agent、搜索、文件树与 Git 面板会同时覆盖它们。" = "Choose one or more project folders: the first is the primary folder; the agent, search, file tree and Git panel cover all of them.";
+"选择一个或多个项目文件夹(它们是平级的):Agent、搜索、文件树与 Git 面板会同时覆盖它们。" = "Choose one or more project folders (they are equal peers): the agent, search, file tree and Git panel cover all of them.";
 "名称(可选)" = "Name (optional)";
-"默认使用主文件夹名" = "Defaults to the primary folder name";
+"默认使用第一个文件夹名" = "Defaults to the first folder name";
 "尚未添加文件夹" = "No folders added yet";

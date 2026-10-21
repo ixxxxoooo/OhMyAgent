@@ -44,13 +44,13 @@ private struct WorkspaceCreateCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("添加工作区").font(OMFonts.title).foregroundStyle(OMColors.primaryText)
-            Text("选择一个或多个项目文件夹:第一个是主文件夹,Agent、搜索、文件树与 Git 面板会同时覆盖它们。")
+            Text("选择一个或多个项目文件夹(它们是平级的):Agent、搜索、文件树与 Git 面板会同时覆盖它们。")
                 .font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("名称(可选)").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
-                TextField("默认使用主文件夹名", text: $draft.name)
+                TextField("默认使用第一个文件夹名", text: $draft.name)
                     .textFieldStyle(.plain).font(OMFonts.small)
                     .padding(.horizontal, 8).frame(height: 28)
                     .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
@@ -101,7 +101,6 @@ private struct WorkspaceCreateCard: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 6) {
                     Text(verbatim: (path as NSString).lastPathComponent).font(OMFonts.small).foregroundStyle(OMColors.primaryText).lineLimit(1)
-                    if isPrimary { Text("主文件夹").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText) }
                 }
                 Text(verbatim: (path as NSString).abbreviatingWithTildeInPath)
                     .font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText).lineLimit(1).truncationMode(.middle)

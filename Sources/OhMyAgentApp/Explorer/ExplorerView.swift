@@ -115,8 +115,10 @@ private struct ExplorerProjectView: View {
         }
     }
 
+    /// 文件树来源:单文件夹项目直接铺开;多文件夹工作区里所有文件夹平级,各带一行标题。
     private var sources: [ExplorerSource] {
-        [ExplorerSource(root: projectID, showsHeader: false)] + extraFolders.map { ExplorerSource(root: $0, showsHeader: true) }
+        let showsHeader = !extraFolders.isEmpty
+        return ([projectID] + extraFolders).map { ExplorerSource(root: $0, showsHeader: showsHeader) }
     }
 
     /// 只挂载可见窗口内的行,窗口外用占位高度撑出完整滚动范围。
