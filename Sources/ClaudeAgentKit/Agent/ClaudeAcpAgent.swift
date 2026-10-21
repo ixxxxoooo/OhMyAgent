@@ -269,15 +269,17 @@ public actor ClaudeAcpAgent: ACPRequestHandler {
         let cwd = SessionSpec(params: params).cwd
         let transcript = await Task.detached { store.messages(sessionId: id, cwd: cwd) }.value
         let hint: String?? = .some(TranscriptStore.resumedModel(from: transcript))
+        // 先回放再拉起 `claude`:历史不依赖进程,客户端无需等进程启动(1–2 秒)就能看到内容;进程启动失败时内容仍在
+        let output = await replay(transcript, sessionId: id, cwd: cwd)
+        let replayedMs = OMLogger.milliseconds(since: started)
         let session = try await getOrCreate(params, sessionId: id, resumedModelHint: hint)
-        let output = await replay(transcript, sessionId: id, session: session, cwd: cwd)
         await session.adoptReplay(messageIdToUuid: output.messageIdToUuid)
-        log.info("会话已加载", ["session": id, "messages": "\(transcript.count)", "ms": "\(OMLogger.milliseconds(since: started))"])
+        log.info("会话已加载", ["session": id, "messages": "\(transcript.count)", "replayMs": "\(replayedMs)", "ms": "\(OMLogger.milliseconds(since: started))"])
         return await setupResponse(session)
     }
 
     /// 回放历史为 `session/update`。
-    private func replay(_ messages: [JSONValue], sessionId: String, session: ClaudeSession, cwd: String) async -> ReplayOutput {
+    private func replay(_ messages: [JSONValue], sessionId: String, cwd: String) async -> ReplayOutput {
         guard !messages.isEmpty else { return ReplayOutput() }
         var translator = MessageTranslator(renderer: ToolCallRenderer(capabilities: ToolRenderCapabilities(clientCapabilities: caps.raw)), cwd: cwd)
         translator.supportsPlan = caps.plan
