@@ -46,7 +46,7 @@ struct IDEShellView: View {
             }
             VStack(spacing: 0) {
                 if !(model.panelVisible && model.panelMaximized) {
-                    IDEEditorArea(model: model)
+                    IDEEditorArea(workspace: workspace)
                 }
                 if model.panelVisible {
                     if !model.panelMaximized { IDEResizer(model: model, kind: .panel, area: size) }

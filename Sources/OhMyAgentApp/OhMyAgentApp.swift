@@ -241,13 +241,13 @@ struct WorkbenchCommands: Commands {
             Divider()
             Button("关闭标签") { AppActions.shared.closeActiveTabOrWindow() }
                 .keyboardShortcut(shortcuts.shortcut(for: .closeTab))
-            Button("重新打开已关闭的标签") { workbench.reopenClosedTab() }
+            Button("重新打开已关闭的标签") { if !IDEWindowManager.shared.route(.reopenTab) { workbench.reopenClosedTab() } }
                 .keyboardShortcut(shortcuts.shortcut(for: .reopenTab))
         }
         CommandMenu("标签") {
-            Button("下一个标签") { workbench.cycleTab(by: 1) }
+            Button("下一个标签") { if !IDEWindowManager.shared.route(.nextTab) { workbench.cycleTab(by: 1) } }
                 .keyboardShortcut(shortcuts.shortcut(for: .nextTab))
-            Button("上一个标签") { workbench.cycleTab(by: -1) }
+            Button("上一个标签") { if !IDEWindowManager.shared.route(.previousTab) { workbench.cycleTab(by: -1) } }
                 .keyboardShortcut(shortcuts.shortcut(for: .previousTab))
             Divider()
             Button("回退") { workbench.goBack() }

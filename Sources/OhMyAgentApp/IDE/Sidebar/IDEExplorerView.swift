@@ -235,9 +235,10 @@ struct IDEExplorerView: NSViewRepresentable {
             // 当前编辑器文件变化:自动定位(只在变化时,避免打断用户的选择)
             if newActive != lastActive {
                 lastActive = newActive
-                if let newActive { select(path: newActive, scroll: true) }
+                if let newActive, workspace.revealPath == nil { select(path: newActive, scroll: true) }
             }
-            if let reveal = workspace.revealPath {
+            // 目标行尚未列举出来时保留请求,等下一次行数据到达再定位
+            if let reveal = workspace.revealPath, rows.contains(where: { $0.entry.path == reveal }) {
                 workspace.revealPath = nil
                 select(path: reveal, scroll: true)
             }

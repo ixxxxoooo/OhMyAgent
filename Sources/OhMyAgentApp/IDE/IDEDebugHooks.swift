@@ -34,7 +34,11 @@ enum IDEDebugHooks {
         workspace.configureTree()
         if let raw = env["OMA_IDE_EXPAND"] {
             let paths = raw.split(separator: "|").map { absolute(String($0)) }
-            for path in paths { workspace.tree.expand(path) }
+            for path in paths {
+                // 逐级展开祖先,否则深层目录会被折叠的上级藏住
+                var current = base
+                for part in path.dropFirst(base.count).split(separator: "/") { current += "/" + part; workspace.tree.expand(current) }
+            }
             try? await Task.sleep(for: .milliseconds(300))
             if let last = paths.last { workspace.revealPath = last }
         }

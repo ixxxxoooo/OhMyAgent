@@ -100,6 +100,8 @@ struct FileTabView: View {
     private let store = FileDocumentStore.shared
     /// 标签是否可见(保活的后台标签不做轮询)
     @Environment(\.tabIsActive) private var isActive
+    /// IDE 窗口里的宿主(非 nil 时脏标记、跳转与项目根改走 IDE 窗口;Agent 窗口里为 nil)
+    @Environment(\.ideFileHost) private var ideHost
     @AppStorage(ClientPrefs.Key.editorLSP) private var lspEnabled = true
     @State private var lsp: EditorLSPController?
     /// 最近一次 Agent 改动在新文件中新增的行(仅当文本仍等于 Agent 写入的内容时显示)
@@ -149,7 +151,7 @@ struct FileTabView: View {
                 onMode: { mode in previewKind.map { FileViewModeStore.shared.set(mode, for: $0) } },
                 currentText: { doc.text },
                 onOpen: { target in
-                    if let openInPlace { openInPlace(target) } else { workbench.openFile(target, preview: true) }
+                    if let openInPlace { openInPlace(target) } else if let ideHost { ideHost.open(target, nil, true) } else { workbench.openFile(target, preview: true) }
                 },
                 isComparing: comparing,
                 onToggleCompare: { comparing.toggle() },
@@ -195,7 +197,7 @@ struct FileTabView: View {
             if let lsp, lsp.status != .off { LSPStatusBar(controller: lsp) }
         }
         .onChange(of: doc.isDirty, initial: true) { wasDirty, dirty in
-            workbench.setDirty(dirty, for: tab.id)
+            if let ideHost { ideHost.setDirty(dirty, path) } else { workbench.setDirty(dirty, for: tab.id) }
             if wasDirty, !dirty { lsp?.didSave() }
         }
         .onChange(of: changesRevision, initial: true) {
@@ -234,6 +236,7 @@ struct FileTabView: View {
 
     /// 把选区引用(`@文件:行范围`)追加到所属项目的输入框并切到对话标签。
     private func referenceSelection(_ range: NSRange, text: String) {
+        guard ideHost == nil else { return }   // IDE 窗口的「引用到对话」随 I11 接入
         let root = projectRoot()
         guard workbench.projects.contains(where: { $0.id == root }), let session = workbench.ensureSession(for: root) else { return }
         let token = EditorReference.token(path: path, projectRoot: root, text: text, range: range)
@@ -248,13 +251,18 @@ struct FileTabView: View {
         lsp = nil
         guard lspEnabled, let text = doc.text, !doc.isReadOnly, EditorLSPController.isSupported(path: path) else { return }
         let controller = EditorLSPController(path: path, projectRoot: projectRoot())
-        controller.openLocation = { [weak workbench] target, line in workbench?.openFile(target, line: line, preview: false) }
+        if let ideHost {
+            controller.openLocation = { target, line in MainActor.assumeIsolated { ideHost.open(target, line, false) } }
+        } else {
+            controller.openLocation = { [weak workbench] target, line in workbench?.openFile(target, line: line, preview: false) }
+        }
         lsp = controller
         await controller.attach(text: text)
     }
 
     /// 文件所属项目的根目录(取最长匹配);不在任何项目内则用文件所在目录。
     private func projectRoot() -> String {
+        if let root = ideHost?.root, path.hasPrefix(root + "/") { return root }
         let match = workbench.projects.map(\.id)
             .filter { path == $0 || path.hasPrefix($0 + "/") }
             .max { $0.count < $1.count }

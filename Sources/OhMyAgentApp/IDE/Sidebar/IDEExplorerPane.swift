@@ -31,6 +31,10 @@ struct IDEExplorerPane: View {
                 .omContextMenu { menu(root: root) }
             }
             .task(id: root) { workspace.configureTree() }
+            // 编辑器切换文件时,文件树自动展开并定位到它
+            .onChange(of: workspace.model.activeFilePath, initial: true) { _, path in
+                if let path { workspace.reveal(path) }
+            }
             .task(id: workspace.tree.refreshToken) {
                 workspace.tree.refresh()
                 await git.refresh(full: false)

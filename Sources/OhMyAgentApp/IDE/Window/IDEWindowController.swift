@@ -66,6 +66,11 @@ final class IDEWindowController: NSWindowController, NSWindowDelegate {
 
     // MARK: NSWindowDelegate
 
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        // 有未保存文件时先询问(应用退出流程不经过这里)
+        workspace.confirmWindowClose()
+    }
+
     func windowDidBecomeKey(_ notification: Notification) {
         IDEWindowManager.shared.windowDidBecomeKey(model)
     }

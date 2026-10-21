@@ -64,36 +64,6 @@ struct IDESidebarPane: View {
     }
 }
 
-/// 编辑区:本阶段显示空状态与可用快捷键提示。
-struct IDEEditorArea: View {
-    let model: IDEWindowModel
-
-    var body: some View {
-        let shortcuts = ShortcutStore.shared
-        VStack(spacing: 14) {
-            Image.om("code", size: 28).foregroundStyle(OMColors.tertiaryText)
-            VStack(spacing: 6) {
-                hint(String(localized: "显示 / 隐藏侧栏"), shortcuts.binding(for: .toggleSidebar).display)
-                hint(String(localized: "显示 / 隐藏面板"), shortcuts.binding(for: .togglePanel).display)
-                hint(String(localized: "显示 / 隐藏 Agent 面板"), shortcuts.binding(for: .toggleInspector).display)
-                hint(String(localized: "切换到 Agents Window"), shortcuts.binding(for: .switchWindowMode).display)
-                hint(String(localized: "新建 IDE 窗口"), shortcuts.binding(for: .newIDEWindow).display)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(OMColors.contentBackground)
-    }
-
-    private func hint(_ title: String, _ keys: String) -> some View {
-        HStack(spacing: 12) {
-            Text(title).font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
-                .frame(width: 160, alignment: .trailing)
-            Text(keys).font(OMFonts.small).foregroundStyle(OMColors.tertiaryText)
-                .frame(width: 80, alignment: .leading)
-        }
-    }
-}
-
 /// 底部面板:本阶段为占位容器,带最大化与关闭。
 struct IDEBottomPanel: View {
     let model: IDEWindowModel

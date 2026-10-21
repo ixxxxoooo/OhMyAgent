@@ -139,6 +139,7 @@ final class AppActions {
 
     /// 保存当前聚焦标签对应的文件。
     func saveActiveFile() {
+        if IDEWindowManager.shared.route(.save) { return }
         let workbench = AppEnvironment.shared.workbench
         guard let tab = workbench.focusedActiveTab, let path = FilesWorkspaceStore.shared.filePath(of: tab, project: workbench.selectedProjectID) else { return }
         Task { _ = await FileDocumentStore.shared.save(path); refreshDirtyFlags() }
@@ -146,6 +147,7 @@ final class AppActions {
 
     /// 保存所有未保存的文件。
     func saveAllFiles() {
+        if IDEWindowManager.shared.route(.saveAll) { return }
         Task { _ = await FileDocumentStore.shared.saveAll(); refreshDirtyFlags() }
     }
 
@@ -158,8 +160,8 @@ final class AppActions {
 
     /// ⌘W:鼠标在某个标签组(编辑区/右栏)内时关闭该组的当前标签;固定标签不关闭;鼠标不在任何标签组内才关闭窗口。
     func closeActiveTabOrWindow() {
-        // IDE 窗口:本阶段没有编辑器标签(I4 起关标签),⌘W 直接关窗口
-        if IDEWindowManager.shared.route(.closeWindow) { return }
+        // IDE 窗口:关聚焦组的当前标签;没有标签时关窗口
+        if IDEWindowManager.shared.route(.closeTab) { return }
         let workbench = AppEnvironment.shared.workbench
         guard let hit = DockFrameRegistry.shared.groupUnderMouse() else {
             NSApp.keyWindow?.performClose(nil)

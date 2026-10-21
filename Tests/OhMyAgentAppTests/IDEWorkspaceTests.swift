@@ -56,4 +56,56 @@ struct IDEWorkspaceTests {
         workspace.open("/tmp/x.swift", preview: false)
         #expect(workspace.model.activeFilePath == "/tmp/x.swift")
     }
+
+    @Test("关闭未修改的标签直接关闭并可重新打开")
+    func closeAndReopen() throws {
+        let root = try makeRoot()
+        defer { try? FileManager.default.removeItem(atPath: root) }
+        let workspace = IDEWorkspace(model: IDEWindowModel(snapshot: IDEWindowSnapshot(workspaceRoot: root)))
+        let id = workspace.model.openFile(root + "/a/b/c.txt", preview: false)
+        workspace.requestClose(id ?? UUID())
+        #expect(workspace.model.openFilePaths.isEmpty)
+        workspace.reopenClosed()
+        #expect(workspace.model.openFilePaths == [root + "/a/b/c.txt"])
+    }
+
+    @Test("固定标签不会被普通关闭关掉,显式关闭才行")
+    func pinnedTabsSurviveClose() {
+        let workspace = IDEWorkspace(model: IDEWindowModel(snapshot: IDEWindowSnapshot(workspaceRoot: "/tmp")))
+        let id = workspace.model.openFile("/tmp/p.swift", preview: false) ?? UUID()
+        var layout = workspace.model.editor
+        layout.togglePinned(id)
+        workspace.model.editor = layout
+        workspace.requestClose(id)
+        #expect(workspace.model.openFilePaths.count == 1)
+        workspace.requestClose(id, force: true)
+        #expect(workspace.model.openFilePaths.isEmpty)
+    }
+
+    @Test("循环切换标签首尾相接")
+    func cycleTabs() {
+        let workspace = IDEWorkspace(model: IDEWindowModel(snapshot: IDEWindowSnapshot(workspaceRoot: "/tmp")))
+        for name in ["a", "b", "c"] { workspace.model.openFile("/tmp/\(name).swift", preview: false) }
+        #expect(workspace.model.activeFilePath == "/tmp/c.swift")
+        workspace.cycleTab(by: 1)
+        #expect(workspace.model.activeFilePath == "/tmp/a.swift")
+        workspace.cycleTab(by: -1)
+        #expect(workspace.model.activeFilePath == "/tmp/c.swift")
+    }
+
+    @Test("没有未保存文件时允许关闭窗口")
+    func windowCloseWithoutDirty() {
+        let workspace = IDEWorkspace(model: IDEWindowModel(snapshot: IDEWindowSnapshot(workspaceRoot: "/tmp")))
+        workspace.model.openFile("/tmp/clean.swift", preview: false)
+        #expect(workspace.dirtyPaths.isEmpty)
+        #expect(workspace.confirmWindowClose())
+    }
+
+    @Test("标签拖动字符串可往返编码")
+    func tabTransferRoundTrip() {
+        let id = UUID()
+        #expect(IDETabTransfer.decode(IDETabTransfer.encode(id)) == id)
+        #expect(IDETabTransfer.decode("oma-tab:不是 uuid") == nil)
+        #expect(IDETabTransfer.decode("其他文本") == nil)
+    }
 }

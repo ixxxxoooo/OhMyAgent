@@ -2793,3 +2793,9 @@
 "创建副本" = "Duplicate";
 "要把这 %lld 个项目移到废纸篓吗?" = "Move these %lld items to the Trash?";
 "无法创建副本" = "Couldn't create a copy";
+"该类型的标签在 IDE 窗口中暂不支持" = "This kind of tab isn't supported in IDE windows yet";
+"关闭其他" = "Close Others";
+"固定标签" = "Pin Tab";
+"拆分到右侧" = "Split Right";
+"在文件树中显示" = "Reveal in Explorer";
+"要保存 %lld 个文件的修改吗?" = "Save changes to %lld files?";
