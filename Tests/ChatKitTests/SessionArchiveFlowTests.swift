@@ -95,6 +95,22 @@ struct SessionArchiveFlowTests {
         #expect(!model.timeline.entries.contains { $0.text.contains("存档里的问题") })
     }
 
+    @Test("手动重新同步:当前内容保持显示,引擎内容不同则替换")
+    func manualResync() async throws {
+        let (archive, cleanup) = useTempArchive()
+        defer { cleanup() }
+        let ws = try M3ScenarioTests.tempWorkspace()
+        defer { try? FileManager.default.removeItem(at: ws) }
+        let model = try await M3ScenarioTests.readyModel(workspace: ws)
+        defer { model.shutdown() }
+        let first = try await archivedThenForked(model, archive)
+        model.openSession(SessionSummary(sessionId: first, cwd: ws.path, updatedAt: "2000-01-01T00:00:00Z"))
+        #expect(await SessionModelTests.wait { model.canResyncFromEngine && model.sessionId == first })
+        #expect(model.timeline.entries.contains { $0.text.contains("存档里的问题") })
+        model.resyncFromEngine()
+        #expect(await SessionModelTests.wait { model.archiveSyncing == nil && model.timeline.entries.contains { $0.text.contains("历史回答") } })
+    }
+
     @Test("打开历史会话:回放内容同步为存档")
     func replayIsSynced() async throws {
         let (archive, cleanup) = useTempArchive()

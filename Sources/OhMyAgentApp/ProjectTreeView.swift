@@ -499,6 +499,9 @@ struct SessionLine: View {
             OMMenuItem("重命名…", icon: "pencil") { rename(id) }
             if isSelected, let model = workbench.sessions[item.projectID] {
                 OMMenuItem("分支", icon: "git-branch") { _ = workbench.forkConversation(from: model) }
+                if model.sessionId == id, model.canResyncFromEngine {
+                    OMMenuItem("从 Agent 重新同步", icon: "refresh-cw") { model.resyncFromEngine() }
+                }
             }
             OMMenuSubmenu("拷贝", icon: "copy") {
                 OMMenuItem("会话 ID") { copy(id) }

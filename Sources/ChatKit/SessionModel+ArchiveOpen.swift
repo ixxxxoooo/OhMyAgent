@@ -147,6 +147,19 @@ extension SessionModel {
         }
     }
 
+    /// 是否可以从引擎重新同步当前会话(已连接、空闲、引擎支持 load、存档已启用)。
+    public var canResyncFromEngine: Bool {
+        Self.archive != nil && client != nil && phase == .ready && sessionId != nil && !isRunning && !isReplaying
+            && archiveSyncing == nil && capabilities.loadSession
+    }
+
+    /// 从引擎重新同步当前会话:当前内容保持显示,后台静默 `session/load`,内容不同才替换。
+    public func resyncFromEngine() {
+        guard canResyncFromEngine, let sessionId, let client else { return }
+        log.info("手动重新同步会话", ["target": String(sessionId.prefix(8))])
+        silentSync(SessionSummary(sessionId: sessionId, cwd: workspace.path), client: client)
+    }
+
     /// 存档已显示但接回引擎失败:内容保留(不当作空会话隐藏),只提示原因。
     private func reportArchivedAttachFailure(_ error: Error, target: String) {
         log.warning("存档回显后接回引擎失败", ["target": target, "error": "\(error)"])
