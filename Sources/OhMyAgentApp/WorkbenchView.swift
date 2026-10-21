@@ -219,18 +219,7 @@ struct WorkbenchView: View {
         if let text = env["OMA_AUTOSEND"], !text.isEmpty, let model = workbench.activeSession {
             Log.app.debug("调试钩子:等待就绪后自动发送", ["project": model.workspace.lastPathComponent])
             for _ in 0..<100 where model.phase != .ready { try? await Task.sleep(for: .milliseconds(100)) }
-            let images = model.attachments
-            model.attachments = []
-            model.send(text, images: images)
-            if env["OMA_AUTOALLOW"] != nil {
-                // 调试:自动批准本轮第一个权限请求(用于无人值守验证 Agent 编辑联动)
-                for _ in 0..<100 where model.pendingPermissions.isEmpty { try? await Task.sleep(for: .milliseconds(100)) }
-                if let prompt = model.pendingPermissions.first {
-                    // 取第一个「允许」类选项(计划批准的选项 ID 不是 allow)
-                    let allow = prompt.request.options.first { $0.kind == .allowOnce || $0.kind == .allowAlways }?.optionId ?? "allow"
-                    model.resolve(prompt, optionId: allow)
-                }
-            }
+            await AutoSendHook.run(text, model: model, autoAllow: env["OMA_AUTOALLOW"] != nil)
         } else if env["OMA_AUTOSEND"] != nil {
             Log.app.warning("调试钩子:没有可用会话,未发送", ["active": "\(workbench.activeSession != nil)"])
         }
