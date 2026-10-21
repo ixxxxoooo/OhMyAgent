@@ -13,7 +13,7 @@ public enum LineMarker: Sendable {
 /// 代码编辑器视图(滚动视图 + 文本视图 + 行号标尺)。
 @MainActor
 public final class CodeEditorView: NSView {
-    /// 超过该行数进入大文件模式:关闭自动换行,仅高亮视口附近。
+    /// 超过该行数进入大文件模式(仅高亮视口附近;不再因此强制换行)。
     public static var largeFileLineThreshold: Int {
         let value = UserDefaults.standard.object(forKey: "editor.largeFileLines") as? Int ?? 20_000
         return min(max(value, 2_000), 200_000)
@@ -32,7 +32,11 @@ public final class CodeEditorView: NSView {
     private var appliedFamily = EditorFontPrefs.preferredFamily
     private var appliedSize = EditorFontPrefs.preferredSize
     var language: SyntaxLanguage = .plain
-    private var lineIndex = LineIndex(text: "")
+    private(set) var lineIndex = LineIndex(text: "")
+    /// 行索引是否与当前文本一致:一致时由文本存储的编辑回调增量更新;装载大文件期间(后台建索引)为 false。
+    private(set) var lineIndexIsLive = false
+    /// 不换行布局用的单字符宽度缓存(随字体变化重算)
+    private var cachedCharWidth: (font: NSFont, width: CGFloat)?
     /// 已应用高亮的 UTF-16 范围(长度为 0 表示尚未高亮;测量工具据此判断首个高亮帧)。
     public internal(set) var highlightedRange = NSRange(location: 0, length: 0)
     private var rebuildTask: Task<Void, Never>?
@@ -164,6 +168,11 @@ public final class CodeEditorView: NSView {
             self, selector: #selector(viewportDidChange),
             name: NSView.boundsDidChangeNotification, object: scrollView.contentView
         )
+        // 文本存储处理完一次编辑:增量维护行索引(不能把自己设为 textStorage.delegate,TextKit 2 的内容存储占用着它)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(storageDidProcessEditing(_:)),
+            name: NSTextStorage.didProcessEditingNotification, object: textView.textStorage
+        )
         // 设置页修改字体族/字号后,已打开的编辑器立即跟随(不依赖 SwiftUI 的刷新时机,后台保活的标签同样生效)
         NotificationCenter.default.addObserver(
             self, selector: #selector(defaultsDidChange),
@@ -174,6 +183,19 @@ public final class CodeEditorView: NSView {
             self, selector: #selector(themeDidChange),
             name: ThemeRuntime.didChange, object: nil
         )
+    }
+
+    /// 文本存储完成一次字符编辑:用编辑范围与长度变化增量更新行索引(属性变更如高亮不会走到这里的字符分支)。
+    @objc private func storageDidProcessEditing(_ notification: Notification) {
+        guard let storage = notification.object as? NSTextStorage,
+              storage.editedMask.contains(.editedCharacters), lineIndexIsLive else { return }
+        if lineIndex.applyEdit(editedRange: storage.editedRange, changeInLength: storage.changeInLength, text: storage.mutableString) {
+            ruler.lineIndex = lineIndex
+        } else {
+            // 参数不自洽(例如装载与回调交错):标记失效,由 handleEdit 整体重建
+            lineIndexIsLive = false
+            Log.editor.warning("行索引增量更新失败,退回整体重建", ["editedRange": "\(storage.editedRange)", "delta": "\(storage.changeInLength)"])
+        }
     }
 
     /// 主题变化后重新应用编辑器配色并清空高亮缓存。
@@ -201,6 +223,7 @@ public final class CodeEditorView: NSView {
         highlightedRange = NSRange(location: 0, length: 0)
         rebuildTask?.cancel()
         highlightTask?.cancel()
+        lineIndexIsLive = false
 
         // 新文本使旧诊断失效(属性随文本一起被清掉)
         diagnostics = []
@@ -226,7 +249,9 @@ public final class CodeEditorView: NSView {
         if text.utf16.count <= Self.syncLoadLimit {
             let index = LineIndex(text: text)
             lineIndex = index
+            lineIndexIsLive = true
             ruler.lineIndex = index
+            updateNoWrapGeometry()   // 不换行:同步按最长行重估宽度,避免首帧长行被折行
             if !usesMarkdownStyling {
                 let lexStart = ContinuousClock.now
                 paintSyncHighlight(SimpleLexer.lex(text, language: language))
@@ -250,8 +275,10 @@ public final class CodeEditorView: NSView {
             await MainActor.run {
                 guard let self, self.generation == current else { return }
                 self.lineIndex = index
+                self.lineIndexIsLive = true
                 self.ruler.lineIndex = index
                 self.applyLargeFileMode(index.lineCount > Self.largeFileLineThreshold)
+                self.updateNoWrapGeometry()
                 self.scheduleHighlight()
             }
         }
@@ -281,32 +308,42 @@ public final class CodeEditorView: NSView {
         highlightedRange = docRange
     }
 
-    /// 用户编辑后:同步更新行索引(小文件)、防抖重做词法并回调。
+    /// 用户编辑后:确认行索引(正常由文本存储回调增量维护)、防抖重做词法并回调。
     fileprivate func handleEdit() {
         let text = textView.string
         generation += 1
         let current = generation
         let language = self.language
         let engine = self.engine
-        if text.utf16.count <= 300_000 {
+        // 行索引与文本一致时已被增量更新;装载大文件期间或增量参数不自洽时才退回整体重建
+        var needsIndexRebuild = !lineIndexIsLive
+        if needsIndexRebuild, text.utf16.count <= 300_000 {
             let index = LineIndex(text: text)
             lineIndex = index
+            lineIndexIsLive = true
             ruler.lineIndex = index
+            needsIndexRebuild = false
         } else {
             ruler.needsDisplay = true
         }
+        updateNoWrapGeometry()
+        let rebuildIndex = needsIndexRebuild
         rebuildTask?.cancel()
         rebuildTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(180))
             guard !Task.isCancelled else { return }
-            let index = await Task.detached(priority: .userInitiated) { LineIndex(text: text) }.value
+            let index: LineIndex? = rebuildIndex ? await Task.detached(priority: .userInitiated) { LineIndex(text: text) }.value : nil
             _ = await engine.rebuild(text: text, language: language)
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 guard let self, self.generation == current else { return }
-                self.lineIndex = index
-                self.ruler.lineIndex = index
-                self.applyLargeFileMode(index.lineCount > Self.largeFileLineThreshold)
+                if let index {
+                    self.lineIndex = index
+                    self.lineIndexIsLive = true
+                    self.ruler.lineIndex = index
+                }
+                self.applyLargeFileMode(self.lineIndex.lineCount > Self.largeFileLineThreshold)
+                self.updateNoWrapGeometry()
                 self.highlightedRange = NSRange(location: 0, length: 0)
                 self.scheduleHighlight()
             }
@@ -524,42 +561,71 @@ public final class CodeEditorView: NSView {
 
     // MARK: - 大文件模式
 
+    /// 记录大文件模式。大文件不再强制换行(不换行的宽度由估算得到,见 `updateNoWrapGeometry`),
+    /// 该标志目前只用于装载日志与外部判断。
     private func applyLargeFileMode(_ large: Bool) {
-        guard large != isLargeFileMode else { return }
         isLargeFileMode = large
-        applyWrapping()
     }
 
-    /// 当前实际是否按自动换行布局(用户偏好或大文件模式强制)。
-    public var isWrapping: Bool { wrapsLines || isLargeFileMode }
+    /// 当前实际是否按自动换行布局(用户偏好)。
+    public var isWrapping: Bool { wrapsLines }
 
-    /// 是否自动换行。M0 实测:容器宽度超过可视宽度(横向滚动)时,TextKit 2 需要全量布局,
-    /// 5 万行装载 ≈ 0.8s、输入 ≈ 115ms;自动换行装载 ≈ 25ms、输入 ≈ 1.2ms。
-    /// 因此默认换行,且大文件模式强制换行。
+    /// 是否自动换行(默认开)。不换行时不再用超宽固定容器:
+    /// 旧做法把容器宽度设成 10 万 pt 并让文本视图横向自适应,TextKit 2 为量出真实宽度必须全量布局
+    /// (M0 实测 5 万行装载 ≈ 0.8s、输入 ≈ 115ms)。现在文本视图宽度由「最长行列数 × 字符宽」估算并手动设定,
+    /// 视口布局只处理可见行(见 `updateNoWrapGeometry`)。
     public var wrapsLines = UserDefaults.standard.object(forKey: "editor.wrap") as? Bool ?? true {
         didSet { applyWrapping() }
     }
 
-    /// 配置换行策略。大文件模式一律换行以保证性能。
+    /// 配置换行策略。
     private func applyWrapping() {
         guard let container = textView.textContainer else { return }
-        if wrapsLines || isLargeFileMode {
+        if isWrapping {
             container.widthTracksTextView = true
             container.size = NSSize(width: scrollView.contentSize.width, height: CGFloat.greatestFiniteMagnitude)
             textView.isHorizontallyResizable = false
+            textView.autoresizingMask = [.width]
             scrollView.hasHorizontalScroller = false
         } else {
             container.widthTracksTextView = false
-            container.size = NSSize(width: 100_000, height: CGFloat.greatestFiniteMagnitude)
-            textView.isHorizontallyResizable = true
+            // 关键:不让文本视图根据实际用量自适应宽度(那会触发全量布局),宽度由 updateNoWrapGeometry 估算后手动设置
+            textView.isHorizontallyResizable = false
+            textView.autoresizingMask = []
             scrollView.hasHorizontalScroller = true
+            updateNoWrapGeometry()
         }
+    }
+
+    /// 单个字符的宽度(等宽字体;取 `0` 与 `M` 的较大者,随字体缓存)。
+    private var characterWidth: CGFloat {
+        let font = theme.font
+        if let cached = cachedCharWidth, cached.font == font { return cached.width }
+        let width = max(NSAttributedString(string: "0", attributes: [.font: font]).size().width,
+                        NSAttributedString(string: "M", attributes: [.font: font]).size().width)
+        cachedCharWidth = (font, width)
+        return width
+    }
+
+    /// 不换行模式:按最长行估算内容宽度,设置文本容器与文本视图宽度(不小于视口宽度)。
+    /// 估算包含制表符/宽字符折算与少量余量,宁大勿小(过小会让长行在容器边缘被折行)。
+    func updateNoWrapGeometry() {
+        guard !isWrapping, let container = textView.textContainer else { return }
+        let insetWidth = textView.textContainerInset.width * 2
+        let padding = container.lineFragmentPadding * 2
+        let estimated = ceil(CGFloat(lineIndex.longestColumns) * characterWidth * 1.02 + characterWidth * 4) + padding
+        let viewport = scrollView.contentSize.width - insetWidth
+        let width = max(estimated, viewport)
+        if abs(container.size.width - width) > 0.5 { container.size = NSSize(width: width, height: CGFloat.greatestFiniteMagnitude) }
+        let frameWidth = width + insetWidth
+        if abs(textView.frame.width - frameWidth) > 0.5 { textView.setFrameSize(NSSize(width: frameWidth, height: textView.frame.height)) }
     }
 
     // MARK: - 视口高亮
 
     @objc private func viewportDidChange() {
         ruler.needsDisplay = true
+        updateNoWrapGeometry()
         scheduleHighlight()
     }
 
@@ -711,6 +777,9 @@ final class LineNumberRulerView: NSRulerView {
             .foregroundColor: theme.gutterForeground,
         ]
         let originY = textView.textContainerOrigin.y
+        let digitSize = ("0" as NSString).size(withAttributes: attributes)
+        let digitWidth = digitSize.width
+        let digitHeight = digitSize.height
         layoutManager.enumerateTextLayoutFragments(from: viewportRange.location, options: [.ensuresLayout]) { fragment in
             if fragment.rangeInElement.location.compare(viewportRange.endLocation) != .orderedAscending { return false }
             let nsRange = contentStorage.nsRange(fragment.rangeInElement)
@@ -721,9 +790,10 @@ final class LineNumberRulerView: NSRulerView {
             // 折叠的行(Markdown 围栏标记行)不编号,避免与下一行重叠
             if frame.height < 6 { return true }
             let pointInRuler = self.convert(NSPoint(x: 0, y: frame.minY + originY), from: textView)
-            let label = NSAttributedString(string: String(line + 1), attributes: attributes)
-            let size = label.size()
-            label.draw(at: NSPoint(x: self.ruleThickness - size.width - 8, y: pointInRuler.y + (frame.height - size.height) / 2))
+            // 等宽数字:宽度 = 位数 × 数字宽,不必每行构造富文本再量尺寸(5 万行文件输入时标尺重绘是热点)
+            let label = String(line + 1) as NSString
+            let width = digitWidth * CGFloat(label.length)
+            label.draw(at: NSPoint(x: self.ruleThickness - width - 8, y: pointInRuler.y + (frame.height - digitHeight) / 2), withAttributes: attributes)
             if let severity = self.diagnosticLines[line] {
                 CodeEditorView.color(for: severity).setFill()
                 NSBezierPath(ovalIn: NSRect(x: 6, y: pointInRuler.y + (frame.height - 6) / 2, width: 6, height: 6)).fill()
