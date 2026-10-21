@@ -373,12 +373,9 @@ private struct VerbStyleRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 10) {
-                ActiveTimeline(interval: 0.15, start: Date(timeIntervalSince1970: 0)) { date in
-                    Text(WorkingStatus.glyph(tick: Int(date.timeIntervalSinceReferenceDate / 0.15), style: style))
-                        .font(OMFonts.body.weight(.medium))
-                        .foregroundStyle(OMColors.accent)
-                        .frame(width: 18)
-                }
+                // AppKit 逐帧换字符,不经过 SwiftUI 时间线(见 GlyphTicker)
+                GlyphTicker(style: style, color: OMColors.accent)
+                    .frame(width: 18, height: 18)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(LocalizedStringKey(style.title)).font(OMFonts.body)
                     Text(LocalizedStringKey(style.summary)).font(OMFonts.caption).foregroundStyle(OMColors.secondaryText)
