@@ -60,6 +60,12 @@ final class AppEnvironment {
         // 切换项目后,为新项目重新安排预热
         workbench.onProjectSelected = { [weak self] _ in self?.scheduleEngineWarmup(delay: .seconds(2)) }
         workbench.onFileOpened = { path in RecentStore.recordFile(path) }
+        // 键盘窗口是 IDE 窗口时(如 IDE 里的 Agent 面板点了文件引用),文件在该 IDE 窗口的编辑器里打开
+        workbench.fileOpenRedirect = { path, line, preview in
+            guard let model = WindowContext.shared.ideModel else { return false }
+            model.openFile(path, line: line, preview: preview)
+            return true
+        }
         workbench.onProjectRemoved = { root in TerminalStore.shared.remove(WorkbenchModel.residentTerminalID(root: root)) }
     }
 

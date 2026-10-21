@@ -241,7 +241,11 @@ struct FileTabView: View {
 
     /// 把选区引用(`@文件:行范围`)追加到所属项目的输入框并切到对话标签。
     private func referenceSelection(_ range: NSRange, text: String) {
-        guard ideHost == nil else { return }   // IDE 窗口的「引用到对话」随 I11 接入
+        if let ideHost {
+            // IDE 窗口:引用追加到本窗口 Agent 面板的输入框
+            ideHost.reference(EditorReference.token(path: path, projectRoot: projectRoot(), text: text, range: range))
+            return
+        }
         let root = projectRoot()
         guard workbench.projects.contains(where: { $0.id == root }), let session = workbench.ensureSession(for: root) else { return }
         let token = EditorReference.token(path: path, projectRoot: root, text: text, range: range)

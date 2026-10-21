@@ -68,27 +68,6 @@ struct IDESidebarPane: View {
     }
 }
 
-/// Agent 面板:本阶段为占位容器。
-struct IDEAgentPane: View {
-    let model: IDEWindowModel
-
-    var body: some View {
-        VStack(spacing: 0) {
-            PaneHeader(title: String(localized: "Agent")) { model.toggleAgentPane() }
-            Rectangle().fill(OMColors.hairline).frame(height: 1)
-            OMEmptyState {
-                Label("Agent 面板", om: "sparkles")
-            } description: {
-                Text("在这里与 Agent 对话的功能将在后续版本提供")
-            } actions: {
-                Button("到 Agents Window 对话") { IDEWindowManager.shared.switchToAgent() }
-            }
-        }
-        .frame(maxHeight: .infinity)
-        .background(OMColors.surface)
-    }
-}
-
 /// 状态栏(22pt):左侧工作区名称,右侧预留给行列、编码、语言等状态(后续里程碑)。
 struct IDEStatusBar: View {
     let model: IDEWindowModel

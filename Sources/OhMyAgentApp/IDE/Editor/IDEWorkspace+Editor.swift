@@ -13,6 +13,7 @@ extension IDEWorkspace {
             root: root,
             open: { [weak self] path, line, preview in self?.model.openFile(path, line: line, preview: preview) },
             setDirty: { [weak self] dirty, path in self?.model.setDirty(dirty, forFile: path) },
+            reference: { [weak self] token in self?.addReferenceToChat(token) },
             report: { [weak self] path, diagnostics, text in
                 let problems = diagnostics.map { item -> IDEProblem in
                     let position = IDELineMap.lineColumn(utf16Offset: item.range.location, in: text)

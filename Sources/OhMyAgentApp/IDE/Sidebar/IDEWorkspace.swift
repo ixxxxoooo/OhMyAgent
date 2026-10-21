@@ -24,12 +24,16 @@ final class IDEWorkspace {
     @ObservationIgnored private(set) var history = FileOpHistory()
     /// 全局搜索/替换模型(每窗口一份)
     let search = IDESearchModel()
+    /// Agent 面板所用会话的项目标识与槽位(每窗口一个专属槽位,不与 Agents Window 的会话标签冲突)
+    @ObservationIgnored var agentProjectID: String?
+    @ObservationIgnored var agentSlot: String?
     /// 最近关闭的文件标签(供「重新打开已关闭的标签」)
     @ObservationIgnored var closedStack: [TabKind] = []
 
     /// - Parameter model: 窗口模型
     init(model: IDEWindowModel) {
         self.model = model
+        agentSlot = "ide-" + model.id.uuidString.prefix(8).lowercased()
     }
 
     /// 工作区根目录;未打开文件夹为 nil。

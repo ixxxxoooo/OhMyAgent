@@ -58,7 +58,7 @@ struct IDEShellView: View {
             .clipped()
             if agentShown {
                 IDEResizer(model: model, kind: .agent, area: size)
-                IDEAgentPane(model: model).frame(width: agentWidth)
+                IDEAgentPane(workspace: workspace).frame(width: agentWidth)
             }
         }
     }

@@ -84,6 +84,8 @@ public final class WorkbenchModel {
     @ObservationIgnored public var onProjectSelected: (@MainActor (String) -> Void)?
     /// 文件被打开(任何入口)时回调,应用层据此记录「最近文件」。
     @ObservationIgnored public var onFileOpened: (@MainActor (String) -> Void)?
+    /// 文件打开重定向(应用层注入):返回 true 表示已由别处(如键盘窗口是 IDE 窗口时的 IDE 编辑器)接管,不再在本模型的停靠区打开。
+    @ObservationIgnored public var fileOpenRedirect: (@MainActor (_ path: String, _ line: Int?, _ preview: Bool) -> Bool)?
     /// 项目被移除后回调(应用层据此结束该项目的常驻终端进程)。
     @ObservationIgnored public var onProjectRemoved: (@MainActor (String) -> Void)?
     @ObservationIgnored public var makeAgentSession: (@MainActor (URL, String) -> SessionModel?)?
@@ -404,6 +406,7 @@ public final class WorkbenchModel {
     @discardableResult
     public func openFile(_ path: String, line: Int? = nil, preview: Bool = true, target: OpenTarget = .auto) -> UUID {
         onFileOpened?(path)
+        if fileOpenRedirect?(path, line, preview) == true { return UUID() }
         return openTab(.file(path: path), title: (path as NSString).lastPathComponent, preview: preview, line: line, host: resolveHost(target))
     }
 
