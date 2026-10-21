@@ -1704,10 +1704,10 @@ public final class SessionModel {
         }
     }
 
-    /// 当前生效的上下文窗口(token;0 = 自动):启用映射时取主模型的模型级窗口,没有再退回全局偏好。
+    /// 当前生效的上下文窗口(token;0 = 自动):启用映射时取主模型的模型级窗口,没有再退回全局偏好(未设置时 200K)。
     public var contextWindowTokens: Int {
         if let window = mappedModels[.main]?.contextWindow, window > 0 { return ContextWindowChoice.normalized(window) }
-        return ContextWindowChoice.normalized(UserDefaults.standard.integer(forKey: ClientPrefs.Key.autoCompactWindow))
+        return ContextWindowChoice.normalized(SessionOptions.storedAutoCompactWindow(.standard))
     }
 
     /// 在输入框里调整上下文窗口(按模型记忆):

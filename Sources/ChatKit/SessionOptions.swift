@@ -228,7 +228,7 @@ public struct SessionOptions: Equatable, Sendable {
     public var loadClaudeMemory = true
     /// MCP 工具按需加载模式
     public var mcpToolSearch = McpToolSearch.auto
-    /// 自动压缩窗口(token):对话占用达到该窗口的压缩阈值就压缩,给上下文设上限;0 表示使用 Claude Code / 模型默认值
+    /// 自动压缩窗口(token):对话占用达到该窗口的压缩阈值就压缩,给上下文设上限;0 表示交给 Claude Code 自动决定
     public var autoCompactWindow = 0
 
     /// 自动压缩窗口允许的范围(token);Claude Code 的上限是 100 万。
@@ -241,6 +241,16 @@ public struct SessionOptions: Equatable, Sendable {
     public static let maxContextKey = "CLAUDE_CODE_MAX_CONTEXT_TOKENS"
     /// Claude Code 对未知模型默认假定的窗口(token)
     public static let defaultModelWindow = 200_000
+    /// 用户没选过时的自动压缩窗口(token):200K,兼顾长任务连贯与每轮成本
+    public static let defaultAutoCompactWindow = 200_000
+
+    /// 偏好里的自动压缩窗口:从未设置时取 `defaultAutoCompactWindow`,显式选「自动」存 0。
+    /// - Parameter defaults: 偏好存储
+    /// - Returns: token 数(0 表示自动)
+    public static func storedAutoCompactWindow(_ defaults: UserDefaults) -> Int {
+        guard defaults.object(forKey: ClientPrefs.Key.autoCompactWindow) != nil else { return defaultAutoCompactWindow }
+        return max(defaults.integer(forKey: ClientPrefs.Key.autoCompactWindow), 0)
+    }
 
     public init() {}
 
@@ -253,7 +263,7 @@ public struct SessionOptions: Equatable, Sendable {
         appendPrompt = defaults.string(forKey: ClientPrefs.Key.appendPrompt) ?? ""
         loadClaudeMemory = defaults.object(forKey: ClientPrefs.Key.loadClaudeMemory) as? Bool ?? true
         mcpToolSearch = McpToolSearch(rawValue: defaults.string(forKey: ClientPrefs.Key.mcpToolSearch) ?? "") ?? .auto
-        autoCompactWindow = max(defaults.integer(forKey: ClientPrefs.Key.autoCompactWindow), 0)
+        autoCompactWindow = Self.storedAutoCompactWindow(defaults)
     }
 
     /// 夹到允许范围后的自动压缩窗口;未设置(≤ 0)返回 nil。

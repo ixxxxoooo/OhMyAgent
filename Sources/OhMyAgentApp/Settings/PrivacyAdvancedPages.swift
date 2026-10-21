@@ -47,7 +47,7 @@ struct AdvancedPage: View {
     @AppStorage(ClientPrefs.Key.featureTerminal) private var terminal = false
     @AppStorage(ClientPrefs.Key.featureElicitation) private var elicitation = true
     @AppStorage(ClientPrefs.Key.mcpToolSearch) private var mcpToolSearch = McpToolSearch.auto.rawValue
-    @AppStorage(ClientPrefs.Key.autoCompactWindow) private var autoCompactWindow = 0
+    @AppStorage(ClientPrefs.Key.autoCompactWindow) private var autoCompactWindow = SessionOptions.defaultAutoCompactWindow
     @State private var tools: LocatedTools?
     @State private var envText = ""
     @State private var envDirty = false
@@ -73,8 +73,8 @@ struct AdvancedPage: View {
                         .font(OMFonts.caption).foregroundStyle(OMColors.warning)
                 }
                 Note("对新建或恢复的会话生效。对应环境变量 ENABLE_TOOL_SEARCH。")
-                SettingsNumericField(title: "上下文上限(自动压缩窗口)", value: $autoCompactWindow, format: IntegerFormatStyle<Int>(), unit: "token", prompt: "0 表示默认", fieldWidth: 110)
-                Note("给对话上下文设上限:占用接近该值时 Claude Code 自动压缩,避免长会话越滚越大、每轮都重复读取巨量历史。范围 10 万 ~ 100 万(超出会被夹到范围内),0 使用默认值。这是全局兜底值:模型映射里为模型单独设置了窗口(输入框「上下文」按模型记忆)时以模型的为准。同时会声明模型窗口(CLAUDE_CODE_MAX_CONTEXT_TOKENS),超过 20 万请确认所用模型真的支持。对新建或恢复的会话生效。")
+                SettingsNumericField(title: "上下文上限(自动压缩窗口)", value: $autoCompactWindow, format: IntegerFormatStyle<Int>(), unit: "token", prompt: "0 表示自动", fieldWidth: 110)
+                Note("给对话上下文设上限:占用接近该值时 Claude Code 自动压缩,避免长会话越滚越大、每轮都重复读取巨量历史。范围 10 万 ~ 100 万(超出会被夹到范围内),未设置时为 20 万,0 表示交给 Claude Code 按模型自动决定。这是全局兜底值:模型映射里为模型单独设置了窗口(输入框「上下文」按模型记忆)时以模型的为准。同时会声明模型窗口(CLAUDE_CODE_MAX_CONTEXT_TOKENS),超过 20 万请确认所用模型真的支持。对新建或恢复的会话生效。")
             }
             Section("MCP 运行参数") {
                 ScopeHeader(model: model)

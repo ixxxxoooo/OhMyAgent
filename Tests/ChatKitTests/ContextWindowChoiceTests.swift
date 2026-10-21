@@ -5,14 +5,14 @@ import Testing
 
 @Suite("上下文窗口档位")
 struct ContextWindowChoiceTests {
-    @Test("标题:默认、K、M")
+    @Test("标题:自动、K、M")
     func titles() {
         #expect(ContextWindowChoice.title(for: 200_000) == "200K")
         #expect(ContextWindowChoice.title(for: 1_000_000) == "1M")
-        #expect(ContextWindowChoice.title(for: 0) == String(localized: "默认"))
+        #expect(ContextWindowChoice.title(for: 0) == String(localized: "自动"))
     }
 
-    @Test("归一:负数为默认,其余夹到允许范围")
+    @Test("归一:负数为自动,其余夹到允许范围")
     func normalize() {
         #expect(ContextWindowChoice.normalized(-5) == 0)
         #expect(ContextWindowChoice.normalized(10_000) == SessionOptions.autoCompactRange.lowerBound)
@@ -60,5 +60,22 @@ struct ModelContextWindowStorageTests {
         try ProviderStorage.setModelContextWindow(300_000, model: "new-model", providerId: provider.id, directory: dir)
         #expect(ProviderStorage.load(directory: dir).providers[0].modelList.first { $0.id == "new-model" }?.contextWindow == 300_000)
         try ProviderStorage.setModelContextWindow(300_000, model: "x", providerId: "nope", directory: dir)
+    }
+}
+
+@Suite("自动压缩窗口偏好默认值")
+struct AutoCompactDefaultTests {
+    @Test("从未设置时为 200K,显式选「自动」为 0,其余按存储值")
+    func storedDefault() throws {
+        let suite = "oma-autocompact-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        #expect(SessionOptions.storedAutoCompactWindow(defaults) == 200_000)
+        #expect(SessionOptions(defaults: defaults).effectiveAutoCompactWindow == 200_000)
+        defaults.set(0, forKey: ClientPrefs.Key.autoCompactWindow)
+        #expect(SessionOptions.storedAutoCompactWindow(defaults) == 0)
+        #expect(SessionOptions(defaults: defaults).effectiveAutoCompactWindow == nil)
+        defaults.set(500_000, forKey: ClientPrefs.Key.autoCompactWindow)
+        #expect(SessionOptions.storedAutoCompactWindow(defaults) == 500_000)
     }
 }
