@@ -3,6 +3,7 @@
 // 本阶段(I2)只提供布局与空状态,真实内容由后续里程碑接入(I3 侧栏三视图、I4 编辑器组、I9 底部面板、I11 Agent 面板)。
 
 import DesignSystem
+import EditorKit
 import IconKit
 import IDEKit
 import SwiftUI
@@ -68,9 +69,10 @@ struct IDESidebarPane: View {
     }
 }
 
-/// 状态栏(22pt):左侧工作区名称,右侧预留给行列、编码、语言等状态(后续里程碑)。
+/// 状态栏(22pt):左侧工作区名称与问题计数,右侧活动文件的行列、语言、编码。
 struct IDEStatusBar: View {
-    let model: IDEWindowModel
+    let workspace: IDEWorkspace
+    private var model: IDEWindowModel { workspace.model }
     private var problems: ProblemsStore { model.problems }
 
     var body: some View {
@@ -90,6 +92,20 @@ struct IDEStatusBar: View {
             .omTooltip(String(localized: "显示问题面板"))
             .accessibilityLabel(String(localized: "显示问题面板"))
             Spacer(minLength: 0)
+            if let path = model.activeFilePath {
+                if let caret = workspace.carets[path] {
+                    Button { workspace.openPalette(":") } label: {
+                        Text(caret.selectedLength > 0
+                             ? String(localized: "行 \(caret.line),列 \(caret.column)(已选 \(caret.selectedLength))")
+                             : String(localized: "行 \(caret.line),列 \(caret.column)"))
+                    }
+                    .buttonStyle(.plain)
+                    .omTooltip(String(localized: "转到行…"))
+                    .accessibilityLabel(String(localized: "转到行…"))
+                }
+                Text(Self.languageName(for: path))
+                Text(verbatim: "UTF-8")
+            }
         }
         .font(OMFonts.caption)
         .foregroundStyle(OMColors.secondaryText)
@@ -97,5 +113,26 @@ struct IDEStatusBar: View {
         .frame(height: IDEMetrics.statusBarHeight)
         .frame(maxWidth: .infinity)
         .background(OMColors.sidebar)
+    }
+}
+
+extension IDEStatusBar {
+    /// 语言的展示名(未识别为纯文本)。
+    static func languageName(for path: String) -> String {
+        let language = SyntaxLanguage.detect(path: path)
+        switch language {
+        case .plain: return String(localized: "纯文本")
+        case .javascript: return "JavaScript"
+        case .typescript: return "TypeScript"
+        case .html: return "HTML"
+        case .css: return "CSS"
+        case .json: return "JSON"
+        case .yaml: return "YAML"
+        case .toml: return "TOML"
+        case .sql: return "SQL"
+        case .php: return "PHP"
+        case .c: return "C/C++"
+        default: return language.rawValue.prefix(1).uppercased() + language.rawValue.dropFirst()
+        }
     }
 }

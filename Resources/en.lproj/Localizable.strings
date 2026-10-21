@@ -2846,3 +2846,15 @@
 "输入行号以跳转" = "Enter a line number to jump";
 "转到第 %lld 行,第 %lld 列" = "Go to line %lld, column %lld";
 "转到第 %lld 行" = "Go to line %lld";
+"行 %lld,列 %lld(已选 %lld)" = "Ln %lld, Col %lld (%lld selected)";
+"行 %lld,列 %lld" = "Ln %lld, Col %lld";
+"纯文本" = "Plain Text";
+"代码编辑" = "Code Editing";
+"自动闭合括号与引号" = "Auto-close Brackets and Quotes";
+"输入 ( [ { \" ' ` 时补全另一半,选中文本时输入会包裹选区。" = "Typing ( [ { \" ' ` inserts the closing half; typing over a selection wraps it.";
+"高亮当前行" = "Highlight Current Line";
+"高亮配对括号" = "Highlight Matching Brackets";
+"自动保存" = "Auto Save";
+"IDE 窗口里的文件修改后自动写盘;「失焦」指窗口失去键盘焦点时保存。" = "Files in IDE windows are written to disk automatically; \"On Focus Loss\" saves when the window loses keyboard focus.";
+"失焦" = "On Focus Loss";
+"快捷键:⌘/ 切换注释、⌥↑/⌥↓ 移动行、⇧⌥↑/⇧⌥↓ 复制行、⌘⇧K 删除行、⌘D 添加下一个相同项、⌥ 点击添加光标、⌃G 转到行。" = "Shortcuts: ⌘/ toggle comment, ⌥↑/⌥↓ move line, ⇧⌥↑/⇧⌥↓ copy line, ⌘⇧K delete line, ⌘D add next occurrence, ⌥-click add cursor, ⌃G go to line.";

@@ -4,6 +4,7 @@
 
 import AppKit
 import ChatKit
+import EditorKit
 import IDEKit
 import Observation
 import OMLog
@@ -24,6 +25,8 @@ final class IDEWorkspace {
     @ObservationIgnored private(set) var history = FileOpHistory()
     /// 全局搜索/替换模型(每窗口一份)
     let search = IDESearchModel()
+    /// 各文件标签最近上报的光标(状态栏显示活动文件的行列)
+    var carets: [String: EditorCaret] = [:]
     /// 命令面板/快速打开(每窗口一份)
     let palette = IDEPaletteModel()
     /// Agent 面板所用会话的项目标识与槽位(每窗口一个专属槽位,不与 Agents Window 的会话标签冲突)
@@ -31,6 +34,8 @@ final class IDEWorkspace {
     @ObservationIgnored var agentSlot: String?
     /// 最近关闭的文件标签(供「重新打开已关闭的标签」)
     @ObservationIgnored var closedStack: [TabKind] = []
+    /// 延迟自动保存的计时任务
+    @ObservationIgnored var autoSaveTask: Task<Void, Never>?
 
     /// - Parameter model: 窗口模型
     init(model: IDEWindowModel) {

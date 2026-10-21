@@ -16,6 +16,8 @@ struct IDEFileHost {
     var reference: @MainActor (String) -> Void
     /// 上报某文件当前的诊断(参数:路径、诊断、对应文本;空数组表示清除)
     var report: @MainActor (String, [EditorDiagnostic], String) -> Void
+    /// 上报某文件的光标状态(路径,光标)
+    var caret: @MainActor (String, EditorCaret) -> Void
 }
 
 extension EnvironmentValues {

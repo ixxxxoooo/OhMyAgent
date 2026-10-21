@@ -21,6 +21,8 @@ public struct CodeEditor: NSViewRepresentable {
     public var onReferenceSelection: ((NSRange) -> Void)?
     /// Markdown 显示模式(仅 `.markdown` 语言有效)
     public var markdownMode: MarkdownEditorMode
+    /// 光标/选区变化回调(状态栏的「行 列」用);nil 时不计算
+    public var onCaretChange: ((EditorCaret) -> Void)?
 
     /// 创建编辑器。
     /// - Parameters:
@@ -33,7 +35,8 @@ public struct CodeEditor: NSViewRepresentable {
     ///   - features: 语言智能回调
     ///   - onReferenceSelection: 引用选区回调
     ///   - onChange: 编辑回调
-    public init(text: String, language: SyntaxLanguage, isEditable: Bool = false, revealLine: Int? = nil, markers: [Int: LineMarker] = [:], diagnostics: [EditorDiagnostic] = [], features: EditorLanguageFeatures = EditorLanguageFeatures(), onReferenceSelection: ((NSRange) -> Void)? = nil, markdownMode: MarkdownEditorMode = .off, onChange: ((String) -> Void)? = nil) {
+    public init(text: String, language: SyntaxLanguage, isEditable: Bool = false, revealLine: Int? = nil, markers: [Int: LineMarker] = [:], diagnostics: [EditorDiagnostic] = [], features: EditorLanguageFeatures = EditorLanguageFeatures(), onReferenceSelection: ((NSRange) -> Void)? = nil, markdownMode: MarkdownEditorMode = .off, onCaretChange: ((EditorCaret) -> Void)? = nil, onChange: ((String) -> Void)? = nil) {
+        self.onCaretChange = onCaretChange
         self.markdownMode = markdownMode
         self.onReferenceSelection = onReferenceSelection
         self.diagnostics = diagnostics
@@ -62,6 +65,7 @@ public struct CodeEditor: NSViewRepresentable {
         view.setText(text, language: language)
         view.features = features
         view.onReferenceSelection = onReferenceSelection
+        view.onCaretChange = onCaretChange
         view.setDiagnostics(diagnostics)
         return view
     }
@@ -87,6 +91,7 @@ public struct CodeEditor: NSViewRepresentable {
         view.textView.isEditable = isEditable
         view.features = features
         view.onReferenceSelection = onReferenceSelection
+        view.onCaretChange = onCaretChange
         view.setDiagnostics(diagnostics)
         view.lineMarkers = markers
         if let line = revealLine, context.coordinator.revealedLine != line {
@@ -106,5 +111,22 @@ public struct CodeEditor: NSViewRepresentable {
         var loadedLanguage: SyntaxLanguage?
         var revealedLine: Int?
         var onChange: ((String) -> Void)?
+    }
+}
+
+/// 编辑器光标状态(行、列均 1 起始;`selectedLength` 为选中的字符数)。
+public struct EditorCaret: Equatable, Sendable {
+    public var line: Int
+    public var column: Int
+    public var selectedLength: Int
+
+    /// - Parameters:
+    ///   - line: 行号
+    ///   - column: 列号
+    ///   - selectedLength: 选中字符数
+    public init(line: Int, column: Int, selectedLength: Int) {
+        self.line = line
+        self.column = column
+        self.selectedLength = selectedLength
     }
 }

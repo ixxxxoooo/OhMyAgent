@@ -75,6 +75,10 @@ final class IDEWindowController: NSWindowController, NSWindowDelegate {
         IDEWindowManager.shared.windowDidBecomeKey(model)
     }
 
+    func windowDidResignKey(_ notification: Notification) {
+        workspace.autoSaveOnFocusLoss()
+    }
+
     func windowDidMove(_ notification: Notification) { recordFrame() }
 
     func windowDidResize(_ notification: Notification) { recordFrame() }

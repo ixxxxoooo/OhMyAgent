@@ -7,6 +7,7 @@ import ChatKit
 import ClaudeConfigKit
 import DesignSystem
 import EditorKit
+import IDEKit
 import SwiftUI
 
 /// 编辑器。
@@ -18,6 +19,10 @@ struct EditorPage: View {
     @AppStorage(ClientPrefs.Key.editorWrap) private var wrap = true
     @AppStorage(ClientPrefs.Key.editorLargeFileLines) private var largeFileLines = 20_000
     @AppStorage(ClientPrefs.Key.editorFollowAgent) private var followAgent = false
+    @AppStorage(EditorBehaviorPrefs.autoCloseKey) private var autoClose = true
+    @AppStorage(EditorBehaviorPrefs.currentLineKey) private var currentLine = true
+    @AppStorage(EditorBehaviorPrefs.bracketMatchKey) private var bracketMatch = true
+    @AppStorage(IDEAutoSaveMode.key) private var autoSave = IDEAutoSaveMode.off.rawValue
     private let appearance = AppearanceModel.shared
     @State private var schemePickerShown = false
 
@@ -153,6 +158,22 @@ struct EditorPage: View {
                         .multilineTextAlignment(.trailing).frame(width: 90).accessibilityLabel("大文件模式起点")
                     Text("行").font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
                 }
+            }
+            SettingsCard("代码编辑") {
+                SettingsToggleRow("自动闭合括号与引号", detail: "输入 ( [ { \" ' ` 时补全另一半,选中文本时输入会包裹选区。", isOn: $autoClose)
+                SettingsToggleRow("高亮当前行", isOn: $currentLine)
+                SettingsToggleRow("高亮配对括号", isOn: $bracketMatch)
+                SettingsRow("自动保存", detail: "IDE 窗口里的文件修改后自动写盘;「失焦」指窗口失去键盘焦点时保存。") {
+                    Picker("", selection: $autoSave) {
+                        Text("关闭").tag(IDEAutoSaveMode.off.rawValue)
+                        Text("延迟").tag(IDEAutoSaveMode.afterDelay.rawValue)
+                        Text("失焦").tag(IDEAutoSaveMode.onFocusLoss.rawValue)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(width: 180)
+                }
+                Note("快捷键:⌘/ 切换注释、⌥↑/⌥↓ 移动行、⇧⌥↑/⇧⌥↓ 复制行、⌘⇧K 删除行、⌘D 添加下一个相同项、⌥ 点击添加光标、⌃G 转到行。").footnote()
             }
             SettingsCard("Agent 联动") {
                 SettingsToggleRow("跟随 Agent", detail: "Agent 每次修改文件都会在预览标签中打开该文件并跳到第一处改动(仅当前项目);本轮改动过的行会在行号栏用强调色标出。", isOn: $followAgent)

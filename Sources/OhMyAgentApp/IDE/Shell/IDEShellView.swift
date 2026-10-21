@@ -21,7 +21,7 @@ struct IDEShellView: View {
                 workArea(size: geo.size)
             }
             Rectangle().fill(OMColors.hairline).frame(height: 1)
-            IDEStatusBar(model: model)
+            IDEStatusBar(workspace: workspace)
         }
         .background(OMColors.contentBackground)
         .ignoresSafeArea(.container, edges: .top)

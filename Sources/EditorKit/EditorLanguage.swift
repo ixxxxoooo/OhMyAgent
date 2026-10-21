@@ -146,6 +146,7 @@ public final class EditorTextView: NSTextView {
     public override func insertText(_ insertString: Any, replacementRange: NSRange) {
         if canEnhance, language != .markdown, language != .plain, replacementRange.location == NSNotFound,
            let text = insertString as? String, text.count == 1, let char = text.first,
+           EditorBehaviorPrefs.autoClose,
            let edit = EditorEditing.typed(char, text: string, selection: selectedRange()) {
             if edit.replacement.isEmpty {
                 setSelectedRange(edit.selection)
@@ -159,7 +160,7 @@ public final class EditorTextView: NSTextView {
 
     /// 退格:夹在空括号对之间时一并删除。
     public override func deleteBackward(_ sender: Any?) {
-        if canEnhance, language != .markdown, language != .plain,
+        if canEnhance, language != .markdown, language != .plain, EditorBehaviorPrefs.autoClose,
            let edit = EditorEditing.backspacePair(text: string, selection: selectedRange()) {
             applyEdit(edit)
             return
@@ -199,7 +200,7 @@ public final class EditorTextView: NSTextView {
         super.drawBackground(in: rect)
         guard let manager = textLayoutManager, let storage = textContentStorage else { return }
         let origin = textContainerOrigin
-        if let color = currentLineColor, isEditable, selectedRanges.count == 1, selectedRange().length == 0,
+        if let color = currentLineColor, isEditable, EditorBehaviorPrefs.currentLine, selectedRanges.count == 1, selectedRange().length == 0,
            window?.firstResponder === self,
            let location = storage.location(storage.documentRange.location, offsetBy: selectedRange().location),
            let fragment = manager.textLayoutFragment(for: location) {
@@ -210,7 +211,7 @@ public final class EditorTextView: NSTextView {
             color.setFill()
             frame.intersection(rect).fill()
         }
-        if let color = bracketColor, !bracketPair.isEmpty {
+        if let color = bracketColor, !bracketPair.isEmpty, EditorBehaviorPrefs.bracketMatch {
             color.setFill()
             for offset in bracketPair {
                 guard let start = storage.location(storage.documentRange.location, offsetBy: offset),

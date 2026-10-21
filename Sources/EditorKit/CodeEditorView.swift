@@ -31,6 +31,8 @@ public final class CodeEditorView: NSView {
     /// 上次应用的字体族与字号偏好,用来判断偏好是否真的变了
     private var appliedFamily = EditorFontPrefs.preferredFamily
     private var appliedSize = EditorFontPrefs.preferredSize
+    /// 光标变化回调(状态栏用)
+    public var onCaretChange: ((EditorCaret) -> Void)?
     var language: SyntaxLanguage = .plain { didSet { textView.language = language } }
     private(set) var lineIndex = LineIndex(text: "")
     /// 行索引是否与当前文本一致:一致时由文本存储的编辑回调增量更新;装载大文件期间(后台建索引)为 false。
@@ -736,6 +738,10 @@ extension CodeEditorView: NSTextViewDelegate {
         markdownSelectionDidChange()
         updateBracketMatch()
         textView.needsDisplay = true
+        if let onCaretChange {
+            let position = caretPosition
+            onCaretChange(EditorCaret(line: position.line, column: position.column, selectedLength: textView.selectedRange().length))
+        }
     }
 
     /// 光标紧邻括号时,高亮它与配对括号。

@@ -2,6 +2,7 @@
 // IDE 工作区的编辑器操作:标签关闭(含未保存确认)、保存、切换、重新打开已关闭的标签、窗口关闭前的脏文件确认。
 
 import AppKit
+import EditorKit
 import IDEKit
 import OMLog
 import WorkbenchKit
@@ -12,7 +13,10 @@ extension IDEWorkspace {
         IDEFileHost(
             root: root,
             open: { [weak self] path, line, preview in self?.model.openFile(path, line: line, preview: preview) },
-            setDirty: { [weak self] dirty, path in self?.model.setDirty(dirty, forFile: path) },
+            setDirty: { [weak self] dirty, path in
+                self?.model.setDirty(dirty, forFile: path)
+                if dirty { self?.scheduleAutoSave() }
+            },
             reference: { [weak self] token in self?.addReferenceToChat(token) },
             report: { [weak self] path, diagnostics, text in
                 let problems = diagnostics.map { item -> IDEProblem in
@@ -21,7 +25,8 @@ extension IDEWorkspace {
                                       severity: IDESeverity(rawValue: item.severity.rawValue) ?? .information, message: item.message)
                 }
                 self?.model.problems.set(problems, forFile: path)
-            }
+            },
+            caret: { [weak self] path, caret in self?.carets[path] = caret }
         )
     }
 
@@ -48,6 +53,25 @@ extension IDEWorkspace {
     }
 
     // MARK: 保存
+
+    /// 「延迟保存」模式下,最后一次修改后停顿一秒保存全部;每次修改重置计时。
+    func scheduleAutoSave() {
+        guard IDEAutoSaveMode.current == .afterDelay else { return }
+        autoSaveTask?.cancel()
+        autoSaveTask = Task { [weak self] in
+            try? await Task.sleep(for: IDEAutoSaveMode.delay)
+            guard !Task.isCancelled, let self, IDEAutoSaveMode.current == .afterDelay else { return }
+            Log.editor.info("IDE 自动保存", ["files": "\(self.dirtyPaths.count)"])
+            self.saveAll()
+        }
+    }
+
+    /// 窗口失去焦点:「失焦保存」模式下保存全部。
+    func autoSaveOnFocusLoss() {
+        guard IDEAutoSaveMode.current == .onFocusLoss, !dirtyPaths.isEmpty else { return }
+        Log.editor.info("IDE 失焦自动保存", ["files": "\(dirtyPaths.count)"])
+        saveAll()
+    }
 
     /// 保存当前聚焦标签的文件。
     func saveActive() {

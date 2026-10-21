@@ -2,6 +2,7 @@
 // IDE 命令面板(I12):打开/索引、选择文件、执行命令、转到行解析、上下文。
 
 import Foundation
+import EditorKit
 import IDEKit
 import Testing
 import WorkbenchKit
@@ -70,5 +71,15 @@ struct IDEPaletteTests {
         #expect(space.palette.highlighted == 0)
         space.palette.move(-3, count: 4)
         #expect(space.palette.highlighted == 0)
+    }
+
+    @Test("状态栏语言名与光标上报")
+    func statusBarPieces() {
+        #expect(IDEStatusBar.languageName(for: "/a/b.swift") == "Swift")
+        #expect(IDEStatusBar.languageName(for: "/a/b.ts") == "TypeScript")
+        #expect(IDEStatusBar.languageName(for: "/a/b.unknownext") == String(localized: "纯文本"))
+        let space = IDEWorkspace(model: IDEWindowModel(snapshot: IDEWindowSnapshot(workspaceRoot: "/tmp")))
+        space.fileHost.caret("/tmp/a.swift", EditorCaret(line: 3, column: 5, selectedLength: 0))
+        #expect(space.carets["/tmp/a.swift"] == EditorCaret(line: 3, column: 5, selectedLength: 0))
     }
 }
