@@ -42,6 +42,8 @@ let package = Package(
         .target(name: "GitKit", dependencies: ["DiffKit", "OMLog"]),
         // LSP 客户端:Content-Length 分帧、客户端 actor、服务器定位与管理(复用 ACPKit 的 JSON-RPC 连接,无 UI)
         .target(name: "LSPKit", dependencies: ["ACPKit", "OMLog"]),
+        // IDE 模式数据层:每窗口模型、窗口注册表、命令注册表、问题聚合(无视图)
+        .target(name: "IDEKit", dependencies: ["OMLog", "WorkbenchKit"]),
         // 演示模式数据:确定性生成演示项目、Git 仓库、历史会话与演示用 Claude 配置(无视图)
         .target(name: "DemoKit", dependencies: ["ACPKit", "CanvasKit", "OMLog", "WorkbenchKit"]),
         // Liquid Glass 设计系统
@@ -55,7 +57,7 @@ let package = Package(
         // 应用本体
         .executableTarget(
             name: "OhMyAgentApp",
-            dependencies: ["ACPKit", "AgentHost", "ChatKit", "ClaudeConfigKit", "DiffKit", "EditorKit", "DesignSystem", "IconKit", "MermaidKit", "GitKit", "LSPKit", "DemoKit", "OMLog", "SpreadsheetKit", "AutomationKit", "WorkbenchKit", "CanvasKit",
+            dependencies: ["ACPKit", "AgentHost", "ChatKit", "ClaudeConfigKit", "DiffKit", "EditorKit", "DesignSystem", "IconKit", "MermaidKit", "GitKit", "LSPKit", "DemoKit", "OMLog", "SpreadsheetKit", "AutomationKit", "WorkbenchKit", "CanvasKit", "IDEKit",
                            .product(name: "SwiftTerm", package: "SwiftTerm")]
         ),
         // 脚本化 ACP Agent,用于测试与预览
@@ -82,6 +84,7 @@ let package = Package(
         .testTarget(name: "CanvasKitTests", dependencies: ["CanvasKit"]),
         .testTarget(name: "AutomationKitTests", dependencies: ["AutomationKit"]),
         .testTarget(name: "EditorKitTests", dependencies: ["EditorKit"]),
+        .testTarget(name: "IDEKitTests", dependencies: ["IDEKit", "WorkbenchKit"]),
         .testTarget(name: "MermaidKitTests", dependencies: ["MermaidKit"]),
         .testTarget(name: "OhMyAgentAppTests", dependencies: ["OhMyAgentApp", "ChatKit", "ACPKit", "DesignSystem", "EditorKit", "LSPKit", "CanvasKit", "DemoKit"]),
         .testTarget(name: "WorkbenchKitTests", dependencies: ["WorkbenchKit", "ChatKit", "ACPKit", "AgentHost", "FakeAgent"]),
