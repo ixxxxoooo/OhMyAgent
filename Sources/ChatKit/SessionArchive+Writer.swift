@@ -21,7 +21,7 @@ struct ArchiveWriter {
 extension SessionArchive {
     /// 处理一条更新:瞬时状态丢弃;同一消息的文本片段合并;其他更新先结束合并中的片段再追加。
     func recordNow(_ key: SessionArchiveKey, cwd: String?, update: JSONValue) {
-        guard let kind = update["sessionUpdate"]?.stringValue, !SessionArchiveFormat.transientKinds.contains(kind) else { return }
+        guard !purged.contains(key.sessionId), let kind = update["sessionUpdate"]?.stringValue, !SessionArchiveFormat.transientKinds.contains(kind) else { return }
         var writer = writers[key] ?? ArchiveWriter(cwd: cwd)
         if writer.cwd == nil { writer.cwd = cwd }
         if let text = Self.mergeableText(update) {

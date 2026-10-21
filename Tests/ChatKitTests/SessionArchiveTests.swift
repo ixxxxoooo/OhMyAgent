@@ -168,6 +168,23 @@ struct SessionArchiveTests {
         #expect(archive.usage().files == 0)
     }
 
+    @Test("用户删除会话:各引擎下的存档都被删除,之后到达的更新被忽略")
+    func purgeAcrossAgents() async {
+        let (archive, root) = makeArchive()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let other = SessionArchiveKey(agentId: "opencode", sessionId: key.sessionId)
+        archive.record(key, cwd: nil, update: chunk("agent_message_chunk", "a", id: "m1"))
+        archive.record(other, cwd: nil, update: chunk("agent_message_chunk", "b", id: "m1"))
+        archive.flush(key)
+        archive.flush(other)
+        _ = await archive.load(other)
+        await archive.purge(sessionId: key.sessionId)
+        #expect(archive.usage().files == 0)
+        archive.record(key, cwd: nil, update: ["sessionUpdate": "tool_call", "toolCallId": "late"])
+        archive.flush(key)
+        #expect(await archive.load(key) == nil)
+    }
+
     @Test("延迟写盘:不调 flush 也会在短延迟后落盘")
     func delayedWrite() async throws {
         let (archive, root) = makeArchive()

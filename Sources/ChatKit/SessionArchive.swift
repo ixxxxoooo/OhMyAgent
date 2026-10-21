@@ -20,12 +20,15 @@ public actor SessionArchive {
         case endSync(SessionArchiveKey, success: Bool, reply: CheckedContinuation<SessionArchiveSyncOutcome, Never>)
         case load(SessionArchiveKey, reply: CheckedContinuation<ArchivedSession?, Never>)
         case delete(SessionArchiveKey, reply: CheckedContinuation<Void, Never>)
+        case purge(String, reply: CheckedContinuation<Void, Never>)
     }
 
     /// 存档根目录
     public nonisolated let root: URL
     private nonisolated let inbox: AsyncStream<Command>.Continuation
     var writers: [SessionArchiveKey: ArchiveWriter] = [:]
+    /// 用户已删除的会话 ID:之后到达的更新一律忽略(被中断的回合可能还在收尾)
+    var purged: Set<String> = []
     let log = Log.session.with(["part": "archive"])
     /// 缓冲超过该字节数立即写盘;否则在 `writeDelay` 后写盘
     let bufferLimit = 64 * 1024
@@ -97,6 +100,12 @@ public actor SessionArchive {
         await withCheckedContinuation { reply in inbox.yield(.delete(key, reply: reply)) }
     }
 
+    /// 用户删除会话:在所有引擎下删除它的存档,并忽略之后到达的更新。
+    /// - Parameter sessionId: 协议会话 ID
+    public nonisolated func purge(sessionId: String) async {
+        await withCheckedContinuation { reply in inbox.yield(.purge(sessionId, reply: reply)) }
+    }
+
     /// 存档文件是否存在(只看文件,不读内容)。
     /// - Parameter key: 存档键
     public nonisolated func exists(_ key: SessionArchiveKey) -> Bool {
@@ -154,7 +163,24 @@ public actor SessionArchive {
         case .endSync(let key, let success, let reply): reply.resume(returning: endSyncNow(key, success: success))
         case .load(let key, let reply): reply.resume(returning: loadNow(key))
         case .delete(let key, let reply): deleteNow(key); reply.resume()
+        case .purge(let sessionId, let reply): purgeNow(sessionId); reply.resume()
         }
+    }
+
+    /// 在每个引擎目录下删除该会话的存档。
+    private func purgeNow(_ sessionId: String) {
+        purged.insert(sessionId)
+        let agents = (try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? []
+        for key in writers.keys where key.sessionId == sessionId { deleteNow(key) }
+        for agent in agents {
+            let directory = root.appendingPathComponent(agent, isDirectory: true)
+            let name = SessionArchiveFormat.safeName(sessionId) + ".jsonl"
+            for url in [directory.appendingPathComponent(name), directory.appendingPathComponent(name + ".sync")]
+            where FileManager.default.fileExists(atPath: url.path) {
+                do { try FileManager.default.removeItem(at: url) } catch { log.error("删除会话存档失败", error: error, ["session": String(sessionId.prefix(8))]) }
+            }
+        }
+        log.info("会话存档已随会话删除", ["session": String(sessionId.prefix(8))])
     }
 
     /// 安排一次延迟写盘(同一会话只排一次)。

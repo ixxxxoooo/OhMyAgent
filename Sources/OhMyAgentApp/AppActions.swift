@@ -94,6 +94,7 @@ final class AppActions {
         let bystander = bystanders.first { $0.phase == .ready } ?? bystanders.first
         let displaying = models.first { $0.sessionId == sessionId && matches($0) }
         RecentStore.removeSession(sessionId)
+        if let archive = SessionModel.archive { Task { await archive.purge(sessionId: sessionId) } }
         if let bystander {
             workbench.forgetSession(sessionId, in: projectID)
             Task { _ = await bystander.deleteOnEngine(sessionId) }
