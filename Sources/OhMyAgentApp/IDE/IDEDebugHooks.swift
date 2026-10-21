@@ -45,11 +45,12 @@ enum IDEDebugHooks {
         try? await Task.sleep(for: .milliseconds(500))
         let before = footprintMB()
         for round in 1...rounds {
-            let coldTime = clock.measure { manager.open(root: target, forceNew: true) }
+            // 计入首帧:显示后强制同步排版与绘制,否则只量到「下单」的耗时
+            let coldTime = clock.measure { let model = manager.open(root: target, forceNew: true); manager.controller(for: model)?.window?.displayIfNeeded() }
             await settle()
             manager.switchToAgent()
             await settle()
-            let warmTime = clock.measure { manager.switchToIDE() }
+            let warmTime = clock.measure { manager.switchToIDE(); manager.controller(for: manager.registry.mostRecent ?? warmup)?.window?.displayIfNeeded() }
             await settle()
             if let model = manager.registry.mostRecent { manager.controller(for: model)?.window?.close() }
             await settle()
