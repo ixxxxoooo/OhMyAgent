@@ -375,6 +375,13 @@ public final class CodeEditorView: NSView {
         scheduleHighlight()
     }
 
+    /// 执行编辑动作(命令面板用)。
+    /// - Parameter action: 动作
+    public func perform(_ action: EditorAction) {
+        textView.window?.makeFirstResponder(textView)
+        textView.perform(action)
+    }
+
     /// 当前光标的行、列(均 1 起始)。
     public var caretPosition: (line: Int, column: Int) {
         let offset = textView.selectedRange().location

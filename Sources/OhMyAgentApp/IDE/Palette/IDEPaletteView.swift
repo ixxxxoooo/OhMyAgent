@@ -1,0 +1,152 @@
+// @author ixxxxoooo
+// IDE 命令面板视图:居中浮层(遮罩 + 卡片),输入框 + 结果列表;↑↓ 选择、↩ 执行、Esc 关闭。
+// 外观沿用全局浮层规范(`omGlassCard`、令牌颜色/字号/圆角)。
+
+import DesignSystem
+import IconKit
+import IDEKit
+import SwiftUI
+import WorkbenchKit
+
+/// 面板浮层(盖在整个 IDE 外壳上,未显示时不占任何空间)。
+struct IDEPaletteOverlay: View {
+    let workspace: IDEWorkspace
+
+    var body: some View {
+        if workspace.palette.isPresented {
+            ZStack(alignment: .top) {
+                OMColors.scrim
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .onTapGesture { workspace.palette.dismiss() }
+                IDEPaletteCard(workspace: workspace)
+                    .padding(.top, 56)
+            }
+            .transition(.opacity)
+        }
+    }
+}
+
+private struct IDEPaletteCard: View {
+    let workspace: IDEWorkspace
+    @FocusState private var focused: Bool
+
+    private var palette: IDEPaletteModel { workspace.palette }
+
+    var body: some View {
+        let items = palette.items(context: workspace.commandContext, recents: workspace.openRelativePaths)
+        VStack(spacing: 0) {
+            HStack(spacing: OMSpacing.sm) {
+                Image.om(icon, size: 14).foregroundStyle(OMColors.secondaryText)
+                TextField(placeholder, text: Bindable(palette).text)
+                    .textFieldStyle(.plain)
+                    .font(OMFonts.body)
+                    .focused($focused)
+                    .onSubmit { if items.indices.contains(palette.highlighted) { workspace.choose(items[palette.highlighted]) } }
+                    .accessibilityLabel(placeholder)
+            }
+            .padding(.horizontal, OMSpacing.md)
+            .frame(height: 40)
+            Rectangle().fill(OMColors.hairline).frame(height: 1)
+            list(items)
+        }
+        .frame(width: 560)
+        .omGlassCard(cornerRadius: OMRadius.modal)
+        .omFloatingShadow()
+        .onAppear { focused = true }
+        .onKeyPress(.upArrow) { palette.move(-1, count: items.count); return .handled }
+        .onKeyPress(.downArrow) { palette.move(1, count: items.count); return .handled }
+        .onKeyPress(.escape) { palette.dismiss(); return .handled }
+    }
+
+    private var icon: String {
+        switch palette.query {
+        case .files: "file-search"
+        case .commands: "terminal"
+        case .line: "hash"
+        }
+    }
+
+    private var placeholder: String {
+        switch palette.query {
+        case .files: String(localized: "按文件名搜索(> 命令,: 转到行)")
+        case .commands: String(localized: "输入命令名称")
+        case .line: String(localized: "输入行号,如 :120 或 :120:8")
+        }
+    }
+
+    @ViewBuilder
+    private func list(_ items: [IDEPaletteItem]) -> some View {
+        if items.isEmpty {
+            Text(palette.files.isEmpty && palette.query == .files("") ? String(localized: "正在建立文件索引…") : String(localized: "没有匹配项"))
+                .font(OMFonts.small)
+                .foregroundStyle(OMColors.tertiaryText)
+                .frame(maxWidth: .infinity, minHeight: 56)
+        } else {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                            IDEPaletteRow(item: item, highlighted: index == palette.highlighted)
+                                .id(item.id)
+                                .onTapGesture { workspace.choose(item) }
+                                .onHover { if $0 { palette.highlighted = index } }
+                        }
+                    }
+                    .padding(OMSpacing.xs)
+                }
+                .frame(maxHeight: 360)
+                .onChange(of: palette.highlighted) { _, new in
+                    if items.indices.contains(new) { proxy.scrollTo(items[new].id) }
+                }
+            }
+        }
+    }
+}
+
+private struct IDEPaletteRow: View {
+    let item: IDEPaletteItem
+    let highlighted: Bool
+
+    var body: some View {
+        HStack(spacing: OMSpacing.sm) {
+            switch item {
+            case .file(let match):
+                let name = (match.path as NSString).lastPathComponent
+                let dir = (match.path as NSString).deletingLastPathComponent
+                OMFileIcon(name: name, size: 14)
+                Text(name).font(OMFonts.body).foregroundStyle(OMColors.primaryText).lineLimit(1)
+                if !dir.isEmpty {
+                    Text(dir).font(OMFonts.small).foregroundStyle(OMColors.tertiaryText).lineLimit(1).truncationMode(.head)
+                }
+                Spacer(minLength: 0)
+            case .command(let match):
+                Text(match.command.category + ": ").font(OMFonts.body).foregroundStyle(OMColors.tertiaryText)
+                    + Text(match.command.title).font(OMFonts.body).foregroundStyle(OMColors.primaryText)
+                Spacer(minLength: 0)
+                if let shortcut = match.command.shortcut {
+                    Text(shortcut)
+                        .font(OMFonts.caption)
+                        .foregroundStyle(OMColors.secondaryText)
+                        .padding(.horizontal, 6)
+                        .frame(height: 18)
+                        .background(OMColors.subtleFill, in: OMPillShape())
+                }
+            case .line(let line, let column):
+                Image.om("corner-down-right", size: 14).foregroundStyle(OMColors.secondaryText)
+                Text(Self.lineText(line, column)).font(OMFonts.body).foregroundStyle(line == nil ? OMColors.tertiaryText : OMColors.primaryText)
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(.horizontal, OMSpacing.sm)
+        .frame(height: 28)
+        .background(highlighted ? OMColors.selectedFill : .clear, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
+        .contentShape(Rectangle())
+    }
+
+    private static func lineText(_ line: Int?, _ column: Int?) -> String {
+        guard let line else { return String(localized: "输入行号以跳转") }
+        if let column { return String(localized: "转到第 \(line) 行,第 \(column) 列") }
+        return String(localized: "转到第 \(line) 行")
+    }
+}

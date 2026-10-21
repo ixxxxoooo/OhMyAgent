@@ -78,6 +78,16 @@ public struct FuzzyMatch: Identifiable, Hashable, Sendable {
     public let score: Int
     /// 命中的字符位置(以 `path` 的 Character 下标)
     public let positions: [Int]
+
+    /// - Parameters:
+    ///   - path: 候选路径
+    ///   - score: 得分
+    ///   - positions: 命中位置
+    public init(path: String, score: Int, positions: [Int]) {
+        self.path = path
+        self.score = score
+        self.positions = positions
+    }
 }
 
 /// 快速打开的模糊匹配。

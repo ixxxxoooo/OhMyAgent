@@ -274,11 +274,11 @@ struct WorkbenchCommands: Commands {
             Divider()
             Button("搜索…") { HubModel.shared.present(.all, workbench: workbench) }
                 .keyboardShortcut(shortcuts.shortcut(for: .hubSearch))
-            Button("快速打开文件…") { PaletteModel.present(.files, workbench: workbench) }
+            Button("快速打开文件…") { if !IDEWindowManager.shared.route(.quickOpen) { PaletteModel.present(.files, workbench: workbench) } }
                 .keyboardShortcut(shortcuts.shortcut(for: .quickOpen))
-            Button("命令面板…") { PaletteModel.present(.commands, workbench: workbench) }
+            Button("命令面板…") { if !IDEWindowManager.shared.route(.commandPalette) { PaletteModel.present(.commands, workbench: workbench) } }
                 .keyboardShortcut(shortcuts.shortcut(for: .commandPalette))
-            Button("在文件中搜索") { workbench.showRight(.search); SearchModel.shared.requestFocus() }
+            Button("在文件中搜索") { if !IDEWindowManager.shared.route(.showSearch) { workbench.showRight(.search); SearchModel.shared.requestFocus() } }
                 .keyboardShortcut(shortcuts.shortcut(for: .globalSearch))
             Button("新建终端") { AppActions.shared.newTerminal() }
                 .keyboardShortcut(shortcuts.shortcut(for: .newTerminal))

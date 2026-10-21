@@ -27,6 +27,7 @@ struct IDEShellView: View {
         .ignoresSafeArea(.container, edges: .top)
         .tint(appearance.tint)
         .omScrollbarPolicy()
+        .overlay { IDEPaletteOverlay(workspace: workspace) }
         .frame(minWidth: IDEMetrics.windowMinWidth, minHeight: IDEMetrics.windowMinHeight)
     }
 

@@ -24,6 +24,8 @@ final class IDEWorkspace {
     @ObservationIgnored private(set) var history = FileOpHistory()
     /// 全局搜索/替换模型(每窗口一份)
     let search = IDESearchModel()
+    /// 命令面板/快速打开(每窗口一份)
+    let palette = IDEPaletteModel()
     /// Agent 面板所用会话的项目标识与槽位(每窗口一个专属槽位,不与 Agents Window 的会话标签冲突)
     @ObservationIgnored var agentProjectID: String?
     @ObservationIgnored var agentSlot: String?

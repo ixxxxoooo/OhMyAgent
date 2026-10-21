@@ -4,6 +4,7 @@
 
 import AppKit
 import ChatKit
+import EditorKit
 import IDEKit
 import OMLog
 import WorkbenchKit
@@ -23,6 +24,8 @@ final class IDEWindowManager {
 
     private init() {
         registry = IDEWindowRegistry()
+        // 编辑器里按 ⌃G:IDE 窗口弹出「转到行」输入
+        CodeEditorView.goToLineHandler = { [weak self] in self?.route(.goToLine) }
     }
 
     // MARK: 查询
@@ -120,6 +123,7 @@ final class IDEWindowManager {
         case toggleSidebar, togglePanel, toggleAgentPane, closeWindow
         case save, saveAll, closeTab, reopenTab, nextTab, previousTab
         case newTerminal, showProblems
+        case quickOpen, commandPalette, goToLine, showSearch
     }
 
     /// 若当前键盘窗口是 IDE 窗口,执行命令并返回 true;否则返回 false(调用方走 Agent 窗口的默认行为)。
@@ -141,6 +145,10 @@ final class IDEWindowManager {
             }
         case .newTerminal: controllers[model.id]?.workspace.newTerminal()
         case .showProblems: model.showPanel(.problems)
+        case .quickOpen: controllers[model.id]?.workspace.openPalette("")
+        case .commandPalette: controllers[model.id]?.workspace.openPalette(">")
+        case .goToLine: controllers[model.id]?.workspace.openPalette(":")
+        case .showSearch: controllers[model.id]?.workspace.perform("view.search")
         case .reopenTab: controllers[model.id]?.workspace.reopenClosed()
         case .nextTab: controllers[model.id]?.workspace.cycleTab(by: 1)
         case .previousTab: controllers[model.id]?.workspace.cycleTab(by: -1)

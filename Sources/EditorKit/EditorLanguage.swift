@@ -233,31 +233,44 @@ public final class EditorTextView: NSTextView {
     private func handleEditingShortcut(_ event: NSEvent, isKeyEquivalent: Bool) -> Bool {
         guard canEnhance || (isEditable && codeEditingEnabled && selectedRanges.count > 1 && event.keyCode == 2) else { return false }
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.numericPad, .function])
-        let selection = selectedRange()
         switch (event.keyCode, flags) {
-        case (44, [.command]):  // ⌘/ 切换行注释
-            guard let prefix = EditorEditing.commentPrefix(for: language),
-                  let edit = EditorEditing.toggleLineComment(text: string, selection: selection, prefix: prefix) else { return true }
-            applyEdit(edit)
-            return true
-        case (40, [.command, .shift]):  // ⌘⇧K 删除行
-            applyEdit(EditorEditing.deleteLines(text: string, selection: selection))
-            return true
-        case (126, [.option]), (125, [.option]):  // ⌥↑/⌥↓ 移动行
-            if let edit = EditorEditing.moveLines(text: string, selection: selection, up: event.keyCode == 126) { applyEdit(edit) }
-            return true
-        case (126, [.option, .shift]), (125, [.option, .shift]):  // ⇧⌥↑/↓ 复制行
-            applyEdit(EditorEditing.duplicateLines(text: string, selection: selection, down: event.keyCode == 125))
-            return true
-        case (2, [.command]) where isKeyEquivalent:  // ⌘D 添加下一个相同项
-            addNextOccurrence()
-            return true
+        case (44, [.command]): perform(.toggleComment)
+        case (40, [.command, .shift]): perform(.deleteLine)
+        case (126, [.option]): perform(.moveLineUp)
+        case (125, [.option]): perform(.moveLineDown)
+        case (126, [.option, .shift]): perform(.duplicateLineUp)
+        case (125, [.option, .shift]): perform(.duplicateLineDown)
+        case (2, [.command]) where isKeyEquivalent: perform(.addNextOccurrence)
         case (5, [.control]):  // ⌃G 转到行
             guard let onGoToLine else { return false }
             onGoToLine()
-            return true
-        default:
-            return false
+        default: return false
+        }
+        return true
+    }
+
+    /// 执行一个编辑动作(快捷键与命令面板共用)。
+    /// - Parameter action: 动作
+    func perform(_ action: EditorAction) {
+        guard isEditable, codeEditingEnabled else { return }
+        let selection = selectedRange()
+        switch action {
+        case .toggleComment:
+            guard selectedRanges.count == 1, let prefix = EditorEditing.commentPrefix(for: language),
+                  let edit = EditorEditing.toggleLineComment(text: string, selection: selection, prefix: prefix) else { return }
+            applyEdit(edit)
+        case .deleteLine:
+            guard selectedRanges.count == 1 else { return }
+            applyEdit(EditorEditing.deleteLines(text: string, selection: selection))
+        case .moveLineUp, .moveLineDown:
+            guard selectedRanges.count == 1,
+                  let edit = EditorEditing.moveLines(text: string, selection: selection, up: action == .moveLineUp) else { return }
+            applyEdit(edit)
+        case .duplicateLineUp, .duplicateLineDown:
+            guard selectedRanges.count == 1 else { return }
+            applyEdit(EditorEditing.duplicateLines(text: string, selection: selection, down: action == .duplicateLineDown))
+        case .addNextOccurrence:
+            addNextOccurrence()
         }
     }
 
@@ -518,4 +531,9 @@ private extension NSString {
         while isWord(end) { end += 1 }
         return NSRange(location: start, length: end - start)
     }
+}
+
+/// 编辑器可被外部(命令面板、菜单)触发的编辑动作。
+public enum EditorAction: Sendable {
+    case toggleComment, deleteLine, moveLineUp, moveLineDown, duplicateLineUp, duplicateLineDown, addNextOccurrence
 }
