@@ -113,7 +113,7 @@ struct FileHeaderBar: View {
         // 文件名可拖到中栏标签条(与资源管理器条目同样以文件 URL 拖出),右键可直接在中栏打开
         .onDrag { NSItemProvider(object: URL(fileURLWithPath: path) as NSURL) }
         .omContextMenu {
-            OMMenuItem("在中栏打开", icon: "panel-top") {
+            OMMenuItem("在中栏打开", icon: "app-window") {
                 MainActor.assumeIsolated { _ = AppEnvironment.shared.workbench.openFile(path, preview: false, target: .editor) }
             }
             OMMenuItem("在 Finder 中显示", icon: "folder-open") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }
