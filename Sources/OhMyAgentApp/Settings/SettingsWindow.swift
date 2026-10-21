@@ -153,10 +153,12 @@ enum SettingsContext {
 /// 设置整页(并入主窗口):左侧分组导航 + 搜索,右侧内容居中;「返回」回到工作台。
 struct SettingsView: View {
     let workbench: WorkbenchModel
-    @Bindable private var router = SettingsRouter.shared
+    private let router = SettingsRouter.shared
     @State private var model = ClaudeSettingsModel(paths: ClaudePaths(workspace: SettingsContext.workspace))
     @State private var center = ConfigCenter(paths: ClaudePaths(workspace: SettingsContext.workspace))
-    @State private var query = ""
+    /// 右侧实际显示的页面:比侧栏选中晚一帧切换,让点击高亮先画出来
+    @State private var shownPage = SettingsRouter.shared.page
+    @State private var keepAlive = SettingsKeepAlive()
     private let appearance = AppearanceModel.shared
 
     @AppStorage(ClientPrefs.Key.settingsWidth) private var widthRaw = SettingsContentWidth.standard.rawValue
@@ -167,7 +169,7 @@ struct SettingsView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            sidebar
+            SettingsSidebar(workbench: workbench)
                 .frame(width: CGFloat(PanelMetrics.clamp(workbench.layout.leftWidth, side: .left)))
             Divider()
             VStack(spacing: 0) {
@@ -179,9 +181,19 @@ struct SettingsView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(10).background(OMColors.danger.opacity(0.1))
                 }
-                // 宽高都给出上下限:尺寸只由窗口决定,不再先按理想尺寸把整页内容测量一遍(切页卡顿的主因)
-                page
-                    .id(router.page)
+                // 最近访问的静态页保持挂载(见 SettingsKeepAlive),只显示当前页;隐藏页不接收点击与无障碍
+                ZStack {
+                    ForEach(keepAlive.mounted(current: shownPage), id: \.self) { item in
+                        let active = item == shownPage
+                        SettingsPageHost(page: item, workbench: workbench, model: model, center: center)
+                            .equatable()
+                            // 隐藏页的定时动画(ActiveTimeline 等)降到极低频,否则会持续触发整窗重新布局
+                            .environment(\.tabIsActive, active)
+                            .opacity(active ? 1 : 0)
+                            .allowsHitTesting(active)
+                            .accessibilityHidden(!active)
+                    }
+                }
                     .frame(minWidth: 0, maxWidth: contentWidth, minHeight: 0, maxHeight: .infinity)
                     .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
                     .background(OMColors.surface)
@@ -191,9 +203,16 @@ struct SettingsView: View {
         .background(OMColors.surface)
         // 无标题栏窗口:内容铺满到窗口顶部,由侧栏/内容区各自预留标题栏高度,避免系统安全区叠加出多余留白
         .ignoresSafeArea(.container, edges: .top)
-        .navigationTitle(router.page.title)
+        .navigationTitle(shownPage.title)
         .tint(appearance.tint)
         .onExitCommand { workbench.closeSettings() }
+        .onAppear { keepAlive.visit(shownPage) }
+        // 只在这个不可见子视图里读 router.page:选中变化时本视图 body 不重算。
+        // 换页排在本轮渲染提交之后(侧栏高亮先上屏),新页面的构建与布局放到下一帧
+        .background(SettingsRouteFollower { next in
+            SettingsSweepProbe.markSelect()
+            RunLoopAfterCommit.perform { show(next) }
+        })
         .task {
             model.start()
             center.start()
@@ -206,136 +225,16 @@ struct SettingsView: View {
                 await SettingsSweepProbe.run(router: router, rounds: rounds)
             }
         }
-        .task {
-            // 调试:OMA_SETTINGS_SWEEP=轮数 依次切换全部设置页并记录首帧耗时
-            if let rounds = ProcessInfo.processInfo.environment["OMA_SETTINGS_SWEEP"].flatMap(Int.init) {
-                await SettingsSweepProbe.run(router: router, rounds: rounds)
-            }
-        }
         .onDisappear { model.stop(); center.stop() }
     }
 
-    /// 左侧导航:返回、搜索、分组页面列表。
-    private var sidebar: some View {
-        VStack(spacing: 0) {
-            // 第一行留给红绿灯(整行可拖动窗口);「返回」放在红绿灯下面一行,不与红绿灯并排
-            Color.clear
-                .frame(height: TitlebarMetrics.height)
-                .background(WindowDragArea())
-            HStack {
-                Button { workbench.closeSettings() } label: {
-                    Label("返回", om: "arrow.left")
-                        .font(OMFonts.body)
-                        .frame(height: 26)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(OMColors.secondaryText)
-                .omTooltip("返回工作台 (Esc)")
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 14)
-            .padding(.bottom, 4)
-            HStack(spacing: 6) {
-                Image.om("magnifyingglass", size: 12).foregroundStyle(OMColors.tertiaryText)
-                TextField("搜索设置", text: $query)
-                    .textFieldStyle(.plain)
-                    .font(OMFonts.body)
-            }
-            .padding(.horizontal, 8)
-            .frame(height: 26)
-            .background(RoundedRectangle(cornerRadius: OMRadius.control).fill(OMColors.hoverFill))
-            .padding(.horizontal, 12)
-            .padding(.bottom, 8)
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 2) {
-                    ForEach(filteredGroups, id: \.title) { group in
-                        Text(LocalizedStringKey(group.title))
-                            .font(OMFonts.small)
-                            .foregroundStyle(OMColors.tertiaryText)
-                            .padding(.horizontal, 10)
-                            .padding(.top, 12)
-                            .padding(.bottom, 4)
-                        ForEach(group.pages) { page in
-                            SettingsSidebarRow(page: page, selected: router.page == page) { router.page = page }
-                        }
-                    }
-                }
-                .padding(.horizontal, 10)
-                .padding(.bottom, 12)
-            }
-        }
-        .background(SidebarBackground())
-    }
-
-    /// 按搜索词过滤后的分组(标题或分组名包含关键字)。
-    private var filteredGroups: [(title: String, pages: [SettingsPage])] {
-        let key = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !key.isEmpty else { return SettingsPage.groups }
-        return SettingsPage.groups.compactMap { group in
-            let pages = group.pages.filter { page in
-                page.title.localizedCaseInsensitiveContains(key) || group.title.localizedCaseInsensitiveContains(key)
-                    || page.keywords.contains { $0.localizedCaseInsensitiveContains(key) }
-            }
-            return pages.isEmpty ? nil : (group.title, pages)
-        }
-    }
-
-    @ViewBuilder
-    private var page: some View {
-        switch router.page {
-        case .general: GeneralPage()
-        case .appearance: AppearancePage()
-        case .agent: AgentModelPage(model: model)
-        case .providers: ModelProvidersPage()
-        case .modelMapping: ModelMappingPage()
-        case .prompts: PromptsPage()
-        case .network: NetworkPage()
-        case .permissions: PermissionsPage(model: model)
-        case .trust: ProjectTrustPage(workbench: workbench)
-        case .mcp: MCPSettingsPage(center: center)
-        case .skills: SkillsSettingsPage(center: center, kind: .skill)
-        case .subagents: SkillsSettingsPage(center: center, kind: .agent)
-        case .hooks: HooksSettingsPage(center: center)
-        case .plugins: PluginsSettingsPage(center: center)
-        case .memory: MemorySettingsPage(center: center)
-        case .editor: EditorPage()
-        case .terminal: TerminalPage()
-        case .sourceControl: SourceControlPage()
-        case .browser: BrowserPage()
-        case .codeIntelligence: CodeIntelligencePage()
-        case .shortcuts: ShortcutsPage()
-        case .usage: UsagePage(paths: model.paths)
-        case .agentExtensions: AgentExtensionsPage()
-        case .privacy: PrivacyPage(model: model)
-        case .advanced: AdvancedPage(model: model)
-        case .diagnostics: DiagnosticsPage(center: center)
-        case .about: AboutPage()
-        }
-    }
-}
-
-/// 设置页左栏的一行:选中态取主题 `selectedFill`,不用系统列表的强调蓝(窗口激活/失活时颜色不再变化)。
-private struct SettingsSidebarRow: View {
-    let page: SettingsPage
-    let selected: Bool
-    let action: () -> Void
-    @State private var hovering = false
-
-    var body: some View {
-        Button(action: action) {
-            Label(page.title, om: page.icon)
-                .font(OMFonts.body)
-                .foregroundStyle(OMColors.primaryText)
-                .padding(.horizontal, 10)
-                .frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous)
-                        .fill(selected ? OMColors.selectedFill : (hovering ? OMColors.hoverFill : Color.clear))
-                )
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
+    /// 切换右侧显示的页面并记录保活;先让隐藏页里的输入框交出焦点,避免键入落到看不见的页面。
+    /// - Parameter next: 要显示的页面
+    private func show(_ next: SettingsPage) {
+        guard next == router.page, next != shownPage else { return }
+        SettingsSweepProbe.markShow()
+        NSApp.keyWindow?.makeFirstResponder(nil)
+        keepAlive.visit(next)
+        shownPage = next
     }
 }
