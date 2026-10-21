@@ -26,10 +26,10 @@ struct DemoIDELabTests {
         #expect(text.utf8.reduce(0) { $1 == 0x0A ? $0 + 1 : $0 } == DemoIDELab.bigLineCount)
     }
 
-    @Test("超长单行 JSON:存在 20 万字符以上的一行")
+    @Test("超长单行 JSON:存在 10 万字符以上的一行")
     func longLine() {
         let longest = DemoIDELab.longLinesJSON.split(separator: "\n").map(\.count).max() ?? 0
-        #expect(longest > 200_000, "最长行 \(longest)")
+        #expect(longest > 100_000, "最长行 \(longest)")
     }
 
     @Test("语言样例覆盖首批 tree-sitter 语言,并含一个不支持语言用于回退")

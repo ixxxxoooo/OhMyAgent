@@ -1,7 +1,7 @@
 // @author ixxxxoooo
 // 编辑器性能测量工具(M0 起步,I1 扩展):装载文件,测量「打开到首个高亮帧」「滚动帧耗时」「按键到上屏延迟」「主线程卡顿」与内存。
 // 用法(必须 release):
-//   swift run -c release EditorSpike [--ide-big | --lines N | --file 路径] [--nowrap] [--keys N] [--scroll N] [--json]
+//   swift run -c release EditorSpike [--ide-big | --ide-long | --lines N | --file 路径] [--nowrap] [--keys N] [--scroll N] [--json]
 // `--ide-big` 使用与 IDE 实验室 `Big50k.swift` 相同的 5 万行 / 约 1.6MB 素材(计划第 4 节的测量对象);默认 5 万行合成 Swift 源码、自动换行。`Scripts/editor-bench.sh` 会同时跑换行与不换行两种模式并按计划预算打印结论。
 
 import AppKit
@@ -43,6 +43,7 @@ struct Options {
     var scrollSteps = 400
     var json = false
     var ideBig = false
+    var ideLong = false
 
     init(_ arguments: [String]) {
         var iterator = arguments.dropFirst().makeIterator()
@@ -55,6 +56,7 @@ struct Options {
             case "--scroll": scrollSteps = Int(iterator.next() ?? "") ?? scrollSteps
             case "--json": json = true
             case "--ide-big": ideBig = true
+            case "--ide-long": ideLong = true
             default: lines = Int(argument) ?? lines
             }
         }
@@ -81,6 +83,8 @@ let source: String
 if let path = options.file {
     guard let text = try? String(contentsOfFile: path, encoding: .utf8) else { print("[editor] 无法读取 \(path)"); exit(2) }
     source = text
+} else if options.ideLong {
+    source = DemoIDELab.longLinesJSON
 } else if options.ideBig {
     source = DemoIDELab.swiftLines(count: DemoIDELab.bigLineCount)
 } else {
@@ -196,11 +200,13 @@ if let repeatText = ProcessInfo.processInfo.environment["SPIKE_REPEAT"], let rep
     exit(0)
 }
 var typeTimes: [Double] = []
+var insertTimes: [Double] = []
 var worstStall = 0.0
 for index in 0..<options.keys {
     let keyMs: Double = autoreleasepool {
         let start = ContinuousClock.now
         editor.textView.insertText("x", replacementRange: editor.textView.selectedRange())
+        insertTimes.append(ms(ContinuousClock.now - start))
         window.displayIfNeeded()
         return ms(ContinuousClock.now - start)
     }
@@ -215,6 +221,8 @@ for index in 0..<options.keys {
 report("typing.avg", typeTimes.reduce(0, +) / Double(max(typeTimes.count, 1)))
 report("typing.p95", percentile(typeTimes, 0.95))
 report("typing.max", typeTimes.max() ?? 0)
+report("typing.insert-avg", insertTimes.reduce(0, +) / Double(max(insertTimes.count, 1)))
+report("typing.insert-p95", percentile(insertTimes, 0.95))
 report("typing.main-stall-max", worstStall)
 report("memory.final", Double(footprintMB() - baseline), "MB")
 

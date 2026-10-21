@@ -56,9 +56,9 @@ public enum DemoIDELab {
         return lines.prefix(count).joined(separator: "\n") + "\n"
     }
 
-    /// 含若干超长单行的 JSON(一行约 30 万字符,用来测不换行模式的宽度估算与横向滚动)。
+    /// 含若干超长单行的 JSON(一行约 15 万字符,用来测不换行模式的宽度估算与横向滚动)。
     public static var longLinesJSON: String {
-        let items = (0..<20_000).map { "{\"id\":\($0),\"name\":\"item-\($0)\",\"tags\":[\"a\",\"b\"]}" }
+        let items = (0..<3_000).map { "{\"id\":\($0),\"name\":\"item-\($0)\",\"tags\":[\"a\",\"b\"]}" }
         let minified = "[" + items.joined(separator: ",") + "]"
         return "{\n  \"note\": \"下面一行是压缩过的超长 JSON\",\n  \"payload\": \(minified),\n  \"tail\": true\n}\n"
     }
