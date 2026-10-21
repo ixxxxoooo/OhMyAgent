@@ -189,6 +189,8 @@ struct OhMyAgentApp: App {
         if !DemoLaunch.isActive { AppEnv.seedDevDataIfNeeded() }
         // Bundle ID 变更迁移:须早于外观、快捷键等偏好的首次读取(演示模式使用隔离沙盒,不迁移)
         if !DemoLaunch.isActive { LegacyDefaultsMigration.migrateIfNeeded() }
+        // 会话存档:须在演示沙盒与开发版数据就位之后才首次取 `shared`(其根目录随主目录重定向)
+        MainActor.assumeIsolated { SessionModel.archive = .shared }
         DiagnosticsStore.shared.markLaunch()
         ThemeBridges.register()
     }

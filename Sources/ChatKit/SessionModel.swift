@@ -582,6 +582,7 @@ public final class SessionModel {
         }
         agentName = result.agentTitle ?? result.agentName
         capabilities = result.capabilities
+        installArchiveTap(on: client)
         let coalescer = EventCoalescer()
         self.coalescer = coalescer
         // 后台:读取事件并合并
@@ -740,6 +741,7 @@ public final class SessionModel {
                 guard let self else { return }
                 if outcome == "injected" {
                     self.timeline.appendUser(text, attachments: images, steered: true)
+                    self.archiveUserMessage(text, images: self.capabilities.imagePrompts ? images : [], sessionId: sessionId)
                 } else {
                     // 轮次恰好已结束:作为普通消息排队/发送
                     self.log.info("引导未注入,改为排队", ["outcome": outcome])
@@ -1168,6 +1170,7 @@ public final class SessionModel {
         }
         trackGoal(in: prompt)
         timeline.appendUser(prompt, attachments: images)
+        archiveUserMessage(prompt, images: capabilities.imagePrompts ? images : [], sessionId: sessionId)
         EmptySessionRegistry.unhide(sessionId)
         turnNumber += 1
         if sessionTitle == nil, titleSource == .none { startAutoTitle(for: prompt, sessionId: sessionId) }
@@ -1281,6 +1284,7 @@ public final class SessionModel {
             }
             await self?.coalescer?.drain()
             guard let self else { return }
+            self.flushArchive(self.sessionId)
             self.timeline.finishTurn(aborted: error != nil || reason == .cancelled)
             if let stall = self.stallMessage {
                 self.stallMessage = nil
@@ -1477,17 +1481,29 @@ public final class SessionModel {
         let servers = mcpServers
         let meta = effectiveMeta()
         let dirs = additionalDirectories
+        // 回放即全量同步:引擎回放的更新写入存档临时文件,加载成功后与现有存档比较再替换
+        let archive = canLoad ? Self.archive : nil
+        let archiveKey = archiveKey(summary.sessionId)
+        archive?.beginSync(archiveKey, cwd: cwd)
         Task { [weak self] in
+            var loaded = false
             do {
                 let setup = canLoad
                     ? try await client.loadSession(sessionId: summary.sessionId, cwd: cwd, mcpServers: servers, additionalDirectories: dirs, meta: meta)
                     : try await client.resumeSession(sessionId: summary.sessionId, cwd: cwd, mcpServers: servers, additionalDirectories: dirs, meta: meta)
+                loaded = true
                 self?.configOptions = setup.configOptions.isEmpty ? (self?.configOptions ?? []) : setup.configOptions
             } catch {
                 // 按失败类别给出明确说明;「找不到」多半是从未落盘的空会话,登记后从列表隐藏,避免反复点到
                 self?.timeline.appendNotice(AgentErrorHints.restoreMessage(for: error), isError: true)
                 if AgentErrorHints.classifyRestore(error) == .notFound { EmptySessionRegistry.hide(summary.sessionId) }
                 self?.log.warning("打开历史会话失败", ["target": String(summary.sessionId.prefix(8)), "error": "\(error)"])
+            }
+            if let archive {
+                // 屏障之后,回放期间的原始更新都已交给存档,才能结束同步
+                await self?.awaitEventBarrier(client)
+                let outcome = await archive.endSync(archiveKey, success: loaded)
+                self?.log.info("回放已同步到会话存档", ["target": String(summary.sessionId.prefix(8)), "outcome": "\(outcome)"])
             }
             await self?.settleEvents()
             self?.timeline.finishStreaming()
@@ -1603,6 +1619,14 @@ public final class SessionModel {
     }
 
     /// 让已到达但尚在合并窗口中的事件先落入时间线。
+    /// 等待此前到达的全部通知都已读入(屏障通知在事件流里排在它们之后)。
+    /// - Parameter client: 当前连接
+    private func awaitEventBarrier(_ client: ACPClient) async {
+        let token = UUID().uuidString
+        await client.barrier(token)
+        if await eventBarrier.wait(token) == false { log.warning("等待事件屏障超时", ["turn": "\(turnNumber)"]) }
+    }
+
     private func settleEvents() async {
         coalescer?.flush()
         try? await Task.sleep(for: .milliseconds(40))

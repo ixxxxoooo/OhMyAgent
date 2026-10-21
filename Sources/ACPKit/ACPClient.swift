@@ -202,6 +202,20 @@ struct ClientRequestRouter: ACPRequestHandler {
 
 // MARK: - 客户端
 
+/// 原始 `session/update` 回调的线程安全盒子(会话存档用,拿到的是解析前的原始载荷)。
+/// 用锁保护的存储而非 `Mutex`:`Mutex` 承载闭包时,盒子析构会触发栈溢出(测试中复现)。
+final class UpdateTapBox: @unchecked Sendable {
+    typealias Tap = @Sendable (String, JSONValue) -> Void
+    private let lock = NSLock()
+    private var tap: Tap?
+
+    /// 设置回调;nil 取消。
+    func set(_ value: Tap?) { lock.withLock { tap = value } }
+
+    /// 当前回调。
+    var current: Tap? { lock.withLock { tap } }
+}
+
 /// 类型化 ACP 客户端。
 public actor ACPClient {
     public let connection: ACPConnection
@@ -209,6 +223,7 @@ public actor ACPClient {
     public nonisolated let events: AsyncStream<ClientEvent>
     private let eventContinuation: AsyncStream<ClientEvent>.Continuation
     private var pump: Task<Void, Never>?
+    private nonisolated let updateTap = UpdateTapBox()
 
     public private(set) var capabilities = AgentCapabilities()
 
@@ -226,17 +241,25 @@ public actor ACPClient {
         Task { await connection.setRequestHandler(router) }
     }
 
+    /// 设置原始 `session/update` 回调:每条更新在解析、转发之前同步回调一次(按到达顺序)。
+    /// - Parameter tap: 回调(会话 ID, 原始 update 载荷);nil 取消
+    public nonisolated func setUpdateTap(_ tap: (@Sendable (String, JSONValue) -> Void)?) {
+        updateTap.set(tap)
+    }
+
     /// 启动连接并开始转发事件。
     public func start() async throws {
         try await connection.start()
         let inbound = connection.inbound
         let continuation = eventContinuation
+        let updateTap = updateTap
         pump = Task {
             for await item in inbound {
                 switch item {
                 case .notification(let method, let params):
                     if method == "session/update", let params,
                        let sessionId = params["sessionId"]?.stringValue, let update = params["update"] {
+                        updateTap.current?(sessionId, update)
                         continuation.yield(.sessionUpdate(sessionId: sessionId, update: SessionUpdate(json: update)))
                     } else if method == "_auth/status_update", let status = params?["authStatus"] {
                         continuation.yield(.authStatus(kind: status["kind"]?.stringValue ?? "", label: status["label"]?.stringValue, detail: status["detail"]?.stringValue))
