@@ -76,7 +76,7 @@ def main():
             agent.stop()
         mock.kill()
         shutil.rmtree(work, ignore_errors=True)
-    print(json.dumps({"adapter": adapter, "turns": rows}, ensure_ascii=False, indent=2))
+    print(json.dumps({"turns": rows}, ensure_ascii=False, indent=2))
     # 汇总表
     print("\n轮次 | 上游请求数 | 主请求体(KB) | 消息条数 | system(KB) | tools(个/KB) | 缓存断点")
     for row in rows:
