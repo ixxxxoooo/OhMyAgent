@@ -74,7 +74,7 @@ struct AdvancedPage: View {
                 }
                 Note("对新建或恢复的会话生效。对应环境变量 ENABLE_TOOL_SEARCH。")
                 SettingsNumericField(title: "上下文上限(自动压缩窗口)", value: $autoCompactWindow, format: IntegerFormatStyle<Int>(), unit: "token", prompt: "0 表示默认", fieldWidth: 110)
-                Note("给对话上下文设上限:占用接近该值时 Claude Code 自动压缩,避免长会话越滚越大、每轮都重复读取巨量历史。范围 5 万 ~ 100 万(超出会被夹到范围内),0 使用默认值(大窗口模型可能到 100 万)。模型映射里为模型单独设置了窗口时取两者较小值。对新建或恢复的会话生效。对应环境变量 CLAUDE_CODE_AUTO_COMPACT_WINDOW。")
+                Note("给对话上下文设上限:占用接近该值时 Claude Code 自动压缩,避免长会话越滚越大、每轮都重复读取巨量历史。范围 5 万 ~ 100 万(超出会被夹到范围内),0 使用默认值(大窗口模型可能到 100 万)。模型映射里为模型单独设置了窗口时取两者较小值。对新建或恢复的会话生效。超过 20 万时会同时声明模型窗口(CLAUDE_CODE_MAX_CONTEXT_TOKENS),请确认所用模型真的支持该窗口。对应环境变量 CLAUDE_CODE_AUTO_COMPACT_WINDOW。")
             }
             Section("MCP 运行参数") {
                 ScopeHeader(model: model)

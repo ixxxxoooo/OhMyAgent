@@ -22,6 +22,11 @@ struct ProviderAdvancedTests {
         let env = ProviderLaunch.publicEnvironment(ModelProviderTests.mapping(provider, "m1"), gateway: gateway)
         #expect(env["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] == "8192")
         #expect(env["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] == "200000")
+        #expect(env["CLAUDE_CODE_MAX_CONTEXT_TOKENS"] == nil)
+        provider.contextWindow = 1_000_000
+        let big = ProviderLaunch.publicEnvironment(ModelProviderTests.mapping(provider, "m1"), gateway: gateway)
+        #expect(big["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] == "1000000")
+        #expect(big["CLAUDE_CODE_MAX_CONTEXT_TOKENS"] == "1000000")
         #expect(env["CLAUDE_CODE_EFFORT_LEVEL"] == "high")
         #expect(ProviderLaunch.publicEnvironment(ModelProviderTests.mapping(base(), "m1"), gateway: gateway)["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] == nil)
     }

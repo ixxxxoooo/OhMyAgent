@@ -234,7 +234,11 @@ public enum ProviderLaunch {
         let provider = main.provider
         if let value = provider.maxOutputTokens, value > 0 { env["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] = String(value) }
         let window = provider.modelList.first(where: { $0.id == main.model })?.contextWindow ?? provider.contextWindow
-        if let value = window, value > 0 { env["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] = String(value) }
+        if let value = window, value > 0 {
+            env["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] = String(value)
+            // 别名 oma-* 对 Claude Code 是未知模型,窗口默认 20 万;厂商声明了更大窗口时一并告知,否则压缩窗口会被夹回 20 万
+            if value > SessionOptions.defaultModelWindow { env[SessionOptions.maxContextKey] = String(value) }
+        }
         if let value = nonEmpty(provider.effort) { env["CLAUDE_CODE_EFFORT_LEVEL"] = value }
         // 经网关的第三方模型不会返回服务端 auto 模式检查结果,关闭探测以免出现「分类器计费」警告
         env[NoticeFilter.autoModeServerKey] = "0"

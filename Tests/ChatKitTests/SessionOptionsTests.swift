@@ -196,6 +196,21 @@ struct WidthSliderPresetTests {
         #expect(options.environment[SessionOptions.autoCompactKey] == "1000000")
     }
 
+    @Test("自动压缩窗口超过 20 万时同时声明模型窗口,否则会被夹回 20 万")
+    func autoCompactWindowRaisesModelWindow() {
+        var options = SessionOptions()
+        options.autoCompactWindow = 200_000
+        #expect(options.environment[SessionOptions.maxContextKey] == nil)
+        options.autoCompactWindow = 400_000
+        #expect(options.environment[SessionOptions.maxContextKey] == "400000")
+        // 映射已声明模型窗口时,全局值不再覆盖它
+        let mapped: JSONValue = .object(["claudeCode": .object(["options": .object(["settings": .object(["env": .object([
+            SessionOptions.autoCompactKey: .string("1000000"), SessionOptions.maxContextKey: .string("1000000")])])])])])
+        let merged = options.merged(into: mapped)
+        #expect(merged?["claudeCode"]?["options"]?["settings"]?["env"]?[SessionOptions.maxContextKey]?.stringValue == "1000000")
+        #expect(merged?["claudeCode"]?["options"]?["env"]?[SessionOptions.maxContextKey] == nil)
+    }
+
     @Test("自动压缩窗口:与模型映射的窗口取较小值")
     func autoCompactWindowTakesSmaller() {
         let mapped: JSONValue = .object(["claudeCode": .object(["options": .object(["settings": .object(["env": .object([SessionOptions.autoCompactKey: .string("1000000")])])])])])

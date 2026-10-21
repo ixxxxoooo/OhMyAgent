@@ -235,6 +235,11 @@ public struct SessionOptions: Equatable, Sendable {
     public static let autoCompactRange = 50_000...1_000_000
     /// 自动压缩窗口对应的环境变量。
     public static let autoCompactKey = "CLAUDE_CODE_AUTO_COMPACT_WINDOW"
+    /// 模型真实窗口的环境变量:网关别名(如 `oma-main`)不是 Claude Code 认识的模型,窗口默认按 20 万算,
+    /// 而自动压缩窗口会被夹到模型窗口以内,所以要超过 20 万必须同时声明模型窗口。
+    public static let maxContextKey = "CLAUDE_CODE_MAX_CONTEXT_TOKENS"
+    /// Claude Code 对未知模型默认假定的窗口(token)
+    public static let defaultModelWindow = 200_000
 
     public init() {}
 
@@ -287,7 +292,11 @@ public struct SessionOptions: Equatable, Sendable {
         if timeoutSeconds > 0 { env["API_TIMEOUT_MS"] = String(timeoutSeconds * 1000) }
         if !loadClaudeMemory { env["CLAUDE_CODE_DISABLE_CLAUDE_MDS"] = "1" }
         if let value = mcpToolSearch.environmentValue { env["ENABLE_TOOL_SEARCH"] = value }
-        if let window = effectiveAutoCompactWindow { env[Self.autoCompactKey] = String(window) }
+        if let window = effectiveAutoCompactWindow {
+            env[Self.autoCompactKey] = String(window)
+            // 超过默认窗口时同时抬高模型窗口,否则自动压缩窗口会被夹回 20 万
+            if window > Self.defaultModelWindow { env[Self.maxContextKey] = String(window) }
+        }
         return env
     }
 
@@ -324,6 +333,8 @@ public struct SessionOptions: Equatable, Sendable {
             settings["env"] = .object(settingsEnv)
             options["settings"] = .object(settings)
             env.removeValue(forKey: Self.autoCompactKey)
+            // 模型窗口以映射(厂商声明的真实窗口)为准,全局值只收紧压缩阈值,不改模型窗口
+            if settingsEnv[Self.maxContextKey] != nil { env.removeValue(forKey: Self.maxContextKey) }
         }
         if !env.isEmpty { options["env"] = .object(env) }
         if !options.isEmpty { claudeCode["options"] = .object(options) }
