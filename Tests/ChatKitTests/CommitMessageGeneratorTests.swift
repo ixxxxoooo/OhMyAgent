@@ -64,6 +64,15 @@ struct CommitMessageGeneratorTests {
         #expect(text.contains("当前分支:main"))
     }
 
+    @Test("提示词要求 3 到 6 条带反引号的详细要点并给出示例")
+    func promptAsksDetailedBullets() {
+        let context = CommitContext(files: [CommitFileChange(path: "a.swift", status: "M")], patch: "", recentSubjects: ["feat: x"])
+        let text = CommitMessageGenerator.prompt(for: context)
+        #expect(text.contains("3 到 6 条"))
+        #expect(text.contains("反引号"))
+        #expect(text.contains("- 在`go.mod`中添加"))
+    }
+
     @Test("英文仓库提示英文输出;非规范提交不强制 type")
     func promptEnglish() {
         let context = CommitContext(files: [CommitFileChange(path: "a.txt", status: "M")], patch: "", recentSubjects: ["Update readme", "Add logo", "Tidy up"])

@@ -165,8 +165,11 @@ public enum CommitMessageGenerator {
         let recent = context.recentSubjects.prefix(8).map { "- \($0)" }.joined(separator: "\n")
         var rules = [
             "你是一位资深工程师,正在为下面这次代码改动写 git 提交说明。",
-            "格式:第一行是标题(不超过 \(subjectLimit) 个字符,不加句号);如改动涉及多个方面,空一行后用 2 到 5 条「- 」要点说明做了什么和为什么,每条一行。",
-            "只描述这次改动的实际内容,优先写「为什么/达到什么效果」而不是罗列文件名;不要编造补丁里没有的内容。",
+            "格式:第一行是标题(不超过 \(subjectLimit) 个字符,不加句号),概括这次改动的整体目的,可用「并」串联 2 个相关方面;空一行后写 3 到 6 条「- 」要点,每条一行,以句号结尾。",
+            "每条要点说清「在哪个文件/模块、新增或修改了什么、起什么作用」;文件名、路径、类型名、函数名、常量、依赖、配置键用反引号包裹(如 `go.mod`、`FromSystemKB`)。",
+            "要点按重要性排序,同类改动(如多个文档/测试/参数说明)合并为一条;不要逐个罗列文件,也不要写「更新了若干文件」这类空话。",
+            "只描述这次改动的实际内容,不要编造补丁里没有的内容;纯重命名/格式化等琐碎改动可以只写标题。",
+            "要点示例(仅示意风格,勿照抄内容):\n- 在`go.mod`中添加`github.com/foo/bar v1.2.0`依赖。\n- 在`constants`中新增`FromSystemKB`常量。\n- 修改Swagger文档,更新`fromSystem`的描述,包含`kb`选项。",
             "输出语言:\(chinese ? "中文(标识符和专有名词保持原样)" : "英文")。",
             conventional ? "标题使用 Conventional Commits:`type(scope): 描述`,type 取 feat/fix/refactor/docs/test/chore/perf/style/build/ci 之一,scope 取受影响的模块(可省略)。" : "标题模仿下面「最近的提交」的写法与粒度。",
             "只输出提交说明本身,不要代码块围栏、引号、解释或前缀。",
@@ -186,7 +189,7 @@ public enum CommitMessageGenerator {
     public static func requestBody(model: String, context: CommitContext) -> Data? {
         let body: [String: Any] = [
             "model": model,
-            "max_tokens": 400,
+            "max_tokens": 800,
             "stream": false,
             "messages": [["role": "user", "content": prompt(for: context)]],
         ]
