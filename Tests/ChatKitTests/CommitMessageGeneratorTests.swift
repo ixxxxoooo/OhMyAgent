@@ -73,6 +73,14 @@ struct CommitMessageGeneratorTests {
         #expect(text.contains("- 在`go.mod`中添加"))
     }
 
+    @Test("提示词要求按改动实质选 type,不默认 feat")
+    func promptTypeGuidance() {
+        let context = CommitContext(files: [CommitFileChange(path: "a.swift", status: "M")], patch: "", recentSubjects: ["feat: x"])
+        let text = CommitMessageGenerator.prompt(for: context)
+        #expect(text.contains("拿不准时不要默认 feat"))
+        #expect(text.contains("修改、调整、优化已有行为"))
+    }
+
     @Test("英文仓库提示英文输出;非规范提交不强制 type")
     func promptEnglish() {
         let context = CommitContext(files: [CommitFileChange(path: "a.txt", status: "M")], patch: "", recentSubjects: ["Update readme", "Add logo", "Tidy up"])

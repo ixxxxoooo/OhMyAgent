@@ -171,7 +171,7 @@ public enum CommitMessageGenerator {
             "只描述这次改动的实际内容,不要编造补丁里没有的内容;纯重命名/格式化等琐碎改动可以只写标题。",
             "要点示例(仅示意风格,勿照抄内容):\n- 在`go.mod`中添加`github.com/foo/bar v1.2.0`依赖。\n- 在`constants`中新增`FromSystemKB`常量。\n- 修改Swagger文档,更新`fromSystem`的描述,包含`kb`选项。",
             "输出语言:\(chinese ? "中文(标识符和专有名词保持原样)" : "英文")。",
-            conventional ? "标题使用 Conventional Commits:`type(scope): 描述`,type 取 feat/fix/refactor/docs/test/chore/perf/style/build/ci 之一,scope 取受影响的模块(可省略)。" : "标题模仿下面「最近的提交」的写法与粒度。",
+            conventional ? "标题使用 Conventional Commits:`type(scope): 描述`,type 取 feat/fix/refactor/docs/test/chore/perf/style/build/ci 之一,scope 取受影响的模块(可省略)。type 必须按改动实质判断:feat 仅用于全新的用户可见能力;修改、调整、优化已有行为或文案、修正问题用 fix;不改行为的结构调整用 refactor;只动文档/测试/配置/脚本分别用 docs/test/chore。拿不准时不要默认 feat。" : "标题模仿下面「最近的提交」的写法与粒度。",
             "只输出提交说明本身,不要代码块围栏、引号、解释或前缀。",
         ]
         if !context.branch.isEmpty { rules.append("当前分支:\(context.branch)") }
@@ -321,7 +321,7 @@ public enum CommitMessageGenerator {
         let totalRemoved = pool.reduce(0) { $0 + $1.removed }
         if fixHits > 0 && fixHits * 6 >= max(1, added.count) && totalAdded < 120 { return "fix" }
         if totalRemoved > totalAdded && totalRemoved > 20 { return "refactor" }
-        return totalAdded >= 60 ? "feat" : "fix"
+        return totalAdded >= 200 && totalRemoved * 3 < totalAdded ? "feat" : "fix"
     }
 
     /// 推断作用域:所有文件共享的模块/目录;否则取改动最多的模块。
