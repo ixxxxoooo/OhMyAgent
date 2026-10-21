@@ -11,6 +11,14 @@ import Testing
         #expect(AgentErrorHints.message(for: error)?.contains("新建对话") == true)
     }
 
+    @Test func quotaExceededNamesModelAndMonth() {
+        let error = JSONRPCError(code: -32603, message: #"API Error: Request rejected (429) · quota exceeded: {"model":"claude-sonnet-5-5","month":"202610","usedInputTokens":1}"#)
+        let hint = AgentErrorHints.message(for: error)
+        #expect(hint?.contains("claude-sonnet-5-5") == true)
+        #expect(hint?.contains("2026-10") == true)
+        #expect(hint?.contains("{") == false)
+    }
+
     @Test func unknownErrorHasNoHint() {
         #expect(AgentErrorHints.message(for: JSONRPCError(code: -1, message: "boom")) == nil)
     }

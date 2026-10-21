@@ -2729,3 +2729,5 @@
 "自动" = "Auto";
 "0 表示自动" = "0 means auto";
 "清空输出" = "Clear output";
+"%@ 在 %@ 的额度已用完。请在输入框切换到其他模型或提供商,或等额度重置后再试。" = "%1$@ has used up its quota for %2$@. Switch to another model or provider in the composer, or try again after the quota resets.";
+"%@ 的额度已用完。请在输入框切换到其他模型或提供商,或等额度重置后再试。" = "%@ has used up its quota. Switch to another model or provider in the composer, or try again after the quota resets.";

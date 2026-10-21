@@ -17,10 +17,41 @@ public enum AgentErrorHints {
         if text.contains("freetiererror") {
             return String(localized: "该免费模型只允许 OpenCode 官方客户端使用:请改用 OpenCode Go 端点或换一个模型。")
         }
+        if let quota = quotaMessage(for: text) { return quota }
         if text.contains("rate limit") || text.contains("too many requests") {
             return String(localized: "上游触发限流,请稍后再试。")
         }
         return nil
+    }
+
+    /// 原始错误文本,作为提示的补充说明(折叠展示,便于排查)。
+    /// - Parameter error: 轮次失败的错误
+    /// - Returns: 代码块包裹的原始文本
+    public static func rawDetail(for error: Error) -> String {
+        let raw = (error as? JSONRPCError)?.message ?? error.localizedDescription
+        return "```\n\(raw)\n```"
+    }
+
+    /// 配额用尽(429 + quota exceeded)的中文说明:能解析出模型与月份时一并写明,不再把原始 JSON 直接抛给用户。
+    /// - Parameter lowercasedText: 已转小写的错误文本
+    /// - Returns: 命中配额用尽时的说明,否则 `nil`
+    static func quotaMessage(for lowercasedText: String) -> String? {
+        guard lowercasedText.contains("quota exceeded") || lowercasedText.contains("insufficient_quota") else { return nil }
+        let model = firstCapture(#""model"\s*:\s*"([^"]+)""#, in: lowercasedText)
+        let month = firstCapture(#""month"\s*:\s*"(\d{4})(\d{2})""#, in: lowercasedText, groups: 2)
+        var subject = String(localized: "当前模型")
+        if let model { subject = model }
+        if let month { return String(localized: "\(subject) 在 \(month) 的额度已用完。请在输入框切换到其他模型或提供商,或等额度重置后再试。") }
+        return String(localized: "\(subject) 的额度已用完。请在输入框切换到其他模型或提供商,或等额度重置后再试。")
+    }
+
+    /// 取正则的捕获组(多个组以「年-月」形式拼接)。
+    private static func firstCapture(_ pattern: String, in text: String, groups: Int = 1) -> String? {
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+              match.numberOfRanges > groups else { return nil }
+        let parts = (1...groups).compactMap { Range(match.range(at: $0), in: text).map { String(text[$0]) } }
+        return parts.count == groups ? parts.joined(separator: "-") : nil
     }
 
     /// 恢复(`session/load` / `session/resume`)失败的归类。

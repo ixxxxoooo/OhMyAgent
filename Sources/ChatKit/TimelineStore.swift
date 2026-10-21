@@ -305,6 +305,14 @@ public final class TimelineStore {
         structureRevision += 1
     }
 
+    /// 去掉末尾由引擎合成的「API Error: …」助手正文:随后会追加更易读的失败提示,避免同一错误显示两遍。
+    public func dropTrailingAPIErrorEcho() {
+        guard let last = entries.last, last.kind == .assistant, last.text.hasPrefix("API Error") else { return }
+        entries.removeLast()
+        revision += 1
+        structureRevision += 1
+    }
+
     /// 把合成用户消息转成时间线条目(`severity == "interrupt"` 的淡色分隔行);`hidden` 不产生条目。
     /// - Parameter message: 已识别的合成消息
     private func appendSynthetic(_ message: SyntheticUserMessage) {
