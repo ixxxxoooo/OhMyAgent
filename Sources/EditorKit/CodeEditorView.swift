@@ -31,6 +31,12 @@ public final class CodeEditorView: NSView {
     /// 上次应用的字体族与字号偏好,用来判断偏好是否真的变了
     private var appliedFamily = EditorFontPrefs.preferredFamily
     private var appliedSize = EditorFontPrefs.preferredSize
+    /// IDE 外围视图(缩略图、粘性滚动);默认都不显示
+    public var chrome: EditorChrome = [] { didSet { if chrome != oldValue { applyChrome() } } }
+    private var minimap: EditorMinimapView?
+    private var sticky: EditorStickyView?
+    private var scrollTrailing: NSLayoutConstraint?
+    private var stickyHeight: NSLayoutConstraint?
     /// 光标变化回调(状态栏用)
     public var onCaretChange: ((EditorCaret) -> Void)?
     var language: SyntaxLanguage = .plain { didSet { textView.language = language } }
@@ -164,9 +170,14 @@ public final class CodeEditorView: NSView {
         scrollView.rulersVisible = true
 
         addSubview(scrollView)
+        let trailing = scrollView.trailingAnchor.constraint(equalTo: trailingAnchor)
+        // 非必需优先级:宿主尺寸为 0 的瞬间留出缩略图宽度会让滚动视图宽度为负,必需约束冲突会把滚动视图撑出自身范围
+        trailing.priority = NSLayoutConstraint.Priority(999)
+        scrollTrailing = trailing
         NSLayoutConstraint.activate([
+            scrollView.widthAnchor.constraint(greaterThanOrEqualToConstant: 0),
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            trailing,
             scrollView.topAnchor.constraint(equalTo: topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
         ])
@@ -190,6 +201,60 @@ public final class CodeEditorView: NSView {
             self, selector: #selector(themeDidChange),
             name: ThemeRuntime.didChange, object: nil
         )
+    }
+
+    /// 按 `chrome` 与偏好创建/移除缩略图与粘性滚动视图。
+    func applyChrome() {
+        let wantsMinimap = chrome.contains(.minimap) && EditorBehaviorPrefs.minimap
+        if wantsMinimap, minimap == nil {
+            let view = EditorMinimapView(editor: self)
+            view.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(view)
+            NSLayoutConstraint.activate([
+                view.trailingAnchor.constraint(equalTo: trailingAnchor),
+                view.topAnchor.constraint(equalTo: topAnchor),
+                view.bottomAnchor.constraint(equalTo: bottomAnchor),
+                view.widthAnchor.constraint(equalToConstant: EditorMinimapView.width),
+            ])
+            minimap = view
+        } else if !wantsMinimap, let view = minimap {
+            view.removeFromSuperview()
+            minimap = nil
+        }
+        scrollTrailing?.constant = minimap == nil ? 0 : -EditorMinimapView.width
+        let wantsSticky = chrome.contains(.stickyScroll) && EditorBehaviorPrefs.stickyScroll
+        if wantsSticky, sticky == nil {
+            let view = EditorStickyView(editor: self)
+            view.translatesAutoresizingMaskIntoConstraints = false
+            view.isHidden = true
+            addSubview(view)
+            let height = view.heightAnchor.constraint(equalToConstant: 0)
+            stickyHeight = height
+            NSLayoutConstraint.activate([
+                view.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor, constant: 0),
+                view.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+                view.topAnchor.constraint(equalTo: topAnchor),
+                height,
+            ])
+            sticky = view
+        } else if !wantsSticky, let view = sticky {
+            view.removeFromSuperview()
+            sticky = nil
+            stickyHeight = nil
+        }
+        sticky?.refresh()
+        minimap?.needsDisplay = true
+    }
+
+    /// 行索引或视口变化后刷新缩略图与粘性滚动。
+    func refreshChrome() {
+        minimap?.needsDisplay = true
+        sticky?.refresh()
+    }
+
+    /// 粘性滚动的高度变化(行数变化)。
+    func stickyHeightDidChange(_ height: CGFloat) {
+        stickyHeight?.constant = height
     }
 
     /// 文本存储完成一次字符编辑:用编辑范围与长度变化增量更新行索引(属性变更如高亮不会走到这里的字符分支)。
@@ -258,6 +323,7 @@ public final class CodeEditorView: NSView {
             lineIndex = index
             lineIndexIsLive = true
             ruler.lineIndex = index
+            refreshChrome()
             updateNoWrapGeometry()   // 不换行:同步按最长行重估宽度,避免首帧长行被折行
             if !usesMarkdownStyling {
                 let lexStart = ContinuousClock.now
@@ -284,6 +350,7 @@ public final class CodeEditorView: NSView {
                 self.lineIndex = index
                 self.lineIndexIsLive = true
                 self.ruler.lineIndex = index
+                self.refreshChrome()
                 self.applyLargeFileMode(index.lineCount > Self.largeFileLineThreshold)
                 self.updateNoWrapGeometry()
                 self.scheduleHighlight()
@@ -318,6 +385,8 @@ public final class CodeEditorView: NSView {
     /// 用户编辑后:确认行索引(正常由文本存储回调增量维护)、防抖重做词法并回调。
     fileprivate func handleEdit() {
         let text = textView.string
+        minimap?.needsDisplay = true
+        sticky?.refresh()
         generation += 1
         let current = generation
         let language = self.language
@@ -329,6 +398,7 @@ public final class CodeEditorView: NSView {
             lineIndex = index
             lineIndexIsLive = true
             ruler.lineIndex = index
+            refreshChrome()
             needsIndexRebuild = false
         } else {
             ruler.needsDisplay = true
@@ -348,6 +418,7 @@ public final class CodeEditorView: NSView {
                     self.lineIndex = index
                     self.lineIndexIsLive = true
                     self.ruler.lineIndex = index
+                    self.refreshChrome()
                 }
                 self.applyLargeFileMode(self.lineIndex.lineCount > Self.largeFileLineThreshold)
                 self.updateNoWrapGeometry()
@@ -565,7 +636,10 @@ public final class CodeEditorView: NSView {
 
     /// 偏好变化通知可能在任意线程投递:切回主线程后再比较字体。
     @objc nonisolated private func defaultsDidChange() {
-        Task { @MainActor [weak self] in self?.refreshFontFromPrefs() }
+        Task { @MainActor [weak self] in
+            self?.refreshFontFromPrefs()
+            self?.applyChrome()
+        }
     }
 
     /// 字体族或字号偏好变化时更新字体与行高;颜色等其他主题项保持不变。
@@ -661,6 +735,8 @@ public final class CodeEditorView: NSView {
 
     @objc private func viewportDidChange() {
         ruler.needsDisplay = true
+        minimap?.needsDisplay = true
+        sticky?.refresh()
         updateNoWrapGeometry()
         scheduleHighlight()
     }

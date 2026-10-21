@@ -210,3 +210,54 @@ struct EditorEditingViewTests {
         #expect(editor.textView.bracketPair.isEmpty)
     }
 }
+
+@Suite("粘性滚动与缩略图采样")
+struct EditorScopesTests {
+    @Test func 行尾换行不影响块头判断() {
+        #expect(EditorScopes.opensBlock("func f() {\n"))
+        #expect(!EditorScopes.opensBlock("let x = 1\r\n"))
+    }
+
+    private let sample = """
+    struct A {
+        func f() {
+            if x {
+                work()
+                more()
+            }
+        }
+        var y = 1
+    }
+    """.components(separatedBy: "\n")
+
+    @Test("缩进与块开头判断")
+    func basics() {
+        #expect(EditorScopes.indent(of: "    a") == 4)
+        #expect(EditorScopes.indent(of: "\t\ta") == 8)
+        #expect(EditorScopes.indent(of: "   ") == nil)
+        #expect(EditorScopes.opensBlock("func f() {"))
+        #expect(EditorScopes.opensBlock("if x:"))
+        #expect(!EditorScopes.opensBlock("// 注释 {"))
+        #expect(!EditorScopes.opensBlock("let a = 1"))
+    }
+
+    @Test("由外到内给出包含顶行的块头,且最多 limit 层")
+    func enclosing() {
+        let lines = sample
+        let chain = EditorScopes.enclosing(topLine: 4, lineCount: lines.count) { lines.indices.contains($0) ? lines[$0] : nil }
+        #expect(chain == [0, 1, 2])
+        let limited = EditorScopes.enclosing(topLine: 4, limit: 2, lineCount: lines.count) { lines.indices.contains($0) ? lines[$0] : nil }
+        #expect(limited == [1, 2])
+        // 顶行回到顶层缩进:没有外层
+        #expect(EditorScopes.enclosing(topLine: 7, lineCount: lines.count) { lines.indices.contains($0) ? lines[$0] : nil } == [0])
+        #expect(EditorScopes.enclosing(topLine: 0, lineCount: lines.count) { _ in "x" }.isEmpty)
+    }
+
+    @Test("缩略图采样:行数少时一行一格,多时均匀抽样")
+    func minimap() {
+        #expect(EditorScopes.minimapLines(lineCount: 3, rows: 10) == [0, 1, 2])
+        let sampled = EditorScopes.minimapLines(lineCount: 1000, rows: 100)
+        #expect(sampled.count == 100 && sampled.first == 0 && sampled.last == 990)
+        #expect(EditorScopes.minimapLines(lineCount: 0, rows: 5).isEmpty)
+    }
+}

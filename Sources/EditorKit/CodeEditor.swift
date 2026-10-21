@@ -21,6 +21,8 @@ public struct CodeEditor: NSViewRepresentable {
     public var onReferenceSelection: ((NSRange) -> Void)?
     /// Markdown 显示模式(仅 `.markdown` 语言有效)
     public var markdownMode: MarkdownEditorMode
+    /// IDE 外围视图(缩略图、粘性滚动)
+    public var chrome: EditorChrome = []
     /// 光标/选区变化回调(状态栏的「行 列」用);nil 时不计算
     public var onCaretChange: ((EditorCaret) -> Void)?
 
@@ -35,8 +37,9 @@ public struct CodeEditor: NSViewRepresentable {
     ///   - features: 语言智能回调
     ///   - onReferenceSelection: 引用选区回调
     ///   - onChange: 编辑回调
-    public init(text: String, language: SyntaxLanguage, isEditable: Bool = false, revealLine: Int? = nil, markers: [Int: LineMarker] = [:], diagnostics: [EditorDiagnostic] = [], features: EditorLanguageFeatures = EditorLanguageFeatures(), onReferenceSelection: ((NSRange) -> Void)? = nil, markdownMode: MarkdownEditorMode = .off, onCaretChange: ((EditorCaret) -> Void)? = nil, onChange: ((String) -> Void)? = nil) {
+    public init(text: String, language: SyntaxLanguage, isEditable: Bool = false, revealLine: Int? = nil, markers: [Int: LineMarker] = [:], diagnostics: [EditorDiagnostic] = [], features: EditorLanguageFeatures = EditorLanguageFeatures(), onReferenceSelection: ((NSRange) -> Void)? = nil, markdownMode: MarkdownEditorMode = .off, chrome: EditorChrome = [], onCaretChange: ((EditorCaret) -> Void)? = nil, onChange: ((String) -> Void)? = nil) {
         self.onCaretChange = onCaretChange
+        self.chrome = chrome
         self.markdownMode = markdownMode
         self.onReferenceSelection = onReferenceSelection
         self.diagnostics = diagnostics
@@ -66,6 +69,7 @@ public struct CodeEditor: NSViewRepresentable {
         view.features = features
         view.onReferenceSelection = onReferenceSelection
         view.onCaretChange = onCaretChange
+        view.chrome = chrome
         view.setDiagnostics(diagnostics)
         return view
     }
@@ -92,6 +96,7 @@ public struct CodeEditor: NSViewRepresentable {
         view.features = features
         view.onReferenceSelection = onReferenceSelection
         view.onCaretChange = onCaretChange
+        view.chrome = chrome
         view.setDiagnostics(diagnostics)
         view.lineMarkers = markers
         if let line = revealLine, context.coordinator.revealedLine != line {

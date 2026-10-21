@@ -123,8 +123,12 @@ private struct IDEPaletteRow: View {
                 }
                 Spacer(minLength: 0)
             case .command(let match):
-                Text(match.command.category + ": ").font(OMFonts.body).foregroundStyle(OMColors.tertiaryText)
-                    + Text(match.command.title).font(OMFonts.body).foregroundStyle(OMColors.primaryText)
+                HStack(spacing: 0) {
+                    Text(match.command.category + ": ").foregroundStyle(OMColors.tertiaryText)
+                    Text(match.command.title).foregroundStyle(OMColors.primaryText)
+                }
+                .font(OMFonts.body)
+                .lineLimit(1)
                 Spacer(minLength: 0)
                 if let shortcut = match.command.shortcut {
                     Text(shortcut)
