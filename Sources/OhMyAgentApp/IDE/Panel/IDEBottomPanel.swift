@@ -135,6 +135,7 @@ private struct IDETerminalsView: View {
         .background(active ? OMColors.selectedFill : Color.clear)
         .contentShape(Rectangle())
         .onTapGesture { model.activeTerminalID = id }
+        .accessibilityAddTraits(.isButton)
     }
 }
 

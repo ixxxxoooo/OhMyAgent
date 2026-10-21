@@ -88,6 +88,10 @@ struct DemoCoverageTests {
 
     @Test("切换模型会在时间线插入「由 X 切换为 Y」分割线,切回同一模型不重复插入")
     func modelSwitchDivider() async throws {
+        // 「记住上次选择」会把别的用例选过的模型写进测试进程的偏好,新会话启动即是该模型而不再切换;先清空
+        for key in UserDefaults.standard.dictionaryRepresentation().keys where key.hasPrefix("chat.preferred.") {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
         let ws = try M3ScenarioTests.tempWorkspace()
         defer { try? FileManager.default.removeItem(at: ws) }
         let model = try await M3ScenarioTests.readyModel(workspace: ws)
@@ -96,12 +100,12 @@ struct DemoCoverageTests {
         #expect(await SessionModelTests.wait { !model.pendingPermissions.isEmpty })
         if let prompt = model.pendingPermissions.first { model.resolve(prompt, optionId: "allow") }
         #expect(await SessionModelTests.wait { !model.isRunning })
-        model.setConfigOption("model", value: "scripted-2")
+        model.setConfigOption("model", value: "scripted-2", remember: false)
         #expect(await SessionModelTests.wait { model.timeline.entries.contains { $0.kind == .modelSwitch } })
         let entry = try #require(model.timeline.entries.last { $0.kind == .modelSwitch })
         #expect(entry.text == "Scripted 1" && entry.detail == "Scripted 2")
         // 设置为当前值:不应再追加
-        model.setConfigOption("model", value: "scripted-2")
+        model.setConfigOption("model", value: "scripted-2", remember: false)
         try await Task.sleep(for: .milliseconds(300))
         #expect(model.timeline.entries.filter { $0.kind == .modelSwitch }.count == 1)
         model.shutdown()

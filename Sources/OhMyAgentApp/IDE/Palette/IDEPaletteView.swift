@@ -92,6 +92,7 @@ private struct IDEPaletteCard: View {
                             IDEPaletteRow(item: item, highlighted: index == palette.highlighted)
                                 .id(item.id)
                                 .onTapGesture { workspace.choose(item) }
+                                .accessibilityAddTraits(.isButton)
                                 .onHover { if $0 { palette.highlighted = index } }
                         }
                     }

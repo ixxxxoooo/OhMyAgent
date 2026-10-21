@@ -46,7 +46,7 @@ struct ProviderModelListTests {
         provider.models = [ProviderModel(id: "a", contextWindow: 500)]
         #expect(provider.effectiveContextWindow == 500)
         let gateway = URL(string: "http://127.0.0.1:9/t")!
-        #expect(ProviderLaunch.publicEnvironment(ModelProviderTests.mapping(provider, "a"), gateway: gateway)["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] == "500")
+        #expect(ProviderLaunch.publicEnvironment(ModelProviderTests.mapping(provider, "a"), gateway: gateway)[SessionOptions.maxContextKey] == "500")
     }
 
     @Test("旧文件无新字段:协议默认 Anthropic、默认启用;protocol 键往返")

@@ -166,6 +166,7 @@ private struct FileHeader: View {
         .onTapGesture {
             if model.collapsed.contains(file.id) { model.collapsed.remove(file.id) } else { model.collapsed.insert(file.id) }
         }
+        .accessibilityAddTraits(.isButton)
     }
 }
 
