@@ -74,8 +74,11 @@ public final class AgentRegistryModel {
         }
     }
 
-    /// 设置默认 Agent。
-    public func setDefault(agentId: String?) { update { $0.defaultAgent = agentId } }
+    /// 设置默认 Agent;同时清除「上次选择的引擎」,让这次明确指定立即生效。
+    public func setDefault(agentId: String?) {
+        PreferredEngine.clear()
+        update { $0.defaultAgent = agentId }
+    }
 
     /// 新增或替换 Agent-as-MCP 登记项。
     public func upsertMCP(_ entry: AgentMCPEntry) {

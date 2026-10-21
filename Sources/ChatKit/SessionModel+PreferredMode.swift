@@ -43,10 +43,22 @@ public enum PreferredMode {
 }
 
 extension SessionModel {
-    /// 新建会话后,把权限模式切换到用户上次选择的值(恢复历史会话不调用)。
+    /// 新建会话后,把权限模式、模型、思考强度切换到用户上次选择的值(恢复历史会话不调用)。
+    /// 各项按顺序逐个应用:每次响应都带回完整配置列表,并发提交会让先返回的结果被后返回的旧列表覆盖。
     func applyPreferredMode() {
-        guard let value = PreferredMode.target(saved: PreferredMode.saved(agentId: activeDescriptor.id), option: option(category: "mode")),
-              let optionId = option(category: "mode")?.id else { return }
-        setConfigOption(optionId, value: value, remember: false)
+        if isHibernated { whenAwake { [weak self] in self?.applyPreferredMode() }; return }
+        let changes = PreferredConfigOption.changes(agentId: activeDescriptor.id, options: configOptions)
+        guard !changes.isEmpty, let client, let sessionId else { return }
+        Task { [weak self] in
+            for change in changes {
+                guard self?.sessionId == sessionId else { return }
+                do {
+                    let updated = try await client.setConfigOption(sessionId: sessionId, configId: change.optionId, value: .string(change.value))
+                    if !updated.isEmpty { self?.configOptions = updated }
+                } catch {
+                    self?.log.warning("沿用上次选择失败", ["option": change.optionId, "error": "\(error)"])
+                }
+            }
+        }
     }
 }

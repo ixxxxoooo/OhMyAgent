@@ -12,6 +12,7 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
     case saveFile, hubSearch, quickOpen, commandPalette, globalSearch, newTerminal
     case closeTab, reopenTab, nextTab, previousTab
     case goBack, goForward
+    case switchWindowMode, newIDEWindow
     var id: String { rawValue }
 
     var title: String {
@@ -35,6 +36,8 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
         case .previousTab: return String(localized: "上一个标签")
         case .goBack: return String(localized: "回退")
         case .goForward: return String(localized: "前进")
+        case .switchWindowMode: return String(localized: "切换 Agent / IDE 窗口")
+        case .newIDEWindow: return String(localized: "新建 IDE 窗口")
         }
     }
 
@@ -60,6 +63,8 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
         case .previousTab: return ShortcutBinding(key: "tab", modifiers: ["control", "shift"])
         case .goBack: return ShortcutBinding(key: "[", modifiers: ["command"])
         case .goForward: return ShortcutBinding(key: "]", modifiers: ["command"])
+        case .switchWindowMode: return ShortcutBinding(key: "i", modifiers: ["control", "command"])
+        case .newIDEWindow: return ShortcutBinding(key: "n", modifiers: ["command", "shift"])
         }
     }
 }

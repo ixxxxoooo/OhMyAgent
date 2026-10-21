@@ -173,7 +173,7 @@ struct TabGroupView: View {
         let leading = edges.left && layout.visibleColumns(on: .left).isEmpty
             ? TitlebarMetrics.leftClusterWidth(toggles: layout.toggleCount(on: .left), collapsed: true) : 0
         let trailing = edges.right && layout.visibleColumns(on: .right).isEmpty
-            ? TitlebarMetrics.rightClusterWidth(toggles: layout.toggleCount(on: .right)) : 0
+            ? TitlebarMetrics.rightClusterWidth(toggles: layout.toggleCount(on: .right), includesModeSwitch: true) : 0
         return (leading, trailing)
     }
 

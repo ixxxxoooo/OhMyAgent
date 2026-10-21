@@ -90,6 +90,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         LaunchTrace.mark("引导完成")
         AutomationService.shared.start()
         StatusItemController.shared.start()
+        // IDE 模式:窗口上下文监听 + 恢复上次打开的 IDE 窗口 + 调试钩子(须在 Agent 窗口之后)
+        WindowContext.shared.start()
+        Task { @MainActor in
+            IDEWindowManager.shared.restoreWindows()
+            await IDEDebugHooks.run()
+        }
         AppearanceModel.shared.applyAll()
         LaunchTrace.mark("启动完成")
         Task { await Toolchain.shared.setOverrides(ClientPrefs.pathOverrides()) }
@@ -140,6 +146,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @MainActor
     func applicationWillTerminate(_ notification: Notification) {
+        IDEWindowManager.shared.prepareForTermination()
         UpdateModel.shared.applyOnQuitIfNeeded()
         Log.app.info("应用即将退出", ["sessions": "\(AppEnvironment.shared.workbench.conversations.count)"])
         PerfSession.logSummary()
@@ -216,7 +223,10 @@ struct WorkbenchCommands: Commands {
         CommandGroup(after: .newItem) {
             Button("新对话") { workbench.newConversationInContext() }
                 .keyboardShortcut(shortcuts.shortcut(for: .newConversation))
-                .disabled(workbench.activeSession.map { !$0.isAvailable } ?? false)
+                .disabled(WindowContext.shared.isIDE || (workbench.activeSession.map { !$0.isAvailable } ?? false))
+            Button("新建 IDE 窗口") { IDEWindowManager.shared.newEmptyWindow() }
+                .keyboardShortcut(shortcuts.shortcut(for: .newIDEWindow))
+            Button("在新 IDE 窗口中打开文件夹…") { IDEWindowManager.shared.openFolderInNewWindow() }
             Button("新会话(无需项目)") { workbench.newGeneralConversation() }
             Button("打开项目…") {
                 if let url = WorkspaceStore.chooseDirectory() { AppActions.shared.openWorkspace(url) }
@@ -282,12 +292,22 @@ struct WorkbenchCommands: Commands {
             Button("检查更新…") { UpdateModel.shared.checkInteractively() }
         }
         CommandGroup(replacing: .sidebar) {
-            Button(WorkbenchPanelNames.toggleTitle(.sidebar, visible: workbench.layout.leftVisible)) { workbench.toggleLeft() }
-                .keyboardShortcut(shortcuts.shortcut(for: .toggleSidebar))
-            Button(WorkbenchPanelNames.toggleTitle(.tools, visible: workbench.layout.rightVisible)) { workbench.toggleRight() }
-                .keyboardShortcut(shortcuts.shortcut(for: .toggleInspector))
-            Button(workbench.isTerminalShown ? String(localized: "隐藏终端") : String(localized: "显示终端")) { workbench.toggleTerminal() }
-                .keyboardShortcut(shortcuts.shortcut(for: .togglePanel))
+            // 面板开关:键盘窗口是 IDE 窗口时作用于该窗口(侧栏 / Agent 面板 / 底部面板),否则作用于 Agent 工作台
+            Button(WorkbenchPanelNames.toggleTitle(.sidebar, visible: workbench.layout.leftVisible)) {
+                if !IDEWindowManager.shared.route(.toggleSidebar) { workbench.toggleLeft() }
+            }
+            .keyboardShortcut(shortcuts.shortcut(for: .toggleSidebar))
+            Button(WorkbenchPanelNames.toggleTitle(.tools, visible: workbench.layout.rightVisible)) {
+                if !IDEWindowManager.shared.route(.toggleAgentPane) { workbench.toggleRight() }
+            }
+            .keyboardShortcut(shortcuts.shortcut(for: .toggleInspector))
+            Button(workbench.isTerminalShown ? String(localized: "隐藏终端") : String(localized: "显示终端")) {
+                if !IDEWindowManager.shared.route(.togglePanel) { workbench.toggleTerminal() }
+            }
+            .keyboardShortcut(shortcuts.shortcut(for: .togglePanel))
+            Divider()
+            Button("切换 Agent / IDE 窗口") { IDEWindowManager.shared.toggleMode() }
+                .keyboardShortcut(shortcuts.shortcut(for: .switchWindowMode))
             Button(workbench.isOutputShown ? String(localized: "隐藏输出面板") : String(localized: "显示输出面板")) { workbench.toggleOutput() }
             Divider()
             Button("工具与扩展…") {

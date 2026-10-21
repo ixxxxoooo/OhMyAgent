@@ -63,7 +63,7 @@ struct AgentModelPage: View {
             }
             Section("默认 Agent") {
                 LabeledContent("当前", value: Toolchain.defaultDescriptor().name)
-                Note("可在「Agent 扩展」页登记其他 ACP Agent。")
+                Note("新对话沿用你上次选择的 Agent、模型、思考强度与权限模式;从未选择过时使用「Agent 扩展」页设置的默认 Agent。可在该页登记其他 ACP Agent。")
             }
         }
     }

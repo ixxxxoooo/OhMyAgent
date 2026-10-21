@@ -43,6 +43,8 @@ public struct IDEWindowFrame: Codable, Equatable, Sendable {
 public enum IDEMetrics {
     /// 活动栏宽度
     public static let activityBarWidth: Double = 48
+    /// 标题栏高度(与 Agent 窗口的 `TitlebarMetrics.height` 一致)
+    public static let titleBarHeight: Double = 35
     /// 状态栏高度
     public static let statusBarHeight: Double = 22
     /// 窗口最小尺寸
@@ -93,7 +95,7 @@ public enum IDEMetrics {
     /// 在给定窗口内,底部面板高度的实际上限:让出标题栏、状态栏与编辑区最小高度。
     /// - Parameter window: 窗口内容高度
     public static func panelMax(window: Double) -> Double {
-        max(panelRange.lowerBound, min(panelRange.upperBound, window - 35 - statusBarHeight - editorMinHeight))
+        max(panelRange.lowerBound, min(panelRange.upperBound, window - titleBarHeight - statusBarHeight - editorMinHeight))
     }
 
     /// 规范化工作区路径作为「同一根目录」的比较键:标准化并解析符号链接,去掉末尾斜杠。

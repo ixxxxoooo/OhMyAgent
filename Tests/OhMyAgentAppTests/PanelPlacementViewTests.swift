@@ -15,6 +15,9 @@ struct PanelPlacementViewTests {
         #expect(TitlebarMetrics.leftClusterWidth(toggles: 1) == 198)
         #expect(TitlebarMetrics.rightClusterWidth(toggles: 1) == 34)
         #expect(TitlebarMetrics.rightClusterWidth(toggles: 0) == 0)
+        // 含最外侧的模式切换按钮(Agent 窗口):按钮宽 + 开关 + 间距 + 右边距
+        #expect(TitlebarMetrics.rightClusterWidth(toggles: 0, includesModeSwitch: true) == TitlebarMetrics.modeSwitchWidth + 8)
+        #expect(TitlebarMetrics.rightClusterWidth(toggles: 1, includesModeSwitch: true) == TitlebarMetrics.buttonSize + TitlebarMetrics.buttonSpacing + TitlebarMetrics.modeSwitchWidth + 8)
         #expect(TitlebarMetrics.leftClusterWidth(toggles: 2) > TitlebarMetrics.leftClusterWidth(toggles: 1))
     }
 
@@ -23,7 +26,7 @@ struct PanelPlacementViewTests {
         var layout = WorkbenchLayout()
         layout.rightVisible = true
         // 默认:工具栏在右侧最外
-        #expect(layout.titlebarInsets(for: .tools) == (0, TitlebarMetrics.rightClusterWidth(toggles: 1)))
+        #expect(layout.titlebarInsets(for: .tools) == (0, TitlebarMetrics.rightClusterWidth(toggles: 1, includesModeSwitch: true)))
         #expect(layout.titlebarInsets(for: .sidebar) == (0, 0))
 
         // 工具栏换到左侧且项目栏隐藏:工具栏成为左侧最外列,需要让开红绿灯与回退/前进/开关

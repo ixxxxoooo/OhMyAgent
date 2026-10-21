@@ -158,6 +158,8 @@ final class AppActions {
 
     /// ⌘W:鼠标在某个标签组(编辑区/右栏)内时关闭该组的当前标签;固定标签不关闭;鼠标不在任何标签组内才关闭窗口。
     func closeActiveTabOrWindow() {
+        // IDE 窗口:本阶段没有编辑器标签(I4 起关标签),⌘W 直接关窗口
+        if IDEWindowManager.shared.route(.closeWindow) { return }
         let workbench = AppEnvironment.shared.workbench
         guard let hit = DockFrameRegistry.shared.groupUnderMouse() else {
             NSApp.keyWindow?.performClose(nil)

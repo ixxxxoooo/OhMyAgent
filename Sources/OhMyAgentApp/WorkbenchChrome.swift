@@ -60,6 +60,8 @@ struct AgentMenu: View {
         let workbench = AppEnvironment.shared.workbench
         guard let id = workbench.selectedProjectID, let current = workbench.activeSession, descriptor.id != current.descriptor.id else { return }
         Log.session.info("切换 Agent", ["project": id, "from": current.descriptor.id, "to": descriptor.id, "blank": current.hasNoConversation ? "yes" : "no"])
+        // 记住这次选择:之后新建会话/新窗口默认使用该引擎
+        PreferredEngine.save(descriptor.id)
         guard current.hasNoConversation else {
             workbench.newConversation(in: id, agentID: descriptor.id)
             return

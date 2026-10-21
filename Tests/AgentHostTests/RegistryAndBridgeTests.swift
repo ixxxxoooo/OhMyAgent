@@ -71,6 +71,20 @@ struct RegistryTests {
         #expect(!data.enabledAgents.contains { $0.id == "a" })
     }
 
+    @Test("新会话引擎:上次选择且仍启用 > 配置默认 > Claude Code")
+    func resolvedDefaultPrefersLastUsed() {
+        var data = AgentRegistryData()
+        data.agents = [AgentDescriptor(id: "a", name: "A", kind: .genericACP, command: "a"),
+                       AgentDescriptor(id: "b", name: "B", kind: .genericACP, command: "b", enabled: false)]
+        data.defaultAgent = "a"
+        #expect(data.resolvedDefault(lastUsed: nil).id == "a")
+        #expect(data.resolvedDefault(lastUsed: "claude-code").id == "claude-code")
+        // 上次选择的 Agent 已停用、已删除或为空时回退到配置的默认
+        #expect(data.resolvedDefault(lastUsed: "b").id == "a")
+        #expect(data.resolvedDefault(lastUsed: "gone").id == "a")
+        #expect(data.resolvedDefault(lastUsed: "").id == "a")
+    }
+
     @Test("Agent-as-MCP 转换为 stdio 配置并解析 PATH")
     func mcpAgent() throws {
         let dir = try tempDir(); defer { try? FileManager.default.removeItem(at: dir) }

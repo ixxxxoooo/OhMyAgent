@@ -54,6 +54,6 @@ public actor Toolchain {
             // 演示模式下对外呈现为 Claude Code,界面不出现「Fake」字样
             return AgentDescriptor(id: "fake", name: isDemoMode ? "Claude Code" : "Fake Agent", kind: .genericACP, command: path, summary: String(localized: "脚本化测试 Agent"))
         }
-        return AgentRegistryStore().load().resolvedDefault
+        return AgentRegistryStore().load().resolvedDefault(lastUsed: PreferredEngine.saved())
     }
 }

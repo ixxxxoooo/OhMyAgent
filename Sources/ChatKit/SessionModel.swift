@@ -1894,15 +1894,17 @@ public final class SessionModel {
     /// - Parameters:
     ///   - optionId: 选项 ID
     ///   - value: 新值
-    ///   - remember: 权限模式是否记为偏好(自动化、沿用偏好本身传 false,避免覆盖用户的选择)
+    ///   - remember: 模式/模型/思考强度是否记为偏好(自动化、沿用偏好本身传 false,避免覆盖用户的选择)
     public func setConfigOption(_ optionId: String, value: String, remember: Bool = true) {
         if isHibernated { whenAwake { [weak self] in self?.setConfigOption(optionId, value: value, remember: remember) }; return }
         guard let client, let sessionId else { return }
         // 切换模型时记录切换前的显示名,成功后在时间线插入分割线
         let isModel = configOptions.first { $0.id == optionId }?.category == "model"
         let previous = isModel ? modelLabel(forValue: configOptions.first { $0.id == optionId }?.currentValue.stringValue) : nil
-        // 用户选择的权限模式记下来,新开会话时沿用
-        if remember, configOptions.first(where: { $0.id == optionId })?.category == "mode" { PreferredMode.save(value, agentId: activeDescriptor.id) }
+        // 用户选择的权限模式、模型、思考强度记下来,新开会话/新窗口时沿用
+        if remember, let category = configOptions.first(where: { $0.id == optionId })?.category {
+            PreferredConfigOption.save(value, category: category, agentId: activeDescriptor.id)
+        }
         Task { [weak self] in
             do {
                 let updated = try await client.setConfigOption(sessionId: sessionId, configId: optionId, value: .string(value))
@@ -2394,7 +2396,7 @@ public final class SessionModel {
 
     /// 需要 Agent 进程的操作:休眠中先唤醒,就绪后再执行;否则立即执行。
     /// - Parameter action: 要执行的动作
-    private func whenAwake(_ action: @escaping @MainActor () -> Void) {
+    func whenAwake(_ action: @escaping @MainActor () -> Void) {
         guard isHibernated else { action(); return }
         wakeActions.append(action)
         wake()

@@ -647,7 +647,10 @@ struct AgentIntegrationTests {
         #expect(model.upsert(AgentDescriptor(id: "claude-code", name: "冒名", kind: .genericACP, command: "x")) != nil)
         #expect(model.upsert(AgentDescriptor(id: "g", name: "G", kind: .genericACP, command: " ")) != nil)
         #expect(model.upsert(AgentDescriptor(id: "goose", name: "Goose", kind: .genericACP, command: "goose", args: ["acp"])) == nil)
+        // 明确指定默认 Agent 会清除「上次选择的引擎」,使其立即生效
+        PreferredEngine.save("claude-code")
         model.setDefault(agentId: "goose")
+        #expect(PreferredEngine.saved() == nil)
         #expect(AgentRegistryModel(store: store).data.resolvedDefault.id == "goose")
         model.setEnabled(false, agentId: "goose")
         #expect(model.data.defaultAgent == nil)

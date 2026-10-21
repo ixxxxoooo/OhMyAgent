@@ -29,9 +29,21 @@ enum TitlebarMetrics {
         return trafficLightInset + buttonSize * CGFloat(count) + buttonSpacing * CGFloat(count - 1)
     }
 
+    /// 模式切换按钮(Agent 窗口的「编辑器 ↗」、IDE 窗口的「Agents Window ↗」)的宽度:两个窗口共用同一个值,
+    /// 标题栏右侧簇在两个窗口间切换时不跳动。
+    static let modeSwitchWidth: CGFloat = 124
+
     /// 右上浮层(`toggles` 个面板开关 + 边距)占用的宽度:`toggles == 1` 时为 34;没有开关时为 0。
-    static func rightClusterWidth(toggles: Int) -> CGFloat {
-        toggles <= 0 ? 0 : buttonSize * CGFloat(toggles) + buttonSpacing * CGFloat(toggles - 1) + 8
+    /// - Parameters:
+    ///   - toggles: 面板开关个数
+    ///   - includesModeSwitch: 是否含最外侧的模式切换按钮(Agent 窗口为 true)
+    static func rightClusterWidth(toggles: Int, includesModeSwitch: Bool = false) -> CGFloat {
+        let count = max(toggles, 0)
+        guard includesModeSwitch else {
+            return count == 0 ? 0 : buttonSize * CGFloat(count) + buttonSpacing * CGFloat(count - 1) + 8
+        }
+        // 面板开关(各 buttonSize)+ 模式切换按钮,按钮之间 buttonSpacing,外加 8 的右边距
+        return buttonSize * CGFloat(count) + modeSwitchWidth + buttonSpacing * CGFloat(count) + 8
     }
 }
 
@@ -101,8 +113,10 @@ struct TitlebarOverlay: View {
             HStack(spacing: TitlebarMetrics.buttonSpacing) {
                 // 右侧由内向外:工具栏在项目栏内侧
                 ForEach(toggles(on: .right).reversed()) { toggleButton($0, side: .right) }
+                // 最外侧:切到 IDE 窗口(⌃⌘I;⌥ 点击新开窗口)
+                ModeSwitchButton(target: .ide)
             }
-            .padding(.trailing, 4)
+            .padding(.trailing, 8)
         }
         .frame(height: TitlebarMetrics.height)
         .frame(maxWidth: .infinity, alignment: .top)
@@ -155,7 +169,7 @@ extension WorkbenchLayout {
         guard column != .sidebar, visibleColumns(on: side).first == column else { return (0, 0) }
         return side == .left
             ? (TitlebarMetrics.leftClusterWidth(toggles: toggleCount(on: .left)), 0)
-            : (0, TitlebarMetrics.rightClusterWidth(toggles: toggleCount(on: .right)))
+            : (0, TitlebarMetrics.rightClusterWidth(toggles: toggleCount(on: .right), includesModeSwitch: true))
     }
 }
 

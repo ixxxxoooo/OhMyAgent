@@ -109,6 +109,14 @@ public struct AgentRegistryData: Codable, Sendable, Equatable {
         enabledAgents.first { $0.id == defaultAgent } ?? .claudeCode
     }
 
+    /// 新会话使用的 Agent:用户上次选择且仍启用的 Agent > 配置的默认 Agent > Claude Code。
+    /// - Parameter lastUsed: 用户上次手动选择的 Agent ID(可为空)
+    /// - Returns: 解析出的 Agent
+    public func resolvedDefault(lastUsed: String?) -> AgentDescriptor {
+        if let lastUsed, let match = enabledAgents.first(where: { $0.id == lastUsed }) { return match }
+        return resolvedDefault
+    }
+
     /// 已启用的 Agent-as-MCP 登记项。
     public var enabledMCPAgents: [AgentMCPEntry] { mcpAgents.filter(\.enabled) }
 }
