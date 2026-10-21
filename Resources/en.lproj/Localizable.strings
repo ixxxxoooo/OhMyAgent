@@ -2091,7 +2091,7 @@
 "控制文字笔画粗细(对应 macOS 的 AppleFontSmoothing,只影响本应用):「关闭」最细,「强」最粗;「跟随系统」沿用系统设置。" = "Controls text stroke weight (macOS AppleFontSmoothing, this app only): Off is thinnest, Strong is boldest; System follows the OS setting.";
 "下拉里只列出本机已安装的预置字体;字体未安装时自动回退到系统等宽。" = "Only installed preset fonts are listed; a missing font falls back to the system monospace font.";
 "手动填写任意已安装的字体族名,回车生效,留空恢复系统等宽。" = "Type any installed font family name and press Return; leave empty to restore the system monospace font.";
-"超过该行数的文件会强制换行并关闭复杂高亮以保持流畅(范围 2,000–200,000);新打开的文件立即生效。" = "Files over this line count are forced to wrap with complex highlighting off to stay smooth (2,000–200,000); applies to newly opened files.";
+"超过该行数的文件只高亮视口附近以保持流畅(范围 2,000–200,000);新打开的文件立即生效。" = "Files over this line count only highlight near the viewport to stay smooth (2,000–200,000); applies to newly opened files.";
 "跟随 Agent" = "Follow Agent";
 "Agent 每次修改文件都会在预览标签中打开该文件并跳到第一处改动(仅当前项目);本轮改动过的行会在行号栏用强调色标出。" = "Each time the Agent edits a file it opens in a preview tab at the first change (current project only); lines changed this turn are marked in the gutter.";
 "在编辑器里选中代码,右键「在对话中引用选区」或按 ⌘⇧L,会把 @文件:行范围 加入当前项目的输入框。" = "Select code in the editor and right-click “Reference Selection in Chat” or press ⌘⇧L to add @file:line-range to the current project’s composer.";

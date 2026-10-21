@@ -148,7 +148,7 @@ struct EditorPage: View {
                     Slider(value: $fontSize, in: EditorFontPrefs.sizeRange, step: 1).frame(width: 220)
                 }
                 SettingsToggleRow("自动换行", isOn: $wrap)
-                SettingsRow("大文件模式起点", detail: "超过该行数的文件会强制换行并关闭复杂高亮以保持流畅(范围 2,000–200,000);新打开的文件立即生效。") {
+                SettingsRow("大文件模式起点", detail: "超过该行数的文件只高亮视口附近以保持流畅(范围 2,000–200,000);新打开的文件立即生效。") {
                     TextField("", value: $largeFileLines, format: IntegerFormatStyle<Int>())
                         .multilineTextAlignment(.trailing).frame(width: 90).accessibilityLabel("大文件模式起点")
                     Text("行").font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
