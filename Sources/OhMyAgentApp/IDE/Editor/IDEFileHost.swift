@@ -18,6 +18,8 @@ struct IDEFileHost {
     var report: @MainActor (String, [EditorDiagnostic], String) -> Void
     /// 上报某文件的光标状态(路径,光标)
     var caret: @MainActor (String, EditorCaret) -> Void
+    /// 登记/注销某文件的语言服务器会话(IDE 命令:引用、符号、重命名、格式化经它访问)
+    var registerLSP: @MainActor (String, EditorLSPController?) -> Void
 }
 
 extension EnvironmentValues {

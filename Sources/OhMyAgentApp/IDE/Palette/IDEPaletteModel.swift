@@ -10,16 +10,35 @@ import OMLog
 import WorkbenchKit
 
 /// 面板里的一行结果。
+/// 自定义列表(引用、符号)里的一个位置。
+struct IDEPaletteLocation: Identifiable, Equatable {
+    let id: String
+    /// 主标题(符号名、命中行文本)
+    let title: String
+    /// 副标题(文件相对路径与行号)
+    let detail: String
+    /// Lucide 图标名
+    let icon: String
+    /// 绝对路径
+    let path: String
+    /// 行号(1 起始)
+    let line: Int
+    /// 缩进层级(符号层级)
+    var depth = 0
+}
+
 enum IDEPaletteItem: Identifiable {
     case file(FuzzyMatch)
     case command(IDECommandMatch)
     case line(Int?, Int?)
+    case location(IDEPaletteLocation)
 
     var id: String {
         switch self {
         case .file(let match): "f:" + match.path
         case .command(let match): "c:" + match.command.id
         case .line(let line, let column): "l:\(line ?? 0):\(column ?? 0)"
+        case .location(let location): "p:" + location.id
         }
     }
 }
@@ -43,11 +62,29 @@ final class IDEPaletteModel {
     /// 解析后的查询。
     var query: IDEPaletteQuery { IDEPaletteQuery.parse(text) }
 
+    /// 自定义列表(引用、符号):非 nil 时面板显示它,输入框用于过滤
+    private(set) var customItems: [IDEPaletteLocation]?
+    /// 自定义列表的输入框占位文案
+    private(set) var customPlaceholder = ""
+
+    /// 以自定义列表打开面板(查找引用、转到符号)。
+    /// - Parameters:
+    ///   - items: 列表
+    ///   - placeholder: 输入框占位文案
+    func present(custom items: [IDEPaletteLocation], placeholder: String) {
+        customItems = items
+        customPlaceholder = placeholder
+        text = ""
+        highlighted = 0
+        isPresented = true
+    }
+
     /// 打开面板。
     /// - Parameters:
     ///   - prefix: 初始前缀(`""` 文件、`">"` 命令、`":"` 转到行)
     ///   - root: 工作区根目录(用于文件索引)
     func present(prefix: String, root: String?) {
+        customItems = nil
         text = prefix
         highlighted = 0
         isPresented = true
@@ -78,6 +115,17 @@ final class IDEPaletteModel {
     ///   - context: 命令上下文
     ///   - recents: 已打开文件的相对路径(最近在前)
     func items(context: IDECommandContext, recents: [String]) -> [IDEPaletteItem] {
+        if let customItems {
+            let trimmed = text.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty { return customItems.prefix(200).map(IDEPaletteItem.location) }
+            return customItems
+                .compactMap { item -> (IDEPaletteLocation, Int)? in
+                    FuzzyMatcher.match(query: trimmed, path: item.title + " " + item.detail).map { (item, $0.score) }
+                }
+                .sorted { $0.1 > $1.1 }
+                .prefix(200)
+                .map { IDEPaletteItem.location($0.0) }
+        }
         switch query {
         case .files(let text):
             return IDEQuickOpen.rank(query: text, files: files, recents: recents).map(IDEPaletteItem.file)
@@ -136,6 +184,8 @@ extension IDEWorkspace {
         case .command(let match):
             palette.recordUse(match.command.id)
             perform(match.command.id)
+        case .location(let location):
+            model.openFile(location.path, line: location.line, preview: false)
         case .line(let line, let column):
             guard let line else { return }
             Task { @MainActor in
@@ -165,6 +215,10 @@ extension IDEWorkspace {
         case "go.previousTab": cycleTab(by: -1)
         case "go.revealActiveFile":
             if let path = model.activeFilePath { model.selectSidebar(.explorer); reveal(path) }
+        case "lsp.symbols": showSymbols()
+        case "lsp.references": showReferences()
+        case "lsp.rename": renameSymbol()
+        case "lsp.format": formatDocument()
         case "edit.toggleComment": CodeEditorView.activeEditor()?.perform(.toggleComment)
         case "edit.moveLineUp": CodeEditorView.activeEditor()?.perform(.moveLineUp)
         case "edit.moveLineDown": CodeEditorView.activeEditor()?.perform(.moveLineDown)

@@ -214,6 +214,63 @@ final class EditorLSPController {
         )
     }
 
+    // MARK: 扩展能力(IDE 命令:引用 / 符号 / 重命名 / 格式化)
+
+    /// 当前缓冲区文本(与服务器同步的最新版本)。
+    var text: String { currentText }
+
+    /// 服务器是否就绪(可发扩展请求)。
+    var isReady: Bool { handle != nil }
+
+    /// 文档符号(大纲)。
+    func symbols() async -> [LSPSymbol] {
+        guard let handle else { return [] }
+        await flush()
+        do { return try await handle.client.documentSymbols(uri: handle.uri) } catch {
+            Log.lsp.debug("文档符号失败", ["error": error.localizedDescription])
+            return []
+        }
+    }
+
+    /// 查找某偏移处符号的引用。
+    /// - Parameter offset: UTF-16 偏移
+    func references(at offset: Int) async -> [LSPLocation] {
+        guard let handle else { return [] }
+        await flush()
+        let position = LSPTextMapping.position(offset: offset, in: LineIndex(text: currentText))
+        do { return try await handle.client.references(uri: handle.uri, at: position) } catch {
+            Log.lsp.warning("查找引用失败", ["error": error.localizedDescription])
+            return []
+        }
+    }
+
+    /// 重命名某偏移处的符号,返回需应用的工作区编辑(失败为 nil)。
+    /// - Parameters:
+    ///   - offset: UTF-16 偏移
+    ///   - newName: 新名称
+    func rename(at offset: Int, to newName: String) async -> LSPWorkspaceEdit? {
+        guard let handle else { return nil }
+        await flush()
+        let position = LSPTextMapping.position(offset: offset, in: LineIndex(text: currentText))
+        do { return try await handle.client.rename(uri: handle.uri, at: position, newName: newName) } catch {
+            Log.lsp.warning("重命名失败", ["error": error.localizedDescription])
+            return nil
+        }
+    }
+
+    /// 整篇格式化,返回要应用的编辑(失败为空)。
+    /// - Parameters:
+    ///   - tabSize: 缩进宽度
+    ///   - insertSpaces: 是否用空格缩进
+    func formatEdits(tabSize: Int, insertSpaces: Bool) async -> [LSPTextEdit] {
+        guard let handle else { return [] }
+        await flush()
+        do { return try await handle.client.formatting(uri: handle.uri, tabSize: tabSize, insertSpaces: insertSpaces) } catch {
+            Log.lsp.warning("格式化失败", ["error": error.localizedDescription])
+            return []
+        }
+    }
+
     private func hover(at offset: Int) async -> String? {
         guard let handle else { return nil }
         await flush()

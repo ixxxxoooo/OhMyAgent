@@ -63,6 +63,21 @@ final class ScriptedLSPServer: ACPRequestHandler, @unchecked Sendable {
             return [["uri": "file:///def.swift", "range": ["start": ["line": 3, "character": 4], "end": ["line": 3, "character": 9]]]]
         case "textDocument/completion":
             return ["isIncomplete": false, "items": [["label": "alpha"], ["label": "alphabet", "kind": 3]]]
+        case "textDocument/references":
+            return [["uri": "file:///a.swift", "range": ["start": ["line": 1, "character": 2], "end": ["line": 1, "character": 5]]],
+                    ["uri": "file:///b.swift", "range": ["start": ["line": 7, "character": 0], "end": ["line": 7, "character": 3]]]]
+        case "textDocument/documentSymbol":
+            return [["name": "Foo", "kind": 23, "range": ["start": ["line": 0, "character": 0], "end": ["line": 9, "character": 1]],
+                     "selectionRange": ["start": ["line": 0, "character": 7], "end": ["line": 0, "character": 10]],
+                     "children": [["name": "bar", "kind": 6, "range": ["start": ["line": 2, "character": 4], "end": ["line": 4, "character": 5]],
+                                   "selectionRange": ["start": ["line": 2, "character": 9], "end": ["line": 2, "character": 12]]]]]]
+        case "textDocument/rename":
+            let name = params?["newName"]?.stringValue ?? ""
+            return ["changes": ["file:///a.swift": [["range": ["start": ["line": 0, "character": 4], "end": ["line": 0, "character": 7]], "newText": .string(name)]]]]
+        case "textDocument/formatting":
+            return [["range": ["start": ["line": 0, "character": 0], "end": ["line": 0, "character": 2]], "newText": "  "]]
+        case "textDocument/signatureHelp":
+            return ["signatures": [["label": "f(a: Int, b: String)", "parameters": [["label": "a: Int"], ["label": "b: String"]]]], "activeSignature": 0, "activeParameter": 1]
         default:
             throw JSONRPCError(code: JSONRPCError.methodNotFound, message: method)
         }
@@ -339,4 +354,64 @@ func stdioTransportSendAfterStopDoesNotCrash() async throws {
         for _ in 0..<20 { transport.send(Data("{}".utf8)) }
     }
     try await Task.sleep(for: .milliseconds(200))
+}
+
+
+@Suite("LSP 扩展能力")
+struct LSPFeatureTests {
+    @Test("引用、符号、重命名、格式化、签名帮助的请求与解码")
+    func requests() async throws {
+        let (client, _) = try await makeScripted()
+        try await client.start()
+        let refs = try await client.references(uri: "file:///a.swift", at: LSPPosition(line: 1, character: 3))
+        #expect(refs.count == 2 && refs[1].uri == "file:///b.swift" && refs[1].range.start.line == 7)
+
+        let symbols = try await client.documentSymbols(uri: "file:///a.swift")
+        #expect(symbols.count == 1 && symbols[0].name == "Foo" && symbols[0].kind == .struct)
+        #expect(symbols[0].line == 0 && symbols[0].endLine == 9)
+        #expect(symbols[0].flattened().map(\.depth) == [0, 1])
+        #expect(symbols[0].children[0].kind == .method && symbols[0].children[0].line == 2)
+
+        let edit = try await client.rename(uri: "file:///a.swift", at: LSPPosition(line: 0, character: 5), newName: "bar")
+        #expect(edit.editCount == 1)
+        let applied = LSPTextEdits.apply(try #require(edit.changes["file:///a.swift"]), to: "let foo = 1\n")
+        #expect(applied == "let bar = 1\n")
+
+        let format = try await client.formatting(uri: "file:///a.swift", tabSize: 2, insertSpaces: true)
+        #expect(LSPTextEdits.apply(format, to: "\t\tx\n") == "  x\n")
+
+        let help = try #require(try await client.signatureHelp(uri: "file:///a.swift", at: LSPPosition(line: 0, character: 2)))
+        #expect(help.label == "f(a: Int, b: String)")
+        #expect(help.activeParameter == NSRange(location: 10, length: 9))
+    }
+
+    @Test("未就绪时抛 notReady;服务器不支持的方法抛错")
+    func notReadyAndUnsupported() async throws {
+        let (client, _) = try await makeScripted()
+        await #expect(throws: LSPError.notReady) { _ = try await client.references(uri: "file:///a", at: LSPPosition(line: 0, character: 0)) }
+    }
+
+    @Test("文本编辑应用:多处、重叠忽略、UTF-16 列与越界钳制")
+    func applyEdits() {
+        func edit(_ l1: Int, _ c1: Int, _ l2: Int, _ c2: Int, _ text: String) -> LSPTextEdit {
+            LSPTextEdit(range: LSPRange(start: LSPPosition(line: l1, character: c1), end: LSPPosition(line: l2, character: c2)), newText: text)
+        }
+        #expect(LSPTextEdits.apply([edit(0, 0, 0, 1, "A"), edit(1, 0, 1, 1, "B")], to: "a\nb\n") == "A\nB\n")
+        // 重叠:先出现(起点靠前、同起点更长)的保留,与之重叠的被丢弃
+        #expect(LSPTextEdits.apply([edit(0, 0, 0, 3, "X"), edit(0, 1, 0, 2, "Y")], to: "abc") == "X")
+        // emoji 占两个 UTF-16 单元
+        #expect(LSPTextEdits.apply([edit(0, 2, 0, 3, "!")], to: "😀a") == "😀!")
+        #expect(LSPTextEdits.apply([edit(5, 0, 5, 0, "end")], to: "a\n") == "a\nend")
+        #expect(LSPTextEdits.apply([], to: "same") == "same")
+    }
+
+    @Test("documentChanges 形式的工作区编辑与 SymbolInformation 都能解码")
+    func decodeVariants() throws {
+        let value: JSONValue = ["documentChanges": [["textDocument": ["uri": "file:///x", "version": 1],
+                                                    "edits": [["range": ["start": ["line": 0, "character": 0], "end": ["line": 0, "character": 1]], "newText": "Z"]]]]]
+        #expect(LSPDecode.workspaceEdit(value).changes["file:///x"]?.count == 1)
+        let info: JSONValue = [["name": "g", "kind": 12, "location": ["uri": "file:///x", "range": ["start": ["line": 4, "character": 0], "end": ["line": 6, "character": 1]]]]]
+        let symbols = LSPDecode.symbols(info)
+        #expect(symbols.count == 1 && symbols[0].line == 4 && symbols[0].endLine == 6 && symbols[0].kind == .function)
+    }
 }

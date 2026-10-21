@@ -255,6 +255,12 @@ public actor LSPClient {
         LSPDecode.completions(try await query("textDocument/completion", uri: uri, position: position, timeout: requestTimeout))
     }
 
+    /// 通用请求(就绪检查 + 超时);扩展能力(引用、符号、重命名、格式化)复用。
+    func request(_ method: String, _ params: JSONValue?) async throws -> JSONValue {
+        guard state == .ready else { throw LSPError.notReady }
+        return try await send(method, params, timeout: requestTimeout)
+    }
+
     private func query(_ method: String, uri: String, position: LSPPosition, timeout: Duration) async throws -> JSONValue {
         guard state == .ready else { throw LSPError.notReady }
         let params: JSONValue = [

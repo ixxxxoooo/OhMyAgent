@@ -2858,3 +2858,17 @@
 "IDE 窗口里的文件修改后自动写盘;「失焦」指窗口失去键盘焦点时保存。" = "Files in IDE windows are written to disk automatically; \"On Focus Loss\" saves when the window loses keyboard focus.";
 "失焦" = "On Focus Loss";
 "快捷键:⌘/ 切换注释、⌥↑/⌥↓ 移动行、⇧⌥↑/⇧⌥↓ 复制行、⌘⇧K 删除行、⌘D 添加下一个相同项、⌥ 点击添加光标、⌃G 转到行。" = "Shortcuts: ⌘/ toggle comment, ⌥↑/⌥↓ move line, ⇧⌥↑/⇧⌥↓ copy line, ⌘⇧K delete line, ⌘D add next occurrence, ⌥-click add cursor, ⌃G go to line.";
+"转到符号…" = "Go to Symbol…";
+"查找引用" = "Find References";
+"重命名符号" = "Rename Symbol";
+"格式化文档" = "Format Document";
+"语言服务不可用" = "Language Service Unavailable";
+"当前文件没有就绪的语言服务器(未安装、已关闭或仍在启动)。" = "No language server is ready for this file (not installed, disabled, or still starting).";
+"转到符号" = "Go to Symbol";
+"没有找到引用" = "No References Found";
+"引用(%lld)" = "References (%lld)";
+"名称不能为空或包含空白" = "The name cannot be empty or contain whitespace";
+"无法重命名" = "Cannot Rename";
+"语言服务器没有返回修改。" = "The language server returned no changes.";
+"没有打开的文件" = "No open file";
+"没有可显示的符号" = "No symbols to show";

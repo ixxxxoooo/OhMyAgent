@@ -6,6 +6,7 @@ import AppKit
 import ChatKit
 import EditorKit
 import IDEKit
+import LSPKit
 import Observation
 import OMLog
 import WorkbenchKit
@@ -34,6 +35,12 @@ final class IDEWorkspace {
     @ObservationIgnored var agentSlot: String?
     /// 最近关闭的文件标签(供「重新打开已关闭的标签」)
     @ObservationIgnored var closedStack: [TabKind] = []
+    /// 各文件的语言服务器会话(`FileTabView` 登记)
+    @ObservationIgnored var lspControllers: [String: EditorLSPController] = [:]
+    /// 活动文件的大纲与其所属路径
+    var outline: [LSPSymbol] = []
+    var outlinePath: String?
+    @ObservationIgnored var outlineTask: Task<Void, Never>?
     /// 延迟自动保存的计时任务
     @ObservationIgnored var autoSaveTask: Task<Void, Never>?
 

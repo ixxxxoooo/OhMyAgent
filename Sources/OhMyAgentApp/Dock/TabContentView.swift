@@ -226,6 +226,7 @@ struct FileTabView: View {
         .onDisappear {
             lsp?.detach()
             lsp = nil
+            ideHost?.registerLSP(path, nil)
             ideHost?.report(path, [], "")
         }
         .task(id: "\(path)|\(isActive)") {
@@ -311,6 +312,7 @@ struct FileTabView: View {
         }
         lsp = controller
         await controller.attach(text: text)
+        ideHost?.registerLSP(path, controller)
     }
 
     /// 文件所属项目的根目录(取最长匹配);不在任何项目内则用文件所在目录。

@@ -26,7 +26,8 @@ extension IDEWorkspace {
                 }
                 self?.model.problems.set(problems, forFile: path)
             },
-            caret: { [weak self] path, caret in self?.carets[path] = caret }
+            caret: { [weak self] path, caret in self?.carets[path] = caret },
+            registerLSP: { [weak self] path, controller in self?.registerLSP(controller, for: path) }
         )
     }
 
@@ -79,6 +80,9 @@ extension IDEWorkspace {
         Task {
             _ = await FileDocumentStore.shared.save(path)
             syncDirtyFlags()
+            // 保存后服务器已同步新文本,刷新大纲
+            try? await Task.sleep(for: .milliseconds(400))
+            refreshOutline()
         }
     }
 

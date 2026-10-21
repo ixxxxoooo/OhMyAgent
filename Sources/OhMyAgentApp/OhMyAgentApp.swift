@@ -171,6 +171,13 @@ private func stopLanguageServers() {
     }
 }
 
+/// 功能键(F1…F19)对应的快捷键字符。
+/// - Parameter code: `NSF2FunctionKey` 这类常量
+func functionKeyEquivalent(_ code: Int) -> KeyEquivalent {
+    let scalar = UInt32(exactly: code).flatMap(UnicodeScalar.init) ?? UnicodeScalar(UInt8(0x20))
+    return KeyEquivalent(Character(scalar))
+}
+
 @main
 struct OhMyAgentApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
@@ -282,6 +289,16 @@ struct WorkbenchCommands: Commands {
                 .keyboardShortcut(shortcuts.shortcut(for: .globalSearch))
             Button("新建终端") { AppActions.shared.newTerminal() }
                 .keyboardShortcut(shortcuts.shortcut(for: .newTerminal))
+            Divider()
+            // 代码导航(仅 IDE 窗口响应)
+            Button("转到符号…") { IDEWindowManager.shared.route(.showSymbols) }
+                .keyboardShortcut("o", modifiers: [.command, .shift])
+            Button("查找引用") { IDEWindowManager.shared.route(.showReferences) }
+                .keyboardShortcut(functionKeyEquivalent(NSF12FunctionKey), modifiers: .shift)
+            Button("重命名符号") { IDEWindowManager.shared.route(.renameSymbol) }
+                .keyboardShortcut(functionKeyEquivalent(NSF2FunctionKey), modifiers: [])
+            Button("格式化文档") { IDEWindowManager.shared.route(.formatDocument) }
+                .keyboardShortcut("f", modifiers: [.option, .shift])
         }
         CommandGroup(replacing: .appSettings) {
             Button("设置…") { AppActions.shared.openSettings() }

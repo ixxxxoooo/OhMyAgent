@@ -60,25 +60,27 @@ private struct IDEPaletteCard: View {
     }
 
     private var icon: String {
+        if palette.customItems != nil { return "search" }
         switch palette.query {
-        case .files: "file-search"
-        case .commands: "terminal"
-        case .line: "hash"
+        case .files: return "file-search"
+        case .commands: return "terminal"
+        case .line: return "hash"
         }
     }
 
     private var placeholder: String {
+        if palette.customItems != nil { return palette.customPlaceholder }
         switch palette.query {
-        case .files: String(localized: "按文件名搜索(> 命令,: 转到行)")
-        case .commands: String(localized: "输入命令名称")
-        case .line: String(localized: "输入行号,如 :120 或 :120:8")
+        case .files: return String(localized: "按文件名搜索(> 命令,: 转到行)")
+        case .commands: return String(localized: "输入命令名称")
+        case .line: return String(localized: "输入行号,如 :120 或 :120:8")
         }
     }
 
     @ViewBuilder
     private func list(_ items: [IDEPaletteItem]) -> some View {
         if items.isEmpty {
-            Text(palette.files.isEmpty && palette.query == .files("") ? String(localized: "正在建立文件索引…") : String(localized: "没有匹配项"))
+            Text(palette.customItems == nil && palette.files.isEmpty && palette.query == .files("") ? String(localized: "正在建立文件索引…") : String(localized: "没有匹配项"))
                 .font(OMFonts.small)
                 .foregroundStyle(OMColors.tertiaryText)
                 .frame(maxWidth: .infinity, minHeight: 56)
@@ -132,6 +134,12 @@ private struct IDEPaletteRow: View {
                         .frame(height: 18)
                         .background(OMColors.subtleFill, in: OMPillShape())
                 }
+            case .location(let location):
+                Spacer().frame(width: CGFloat(location.depth) * 12)
+                Image.om(location.icon, size: 14).foregroundStyle(OMColors.secondaryText)
+                Text(location.title).font(OMFonts.body).foregroundStyle(OMColors.primaryText).lineLimit(1)
+                Text(location.detail).font(OMFonts.small).foregroundStyle(OMColors.tertiaryText).lineLimit(1).truncationMode(.head)
+                Spacer(minLength: 0)
             case .line(let line, let column):
                 Image.om("corner-down-right", size: 14).foregroundStyle(OMColors.secondaryText)
                 Text(Self.lineText(line, column)).font(OMFonts.body).foregroundStyle(line == nil ? OMColors.tertiaryText : OMColors.primaryText)
