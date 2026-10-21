@@ -148,6 +148,7 @@ struct ProjectTreeView: View {
                 Button("新建文件夹…") {
                     if let url = WorkspaceStore.createFolder() { AppActions.shared.openWorkspace(url) }
                 }
+                Button("添加工作区…") { WorkspaceCreator.present(workbench: workbench) }
             }
         } label: {
             Image.om("folder.badge.plus", size: 12)

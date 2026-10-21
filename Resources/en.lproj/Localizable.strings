@@ -2742,3 +2742,9 @@
 "清空会话存档" = "Clear Session Archive";
 "将删除所有会话的本地存档;会话本身不受影响,再次打开时会重新从 Agent 拉取。" = "This deletes the local archive of every session. The sessions themselves are not affected and will be fetched from the agent again when opened.";
 "从 Agent 重新同步" = "Resync from Agent";
+"添加工作区…" = "Add Workspace…";
+"添加工作区" = "Add Workspace";
+"选择一个或多个项目文件夹:第一个是主文件夹,Agent、搜索、文件树与 Git 面板会同时覆盖它们。" = "Choose one or more project folders: the first is the primary folder; the agent, search, file tree and Git panel cover all of them.";
+"名称(可选)" = "Name (optional)";
+"默认使用主文件夹名" = "Defaults to the primary folder name";
+"尚未添加文件夹" = "No folders added yet";
