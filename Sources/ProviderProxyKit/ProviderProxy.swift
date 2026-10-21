@@ -308,11 +308,17 @@ public actor ProviderProxy {
     }
 
     /// 上游非 2xx:状态码透传,正文改写成 Anthropic 错误格式(OpenCode 免费层拒绝第三方客户端时给出明确提示)。
+    /// 配额用尽的 429 附带 `x-should-retry: false`:Claude Code 据此立即报错,而不是退避重试约 10 次、空等数分钟。
     static func upstreamFailure(status: Int, body: Data) -> HTTPResult {
         var message = ProtocolMapping.upstreamMessage(from: body)
         if let hint = UpstreamHints.message(for: body) { message = hint }
         message = LogRedactor.redact(message)
-        return error(status: status, message: message.isEmpty ? "upstream error \(status)" : message)
+        var headers = ["Content-Type": "application/json"]
+        if status == 429, UpstreamHints.isQuotaExhausted(body) {
+            headers["x-should-retry"] = "false"
+            Log.agent.warning("上游配额已用尽,通知 Claude Code 不再重试", ["status": "\(status)"])
+        }
+        return .full(status: status, headers: headers, body: ProtocolMapping.anthropicError(status: status, message: message.isEmpty ? "upstream error \(status)" : message))
     }
 }
 

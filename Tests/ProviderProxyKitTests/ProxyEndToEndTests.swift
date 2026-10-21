@@ -94,6 +94,7 @@ struct ProxyEndToEndTests {
         let (upstream, upstreamURL) = try await startUpstream(capture) { request in
             let body = String(decoding: request.body, as: UTF8.self)
             if body.contains("free-model") { return .full(status: 401, headers: [:], body: Data(#"{"type":"error","error":{"type":"FreeTierError","message":"x"}}"#.utf8)) }
+            if body.contains("busy-model") { return .full(status: 429, headers: [:], body: Data(#"{"error":{"message":"rate limited, slow down"}}"#.utf8)) }
             return .full(status: 429, headers: [:], body: Data(#"{"error":{"message":"额度不足"}}"#.utf8))
         }
         defer { upstream.stop() }
@@ -102,6 +103,10 @@ struct ProxyEndToEndTests {
         let (limited, http) = try await post(base, body: #"{"model":"m","messages":[{"role":"user","content":"hi"}]}"#)
         #expect(http.statusCode == 429)
         #expect(String(decoding: limited, as: UTF8.self).contains("额度不足"))
+        #expect(http.value(forHTTPHeaderField: "x-should-retry") == "false", "配额用尽:告诉 Claude Code 不要重试")
+        let (_, busyHTTP) = try await post(base, body: #"{"model":"busy-model","messages":[{"role":"user","content":"hi"}]}"#)
+        #expect(busyHTTP.statusCode == 429)
+        #expect(busyHTTP.value(forHTTPHeaderField: "x-should-retry") == nil, "短暂限流仍交给 Claude Code 重试")
         let (free, freeHTTP) = try await post(base, body: #"{"model":"free-model","messages":[{"role":"user","content":"hi"}]}"#)
         #expect(freeHTTP.statusCode == 401)
         #expect(String(decoding: free, as: UTF8.self).contains("OpenCode"))

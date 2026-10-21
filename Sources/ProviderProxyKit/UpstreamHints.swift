@@ -24,4 +24,15 @@ public enum UpstreamHints {
         }
         return nil
     }
+
+    /// 配额/余额用尽的特征文本(小写比较)。
+    private static let quotaMarkers = ["quota exceeded", "quota_exceeded", "insufficient_quota", "exceeded your current quota", "额度不足", "余额不足", "额度已用尽", "配额已用尽"]
+
+    /// 判断 429 正文是否为「配额/余额用尽」:这类错误重试也不会恢复,不同于短暂限流。
+    /// - Parameter body: 上游响应体
+    /// - Returns: 命中配额用尽特征时为 true
+    public static func isQuotaExhausted(_ body: Data) -> Bool {
+        guard let text = String(data: body, encoding: .utf8)?.lowercased() else { return false }
+        return quotaMarkers.contains { text.contains($0) }
+    }
 }
