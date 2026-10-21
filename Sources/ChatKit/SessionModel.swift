@@ -291,7 +291,7 @@ public final class SessionModel {
     public var dockSelection: ComposerDockSection?
     public var dockHidden = false
     public private(set) var agentName: String
-    public private(set) var configOptions: [SessionConfigOption] = [] {
+    public internal(set) var configOptions: [SessionConfigOption] = [] {
         didSet { if !configOptions.isEmpty { Self.lastConfigOptions[activeDescriptor.id] = configOptions } }
     }
     /// 各 Agent 最近一次拿到的配置选项(模式/模型/思考强度):恢复历史会话时先用它占位,
@@ -330,7 +330,7 @@ public final class SessionModel {
     /// Agent 能力与鉴权方式
     public private(set) var capabilities = AgentCapabilities()
     /// 正在回放历史会话
-    public private(set) var isReplaying = false
+    public internal(set) var isReplaying = false
     /// 工作区文件索引(供 @ 补全)
     public let fileIndex = FileIndex()
     /// 最近的 stderr 行(诊断用,最多 200 行)
@@ -390,7 +390,11 @@ public final class SessionModel {
     private var supervisor: AgentSupervisor?
     /// Agent 进程号(attach 时缓存,供同步的休眠判断检查进程树)
     private var agentPID: Int32?
-    private var client: ACPClient?
+    private(set) var client: ACPClient?
+    /// 正在接回引擎的存档会话 ID:期间屏蔽回放内容进时间线、发送进入排队
+    @ObservationIgnored var archiveSyncing: String?
+    /// 预恢复时启动的存档回显(连接就绪后据此只接回引擎、不重置时间线)
+    @ObservationIgnored var archiveRender: (sessionId: String, task: Task<ArchiveRenderResult, Never>)?
     private var coalescer: EventCoalescer?
     @ObservationIgnored private let eventBarrier = EventBarrier()
     private var pumpTasks: [Task<Void, Never>] = []
@@ -406,7 +410,7 @@ public final class SessionModel {
     private var turnChunks = 0
     private var turnToolCalls = 0
     /// 带项目与会话标识的日志器。
-    private var log: OMLogger {
+    var log: OMLogger {
         Log.session.with(["project": workspace.lastPathComponent, "session": sessionId.map { String($0.prefix(8)) } ?? "-"])
     }
     private let snapshotter = FileSnapshotter()
@@ -642,6 +646,9 @@ public final class SessionModel {
             return
         }
         switch phase {
+        case .ready where archiveSyncing != nil:
+            queuedPrompt = trimmed
+            queuedImages = images
         case .ready:
             start(prompt: trimmed, images: images)
         case .idle, .failed:
@@ -688,7 +695,7 @@ public final class SessionModel {
         send(text, images: images, afterTurn: afterTurn)
     }
 
-    private func flushQueuedPrompt() {
+    func flushQueuedPrompt() {
         guard let queued = queuedPrompt else { return }
         let images = queuedImages
         queuedPrompt = nil
@@ -997,7 +1004,7 @@ public final class SessionModel {
     /// 映射的会话 `_meta`(只含本机网关地址与占位令牌)
     @ObservationIgnored private var providerMeta: JSONValue?
     /// 会话 `_meta`:提供商元数据 + 客户端选项(代理/超时/追加提示词/CLAUDE.md);仅对真实 Claude 通道合并。
-    private func effectiveMeta() -> JSONValue? {
+    func effectiveMeta() -> JSONValue? {
         guard activeDescriptor.kind == .claudeACP else { return providerMeta }
         var options = SessionOptions(defaults: .standard)
         // 直连官方 API(无模型映射、~/.claude 也没配第三方网关)时,「自动」默认启用 MCP 工具按需加载:
@@ -1431,6 +1438,11 @@ public final class SessionModel {
         }
         sessionId = summary.sessionId
         isReplaying = true
+        // 本地有存档:不等连接,立即回显
+        if Self.archive?.exists(archiveKey(summary.sessionId)) == true {
+            let id = summary.sessionId
+            archiveRender = (id, Task { [weak self] in await self?.renderArchive(id) ?? .superseded })
+        }
     }
 
     /// 打开历史会话:优先 `session/load`(回放历史),否则 `session/resume`。
@@ -1443,6 +1455,12 @@ public final class SessionModel {
             if force { isReplaying = false; flushQueuedPrompt() }
             return
         }
+        if force, let render = archiveRender, render.sessionId == summary.sessionId {
+            archiveRender = nil
+            Task { [weak self] in await self?.continueFromArchive(await render.task.value, summary: summary, client: client) }
+            return
+        }
+        archiveRender = nil
         cancel()
         timeline.reset()
         goal = nil
@@ -1462,6 +1480,20 @@ public final class SessionModel {
         usage = nil
         promptCache = nil
         sessionId = summary.sessionId
+        isReplaying = true
+        // 本地有存档:直接回显,再在后台接回引擎(必要时静默同步),不等引擎回放
+        if Self.archive?.exists(archiveKey(summary.sessionId)) == true {
+            openFromArchive(summary, client: client)
+            return
+        }
+        loadFromEngine(summary, client: client)
+    }
+
+    /// 经引擎回放打开历史会话(本地没有存档,或存档不可用);回放同时作为全量同步写入存档。
+    /// - Parameters:
+    ///   - summary: 会话摘要
+    ///   - client: 当前连接
+    func loadFromEngine(_ summary: SessionSummary, client: ACPClient) {
         isReplaying = true
         // 会话记录(耗时/完成时间)与回放并行解析:回放一结束就能补上每回合的结束行,不用再等一轮磁盘解析
         let transcriptTurns = startTranscriptParse()
@@ -1621,10 +1653,15 @@ public final class SessionModel {
     /// 让已到达但尚在合并窗口中的事件先落入时间线。
     /// 等待此前到达的全部通知都已读入(屏障通知在事件流里排在它们之后)。
     /// - Parameter client: 当前连接
-    private func awaitEventBarrier(_ client: ACPClient) async {
+    func awaitEventBarrier(_ client: ACPClient) async {
         let token = UUID().uuidString
         await client.barrier(token)
         if await eventBarrier.wait(token) == false { log.warning("等待事件屏障超时", ["turn": "\(turnNumber)"]) }
+    }
+
+    /// 等待已合并的事件全部应用到时间线。
+    func drainEvents() async {
+        await coalescer?.drain()
     }
 
     private func settleEvents() async {
@@ -2209,11 +2246,12 @@ public final class SessionModel {
         }
     }
 
-    private func handle(_ events: [ClientEvent]) {
+    func handle(_ events: [ClientEvent]) {
         for event in events {
             switch event {
             case .sessionUpdate(let id, let update):
                 guard sessionId == nil || sessionId == id else { continue }
+                if archiveSyncing == id, Self.isTranscriptContent(update) { continue }
                 lastActivity = .now
                 noteTurnProgress(update)
                 handle(update)

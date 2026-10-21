@@ -49,6 +49,52 @@ struct SessionArchiveFlowTests {
         #expect(loaded?.meta.syncedAt != nil)
     }
 
+    /// 发一轮消息、等存档落盘,再分叉出新会话(让「打开第一个会话」成为切换)。
+    private func archivedThenForked(_ model: SessionModel, _ archive: SessionArchive) async throws -> String {
+        let first = try #require(model.sessionId)
+        model.send("存档里的问题")
+        #expect(await SessionModelTests.wait { !model.isRunning && model.timeline.entries.contains { $0.kind == .assistant } })
+        #expect(await pollArchive(archive, model.archiveKey(first)) { $0.updates.contains { $0["sessionUpdate"]?.stringValue == "agent_message_chunk" } } != nil)
+        model.forkCurrentSession()
+        #expect(await SessionModelTests.wait { model.sessionId != first && model.sessionId != nil })
+        return first
+    }
+
+    @Test("存档命中:打开会话直接回显存档内容(不经引擎回放),之后仍可继续对话")
+    func openUsesArchive() async throws {
+        let (archive, cleanup) = useTempArchive()
+        defer { cleanup() }
+        let ws = try M3ScenarioTests.tempWorkspace()
+        defer { try? FileManager.default.removeItem(at: ws) }
+        let model = try await M3ScenarioTests.readyModel(workspace: ws)
+        defer { model.shutdown() }
+        let first = try await archivedThenForked(model, archive)
+        model.openSession(SessionSummary(sessionId: first, cwd: ws.path, updatedAt: "2000-01-01T00:00:00Z"))
+        #expect(await SessionModelTests.wait { !model.isReplaying && model.sessionId == first && model.archiveSyncing == nil })
+        #expect(model.timeline.entries.contains { $0.kind == .user && $0.text.contains("存档里的问题") })
+        // 引擎回放的内容是「历史问题 / 历史回答」:没有出现说明没走 session/load
+        #expect(!model.timeline.entries.contains { $0.text.contains("历史回答") })
+        let assistants = model.timeline.entries.filter { $0.kind == .assistant }.count
+        model.send("继续")
+        #expect(await SessionModelTests.wait { !model.isRunning && model.timeline.entries.filter { $0.kind == .assistant }.count > assistants })
+    }
+
+    @Test("存档落后于引擎:先回显存档,再静默同步并替换为引擎内容")
+    func staleArchiveIsResynced() async throws {
+        let (archive, cleanup) = useTempArchive()
+        defer { cleanup() }
+        let ws = try M3ScenarioTests.tempWorkspace()
+        defer { try? FileManager.default.removeItem(at: ws) }
+        let model = try await M3ScenarioTests.readyModel(workspace: ws)
+        defer { model.shutdown() }
+        let first = try await archivedThenForked(model, archive)
+        model.openSession(SessionSummary(sessionId: first, cwd: ws.path, updatedAt: "2099-01-01T00:00:00Z"))
+        #expect(await SessionModelTests.wait { model.archiveSyncing == nil && model.timeline.entries.contains { $0.text.contains("历史回答") } })
+        // 静默同步期间回放事件不进时间线:引擎内容只出现一次
+        #expect(model.timeline.entries.filter { $0.kind == .assistant && $0.text.contains("历史回答") }.count == 1)
+        #expect(!model.timeline.entries.contains { $0.text.contains("存档里的问题") })
+    }
+
     @Test("打开历史会话:回放内容同步为存档")
     func replayIsSynced() async throws {
         let (archive, cleanup) = useTempArchive()

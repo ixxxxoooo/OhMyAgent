@@ -2731,3 +2731,4 @@
 "清空输出" = "Clear output";
 "%@ 在 %@ 的额度已用完。请在输入框切换到其他模型或提供商,或等额度重置后再试。" = "%1$@ has used up its quota for %2$@. Switch to another model or provider in the composer, or try again after the quota resets.";
 "%@ 的额度已用完。请在输入框切换到其他模型或提供商,或等额度重置后再试。" = "%@ has used up its quota. Switch to another model or provider in the composer, or try again after the quota resets.";
+"引擎里已经没有这个会话(可能已被引擎清理),当前显示的是本地存档。" = "The engine no longer has this session (it may have been cleaned up); showing the local archive.";
