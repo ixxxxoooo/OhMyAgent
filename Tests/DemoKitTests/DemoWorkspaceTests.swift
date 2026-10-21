@@ -63,6 +63,9 @@ struct DemoWorkspaceTests {
         #expect(csv.split(separator: "\n").count == 3_001)
         #expect(FileManager.default.fileExists(atPath: paths.project("perf-render/assets/logo.png").path))
         #expect(FileManager.default.fileExists(atPath: paths.project("perf-longchat/README.md").path))
+        // IDE 实验室:大文件与多语言样例
+        #expect(FileManager.default.fileExists(atPath: paths.project("perf-multitab/ide-lab/big/Big50k.swift").path))
+        #expect(FileManager.default.fileExists(atPath: paths.project("perf-multitab/ide-lab/lang/sample.rs").path))
     }
 
     @Test("atlas-web:提交历史、作者、合并提交、分支与标签")

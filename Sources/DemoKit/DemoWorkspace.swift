@@ -23,7 +23,7 @@ public struct DemoProjectInfo: Sendable, Equatable {
 /// 演示项目生成入口。
 public enum DemoWorkspace {
     /// 数据版本:改动生成内容时递增,旧沙盒会被自动重建。
-    public static let dataVersion = "2"
+    public static let dataVersion = "3"
 
     /// 全部演示项目(顺序即项目树里的默认顺序)。
     public static let catalog: [(name: String, git: Bool, summary: String)] = [
@@ -34,7 +34,7 @@ public enum DemoWorkspace {
         ("empty-project", false, "空目录"),
         ("perf-longchat", false, "性能实验室·超长会话:上千轮会话的滚动、加载、跨叶子复制与混合内容"),
         ("perf-render", false, "性能实验室·渲染:大 Markdown、宽表格、图表、Mermaid 全图种、大 Diff"),
-        ("perf-multitab", true, "性能实验室·多标签:预置多会话/文件/对比/历史标签 + 1 万文件深层目录 perf-fs"),
+        ("perf-multitab", true, "性能实验室·多标签:预置多会话/文件/对比/历史标签 + 1 万文件深层目录 perf-fs + IDE 实验室 ide-lab(5 万行大文件与多语言样例)"),
     ]
 
     /// 生成(或复用)演示项目。

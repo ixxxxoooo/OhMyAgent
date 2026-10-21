@@ -58,6 +58,8 @@ enum DemoPerfProjects {
         try b.write("docs/guide.md", guideV2 + "\n## 新增章节\n\n- [ ] 待补充的内容\n")
         // 深层目录放在提交之后(保持未跟踪,git 只把它当一个目录条目,状态依旧很快)
         try buildDeepTree(root: paths.project("perf-multitab").appendingPathComponent("perf-fs", isDirectory: true))
+        // IDE 实验室素材(大文件与多语言样例,同样保持未跟踪)
+        try DemoIDELab.build(in: paths.project("perf-multitab"))
     }
 
     // MARK: 深层目录
