@@ -85,6 +85,18 @@ public enum BrowserArguments {
         return url
     }
 
+    /// 谷歌按 IP 把 `google.com` 重定向到 `google.com.hk` 时,改走官方「不跳转国家站」入口 `google.com/ncr`。
+    /// - Parameter url: 即将导航的地址
+    /// - Returns: 需要改写时返回新地址(保留 `q` 等查询参数),否则为 nil
+    public static func googleNoCountryRedirect(_ url: URL) -> URL? {
+        guard let host = url.host?.lowercased(), host == "google.com.hk" || host == "www.google.com.hk" else { return nil }
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
+        components.host = "www.google.com"
+        // 根路径经 /ncr 设置地区 cookie 后回到 google.com;带路径的(如搜索)直接换域名并保留参数
+        if components.path.isEmpty || components.path == "/" { components.path = "/ncr"; components.query = nil }
+        return components.url
+    }
+
     /// `host:8080` 这类「冒号后全是端口」的写法不是协议。
     private static func isPortOnly(_ text: String, colon: String.Index) -> Bool {
         let rest = text[text.index(after: colon)...].prefix { $0 != "/" && $0 != "?" && $0 != "#" }

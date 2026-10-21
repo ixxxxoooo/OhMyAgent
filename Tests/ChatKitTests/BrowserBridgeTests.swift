@@ -9,6 +9,13 @@ import Testing
 
 @Suite("浏览器工具入参")
 struct BrowserBridgeTests {
+    @Test("谷歌香港站改写为 ncr 入口")
+    func googleNoCountryRedirect() {
+        #expect(BrowserArguments.googleNoCountryRedirect(URL(string: "https://www.google.com.hk/?gws_rd=cr")!)?.absoluteString == "https://www.google.com/ncr")
+        #expect(BrowserArguments.googleNoCountryRedirect(URL(string: "https://www.google.com.hk/search?q=a")!)?.absoluteString == "https://www.google.com/search?q=a")
+        #expect(BrowserArguments.googleNoCountryRedirect(URL(string: "https://www.google.com/")!) == nil)
+    }
+
     @Test("地址规整:补协议、本机用 http、拒绝危险协议")
     func normalize() {
         #expect(BrowserArguments.normalize("example.com")?.absoluteString == "https://example.com")

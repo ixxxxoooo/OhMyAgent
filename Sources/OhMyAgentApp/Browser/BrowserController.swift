@@ -54,6 +54,8 @@ final class BrowserTabModel: NSObject {
     /// 用户选中元素后回调(元素信息 + 元素截图)
     @ObservationIgnored var onElementPicked: ((PickedElement, Data?) -> Void)?
     private static let logLimit = 300
+    /// 上次把谷歌香港站改写为 `/ncr` 的时间
+    @ObservationIgnored private var lastGoogleRewrite = Date.distantPast
 
     /// - Parameters:
     ///   - id: 标签 id
@@ -194,6 +196,13 @@ extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction) async -> WKNavigationActionPolicy {
         guard let url = navigationAction.request.url else { return .cancel }
         let scheme = url.scheme?.lowercased() ?? ""
+        // 3 秒内只改写一次,避免谷歌仍坚持跳转时死循环
+        if navigationAction.targetFrame?.isMainFrame ?? true, Date().timeIntervalSince(lastGoogleRewrite) > 3,
+           let rewritten = BrowserArguments.googleNoCountryRedirect(url) {
+            lastGoogleRewrite = Date()
+            webView.load(URLRequest(url: rewritten))
+            return .cancel
+        }
         if scheme == "http" || scheme == "https" || url.absoluteString == "about:blank" { return .allow }
         Log.app.warning("浏览器拦截了非 http(s) 导航", ["scheme": scheme])
         return .cancel
