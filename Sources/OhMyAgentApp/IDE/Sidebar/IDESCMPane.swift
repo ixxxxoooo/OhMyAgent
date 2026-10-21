@@ -85,7 +85,7 @@ private struct IDESCMContent: View {
             }
             Spacer(minLength: 4)
             iconButton("refresh-cw", String(localized: "刷新")) { Task { await model.refresh(full: true) } }
-            iconButton("arrow-down-up", String(localized: "同步")) { Task { await model.sync() } }
+            iconButton("arrow-left-right", String(localized: "同步")) { Task { await model.sync() } }
         }
         .padding(.horizontal, 12)
         .frame(height: 32)
@@ -224,7 +224,7 @@ private struct IDESCMRow: View {
     private var menu: [MenuEntry] {
         var items: [MenuEntry] = []
         items += OMMenuItem("打开文件", icon: "file-text") { workspace.open(absolute, preview: false) }.menuEntries
-        if !change.isUntracked { items += OMMenuItem("查看差异", icon: "git-compare") { workspace.model.openDiff(absolute) }.menuEntries }
+        if !change.isUntracked { items += OMMenuItem("查看差异", icon: "file-diff") { workspace.model.openDiff(absolute) }.menuEntries }
         items += OMMenuDivider().menuEntries
         switch section {
         case "staged": items += OMMenuItem("取消暂存", icon: "minus") { Task { await model.unstage([change.path]) } }.menuEntries

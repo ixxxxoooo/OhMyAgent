@@ -40,7 +40,7 @@ struct IDESearchPane: View {
                 HStack(spacing: 4) {
                     Color.clear.frame(width: 24, height: 24)
                     field(String(localized: "替换"), text: $model.replacement, focus: false) {
-                        Button { model.replaceAll() } label: { Image.om("replace-all", size: 14) }
+                        Button { model.replaceAll() } label: { Image.om("list-checks", size: 14) }
                             .buttonStyle(.omIcon)
                             .disabled(model.output?.files.isEmpty ?? true)
                             .omTooltip(String(localized: "全部替换"))
@@ -153,7 +153,7 @@ private struct FileHeader: View {
                 .lineLimit(1).truncationMode(.head)
             Spacer(minLength: 4)
             if hovering && model.showsReplace {
-                Button { model.replace(file: file) } label: { Image.om("replace-all", size: 12) }
+                Button { model.replace(file: file) } label: { Image.om("list-checks", size: 12) }
                     .buttonStyle(.omIcon).omTooltip(String(localized: "替换此文件中的全部匹配")).accessibilityLabel(String(localized: "替换此文件中的全部匹配"))
             }
             Text("\(file.hits.count)").font(OMFonts.caption).foregroundStyle(OMColors.secondaryText)
@@ -181,7 +181,7 @@ private struct HitRow: View {
             Text(attributed).font(OMFonts.monoSmall).lineLimit(1)
             Spacer(minLength: 4)
             if hovering && model.showsReplace {
-                Button { model.replace(hit: hit) } label: { Image.om("replace", size: 12) }
+                Button { model.replace(hit: hit) } label: { Image.om("pencil", size: 12) }
                     .buttonStyle(.omIcon).omTooltip(String(localized: "替换")).accessibilityLabel(String(localized: "替换"))
             }
         }

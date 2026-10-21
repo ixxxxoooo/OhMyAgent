@@ -32,7 +32,7 @@ struct IDEBottomPanel: View {
             Spacer(minLength: 0)
             if model.panelTab == .terminal {
                 iconButton("plus", String(localized: "新建终端")) { workspace.newTerminal() }
-                iconButton("trash-2", String(localized: "结束当前终端")) {
+                iconButton("trash", String(localized: "结束当前终端")) {
                     if let id = model.activeTerminalID { workspace.closeTerminal(id) }
                 }
             }
