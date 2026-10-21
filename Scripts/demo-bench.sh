@@ -5,7 +5,7 @@
 # 模型与引擎切换并恢复会话、运行期真实内存曲线(0.5 秒采样,写入 JSON)。
 #
 # 用法: Scripts/demo-bench.sh [选项]
-#   --only <分类,...>  只跑指定分类:open,load,copy,render,switching,memory(默认 all)
+#   --only <分类,...>  只跑指定分类:open,load,copy,render,switching,memory,ide(默认 all)
 #   --turns <N>        长会话轮数(默认 2000;设 OMA_TIMELINE_TURNS)
 #   --out <文件>       结果 JSON 路径(默认 /tmp/oma-demo-metrics.json;同名 .md 为汇总)
 #   --reset            先重建演示沙盒

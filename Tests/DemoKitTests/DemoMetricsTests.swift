@@ -73,6 +73,17 @@ struct DemoMetricsTests {
         #expect(DemoBenchmarkCatalog.item(id: "memory.after-release") != nil)
     }
 
+    @Test("IDE 分类:先登记为展示项(无预算),目标值写在说明里;覆盖开关窗口与按键延迟等关键指标")
+    func ideCategoryRegistered() {
+        let items = DemoBenchmarkCatalog.items(in: .ide)
+        #expect(items.count >= 20)
+        #expect(items.allSatisfy { $0.budget == nil && $0.purpose.contains("目标") })
+        for id in ["ide.switch-warm", "ide.window-cold", "ide.typing-p95", "ide.open-50k", "ide.memory-drift"] {
+            #expect(DemoBenchmarkCatalog.item(id: id) != nil, "缺少 \(id)")
+        }
+        #expect(DemoBenchmarkCatalog.categories(from: "ide") == [.ide])
+    }
+
     @Test("OMA_DEMO_BENCH 解析:all/1 全部,逗号分隔取分类,非法为 nil")
     func parseCategories() {
         #expect(DemoBenchmarkCatalog.categories(from: "all") == Set(DemoMetricCategory.allCases))
