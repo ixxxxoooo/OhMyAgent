@@ -2722,3 +2722,5 @@
 "检查常用网站与模型服务能否访问及耗时。" = "Checks whether common sites and model services are reachable, and how fast.";
 "开始测试" = "Start test";
 "删除全部 %lld 个未跟踪文件?" = "Delete all %lld untracked files?";
+"上下文窗口:占用接近该值时自动压缩" = "Context window: auto-compact when usage nears this value";
+"上下文上限已更新为 %@,对话上下文已保留。" = "Context limit updated to %@; the conversation context is kept.";

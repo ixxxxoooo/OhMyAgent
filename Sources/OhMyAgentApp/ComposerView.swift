@@ -79,6 +79,7 @@ struct ComposerView: View {
             HStack(spacing: 6) {
                 OptionMenu(model: model, category: "mode", icon: "slider.horizontal.3")
                 OptionMenu(model: model, category: "model", icon: "cpu")
+                ContextWindowMenu(model: model)
                 OptionMenu(model: model, category: "thought_level", icon: "brain")
                 MCPPanelButton(model: model)
                 Spacer(minLength: 8)
@@ -496,6 +497,35 @@ struct OptionMenu: View {
     static func menuImage(for mapped: MappedModel) -> NSImage {
         if case .vector(let name) = brand(for: mapped), let image = BrandIconRenderer.nsImage(name, size: 14) { return image }
         return OMIconRenderer.nsImage("cpu", size: 14)
+    }
+}
+
+/// 上下文窗口选择(控制自动压缩窗口):选中后写入全局偏好并刷新会话,对话上下文保留。
+/// 只对 Claude Code 通道显示;与设置页「上下文上限」是同一项。
+struct ContextWindowMenu: View {
+    let model: SessionModel
+    @State private var shown = false
+
+    var body: some View {
+        if model.activeDescriptor.kind == .claudeACP {
+            let current = model.contextWindowTokens
+            Button { shown.toggle() } label: {
+                Label(ContextWindowChoice.title(for: current), om: "gauge")
+                    .font(OMFonts.small)
+                    .lineLimit(1)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(OMColors.secondaryText)
+            .omTooltip(String(localized: "上下文窗口:占用接近该值时自动压缩"))
+            .accessibilityLabel("上下文窗口")
+            .omPicker(isPresented: $shown, entries: entries, selectedID: "\(current)", placeholder: String(localized: "搜索"), width: 180) { entry in
+                if let tokens = Int(entry.id) { model.setContextWindow(tokens) }
+            }
+        }
+    }
+
+    private var entries: [PickEntry] {
+        ContextWindowChoice.presets.map { PickEntry(id: "\($0)", title: ContextWindowChoice.title(for: $0)) }
     }
 }
 

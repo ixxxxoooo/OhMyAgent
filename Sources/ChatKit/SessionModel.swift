@@ -987,6 +987,10 @@ public final class SessionModel {
     @ObservationIgnored private let gatewayKey = "session-\(UUID().uuidString.prefix(8).lowercased())"
     /// 模型映射在运行中被修改:本轮结束后再刷新
     @ObservationIgnored private var pendingMappingRefresh = false
+    /// 即使映射没变也要用新 `_meta` 恢复会话(如调整了上下文窗口)
+    @ObservationIgnored private var forceMetaRefresh = false
+    /// 强制刷新成功后的时间线提示(替代「模型映射已更新」)
+    @ObservationIgnored private var contextWindowNotice: String?
     @ObservationIgnored private var mappingObserver: Task<Void, Never>?
     /// 映射的会话 `_meta`(只含本机网关地址与占位令牌)
     @ObservationIgnored private var providerMeta: JSONValue?
@@ -1700,6 +1704,24 @@ public final class SessionModel {
         }
     }
 
+    /// 当前生效的上下文窗口(自动压缩窗口,token;0 = 默认),读自全局偏好。
+    public var contextWindowTokens: Int {
+        ContextWindowChoice.normalized(UserDefaults.standard.integer(forKey: ClientPrefs.Key.autoCompactWindow))
+    }
+
+    /// 在输入框里调整上下文窗口:写入全局偏好(与设置页同一项),并用新的 `_meta` 恢复当前会话(保留对话上下文)。
+    /// 环境变量只在会话启动时生效,所以必须刷新会话;运行中则等本轮结束。
+    /// - Parameter tokens: 目标窗口(token),0 表示默认
+    public func setContextWindow(_ tokens: Int) {
+        let value = ContextWindowChoice.normalized(tokens)
+        guard value != contextWindowTokens else { return }
+        UserDefaults.standard.set(value, forKey: ClientPrefs.Key.autoCompactWindow)
+        guard activeDescriptor.kind == .claudeACP, phase == .ready else { return }
+        forceMetaRefresh = true
+        contextWindowNotice = String(localized: "上下文上限已更新为 \(ContextWindowChoice.title(for: value)),对话上下文已保留。")
+        mappingChanged()
+    }
+
     /// 设置页修改了映射:空闲时立即刷新,运行中等本轮结束。
     func mappingChanged() {
         guard activeDescriptor.kind == .claudeACP, phase == .ready else { return }
@@ -1711,6 +1733,10 @@ public final class SessionModel {
     func refreshModelMapping() {
         guard activeDescriptor.kind == .claudeACP, phase == .ready, !isRunning, let client, let sessionId else { return }
         pendingMappingRefresh = false
+        let forced = forceMetaRefresh
+        let forcedNotice = contextWindowNotice
+        forceMetaRefresh = false
+        contextWindowNotice = nil
         let hadConversation = !timeline.entries.isEmpty
         let canResume = capabilities.canResume
         let cwd = workspace.path
@@ -1721,14 +1747,14 @@ public final class SessionModel {
             guard let self else { return }
             await self.resolveProvider(for: self.activeDescriptor)
             defer { self.applyPendingModelSelection() }
-            guard self.mappedModels != previous else { return }
+            guard forced || self.mappedModels != previous else { return }
             let meta = self.effectiveMeta()
             let target = self.mappedModels[.main].map { "\($0.providerName) · \($0.displayName)" } ?? ChatL10n.t("系统默认")
             do {
                 if hadConversation, canResume {
                     let setup = try await client.resumeSession(sessionId: sessionId, cwd: cwd, mcpServers: servers, additionalDirectories: additionalDirectories, meta: meta)
                     if !setup.configOptions.isEmpty { self.configOptions = setup.configOptions }
-                    self.timeline.appendNotice(String(localized: "模型映射已更新为 \(target),对话上下文已保留。"))
+                    self.timeline.appendNotice(forcedNotice ?? String(localized: "模型映射已更新为 \(target),对话上下文已保留。"))
                 } else {
                     // 空会话(还没有任何内容)切换模型:静默重建,不往时间线写提示,界面保持居中的新会话样式
                     try await self.startFreshSession(client: client, cwd: cwd, servers: servers, meta: meta)
