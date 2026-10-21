@@ -343,6 +343,8 @@ struct GroupDropDelegate: DropDelegate {
                     let id = model.openFile(path, preview: false, target: host == .right ? .right : .editor)
                     // 落在边缘:新建分屏;落在中心:并入该组
                     model.moveTab(id, toHost: host, group: group, zone: target)
+                    // 从右栏 Files 拖到中栏:原处的预览随之关闭
+                    if host == .center { FilesWorkspaceStore.shared.closeIfCurrent(path) }
                 }
                 model.syncSelectionFromDock()
             }
