@@ -31,7 +31,7 @@ public final class CodeEditorView: NSView {
     /// 上次应用的字体族与字号偏好,用来判断偏好是否真的变了
     private var appliedFamily = EditorFontPrefs.preferredFamily
     private var appliedSize = EditorFontPrefs.preferredSize
-    var language: SyntaxLanguage = .plain
+    var language: SyntaxLanguage = .plain { didSet { textView.language = language } }
     private(set) var lineIndex = LineIndex(text: "")
     /// 行索引是否与当前文本一致:一致时由文本存储的编辑回调增量更新;装载大文件期间(后台建索引)为 false。
     private(set) var lineIndexIsLive = false
@@ -118,6 +118,9 @@ public final class CodeEditorView: NSView {
         scrollView.contentView.postsBoundsChangedNotifications = true
 
         textView.delegate = self
+        textView.onGoToLine = { CodeEditorView.goToLineHandler?() }
+        textView.currentLineColor = theme.currentLine.withAlphaComponent(0.55)
+        textView.bracketColor = theme.foreground.withAlphaComponent(0.16)
         textView.onFocusChange = { [weak self] focused in
             if focused, let self { CodeEditorView.lastFocused = self }
             self?.markdownSelectionDidChange(focus: focused)
@@ -141,6 +144,8 @@ public final class CodeEditorView: NSView {
         textView.drawsBackground = true
         textView.backgroundColor = theme.background
         textView.textColor = theme.foreground
+        textView.currentLineColor = theme.currentLine.withAlphaComponent(0.55)
+        textView.bracketColor = theme.foreground.withAlphaComponent(0.16)
         applyFontMetrics()
         textView.textContainerInset = NSSize(width: 6, height: 8)
         textView.minSize = NSSize(width: 0, height: 0)
@@ -354,6 +359,28 @@ public final class CodeEditorView: NSView {
         onTextChange?(text)
         scheduleAutoCompletion()
         scheduleFindRefresh()
+    }
+
+    /// 转到行(1 起始)与列(1 起始,缺省为行首),光标落在该处并滚动到可见。
+    /// - Parameters:
+    ///   - line: 行号
+    ///   - column: 列号
+    public func goToLine(_ line: Int, column: Int = 1) {
+        guard let range = lineIndex.range(ofLine: max(line - 1, 0)) else { return }
+        let content = max(range.length - ((textView.string as NSString).substring(with: range).hasSuffix("\n") ? 1 : 0), 0)
+        let offset = range.location + min(max(column - 1, 0), content)
+        textView.setSelectedRange(NSRange(location: offset, length: 0))
+        textView.scrollRangeToVisible(NSRange(location: offset, length: 0))
+        textView.window?.makeFirstResponder(textView)
+        scheduleHighlight()
+    }
+
+    /// 当前光标的行、列(均 1 起始)。
+    public var caretPosition: (line: Int, column: Int) {
+        let offset = textView.selectedRange().location
+        let line = lineIndex.line(containing: offset)
+        let start = lineIndex.range(ofLine: line)?.location ?? 0
+        return (line + 1, offset - start + 1)
     }
 
     /// 滚动到指定行并选中该行。
@@ -700,6 +727,19 @@ extension CodeEditorView: NSTextViewDelegate {
 
     public func textViewDidChangeSelection(_ notification: Notification) {
         markdownSelectionDidChange()
+        updateBracketMatch()
+        textView.needsDisplay = true
+    }
+
+    /// 光标紧邻括号时,高亮它与配对括号。
+    private func updateBracketMatch() {
+        let selection = textView.selectedRange()
+        guard selection.length == 0, language != .markdown, language != .plain, textView.selectedRanges.count == 1,
+              let pair = EditorEditing.matchingBracket(in: textView.string, at: selection.location) else {
+            textView.bracketPair = []
+            return
+        }
+        textView.bracketPair = [pair.open, pair.close]
     }
 }
 

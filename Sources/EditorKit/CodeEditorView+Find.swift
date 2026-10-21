@@ -9,6 +9,9 @@ extension CodeEditorView {
     /// 最近获得焦点的编辑器(菜单命令在焦点不在文本区时的兜底)。
     static weak var lastFocused: CodeEditorView?
 
+    /// ⌃G 转到行的宿主处理(IDE 窗口弹出「转到行」输入);未设置时 ⌃G 不处理。
+    public static var goToLineHandler: (() -> Void)?
+
     /// 当前应响应查找命令的编辑器:键盘焦点所在的编辑器,否则最近聚焦且仍可见的编辑器。
     /// - Returns: 编辑器;没有时为 nil
     public static func activeEditor() -> CodeEditorView? {
