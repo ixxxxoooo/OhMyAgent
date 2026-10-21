@@ -18,6 +18,8 @@ final class LogViewerModel {
     var follow = true
     @ObservationIgnored private var task: Task<Void, Never>?
     private let capacity = 5000
+    /// 清空时记下的最大条目 id:重新订阅时只载入更新的条目,已清空的历史不会再回来。
+    @ObservationIgnored private var clearedUpTo = 0
 
     /// 过滤后的条目(增量维护:追加时只检查新条目,过滤条件变化时才整体重算)。
     private(set) var filtered: [LogEntry] = []
@@ -39,7 +41,7 @@ final class LogViewerModel {
     /// 开始订阅(先载入缓冲里的历史)。
     func start() {
         guard task == nil else { return }
-        entries = LogSystem.shared.recent(limit: capacity)
+        entries = LogSystem.shared.recent(limit: capacity).filter { $0.id > clearedUpTo }
         refilter()
         let lastID = entries.last?.id ?? 0
         let stream = LogSystem.shared.stream()
@@ -64,6 +66,13 @@ final class LogViewerModel {
     func stop() {
         task?.cancel()
         task = nil
+    }
+
+    /// 清空视图里的日志(不影响日志文件与全局缓冲)。
+    func clear() {
+        clearedUpTo = max(clearedUpTo, entries.last?.id ?? 0)
+        entries = []
+        filtered = []
     }
 
     /// 复制当前过滤结果到剪贴板。
@@ -94,6 +103,9 @@ struct LogViewerView: View {
                 Button { model.copyFiltered() } label: { Image.om("copy", size: 13) }
                     .omTooltip("复制当前筛选的日志")
                     .accessibilityLabel("复制日志")
+                Button { model.clear() } label: { Image.om("trash", size: 13) }
+                    .omTooltip("清空输出")
+                    .accessibilityLabel("清空输出")
             }
             .labelsHidden()
             .controlSize(.small)

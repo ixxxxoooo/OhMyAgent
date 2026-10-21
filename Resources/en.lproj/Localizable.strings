@@ -2728,3 +2728,4 @@
 "保存上下文窗口失败:%@" = "Failed to save the context window: %@";
 "自动" = "Auto";
 "0 表示自动" = "0 means auto";
+"清空输出" = "Clear output";
