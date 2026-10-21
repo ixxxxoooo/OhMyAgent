@@ -1,6 +1,7 @@
 // @author ixxxxoooo
 // IDE 窗口的文件宿主:复用 Agent 窗口的 `FileTabView` 时,通过环境值把脏标记、跳转与项目根改接到 IDE 窗口。
 
+import EditorKit
 import SwiftUI
 
 /// IDE 文件宿主(值类型,闭包均在主线程调用)。
@@ -11,6 +12,8 @@ struct IDEFileHost {
     var open: @MainActor (String, Int?, Bool) -> Void
     /// 同步脏标记(是否脏,路径)
     var setDirty: @MainActor (Bool, String) -> Void
+    /// 上报某文件当前的诊断(参数:路径、诊断、对应文本;空数组表示清除)
+    var report: @MainActor (String, [EditorDiagnostic], String) -> Void
 }
 
 extension EnvironmentValues {

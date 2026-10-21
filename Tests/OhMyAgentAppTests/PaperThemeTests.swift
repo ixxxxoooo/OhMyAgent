@@ -96,7 +96,7 @@ struct PaperThemeTests {
     func legacyUnchanged() {
         let standard = ThemeStyle.standard
         #expect(standard.allowsGlass && standard.radiusSet == nil && standard.primaryButton == .accent && standard.selectionTint == .accent)
-        for package in ThemePackage.builtin where package.group != .paper {
+        for package in ThemePackage.builtin where package.group != .paper && package.group != .zed {
             guard let palette = package.palette else { continue }
             #expect(palette.style.allowsGlass && palette.style.radiusSet == nil && palette.style.primaryButton == .accent, "\(package.id) 不应受纸感影响")
         }

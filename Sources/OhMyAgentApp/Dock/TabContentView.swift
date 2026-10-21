@@ -206,12 +206,17 @@ struct FileTabView: View {
         .onChange(of: doc.text) { _, newText in
             if let newText { lsp?.textChanged(newText) }
         }
+        .onChange(of: lsp?.diagnostics ?? []) { _, items in
+            // IDE 窗口:把诊断汇总到「问题」面板
+            ideHost?.report(path, items, doc.text ?? "")
+        }
         .task(id: "\(path)|\(lspEnabled)|\(doc.text != nil)") {
             await startLanguageServer(doc)
         }
         .onDisappear {
             lsp?.detach()
             lsp = nil
+            ideHost?.report(path, [], "")
         }
         .task(id: "\(path)|\(isActive)") {
             // Agent 或其它程序改动文件后,未编辑的标签自动刷新;后台标签暂停,切回时立即补一次

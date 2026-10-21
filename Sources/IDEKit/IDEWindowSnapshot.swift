@@ -14,6 +14,16 @@ public enum IDESidebarView: String, Codable, CaseIterable, Sendable {
     case scm
 }
 
+/// 底部面板的标签页。
+public enum IDEPanelTab: String, Codable, CaseIterable, Sendable {
+    /// 终端
+    case terminal
+    /// 问题(诊断)
+    case problems
+    /// 输出(日志)
+    case output
+}
+
 /// 窗口外框(屏幕坐标,点)。
 public struct IDEWindowFrame: Codable, Equatable, Sendable {
     public var x: Double
@@ -118,6 +128,8 @@ public struct IDEWindowSnapshot: Codable, Equatable, Sendable, Identifiable {
     public var sidebarWidth: Double
     public var panelVisible: Bool
     public var panelHeight: Double
+    /// 底部面板当前标签页(旧版本存档没有该字段,为 nil 时取终端)
+    public var panelTab: IDEPanelTab?
     public var agentPaneVisible: Bool
     public var agentPaneWidth: Double
     /// 窗口外框(尚未记录时为 nil,首次显示用默认尺寸)

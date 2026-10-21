@@ -2814,3 +2814,11 @@
 "要包含的文件(如 *.swift, Sources/**)" = "Files to include (e.g. *.swift, Sources/**)";
 "输入关键词,在工作区的所有文本文件中查找。" = "Type a keyword to search all text files in the workspace.";
 "替换此文件中的全部匹配" = "Replace all matches in this file";
+"Zed 深色" = "Zed Dark";
+"Zed 浅色" = "Zed Light";
+"结束当前终端" = "Kill Terminal";
+"还没有终端" = "No terminals yet";
+"新建一个终端来运行命令" = "Create a terminal to run commands";
+"没有发现问题" = "No problems found";
+"已打开文件的编译错误与警告会显示在这里。" = "Errors and warnings from open files appear here.";
+"显示问题面板" = "Show Problems Panel";

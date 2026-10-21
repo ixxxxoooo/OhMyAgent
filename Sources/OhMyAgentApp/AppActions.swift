@@ -242,7 +242,10 @@ final class AppActions {
     }
 
     /// 新建终端(⌃⇧`):新开一个终端标签。
-    func newTerminal() { openTerminal() }
+    func newTerminal() {
+        if IDEWindowManager.shared.route(.newTerminal) { return }
+        openTerminal()
+    }
 
     /// 切换到相邻的终端标签。
     /// - Parameter step: 1 下一个,-1 上一个

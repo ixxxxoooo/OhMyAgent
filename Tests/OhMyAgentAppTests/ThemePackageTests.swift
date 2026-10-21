@@ -79,6 +79,23 @@ struct ThemePackageTests {
         #expect(ThemeGroup.allCases.contains(.opencode) && ThemeGroup.opencode.title == "OpenCode")
     }
 
+    @Test("Zed 主题:深浅各一套,平面无玻璃、小圆角、冷灰蓝底与蓝色强调")
+    func zedThemes() throws {
+        let group = ThemePackage.all.filter { $0.group == .zed }
+        #expect(Set(group.map(\.id)) == ["zed-dark", "zed-light"])
+        #expect(ThemeGroup.allCases.contains(.zed) && ThemeGroup.zed.title == "Zed")
+        let dark = try #require(ThemePackage.find("zed-dark").palette)
+        let light = try #require(ThemePackage.find("zed-light").palette)
+        #expect(ThemePackage.find("zed-dark").tone == .dark && ThemePackage.find("zed-light").tone == .light)
+        #expect(dark.surface.hexString == "#282C34" && dark.accent.hexString == "#74ADE8")
+        #expect(light.surface.hexString == "#FAFAFA" && light.accent.hexString == "#5C78E2")
+        for palette in [dark, light] {
+            #expect(palette.sidebarBackground != palette.surface)
+            #expect(palette.style.allowsGlass == false && palette.style.flatCards)
+            #expect(palette.ansi?.count == 16)
+        }
+    }
+
     @Test("OhMyAgent 品牌主题:深浅各一套,取自图标配色并开启 Liquid Glass 与 Ember 着色")
     func brandThemes() throws {
         let group = ThemePackage.all.filter { $0.group == .brand }

@@ -12,13 +12,38 @@ extension IDEWorkspace {
         IDEFileHost(
             root: root,
             open: { [weak self] path, line, preview in self?.model.openFile(path, line: line, preview: preview) },
-            setDirty: { [weak self] dirty, path in self?.model.setDirty(dirty, forFile: path) }
+            setDirty: { [weak self] dirty, path in self?.model.setDirty(dirty, forFile: path) },
+            report: { [weak self] path, diagnostics, text in
+                let problems = diagnostics.map { item -> IDEProblem in
+                    let position = IDELineMap.lineColumn(utf16Offset: item.range.location, in: text)
+                    return IDEProblem(path: path, line: position.line, column: position.column,
+                                      severity: IDESeverity(rawValue: item.severity.rawValue) ?? .information, message: item.message)
+                }
+                self?.model.problems.set(problems, forFile: path)
+            }
         )
     }
 
     /// 窗口里所有有未保存修改的文件路径。
     var dirtyPaths: [String] {
         model.openFilePaths.filter { FileDocumentStore.shared.documents[$0]?.isDirty == true }
+    }
+
+    // MARK: 终端
+
+    /// 新建终端并显示面板。
+    func newTerminal() {
+        let id = UUID().uuidString
+        TerminalStore.shared.register(id: id, directory: TerminalPrefs.load().startDirectoryPath(project: root))
+        model.addTerminal(id)
+        model.showPanel(.terminal)
+    }
+
+    /// 结束终端并从列表移除。
+    /// - Parameter id: 终端标识
+    func closeTerminal(_ id: String) {
+        model.removeTerminal(id)
+        TerminalStore.shared.remove(id)
     }
 
     // MARK: 保存

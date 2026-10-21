@@ -68,37 +68,6 @@ struct IDESidebarPane: View {
     }
 }
 
-/// 底部面板:本阶段为占位容器,带最大化与关闭。
-struct IDEBottomPanel: View {
-    let model: IDEWindowModel
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 4) {
-                Text("面板").font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
-                Spacer(minLength: 0)
-                Button { model.panelMaximized.toggle() } label: { Image.om(model.panelMaximized ? "minimize-2" : "maximize-2", size: 12) }
-                    .buttonStyle(.omIcon)
-                    .omTooltip(model.panelMaximized ? String(localized: "还原面板大小") : String(localized: "最大化面板"))
-                    .accessibilityLabel(model.panelMaximized ? String(localized: "还原面板大小") : String(localized: "最大化面板"))
-                Button { model.togglePanel() } label: { Image.om("x", size: 12) }
-                    .buttonStyle(.omIcon)
-                    .omTooltip(String(localized: "关闭面板"))
-                    .accessibilityLabel(String(localized: "关闭面板"))
-            }
-            .padding(.horizontal, 12)
-            .frame(height: 32)
-            Rectangle().fill(OMColors.hairline).frame(height: 1)
-            OMEmptyState {
-                Label("终端、问题与输出", om: "square-terminal")
-            } description: {
-                Text("面板内容将在后续版本提供")
-            }
-        }
-        .background(OMColors.surface)
-    }
-}
-
 /// Agent 面板:本阶段为占位容器。
 struct IDEAgentPane: View {
     let model: IDEWindowModel
@@ -123,12 +92,24 @@ struct IDEAgentPane: View {
 /// 状态栏(22pt):左侧工作区名称,右侧预留给行列、编码、语言等状态(后续里程碑)。
 struct IDEStatusBar: View {
     let model: IDEWindowModel
+    private var problems: ProblemsStore { model.problems }
 
     var body: some View {
         HStack(spacing: 12) {
             Label(model.workspaceName ?? String(localized: "未打开文件夹"), om: "folder")
                 .labelStyle(.titleAndIcon)
                 .lineLimit(1)
+            Button { model.showPanel(.problems) } label: {
+                HStack(spacing: 4) {
+                    Image.om("circle-x", size: 12)
+                    Text("\(problems.errorCount)")
+                    Image.om("triangle-alert", size: 12)
+                    Text("\(problems.warningCount)")
+                }
+            }
+            .buttonStyle(.plain)
+            .omTooltip(String(localized: "显示问题面板"))
+            .accessibilityLabel(String(localized: "显示问题面板"))
             Spacer(minLength: 0)
         }
         .font(OMFonts.caption)

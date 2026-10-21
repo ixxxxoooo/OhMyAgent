@@ -50,7 +50,7 @@ struct IDEShellView: View {
                 }
                 if model.panelVisible {
                     if !model.panelMaximized { IDEResizer(model: model, kind: .panel, area: size) }
-                    IDEBottomPanel(model: model)
+                    IDEBottomPanel(workspace: workspace)
                         .frame(height: model.panelMaximized ? nil : min(model.panelHeight, IDEMetrics.panelMax(window: Double(size.height) + IDEMetrics.titleBarHeight + IDEMetrics.statusBarHeight)))
                 }
             }

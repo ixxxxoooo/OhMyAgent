@@ -119,6 +119,7 @@ final class IDEWindowManager {
     enum Command {
         case toggleSidebar, togglePanel, toggleAgentPane, closeWindow
         case save, saveAll, closeTab, reopenTab, nextTab, previousTab
+        case newTerminal, showProblems
     }
 
     /// 若当前键盘窗口是 IDE 窗口,执行命令并返回 true;否则返回 false(调用方走 Agent 窗口的默认行为)。
@@ -138,6 +139,8 @@ final class IDEWindowManager {
             if let workspace = controllers[model.id]?.workspace, !workspace.closeActiveTab(), model.editor.allTabs.isEmpty {
                 controllers[model.id]?.window?.performClose(nil)
             }
+        case .newTerminal: controllers[model.id]?.workspace.newTerminal()
+        case .showProblems: model.showPanel(.problems)
         case .reopenTab: controllers[model.id]?.workspace.reopenClosed()
         case .nextTab: controllers[model.id]?.workspace.cycleTab(by: 1)
         case .previousTab: controllers[model.id]?.workspace.cycleTab(by: -1)

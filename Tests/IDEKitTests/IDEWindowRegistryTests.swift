@@ -250,3 +250,75 @@ struct IDEEditorTabsTests {
         #expect(model.editor.allTabs.isEmpty)
     }
 }
+
+@MainActor
+@Suite("IDE 底部面板与问题")
+struct IDEPanelAndProblemsTests {
+    private func make() -> IDEWindowModel { IDEWindowModel(snapshot: IDEWindowSnapshot(workspaceRoot: "/tmp")) }
+
+    @Test("旧存档没有 panelTab 字段也能解码,默认终端")
+    func legacySnapshotDecodes() throws {
+        let snapshot = IDEWindowSnapshot(workspaceRoot: "/tmp")
+        var object = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(snapshot)) as? [String: Any])
+        object["panelTab"] = nil
+        let data = try JSONSerialization.data(withJSONObject: object)
+        let decoded = try JSONDecoder().decode(IDEWindowSnapshot.self, from: data)
+        #expect(decoded.panelTab == nil)
+        #expect(IDEWindowModel(snapshot: decoded).panelTab == .terminal)
+    }
+
+    @Test("面板标签页写入快照并还原")
+    func panelTabRoundTrip() {
+        let model = make()
+        model.showPanel(.problems)
+        #expect(model.panelVisible)
+        let restored = IDEWindowModel(snapshot: model.snapshot())
+        #expect(restored.panelTab == .problems)
+    }
+
+    @Test("终端增删与相邻激活")
+    func terminalLifecycle() {
+        let model = make()
+        for id in ["a", "b", "c"] { model.addTerminal(id) }
+        #expect(model.activeTerminalID == "c")
+        model.removeTerminal("c")
+        #expect(model.activeTerminalID == "b")
+        model.removeTerminal("a")
+        #expect(model.terminalIDs == ["b"])
+        model.removeTerminal("b")
+        #expect(model.activeTerminalID == nil)
+        model.addTerminal("")
+        #expect(model.terminalIDs.isEmpty)
+    }
+
+    @Test("偏移换算行列(含换行与越界)")
+    func lineColumnMapping() {
+        let text = "ab\ncde\n\nf"
+        #expect(IDELineMap.lineColumn(utf16Offset: 0, in: text) == (1, 1))
+        #expect(IDELineMap.lineColumn(utf16Offset: 4, in: text) == (2, 2))
+        #expect(IDELineMap.lineColumn(utf16Offset: 7, in: text) == (3, 1))
+        #expect(IDELineMap.lineColumn(utf16Offset: 99, in: text) == (4, 2))
+        #expect(IDELineMap.lineColumn(utf16Offset: -5, in: text) == (1, 1))
+    }
+
+    @Test("问题按文件汇总计数并按行排序,清空即移除")
+    func problemsStore() {
+        let store = ProblemsStore()
+        store.set([
+            IDEProblem(path: "/a.swift", line: 9, column: 1, severity: .warning, message: "w"),
+            IDEProblem(path: "/a.swift", line: 2, column: 5, severity: .error, message: "e"),
+        ], forFile: "/a.swift")
+        store.set([IDEProblem(path: "/b.swift", line: 1, column: 1, severity: .error, message: "e2")], forFile: "/b.swift")
+        #expect(store.errorCount == 2)
+        #expect(store.warningCount == 1)
+        #expect(store.totalCount == 3)
+        #expect(store.byFile["/a.swift"]?.first?.line == 2)
+        #expect(store.groups.map(\.path) == ["/a.swift", "/b.swift"])
+        #expect(store.problems(atLeast: .error).count == 2)
+        store.clear(file: "/a.swift")
+        #expect(store.byFile["/a.swift"] == nil)
+        #expect(store.totalCount == 1)
+        store.set([], forFile: "")
+        #expect(store.totalCount == 1)
+    }
+}

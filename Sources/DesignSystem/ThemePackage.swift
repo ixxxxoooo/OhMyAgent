@@ -267,6 +267,8 @@ public enum ThemeGroup: String, CaseIterable, Sendable {
     case paper
     /// OhMyAgent 品牌主题(取自应用图标:深墨 + 纸白 + Ember,Liquid Glass)
     case brand
+    /// Zed 风格(One Dark / One Light:平面、细描边、小圆角)
+    case zed
     case cursor, anthropic, claudeCode, opencode
     /// 经典配色(Nord、Dracula、Solarized 等社区流行方案)
     case classic
@@ -278,6 +280,7 @@ public enum ThemeGroup: String, CaseIterable, Sendable {
         case .system: return String(localized: "系统")
         case .paper: return String(localized: "纸感")
         case .brand: return "OhMyAgent"
+        case .zed: return "Zed"
         case .cursor: return "Cursor"
         case .anthropic: return "Anthropic"
         case .claudeCode: return "Claude Code"
@@ -662,6 +665,7 @@ extension ThemePackage {
         system,
         paperLight, paperDark,
         brandInkGlass, brandPaperGlass,
+        zedDark, zedLight,
         cursorLight, cursorLightColorblind, cursorDark, cursorDarkHC,
         anthropicLight, anthropicDark,
         claudeDark, claudeLight, claudeDarkDaltonized, claudeLightDaltonized, claudeDarkANSI, claudeLightANSI,

@@ -17,6 +17,14 @@ public final class IDEWindowModel: Identifiable {
     public var sidebarWidth: Double { didSet { if sidebarWidth != oldValue { changed() } } }
     public var panelVisible: Bool { didSet { if panelVisible != oldValue { changed() } } }
     public var panelHeight: Double { didSet { if panelHeight != oldValue { changed() } } }
+    /// 底部面板当前标签页
+    public var panelTab: IDEPanelTab { didSet { if panelTab != oldValue { changed() } } }
+    /// 本窗口的终端标识(进程随应用退出结束,不持久化)
+    public private(set) var terminalIDs: [String] = []
+    /// 当前显示的终端
+    public var activeTerminalID: String?
+    /// 问题存储(语言服务器诊断汇总)
+    @ObservationIgnored public let problems = ProblemsStore()
     /// 底部面板最大化(仅界面状态,不持久化)
     public var panelMaximized = false
     public var agentPaneVisible: Bool { didSet { if agentPaneVisible != oldValue { changed() } } }
@@ -43,6 +51,7 @@ public final class IDEWindowModel: Identifiable {
         sidebarWidth = snap.sidebarWidth
         panelVisible = snap.panelVisible
         panelHeight = snap.panelHeight
+        panelTab = snap.panelTab ?? .terminal
         agentPaneVisible = snap.agentPaneVisible
         agentPaneWidth = snap.agentPaneWidth
         frame = snap.frame
@@ -58,6 +67,7 @@ public final class IDEWindowModel: Identifiable {
         snap.sidebarWidth = sidebarWidth
         snap.panelVisible = panelVisible
         snap.panelHeight = panelHeight
+        snap.panelTab = panelTab
         snap.agentPaneVisible = agentPaneVisible
         snap.agentPaneWidth = agentPaneWidth
         snap.frame = frame
@@ -98,6 +108,29 @@ public final class IDEWindowModel: Identifiable {
     public func togglePanel() {
         panelVisible.toggle()
         if !panelVisible { panelMaximized = false }
+    }
+
+    /// 显示底部面板并切到某标签页。
+    /// - Parameter tab: 标签页
+    public func showPanel(_ tab: IDEPanelTab) {
+        panelTab = tab
+        panelVisible = true
+    }
+
+    /// 登记一个新终端并激活。
+    /// - Parameter id: 终端标识(已存在则只激活)
+    public func addTerminal(_ id: String) {
+        guard !id.isEmpty else { return }
+        if !terminalIDs.contains(id) { terminalIDs.append(id) }
+        activeTerminalID = id
+    }
+
+    /// 移除终端;若它是当前终端,激活相邻的一个。
+    /// - Parameter id: 终端标识
+    public func removeTerminal(_ id: String) {
+        guard let index = terminalIDs.firstIndex(of: id) else { return }
+        terminalIDs.remove(at: index)
+        if activeTerminalID == id { activeTerminalID = terminalIDs.indices.contains(index) ? terminalIDs[index] : terminalIDs.last }
     }
 
     /// 切换 Agent 面板显隐。
