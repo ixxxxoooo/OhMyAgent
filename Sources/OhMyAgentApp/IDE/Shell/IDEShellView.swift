@@ -9,7 +9,8 @@ import SwiftUI
 
 /// IDE 窗口根视图。
 struct IDEShellView: View {
-    let model: IDEWindowModel
+    let workspace: IDEWorkspace
+    private var model: IDEWindowModel { workspace.model }
     private let appearance = AppearanceModel.shared
 
     var body: some View {
@@ -40,7 +41,7 @@ struct IDEShellView: View {
         return HStack(spacing: 0) {
             IDEActivityBar(model: model)
             if model.sidebarVisible {
-                IDESidebarPane(model: model).frame(width: sidebarWidth)
+                IDESidebarPane(workspace: workspace).frame(width: sidebarWidth)
                 IDEResizer(model: model, kind: .sidebar, area: size)
             }
             VStack(spacing: 0) {

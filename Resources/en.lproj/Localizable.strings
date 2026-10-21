@@ -2787,3 +2787,9 @@
 "切换到 Agents Window" = "Switch to Agents Window";
 "面板" = "Panel";
 "Agent" = "Agent";
+"全部折叠" = "Collapse All";
+"在侧边打开" = "Open to the Side";
+"⌥ 点击" = "⌥ Click";
+"创建副本" = "Duplicate";
+"要把这 %lld 个项目移到废纸篓吗?" = "Move these %lld items to the Trash?";
+"无法创建副本" = "Couldn't create a copy";

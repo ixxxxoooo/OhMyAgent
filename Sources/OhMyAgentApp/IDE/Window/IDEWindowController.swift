@@ -10,6 +10,8 @@ import SwiftUI
 @MainActor
 final class IDEWindowController: NSWindowController, NSWindowDelegate {
     let model: IDEWindowModel
+    /// 窗口工作区上下文(文件树、选择、文件操作撤销栈)
+    let workspace: IDEWorkspace
 
     /// 创建窗口(此时不显示)。
     /// - Parameters:
@@ -17,6 +19,7 @@ final class IDEWindowController: NSWindowController, NSWindowDelegate {
     ///   - cascadeIndex: 没有已保存外框时,用于错开新窗口位置的序号
     init(model: IDEWindowModel, cascadeIndex: Int) {
         self.model = model
+        self.workspace = IDEWorkspace(model: model)
         let window = NSWindow(
             contentRect: Self.initialRect(for: model, cascadeIndex: cascadeIndex),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
@@ -30,7 +33,7 @@ final class IDEWindowController: NSWindowController, NSWindowDelegate {
         super.init(window: window)
         window.delegate = self
         WindowChrome.apply(to: window)
-        let host = NSHostingView(rootView: IDEShellView(model: model))
+        let host = NSHostingView(rootView: IDEShellView(workspace: workspace))
         host.sceneBridgingOptions = []
         window.contentView = host
     }

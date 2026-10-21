@@ -33,13 +33,16 @@ private struct PaneHeader: View {
 
 /// 侧栏:头部显示当前视图名;内容区本阶段为空状态(无文件夹时给出「打开文件夹」)。
 struct IDESidebarPane: View {
-    let model: IDEWindowModel
+    let workspace: IDEWorkspace
+    private var model: IDEWindowModel { workspace.model }
 
     var body: some View {
         VStack(spacing: 0) {
-            PaneHeader(title: model.sidebarView.title)
+            if !(model.workspaceName != nil && model.sidebarView == .explorer) { PaneHeader(title: model.sidebarView.title) }
             Group {
-                if let name = model.workspaceName {
+                if model.workspaceName != nil, model.sidebarView == .explorer {
+                    IDEExplorerPane(workspace: workspace)
+                } else if let name = model.workspaceName {
                     OMEmptyState {
                         Label(name, om: model.sidebarView.icon)
                     } description: {

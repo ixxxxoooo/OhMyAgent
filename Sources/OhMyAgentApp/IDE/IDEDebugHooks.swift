@@ -1,6 +1,8 @@
 // @author ixxxxoooo
 // IDE 模式调试钩子(自动化验证用,不抢焦点):
 // - `OMA_IDE=1`:启动后打开 IDE 窗口(根目录取 `OMA_IDE_ROOT`,否则取当前项目);
+// - `OMA_IDE_EXPAND=相对路径1|相对路径2`:打开后展开这些目录并定位到最后一个;
+// - `OMA_IDE_OPEN_FILE=路径[:行]`:打开后在编辑器里打开该文件(相对路径取工作区根);
 // - `OMA_IDE_SWEEP=N`:开关/切换基准,重复 N 轮「冷开 → 切回 Agent → 热切到 IDE → 关闭」,
 //   perf 日志「IDE 窗口基准」记录每轮耗时与内存漂移(计划预算:热切换 ≤ 50ms、冷开 ≤ 250ms、20 轮漂移 ≤ 10MB)。
 
@@ -20,7 +22,27 @@ enum IDEDebugHooks {
             await sweep(rounds: rounds, root: root)
         } else if env["OMA_IDE"] == "1" {
             try? await Task.sleep(for: .milliseconds(800))
-            IDEWindowManager.shared.open(root: root ?? AppEnvironment.shared.workbench.selectedProject?.id)
+            let model = IDEWindowManager.shared.open(root: root ?? AppEnvironment.shared.workbench.selectedProject?.id)
+            if let workspace = IDEWindowManager.shared.controller(for: model)?.workspace { await prepare(workspace, env: env) }
+        }
+    }
+
+    /// 窗口打开后按 `OMA_IDE_EXPAND` / `OMA_IDE_OPEN_FILE` 预置界面状态。
+    private static func prepare(_ workspace: IDEWorkspace, env: [String: String]) async {
+        guard let base = workspace.root else { return }
+        func absolute(_ path: String) -> String { path.hasPrefix("/") ? path : base + "/" + path }
+        workspace.configureTree()
+        if let raw = env["OMA_IDE_EXPAND"] {
+            let paths = raw.split(separator: "|").map { absolute(String($0)) }
+            for path in paths { workspace.tree.expand(path) }
+            try? await Task.sleep(for: .milliseconds(300))
+            if let last = paths.last { workspace.revealPath = last }
+        }
+        if let raw = env["OMA_IDE_OPEN_FILE"], !raw.isEmpty {
+            var path = raw
+            var line: Int?
+            if let colon = raw.lastIndex(of: ":"), let number = Int(raw[raw.index(after: colon)...]) { path = String(raw[..<colon]); line = number }
+            workspace.model.openFile(absolute(path), line: line, preview: false)
         }
     }
 
