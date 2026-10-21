@@ -33,7 +33,8 @@ public final class CodeEditorView: NSView {
     private var appliedSize = EditorFontPrefs.preferredSize
     var language: SyntaxLanguage = .plain
     private var lineIndex = LineIndex(text: "")
-    var highlightedRange = NSRange(location: 0, length: 0)
+    /// 已应用高亮的 UTF-16 范围(长度为 0 表示尚未高亮;测量工具据此判断首个高亮帧)。
+    public internal(set) var highlightedRange = NSRange(location: 0, length: 0)
     private var rebuildTask: Task<Void, Never>?
     private var highlightTask: Task<Void, Never>?
     var generation = 0
@@ -528,6 +529,9 @@ public final class CodeEditorView: NSView {
         isLargeFileMode = large
         applyWrapping()
     }
+
+    /// 当前实际是否按自动换行布局(用户偏好或大文件模式强制)。
+    public var isWrapping: Bool { wrapsLines || isLargeFileMode }
 
     /// 是否自动换行。M0 实测:容器宽度超过可视宽度(横向滚动)时,TextKit 2 需要全量布局,
     /// 5 万行装载 ≈ 0.8s、输入 ≈ 115ms;自动换行装载 ≈ 25ms、输入 ≈ 1.2ms。

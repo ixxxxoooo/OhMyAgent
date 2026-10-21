@@ -9,9 +9,9 @@
 import Foundation
 
 /// IDE 实验室素材生成器。
-enum DemoIDELab {
+public enum DemoIDELab {
     /// 大文件行数。
-    static let bigLineCount = 50_000
+    public static let bigLineCount = 50_000
     /// 普通文件行数。
     static let mediumLineCount = 2_000
 
@@ -32,7 +32,7 @@ enum DemoIDELab {
     /// 确定性的 Swift 源码,恰好 `count` 行(每 12 行一个结构体块,行长混合,平均约 32 字节)。
     /// - Parameter count: 目标行数,必须为正
     /// - Returns: 源码文本(以换行结尾)
-    static func swiftLines(count: Int) -> String {
+    public static func swiftLines(count: Int) -> String {
         guard count > 0 else { return "" }
         var lines: [String] = []
         lines.reserveCapacity(count)
@@ -57,7 +57,7 @@ enum DemoIDELab {
     }
 
     /// 含若干超长单行的 JSON(一行约 30 万字符,用来测不换行模式的宽度估算与横向滚动)。
-    static var longLinesJSON: String {
+    public static var longLinesJSON: String {
         let items = (0..<20_000).map { "{\"id\":\($0),\"name\":\"item-\($0)\",\"tags\":[\"a\",\"b\"]}" }
         let minified = "[" + items.joined(separator: ",") + "]"
         return "{\n  \"note\": \"下面一行是压缩过的超长 JSON\",\n  \"payload\": \(minified),\n  \"tail\": true\n}\n"
