@@ -19,7 +19,7 @@ final class LogViewerModel {
     @ObservationIgnored private var task: Task<Void, Never>?
     private let capacity = 5000
     /// 清空时记下的最大条目 id:重新订阅时只载入更新的条目,已清空的历史不会再回来。
-    @ObservationIgnored private var clearedUpTo = 0
+    @ObservationIgnored private var clearedUpTo: UInt64 = 0
 
     /// 过滤后的条目(增量维护:追加时只检查新条目,过滤条件变化时才整体重算)。
     private(set) var filtered: [LogEntry] = []
