@@ -327,3 +327,16 @@ struct LSPManagerTests {
         await manager.shutdownAll()
     }
 }
+
+/// stop 与排队写入的竞态回归:关闭后反复 send 不得因已关闭句柄的 ObjC 异常崩溃。
+@Test("真实子进程:stop 之后连续 send 不崩溃")
+func stdioTransportSendAfterStopDoesNotCrash() async throws {
+    for _ in 0..<50 {
+        let transport = LSPStdioTransport(launch: ProcessLaunch(executable: "/bin/cat"))
+        _ = try transport.start()
+        for _ in 0..<20 { transport.send(Data("{}".utf8)) }
+        transport.stop()
+        for _ in 0..<20 { transport.send(Data("{}".utf8)) }
+    }
+    try await Task.sleep(for: .milliseconds(200))
+}

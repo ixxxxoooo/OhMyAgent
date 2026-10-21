@@ -23,6 +23,8 @@ public final class LSPStdioTransport: ACPTransport, @unchecked Sendable {
     private let stderrPipe = Pipe()
     private let writeQueue = DispatchQueue(label: "OhMyAgent.LSPStdioTransport.write")
     private let decoder = FrameDecoderBox()
+    /// stdin 是否已关闭;仅在 `writeQueue` 上读写(关闭与写入同队列串行,避免对已关闭句柄写入触发 ObjC 异常)。
+    nonisolated(unsafe) private var stdinClosed = false
 
     /// - Parameter launch: 启动配置
     public init(launch: ProcessLaunch) {
@@ -42,6 +44,8 @@ public final class LSPStdioTransport: ACPTransport, @unchecked Sendable {
     }
 
     public func start() throws -> AsyncStream<TransportEvent> {
+        // 子进程提前退出后写管道会收到 SIGPIPE 直接杀死本进程,统一忽略,改由 write 返回 EPIPE
+        signal(SIGPIPE, SIG_IGN)
         process.executableURL = URL(fileURLWithPath: launch.executable)
         process.arguments = launch.arguments
         process.environment = Self.sanitizedEnvironment(extra: launch.environment)
@@ -85,11 +89,22 @@ public final class LSPStdioTransport: ACPTransport, @unchecked Sendable {
     public func send(_ data: Data) {
         let frame = LSPFrameEncoder.encode(data)
         let handle = stdinPipe.fileHandleForWriting
-        writeQueue.async { try? handle.write(contentsOf: frame) }
+        writeQueue.async { [self] in
+            guard !stdinClosed else { return }
+            do { try handle.write(contentsOf: frame) } catch {
+                Log.lsp.warning("语言服务器写入失败", ["error": "\(error)"])
+            }
+        }
     }
 
+    /// 停止传输:在写队列上关闭 stdin(排在已入队的写入之后),随后终止子进程;关闭后的 `send` 会被丢弃。
     public func stop() {
-        try? stdinPipe.fileHandleForWriting.close()
+        let handle = stdinPipe.fileHandleForWriting
+        writeQueue.async { [self] in
+            guard !stdinClosed else { return }
+            stdinClosed = true
+            try? handle.close()
+        }
         if process.isRunning { process.terminate() }
     }
 }
