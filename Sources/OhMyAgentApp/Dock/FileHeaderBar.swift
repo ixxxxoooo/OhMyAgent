@@ -114,7 +114,7 @@ struct FileHeaderBar: View {
         .onDrag { NSItemProvider(object: URL(fileURLWithPath: path) as NSURL) }
         .omContextMenu {
             OMMenuItem("在中栏打开", icon: "app-window") {
-                MainActor.assumeIsolated { _ = AppEnvironment.shared.workbench.openFile(path, preview: false, target: .editor) }
+                MainActor.assumeIsolated { _ = AppEnvironment.shared.workbench.openFile(path, preview: false, target: .editor); FilesWorkspaceStore.shared.closeIfCurrent(path) }
             }
             OMMenuItem("在 Finder 中显示", icon: "folder-open") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }
             OMMenuItem("拷贝路径", icon: "copy") {

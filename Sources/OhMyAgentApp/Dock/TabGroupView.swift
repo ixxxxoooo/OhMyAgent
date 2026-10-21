@@ -388,6 +388,8 @@ struct TabStripDropDelegate: DropDelegate {
                 for path in paths {
                     let id = model.openFile(path, preview: false, target: host == .right ? .right : .editor)
                     model.moveTab(id, toHost: host, group: group, index: position)
+                    // 从右栏 Files 拖到中栏:原处的预览随之关闭
+                    if host == .center { FilesWorkspaceStore.shared.closeIfCurrent(path) }
                     position = position.map { $0 + 1 }
                 }
                 model.syncSelectionFromDock()

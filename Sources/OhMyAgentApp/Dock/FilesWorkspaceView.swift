@@ -52,6 +52,12 @@ final class FilesWorkspaceStore {
         return model
     }
 
+    /// 文件被移到中栏后,关掉各工作区里正显示它的原地预览(回到空状态)。
+    /// - Parameter path: 已在中栏打开的文件路径
+    func closeIfCurrent(_ path: String) {
+        for model in models.values where model.current == path { model.closeCurrent() }
+    }
+
     /// 所有项目的工作区都清除指向某路径的记录。
     /// - Parameter path: 被删除或重命名的文件/目录路径
     func forget(_ path: String) {
