@@ -2747,3 +2747,8 @@
 "名称(可选)" = "Name (optional)";
 "默认使用第一个文件夹名" = "Defaults to the first folder name";
 "尚未添加文件夹" = "No folders added yet";
+"项目链接" = "Links";
+"GitHub 仓库" = "GitHub Repository";
+"版本发布" = "Releases";
+"在浏览器中打开" = "Open in Browser";
+"复制链接" = "Copy Link";

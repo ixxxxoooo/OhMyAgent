@@ -37,6 +37,10 @@ struct AboutPage: View {
             Section {
                 AboutHeader(version: updates.currentVersion, build: updates.currentBuild)
             }
+            Section("项目链接") {
+                AboutLinkRow(title: "GitHub 仓库", url: UpdateChecker.repositoryURL)
+                AboutLinkRow(title: "版本发布", url: UpdateChecker.releasesURL)
+            }
             Section("更新") {
                 Toggle("自动检查更新", isOn: $autoUpdate)
                 Picker("更新方式", selection: $updateMode) {
@@ -50,6 +54,30 @@ struct AboutPage: View {
                     updateStatus
                 }
                 Note("更新来自 GitHub 最新正式版。开发版只下载、不替换自身。")
+            }
+        }
+    }
+}
+
+/// 关于页链接行:左侧标题,右侧可点击地址(浏览器打开)与复制按钮。
+private struct AboutLinkRow: View {
+    let title: LocalizedStringKey
+    let url: String
+
+    var body: some View {
+        LabeledContent(title) {
+            HStack(spacing: OMSpacing.xs) {
+                Button {
+                    if let target = URL(string: url) { NSWorkspace.shared.open(target) }
+                } label: {
+                    HStack(spacing: OMSpacing.xs) {
+                        Image.om("brand.github", size: 12)
+                        Text(verbatim: url)
+                    }
+                }
+                .buttonStyle(.omPlain)
+                .omTooltip(String(localized: "在浏览器中打开"))
+                OMCopyButton(help: String(localized: "复制链接")) { url }
             }
         }
     }

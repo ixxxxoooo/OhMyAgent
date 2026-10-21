@@ -34,8 +34,14 @@ public enum UpdateResult: Sendable, Equatable {
 
 /// 更新检查器。
 public enum UpdateChecker {
+    /// 项目 GitHub 仓库地址(关于页链接与发布源共用)。
+    public static let repositoryURL = "https://github.com/ixxxxoooo/OhMyAgent"
+
+    /// 项目版本发布页地址。
+    public static let releasesURL = repositoryURL + "/releases"
+
     /// 默认发布源:GitHub 最新正式版 Release 附带的 appcast.json(由 Scripts/publish.sh 上传)。
-    public static let defaultFeedURL = "https://github.com/ixxxxoooo/OhMyAgent/releases/latest/download/appcast.json"
+    public static let defaultFeedURL = releasesURL + "/latest/download/appcast.json"
 
     /// 解析实际使用的发布源:用户未填写时回退默认源。
     /// - Parameter configured: 设置里填写的地址(可为空)
