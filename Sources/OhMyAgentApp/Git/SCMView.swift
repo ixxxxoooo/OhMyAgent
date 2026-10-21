@@ -443,6 +443,11 @@ private struct SCMContent: View {
                 let untracked = model.status.untrackedChanges
                 if !untracked.isEmpty {
                     SectionHeader(title: "未跟踪的文件", count: untracked.count) {
+                        iconButton("undo-2", "放弃全部更改") {
+                            if GitDialogs.confirmDestructive(title: String(localized: "删除全部 \(untracked.count) 个未跟踪文件?"), message: String(localized: "此操作不可撤销。"), button: String(localized: "删除")) {
+                                Task { await model.discard([], untracked: untracked.map(\.path)) }
+                            }
+                        }
                         iconButton("plus", "全部暂存") { Task { await model.stage(untracked.map(\.path)) } }
                     }
                     ForEach(untracked) { change in ChangeRow(workbench: workbench, model: model, change: change, section: .untracked) }

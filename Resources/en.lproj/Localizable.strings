@@ -2721,3 +2721,4 @@
 "版本 %@ (%lld)" = "Version %@ (%lld)";
 "检查常用网站与模型服务能否访问及耗时。" = "Checks whether common sites and model services are reachable, and how fast.";
 "开始测试" = "Start test";
+"删除全部 %lld 个未跟踪文件?" = "Delete all %lld untracked files?";
