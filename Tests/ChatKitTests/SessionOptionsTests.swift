@@ -183,47 +183,42 @@ struct WidthSliderPresetTests {
         #expect(SettingsContentWidth.presets[SettingsContentWidth.presetIndex(raw: "乱写", custom: 900)] == .standard)
     }
 
-    @Test("自动压缩窗口:夹到范围并生成环境变量")
+    @Test("自动压缩窗口:夹到 10 万 ~ 100 万,环境里只声明模型窗口")
     func autoCompactWindowEnv() {
         var options = SessionOptions()
         #expect(options.effectiveAutoCompactWindow == nil)
-        #expect(options.environment[SessionOptions.autoCompactKey] == nil)
-        options.autoCompactWindow = 1_000
-        #expect(options.environment[SessionOptions.autoCompactKey] == "50000")
-        options.autoCompactWindow = 200_000
-        #expect(options.environment[SessionOptions.autoCompactKey] == "200000")
-        options.autoCompactWindow = 9_000_000
-        #expect(options.environment[SessionOptions.autoCompactKey] == "1000000")
-    }
-
-    @Test("自动压缩窗口超过 20 万时同时声明模型窗口,否则会被夹回 20 万")
-    func autoCompactWindowRaisesModelWindow() {
-        var options = SessionOptions()
-        options.autoCompactWindow = 200_000
         #expect(options.environment[SessionOptions.maxContextKey] == nil)
-        options.autoCompactWindow = 400_000
-        #expect(options.environment[SessionOptions.maxContextKey] == "400000")
-        // 映射已声明模型窗口时,全局值不再覆盖它
-        let mapped: JSONValue = .object(["claudeCode": .object(["options": .object(["settings": .object(["env": .object([
-            SessionOptions.autoCompactKey: .string("1000000"), SessionOptions.maxContextKey: .string("1000000")])])])])])
-        let merged = options.merged(into: mapped)
-        #expect(merged?["claudeCode"]?["options"]?["settings"]?["env"]?[SessionOptions.maxContextKey]?.stringValue == "1000000")
-        #expect(merged?["claudeCode"]?["options"]?["env"]?[SessionOptions.maxContextKey] == nil)
+        options.autoCompactWindow = 1_000
+        #expect(options.environment[SessionOptions.maxContextKey] == "100000")
+        options.autoCompactWindow = 200_000
+        #expect(options.environment[SessionOptions.maxContextKey] == "200000")
+        options.autoCompactWindow = 9_000_000
+        #expect(options.environment[SessionOptions.maxContextKey] == "1000000")
+        // 压缩阈值不走最高优先级的环境变量
+        #expect(options.environment["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] == nil)
     }
 
-    @Test("自动压缩窗口:与模型映射的窗口取较小值")
-    func autoCompactWindowTakesSmaller() {
-        let mapped: JSONValue = .object(["claudeCode": .object(["options": .object(["settings": .object(["env": .object([SessionOptions.autoCompactKey: .string("1000000")])])])])])
+    @Test("自动压缩窗口:无映射窗口时写入 settings.autoCompactWindow 并保留环境里的模型窗口")
+    func autoCompactWindowGoesToSettings() {
+        var options = SessionOptions()
+        options.autoCompactWindow = 400_000
+        let merged = options.merged(into: nil)
+        let claudeOptions = merged?["claudeCode"]?["options"]
+        #expect(claudeOptions?["settings"]?[SessionOptions.autoCompactSettingKey]?.intValue == 400_000)
+        #expect(claudeOptions?["env"]?[SessionOptions.maxContextKey]?.stringValue == "400000")
+    }
+
+    @Test("自动压缩窗口:模型映射已声明窗口时以映射为准,全局值不覆盖")
+    func mappingWindowWins() {
+        let mapped: JSONValue = .object(["claudeCode": .object(["options": .object(["settings": .object([
+            SessionOptions.autoCompactSettingKey: .int(1_000_000),
+            "env": .object([SessionOptions.maxContextKey: .string("1000000")])])])])])
         var options = SessionOptions()
         options.autoCompactWindow = 200_000
         let merged = options.merged(into: mapped)
-        let settingsEnv = merged?["claudeCode"]?["options"]?["settings"]?["env"]
-        #expect(settingsEnv?[SessionOptions.autoCompactKey]?.stringValue == "200000")
-        #expect(merged?["claudeCode"]?["options"]?["env"]?[SessionOptions.autoCompactKey] == nil)
-        // 映射的窗口更小时保持映射的值
-        options.autoCompactWindow = 500_000
-        let kept = options.merged(into: .object(["claudeCode": .object(["options": .object(["settings": .object(["env": .object([SessionOptions.autoCompactKey: .string("128000")])])])])]))
-        #expect(kept?["claudeCode"]?["options"]?["settings"]?["env"]?[SessionOptions.autoCompactKey]?.stringValue == "128000")
+        let claudeOptions = merged?["claudeCode"]?["options"]
+        #expect(claudeOptions?["settings"]?[SessionOptions.autoCompactSettingKey]?.intValue == 1_000_000)
+        #expect(claudeOptions?["env"]?[SessionOptions.maxContextKey] == nil)
     }
 
     @Test("纯文字会话:替换系统提示、去掉工具与设置来源,并保留提供商变量")

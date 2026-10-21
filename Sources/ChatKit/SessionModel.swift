@@ -1704,22 +1704,44 @@ public final class SessionModel {
         }
     }
 
-    /// 当前生效的上下文窗口(自动压缩窗口,token;0 = 默认),读自全局偏好。
+    /// 当前生效的上下文窗口(token;0 = 自动):启用映射时取主模型的模型级窗口,没有再退回全局偏好。
     public var contextWindowTokens: Int {
-        ContextWindowChoice.normalized(UserDefaults.standard.integer(forKey: ClientPrefs.Key.autoCompactWindow))
+        if let window = mappedModels[.main]?.contextWindow, window > 0 { return ContextWindowChoice.normalized(window) }
+        return ContextWindowChoice.normalized(UserDefaults.standard.integer(forKey: ClientPrefs.Key.autoCompactWindow))
     }
 
-    /// 在输入框里调整上下文窗口:写入全局偏好(与设置页同一项),并用新的 `_meta` 恢复当前会话(保留对话上下文)。
-    /// 环境变量只在会话启动时生效,所以必须刷新会话;运行中则等本轮结束。
-    /// - Parameter tokens: 目标窗口(token),0 表示默认
+    /// 在输入框里调整上下文窗口(按模型记忆):
+    /// - 启用了模型映射:写进主模型的提供商条目(设置里的模型窗口同一项),切回该模型自动沿用;
+    /// - 否则写全局偏好。
+    /// 窗口只在会话启动时下发,所以随后用新的 `_meta` 恢复当前会话(保留对话上下文);运行中则等本轮结束。
+    /// - Parameter tokens: 目标窗口(token),0 表示自动
     public func setContextWindow(_ tokens: Int) {
         let value = ContextWindowChoice.normalized(tokens)
         guard value != contextWindowTokens else { return }
-        UserDefaults.standard.set(value, forKey: ClientPrefs.Key.autoCompactWindow)
-        guard activeDescriptor.kind == .claudeACP, phase == .ready else { return }
-        forceMetaRefresh = true
-        contextWindowNotice = String(localized: "上下文上限已更新为 \(ContextWindowChoice.title(for: value)),对话上下文已保留。")
-        mappingChanged()
+        let ready = activeDescriptor.kind == .claudeACP && phase == .ready
+        if ready {
+            forceMetaRefresh = true
+            contextWindowNotice = String(localized: "上下文上限已更新为 \(ContextWindowChoice.title(for: value)),对话上下文已保留。")
+        }
+        if let main = mappedModels[.main] {
+            let directory = providerDirectory
+            Task { [weak self] in
+                do {
+                    try await Task.detached(priority: .userInitiated) {
+                        try ProviderStorage.setModelContextWindow(value > 0 ? value : nil, model: main.modelId, providerId: main.providerId, directory: directory)
+                    }.value
+                    NotificationCenter.default.post(name: .omModelMappingChanged, object: nil)
+                } catch {
+                    self?.forceMetaRefresh = false
+                    self?.contextWindowNotice = nil
+                    self?.log.error("保存模型上下文窗口失败", error: error)
+                    self?.timeline.appendNotice(String(localized: "保存上下文窗口失败:\(error.localizedDescription)"), isError: true)
+                }
+            }
+        } else {
+            UserDefaults.standard.set(value, forKey: ClientPrefs.Key.autoCompactWindow)
+            if ready { mappingChanged() }
+        }
     }
 
     /// 设置页修改了映射:空闲时立即刷新,运行中等本轮结束。

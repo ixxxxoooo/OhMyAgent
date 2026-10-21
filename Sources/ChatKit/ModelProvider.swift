@@ -371,7 +371,8 @@ public enum ProviderStorage {
             let target = snapshot.mapping[slot] ?? main
             guard let provider = snapshot.providers.first(where: { $0.id == target.providerId }), !target.model.isEmpty else { continue }
             result[slot] = MappedModel(slot: slot, providerId: provider.id, providerName: provider.name, presetId: provider.presetId,
-                                       modelId: target.model, displayName: provider.displayName(forModel: target.model))
+                                       modelId: target.model, displayName: provider.displayName(forModel: target.model),
+                                       contextWindow: provider.modelList.first(where: { $0.id == target.model })?.contextWindow ?? provider.contextWindow)
         }
         return result
     }
@@ -385,6 +386,28 @@ public enum ProviderStorage {
         var snapshot = load(directory: directory)
         guard snapshot.useMapping != enabled else { return }
         snapshot.useMapping = enabled
+        try save(snapshot, directory: directory)
+    }
+
+    /// 设置某个提供商下某个模型的上下文窗口(读-改-写 providers.json;nil 清除,恢复「自动」)。
+    /// - Parameters:
+    ///   - tokens: 窗口 token 数(nil = 自动)
+    ///   - model: 模型 ID
+    ///   - providerId: 提供商 ID
+    ///   - directory: 存储目录
+    /// - Throws: 写盘错误;提供商不存在时静默忽略
+    public static func setModelContextWindow(_ tokens: Int?, model: String, providerId: String, directory: URL = defaultDirectory) throws {
+        guard !model.isEmpty else { return }
+        var snapshot = load(directory: directory)
+        guard let index = snapshot.providers.firstIndex(where: { $0.id == providerId }) else { return }
+        var list = snapshot.providers[index].modelList
+        if let at = list.firstIndex(where: { $0.id == model }) {
+            list[at].contextWindow = tokens
+        } else {
+            list.append(ProviderModel(id: model, contextWindow: tokens))
+        }
+        snapshot.providers[index].models = list
+        snapshot.providers[index].availableModels = nil
         try save(snapshot, directory: directory)
     }
 

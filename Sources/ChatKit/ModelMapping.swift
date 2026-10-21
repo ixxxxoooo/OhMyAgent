@@ -143,6 +143,8 @@ public struct MappedModel: Equatable, Sendable {
     public var modelId: String
     /// 界面展示名(提供商里重命名过则取重命名)
     public var displayName: String
+    /// 该模型的上下文窗口(token;模型级优先于提供商级,nil = 自动)
+    public var contextWindow: Int?
 }
 
 /// 已解析的一个槽位目标(含密钥,禁止记录)。
@@ -154,7 +156,8 @@ struct ResolvedTarget: Sendable {
 
     var info: MappedModel {
         MappedModel(slot: slot, providerId: provider.id, providerName: provider.name, presetId: provider.presetId,
-                    modelId: model, displayName: provider.displayName(forModel: model))
+                    modelId: model, displayName: provider.displayName(forModel: model),
+                    contextWindow: ProviderLaunch.contextWindow(of: self))
     }
 }
 
@@ -233,12 +236,8 @@ public enum ProviderLaunch {
         if mapping.others[.subagent] != nil { env[ModelSlot.subagent.modelEnvKey] = ModelSlot.subagent.alias } else { env[ModelSlot.subagent.modelEnvKey] = "" }
         let provider = main.provider
         if let value = provider.maxOutputTokens, value > 0 { env["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] = String(value) }
-        let window = provider.modelList.first(where: { $0.id == main.model })?.contextWindow ?? provider.contextWindow
-        if let value = window, value > 0 {
-            env["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] = String(value)
-            // 别名 oma-* 对 Claude Code 是未知模型,窗口默认 20 万;厂商声明了更大窗口时一并告知,否则压缩窗口会被夹回 20 万
-            if value > SessionOptions.defaultModelWindow { env[SessionOptions.maxContextKey] = String(value) }
-        }
+        // 别名 oma-* 对 Claude Code 是未知模型,窗口默认 20 万:把真实窗口声明为模型窗口(压缩阈值走 settings,见 `sessionMeta`)
+        if let value = contextWindow(of: main), value > 0 { env[SessionOptions.maxContextKey] = String(value) }
         if let value = nonEmpty(provider.effort) { env["CLAUDE_CODE_EFFORT_LEVEL"] = value }
         // 经网关的第三方模型不会返回服务端 auto 模式检查结果,关闭探测以免出现「分类器计费」警告
         env[NoticeFilter.autoModeServerKey] = "0"
@@ -252,9 +251,19 @@ public enum ProviderLaunch {
     /// - Returns: `_meta` JSON(只含占位令牌,不含真实密钥)
     static func sessionMeta(_ mapping: ResolvedMapping, gateway: URL) -> JSONValue {
         let publicEnv = publicEnvironment(mapping, gateway: gateway).mapValues(JSONValue.string)
-        let settings: JSONValue = .object(["model": .string(ModelSlot.main.alias), "apiKeyHelper": .string(""), "env": .object(publicEnv)])
+        var fields: [String: JSONValue] = ["model": .string(ModelSlot.main.alias), "apiKeyHelper": .string(""), "env": .object(publicEnv)]
+        // 自动压缩窗口放 settings(flag 层),不用最高优先级的环境变量,会话里的 /autocompact 仍可用
+        if let window = contextWindow(of: mapping.main), SessionOptions.autoCompactRange.contains(window) {
+            fields[SessionOptions.autoCompactSettingKey] = .int(window)
+        }
+        let settings: JSONValue = .object(fields)
         let secretEnv: JSONValue = .object(["ANTHROPIC_AUTH_TOKEN": .string(placeholderToken)])
         return .object(["claudeCode": .object(["options": .object(["settings": settings, "env": secretEnv])])])
+    }
+
+    /// 目标模型生效的上下文窗口:模型级优先于提供商级;未设置为 nil(自动)。
+    static func contextWindow(of target: ResolvedTarget) -> Int? {
+        target.provider.modelList.first(where: { $0.id == target.model })?.contextWindow ?? target.provider.contextWindow
     }
 
     static func nonEmpty(_ text: String?) -> String? {

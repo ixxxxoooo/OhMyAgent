@@ -21,12 +21,19 @@ struct ProviderAdvancedTests {
         provider.effort = "high"
         let env = ProviderLaunch.publicEnvironment(ModelProviderTests.mapping(provider, "m1"), gateway: gateway)
         #expect(env["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] == "8192")
-        #expect(env["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] == "200000")
-        #expect(env["CLAUDE_CODE_MAX_CONTEXT_TOKENS"] == nil)
+        // 模型窗口走 CLAUDE_CODE_MAX_CONTEXT_TOKENS;压缩阈值进 settings,不再用最高优先级的 AUTO_COMPACT 环境变量
+        #expect(env["CLAUDE_CODE_MAX_CONTEXT_TOKENS"] == "200000")
+        #expect(env["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] == nil)
         provider.contextWindow = 1_000_000
-        let big = ProviderLaunch.publicEnvironment(ModelProviderTests.mapping(provider, "m1"), gateway: gateway)
-        #expect(big["CLAUDE_CODE_AUTO_COMPACT_WINDOW"] == "1000000")
-        #expect(big["CLAUDE_CODE_MAX_CONTEXT_TOKENS"] == "1000000")
+        let mapping = ModelProviderTests.mapping(provider, "m1")
+        #expect(ProviderLaunch.publicEnvironment(mapping, gateway: gateway)["CLAUDE_CODE_MAX_CONTEXT_TOKENS"] == "1000000")
+        let meta = ProviderLaunch.sessionMeta(mapping, gateway: gateway)
+        #expect(meta["claudeCode"]?["options"]?["settings"]?["autoCompactWindow"]?.intValue == 1_000_000)
+        // 模型级窗口优先于提供商级,低于 10 万时只声明模型窗口、不写压缩阈值
+        provider.models = [ProviderModel(id: "m1", contextWindow: 64_000)]
+        let small = ModelProviderTests.mapping(provider, "m1")
+        #expect(ProviderLaunch.publicEnvironment(small, gateway: gateway)["CLAUDE_CODE_MAX_CONTEXT_TOKENS"] == "64000")
+        #expect(ProviderLaunch.sessionMeta(small, gateway: gateway)["claudeCode"]?["options"]?["settings"]?["autoCompactWindow"] == nil)
         #expect(env["CLAUDE_CODE_EFFORT_LEVEL"] == "high")
         #expect(ProviderLaunch.publicEnvironment(ModelProviderTests.mapping(base(), "m1"), gateway: gateway)["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] == nil)
     }

@@ -516,7 +516,7 @@ struct ContextWindowMenu: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(OMColors.secondaryText)
-            .omTooltip(String(localized: "上下文窗口:占用接近该值时自动压缩"))
+            .omTooltip(String(localized: "上下文窗口(按模型记忆):占用接近该值时自动压缩"))
             .accessibilityLabel("上下文窗口")
             .omPicker(isPresented: $shown, entries: entries, selectedID: "\(current)", placeholder: String(localized: "搜索"), width: 180) { entry in
                 if let tokens = Int(entry.id) { model.setContextWindow(tokens) }

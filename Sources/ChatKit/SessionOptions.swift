@@ -232,9 +232,10 @@ public struct SessionOptions: Equatable, Sendable {
     public var autoCompactWindow = 0
 
     /// 自动压缩窗口允许的范围(token);Claude Code 的上限是 100 万。
-    public static let autoCompactRange = 50_000...1_000_000
-    /// 自动压缩窗口对应的环境变量。
-    public static let autoCompactKey = "CLAUDE_CODE_AUTO_COMPACT_WINDOW"
+    public static let autoCompactRange = 100_000...1_000_000
+    /// 自动压缩窗口在会话 settings(flag 层)里的键。
+    /// 官方推荐用设置而不是环境变量:`CLAUDE_CODE_AUTO_COMPACT_WINDOW` 优先级最高,会盖掉用户在会话里的 `/autocompact`。
+    public static let autoCompactSettingKey = "autoCompactWindow"
     /// 模型真实窗口的环境变量:网关别名(如 `oma-main`)不是 Claude Code 认识的模型,窗口默认按 20 万算,
     /// 而自动压缩窗口会被夹到模型窗口以内,所以要超过 20 万必须同时声明模型窗口。
     public static let maxContextKey = "CLAUDE_CODE_MAX_CONTEXT_TOKENS"
@@ -292,11 +293,8 @@ public struct SessionOptions: Equatable, Sendable {
         if timeoutSeconds > 0 { env["API_TIMEOUT_MS"] = String(timeoutSeconds * 1000) }
         if !loadClaudeMemory { env["CLAUDE_CODE_DISABLE_CLAUDE_MDS"] = "1" }
         if let value = mcpToolSearch.environmentValue { env["ENABLE_TOOL_SEARCH"] = value }
-        if let window = effectiveAutoCompactWindow {
-            env[Self.autoCompactKey] = String(window)
-            // 超过默认窗口时同时抬高模型窗口,否则自动压缩窗口会被夹回 20 万
-            if window > Self.defaultModelWindow { env[Self.maxContextKey] = String(window) }
-        }
+        // 压缩窗口不会超过模型窗口,所以环境里只声明模型窗口;压缩阈值由 `merged` 写入 settings
+        if let window = effectiveAutoCompactWindow { env[Self.maxContextKey] = String(window) }
         return env
     }
 
@@ -325,16 +323,17 @@ public struct SessionOptions: Equatable, Sendable {
         if case .object(let object)? = options["env"] { env = object }
         // 提供商/用户已显式设置的变量优先
         for (key, value) in environment where env[key] == nil { env[key] = .string(value) }
-        // 模型映射在 settings.env 里也给了窗口时取较小值:全局上限不被映射的大窗口覆盖
-        if let window = effectiveAutoCompactWindow, case .object(var settings)? = options["settings"],
-           case .object(var settingsEnv)? = settings["env"],
-           let mapped = settingsEnv[Self.autoCompactKey]?.stringValue.flatMap({ Int($0) }) {
-            settingsEnv[Self.autoCompactKey] = .string(String(min(mapped, window)))
-            settings["env"] = .object(settingsEnv)
+        // 窗口以模型映射(按模型设置)为准,全局值只在映射没给窗口时兜底;压缩阈值写进 settings 而不是环境变量
+        var settings: [String: JSONValue] = [:]
+        if case .object(let object)? = options["settings"] { settings = object }
+        var settingsEnv: [String: JSONValue] = [:]
+        if case .object(let object)? = settings["env"] { settingsEnv = object }
+        let mapped = settings[Self.autoCompactSettingKey] != nil || settingsEnv[Self.maxContextKey] != nil
+        if mapped {
+            env.removeValue(forKey: Self.maxContextKey)
+        } else if let window = effectiveAutoCompactWindow {
+            settings[Self.autoCompactSettingKey] = .int(window)
             options["settings"] = .object(settings)
-            env.removeValue(forKey: Self.autoCompactKey)
-            // 模型窗口以映射(厂商声明的真实窗口)为准,全局值只收紧压缩阈值,不改模型窗口
-            if settingsEnv[Self.maxContextKey] != nil { env.removeValue(forKey: Self.maxContextKey) }
         }
         if !env.isEmpty { options["env"] = .object(env) }
         if !options.isEmpty { claudeCode["options"] = .object(options) }
