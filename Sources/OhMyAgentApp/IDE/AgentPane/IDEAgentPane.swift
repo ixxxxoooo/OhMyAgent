@@ -154,6 +154,7 @@ private struct PaneTabItem: View {
                 .foregroundStyle(tab.isActive ? OMColors.primaryText : OMColors.secondaryText)
                 .lineLimit(1)
                 .frame(maxWidth: IDETabMetrics.maxLabelWidth, alignment: .leading)
+                .fixedSize(horizontal: true, vertical: false)
             if tab.closable {
                 Button(action: onClose) { Image.om("x", size: 12) }
                     .buttonStyle(.omIcon)

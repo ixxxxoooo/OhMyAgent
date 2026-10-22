@@ -100,6 +100,7 @@ private struct IDETabItem: View {
                 .foregroundStyle(isActive ? OMColors.primaryText : OMColors.secondaryText)
                 .lineLimit(1)
                 .frame(maxWidth: IDETabMetrics.maxLabelWidth, alignment: .leading)
+                .fixedSize(horizontal: true, vertical: false)
             trailing
         }
         .padding(.horizontal, 10)
