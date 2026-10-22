@@ -31,7 +31,7 @@ struct IDEAgentPane: View {
     }
 
     /// 标签条里的一项。
-    private struct PaneTab: Identifiable {
+    struct PaneTab: Identifiable {
         let id: UUID
         let title: String
         let isActive: Bool
@@ -40,60 +40,52 @@ struct IDEAgentPane: View {
         let closable: Bool
     }
 
-    /// 顶部栏(对齐 Cursor):左侧是会话标签条,右侧依次为「新对话 / 历史 / 最大化 / 收起面板」。
+    /// 顶部栏:标签样式与编辑器标签栏(`IDETabBar`)一致;空白处双击新建对话(同 VS Code 标签栏),
+    /// 右侧依次为「新对话 / 历史 / 最大化 / 收起面板」。
     private var header: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 0) {
             tabStrip
-            Spacer(minLength: 0)
-            iconButton("plus", String(localized: "新对话")) { workspace.newAgentConversation() }
-            iconButton("clock", String(localized: "历史对话")) { historyShown.toggle() }
-                .omPicker(isPresented: $historyShown, entries: historyEntries, selectedID: workspace.agentSession?.sessionId,
-                          placeholder: String(localized: "搜索历史对话"), placement: .belowTrailing, width: 300, showsSearch: true) { entry in
-                    workspace.openAgentHistory(sessionID: entry.id, title: entry.title)
+            HStack(spacing: 2) {
+                iconButton("plus", String(localized: "新对话")) { workspace.newAgentConversation() }
+                iconButton("clock", String(localized: "历史对话")) { historyShown.toggle() }
+                    .omPicker(isPresented: $historyShown, entries: historyEntries, selectedID: workspace.agentSession?.sessionId,
+                              placeholder: String(localized: "搜索历史对话"), placement: .belowTrailing, width: 300, showsSearch: true) { entry in
+                        workspace.openAgentHistory(sessionID: entry.id, title: entry.title)
+                    }
+                iconButton(workspace.model.agentPaneMaximized ? "minimize-2" : "maximize-2",
+                           workspace.model.agentPaneMaximized ? String(localized: "还原 Agent 面板") : String(localized: "最大化 Agent 面板")) {
+                    workspace.model.toggleAgentMaximized()
                 }
-            iconButton(workspace.model.agentPaneMaximized ? "minimize-2" : "maximize-2",
-                       workspace.model.agentPaneMaximized ? String(localized: "还原 Agent 面板") : String(localized: "最大化 Agent 面板")) {
-                workspace.model.toggleAgentMaximized()
+                iconButton("panel-right-close", String(localized: "关闭")) { workspace.model.toggleAgentPane() }
             }
-            iconButton("panel-right-close", String(localized: "关闭")) { workspace.model.toggleAgentPane() }
+            .padding(.horizontal, 8)
         }
-        .padding(.horizontal, 8)
-        .frame(height: 32)
+        .frame(height: IDETabMetrics.height)
+        .background(OMColors.sidebar)
     }
 
     /// 会话标签条:融合模式下就是工作台里该项目打开的全部会话标签(与 Agent 窗口一致);否则只有本面板的一个会话。
     private var tabStrip: some View {
         let tabs = paneTabs
-        return ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 2) {
-                ForEach(tabs) { tab in tabView(tab) }
+        return GeometryReader { geo in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 0) {
+                    ForEach(tabs) { tab in tabView(tab) }
+                    // 标签之后的空白区:双击新建对话(同 VS Code 标签栏)
+                    Color.clear
+                        .frame(minWidth: 16, maxWidth: .infinity, minHeight: IDETabMetrics.height)
+                        .contentShape(Rectangle())
+                        .onTapGesture(count: 2) { workspace.newAgentConversation() }
+                }
+                .frame(minWidth: geo.size.width)
             }
+            .scrollBounceBehavior(.basedOnSize)
         }
-        .scrollBounceBehavior(.basedOnSize)
     }
 
+    /// 单个会话标签:与编辑器标签同款(激活底色、顶部强调线、右侧分隔线、悬停显示关闭、中键关闭)。
     private func tabView(_ tab: PaneTab) -> some View {
-        HStack(spacing: 5) {
-            if tab.isRunning { OMSessionDot(.running, size: 6) }
-            Text(verbatim: tab.title)
-                .font(OMFonts.small)
-                .foregroundStyle(tab.isActive ? OMColors.primaryText : OMColors.secondaryText)
-                .lineLimit(1)
-                .frame(maxWidth: 140, alignment: .leading)
-            if tab.closable {
-                Button { workspace.closeAgentTab(tab.id) } label: { Image.om("x", size: 12) }
-                    .buttonStyle(.omIcon)
-                    .omTooltip(String(localized: "关闭对话"))
-                    .accessibilityLabel(String(localized: "关闭对话"))
-            }
-        }
-        .padding(.horizontal, 8)
-        .frame(height: 24)
-        .background(tab.isActive ? OMColors.selectedFill : Color.clear, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
-        .contentShape(Rectangle())
-        .onTapGesture { workspace.activateAgentTab(tab.id) }
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(tab.isActive ? [.isButton, .isSelected] : .isButton)
+        PaneTabItem(tab: tab, onActivate: { workspace.activateAgentTab(tab.id) }, onClose: { workspace.closeAgentTab(tab.id) })
     }
 
     /// 标签条数据。
@@ -144,6 +136,46 @@ struct IDEAgentPane: View {
             .buttonStyle(.omIcon)
             .omTooltip(title)
             .accessibilityLabel(title)
+    }
+}
+
+/// Agent 面板里的单个会话标签。
+private struct PaneTabItem: View {
+    let tab: IDEAgentPane.PaneTab
+    let onActivate: () -> Void
+    let onClose: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if tab.isRunning { OMSessionDot(.running, size: 6) }
+            Text(verbatim: tab.title)
+                .font(OMFonts.small)
+                .foregroundStyle(tab.isActive ? OMColors.primaryText : OMColors.secondaryText)
+                .lineLimit(1)
+                .frame(maxWidth: IDETabMetrics.maxLabelWidth, alignment: .leading)
+            if tab.closable {
+                Button(action: onClose) { Image.om("x", size: 12) }
+                    .buttonStyle(.omIcon)
+                    .opacity(tab.isActive || hovering ? 1 : 0)
+                    .frame(width: 16, height: 16)
+                    .omTooltip(String(localized: "关闭对话"))
+                    .accessibilityLabel(String(localized: "关闭对话"))
+            }
+        }
+        .padding(.horizontal, 10)
+        .frame(height: IDETabMetrics.height)
+        .background(tab.isActive ? OMColors.contentBackground : (hovering ? OMColors.hoverFill : Color.clear))
+        .overlay(alignment: .top) {
+            if tab.isActive { Rectangle().fill(OMColors.accent).frame(height: 2) }
+        }
+        .overlay(alignment: .trailing) { Rectangle().fill(OMColors.hairline).frame(width: 1) }
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
+        .onTapGesture(perform: onActivate)
+        .background(MiddleClickCatcher { if tab.closable { onClose() } })
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(tab.isActive ? [.isButton, .isSelected] : .isButton)
     }
 }
 

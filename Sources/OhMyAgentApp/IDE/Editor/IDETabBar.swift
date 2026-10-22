@@ -37,21 +37,26 @@ struct IDETabBar: View {
     @State private var isDropTargeted = false
 
     var body: some View {
-        ScrollViewReader { proxy in
+        GeometryReader { geo in ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 0) {
                     ForEach(group.tabs) { tab in
                         IDETabItem(workspace: workspace, tab: tab, isActive: tab.id == group.activeID, groupFocused: isFocused, groupID: group.id)
                             .id(tab.id)
                     }
-                    Color.clear.frame(minWidth: 24)
+                    // 标签之后的空白区:双击新建文件(同 VS Code 标签栏空白处双击新建)
+                    Color.clear.frame(minWidth: 24, maxWidth: .infinity, minHeight: IDETabMetrics.height)
+                        .contentShape(Rectangle())
+                        .onTapGesture(count: 2) { if let root = workspace.root { workspace.create(in: root, isDirectory: false) } }
                 }
+                // 内容至少与标签栏等宽,空白区才有足够大的双击区域
+                .frame(minWidth: geo.size.width)
             }
             .onChange(of: group.activeID) { _, id in
                 guard let id else { return }
                 withAnimation(OMMotion.standard) { proxy.scrollTo(id) }
             }
-        }
+        } }
         .frame(height: IDETabMetrics.height)
         .background(OMColors.sidebar)
         .overlay(alignment: .bottom) { Rectangle().fill(OMColors.hairline).frame(height: 1) }
