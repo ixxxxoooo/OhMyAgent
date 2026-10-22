@@ -219,6 +219,8 @@ struct TabGroupView: View {
                         .environment(\.tabIsActive, isActive)
                         .opacity(isActive ? 1 : 0)
                         .allowsHitTesting(isActive)
+                        // 隐藏标签退出控件焦点/键盘导航,减少 SwiftUI 焦点链遍历的节点数
+                        .disabled(!isActive)
                         .accessibilityHidden(!isActive)
                 }
             }

@@ -8,7 +8,8 @@ import Foundation
 /// 一个标签组内的保活状态(纯值类型,便于测试)。
 public struct TabKeepAlive: Equatable, Sendable {
     /// 非常驻标签的保活预算(各类标签按权重计入,含当前激活标签)。
-    public static let defaultLimit = 10
+    /// 体检发现隐藏标签仍参与 SwiftUI 焦点链遍历与布局(单次卡顿可达数秒),预算由 10 降到 5。
+    public static let defaultLimit = 5
 
     /// 最近使用顺序,最近的在前。
     public private(set) var order: [UUID] = []

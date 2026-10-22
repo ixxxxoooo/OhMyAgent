@@ -89,8 +89,8 @@ struct TabKeepAliveTests {
         #expect(keep.mounted(in: [heavy], active: heavy.id).count == 1)
     }
 
-    @Test("默认预算比旧版更大")
+    @Test("默认预算:隐藏标签仍参与焦点链,预算收敛到 5")
     func defaultBudget() {
-        #expect(TabKeepAlive.defaultLimit >= 8)
+        #expect(TabKeepAlive.defaultLimit == 5)
     }
 }

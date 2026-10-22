@@ -169,6 +169,7 @@ struct IDEEditorGroupView: View {
                 tabBody(tab, active: active)
                     .opacity(active ? 1 : 0)
                     .allowsHitTesting(active)
+                    .disabled(!active)
                     .accessibilityHidden(!active)
                     .zIndex(active ? 1 : 0)
             }
