@@ -121,3 +121,25 @@ struct WorkspaceFilesTests {
         #expect(out.files.isEmpty)
     }
 }
+
+@Suite("模糊匹配预判")
+struct FuzzyPrefilterTests {
+    @Test("预判与完整匹配的子序列条件一致;含非 ASCII 的路径返回 nil")
+    func mayMatchAgreesWithMatch() {
+        let paths = ["Sources/App/Main.swift", "README.md", "docs/设计文档.md", "a/b/c_d-e.f", "UPPER/Case.TXT", ""]
+        let queries = ["main", "rdm", "sam", "ABC", "cd", "txt", "zzz", "m s", "设计"]
+        for query in queries {
+            for path in paths {
+                let expected = FuzzyMatcher.match(query: query, path: path) != nil
+                guard let prepared = FuzzyMatcher.preparedQuery(query) else { continue }
+                guard let predicted = FuzzyMatcher.mayMatch(preparedQuery: prepared, path: path) else {
+                    #expect(path.utf8.contains { $0 >= 0x80 }, "只有含非 ASCII 的路径才返回 nil")
+                    continue
+                }
+                #expect(predicted == expected, "查询 \(query) 路径 \(path)")
+            }
+        }
+        #expect(FuzzyMatcher.preparedQuery("设计") == nil)
+        #expect(FuzzyMatcher.preparedQuery("  ") == nil)
+    }
+}

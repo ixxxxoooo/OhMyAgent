@@ -60,7 +60,23 @@ final class IDEPaletteModel {
     /// 每次打开面板递增:视图据此重新把焦点交给输入框(焦点可能还在终端或编辑器上)
     private(set) var focusToken = 0
     /// 工作区相对路径索引
-    private(set) var files: [String] = []
+    private(set) var files: [String] = [] { didSet { filesRevision &+= 1 } }
+    /// 文件索引的修订号:索引变化后文件结果的缓存失效
+    @ObservationIgnored private var filesRevision = 0
+    /// 文件结果缓存的键:输入、索引修订号与已打开文件列表都没变时复用上次排序(悬停改高亮行也会重算 body)
+    private struct RankKey: Equatable {
+        let text: String
+        let filesRevision: Int
+        let recents: [String]
+    }
+    @ObservationIgnored private var rankMemo: (key: RankKey, items: [IDEPaletteItem])?
+    /// 正在后台计算的键(避免同一输入重复排队)
+    @ObservationIgnored private var pendingKey: RankKey?
+    @ObservationIgnored private var rankTask: Task<Void, Never>?
+    /// 后台排序结果到达时加一:视图读取它,结果落地后自动重算
+    private(set) var rankRevision = 0
+    /// 超过该文件数时排序放到后台(输入期间先沿用上一次结果,不阻塞主线程)
+    static let asyncRankThreshold = 3_000
     /// 命令注册表(含最近使用)
     private(set) var registry = IDECommandRegistry()
     @ObservationIgnored private var indexRoot: String?
@@ -165,12 +181,39 @@ final class IDEPaletteModel {
         if customItems != nil { return filteredCustom.map(IDEPaletteItem.location) }
         switch query {
         case .files(let text):
-            return IDEQuickOpen.rank(query: text, files: files, recents: recents).map(IDEPaletteItem.file)
+            return rankedFiles(text: text, recents: recents)
         case .commands(let text):
             return registry.search(query: text, context: context).map(IDEPaletteItem.command)
         case .line(let line, let column):
             return [.line(line, column)]
         }
+    }
+
+    /// 文件结果:命中缓存直接返回;文件数不大时同步排序;文件很多时在后台排序,期间沿用上一次结果。
+    private func rankedFiles(text: String, recents: [String]) -> [IDEPaletteItem] {
+        _ = rankRevision   // 建立观察:后台结果落地后视图重算
+        let key = RankKey(text: text, filesRevision: filesRevision, recents: recents)
+        if let memo = rankMemo, memo.key == key { return memo.items }
+        if files.count <= Self.asyncRankThreshold || rankMemo == nil {
+            let items = IDEQuickOpen.rank(query: text, files: files, recents: recents).map(IDEPaletteItem.file)
+            rankMemo = (key, items)
+            return items
+        }
+        if pendingKey != key {
+            pendingKey = key
+            let snapshot = files
+            rankTask?.cancel()
+            rankTask = Task { [weak self] in
+                let ranked = await Task.detached(priority: .userInitiated) {
+                    IDEQuickOpen.rank(query: text, files: snapshot, recents: recents)
+                }.value
+                guard !Task.isCancelled, let self, self.pendingKey == key else { return }
+                self.rankMemo = (key, ranked.map(IDEPaletteItem.file))
+                self.pendingKey = nil
+                self.rankRevision &+= 1
+            }
+        }
+        return rankMemo?.items ?? []
     }
 
     /// 自定义列表按输入框文本过滤后的结果。

@@ -39,6 +39,33 @@ struct IDEPaletteTests {
         #expect(workspace.openRelativePaths == ["src/main.swift"])
     }
 
+    @Test("文件很多时排序放后台:输入期间沿用旧结果,落地后自动更新;同一输入命中缓存")
+    func largeIndexRanksInBackground() async throws {
+        let base = (FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?.path ?? NSHomeDirectory())
+        let root = base + "/oma-ide-palette-big-\(UUID().uuidString)"
+        try FileManager.default.createDirectory(atPath: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: root) }
+        let count = IDEPaletteModel.asyncRankThreshold + 200
+        for index in 0..<count { FileManager.default.createFile(atPath: root + "/file\(index).txt", contents: Data()) }
+        let workspace = IDEWorkspace(model: IDEWindowModel(snapshot: IDEWindowSnapshot(workspaceRoot: root)))
+        workspace.openPalette("")
+        for _ in 0..<200 where workspace.palette.files.count < count { try await Task.sleep(for: .milliseconds(50)) }
+        #expect(workspace.palette.files.count == count)
+        let context = workspace.commandContext
+        let initial = workspace.palette.items(context: context, recents: [])
+        #expect(!initial.isEmpty, "首次显示同步给出结果")
+        let revision = workspace.palette.rankRevision
+        workspace.palette.text = "file3100"
+        let stale = workspace.palette.items(context: context, recents: [])
+        #expect(stale.map(\.id) == initial.map(\.id), "后台排序期间沿用上一次结果")
+        for _ in 0..<100 where workspace.palette.rankRevision == revision { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(workspace.palette.rankRevision != revision, "结果落地后修订号变化")
+        let fresh = workspace.palette.items(context: context, recents: [])
+        guard case .file(let match)? = fresh.first else { Issue.record("应命中文件"); return }
+        #expect(match.path == "file3100.txt")
+        #expect(workspace.palette.items(context: context, recents: []).map(\.id) == fresh.map(\.id), "同一输入命中缓存")
+    }
+
     @Test("命令模式列出命令,执行后记入最近使用")
     func runCommand() {
         let workspace = IDEWindowModel(snapshot: IDEWindowSnapshot(workspaceRoot: "/tmp"))

@@ -136,6 +136,28 @@ public enum FuzzyMatcher {
         return result.isEmpty ? nil : result
     }
 
+    /// 纯子序列预判(不打分、不分配):供上层在做完整匹配前先排除绝大多数不匹配的候选。
+    /// - Parameters:
+    ///   - query: 已规整的查询字节(见 `preparedQuery`)
+    ///   - path: 候选文本
+    /// - Returns: `true` 可能匹配、`false` 一定不匹配(与 `match` 的子序列条件一致);路径含非 ASCII 时返回 `nil`(调用方走通用路径)
+    public static func mayMatch(preparedQuery query: [UInt8], path: String) -> Bool? {
+        var copy = path
+        return copy.withUTF8 { buf -> Bool? in
+            for byte in buf where byte >= 0x80 { return nil }
+            var probe = 0
+            for byte in buf where probe < query.count {
+                let lowered = byte >= 65 && byte <= 90 ? byte | 0x20 : byte
+                if lowered == query[probe] { probe += 1 }
+            }
+            return probe == query.count
+        }
+    }
+
+    /// 把查询规整为可重复使用的预判字节:小写、去空白;含非 ASCII 或为空时返回 nil。
+    /// - Parameter query: 查询
+    public static func preparedQuery(_ query: String) -> [UInt8]? { asciiQuery(query) }
+
     /// `match` 的 ASCII 字节快路径:评分规则与 `match` 完全一致。
     /// - Parameters:
     ///   - query: 已规整的查询字节(见 `asciiQuery`)

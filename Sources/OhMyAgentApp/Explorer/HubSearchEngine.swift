@@ -141,17 +141,20 @@ enum HubSearchEngine {
     static func rank(_ query: String, _ list: [HubCandidate], limit: Int) -> [HubItem] {
         if query.isEmpty { return list.prefix(limit).map { HubItem(id: $0.id, candidate: $0, positions: []) } }
         var scored: [(item: HubItem, score: Int, index: Int)] = []
+        // 纯 ASCII 查询:先用字节子序列预判跳过绝大多数不可能模糊命中的候选(万级文件候选时省掉每个候选的数组分配)
+        let prepared = FuzzyMatcher.preparedQuery(query)
         for (index, candidate) in list.enumerated() {
-            if let hit = match(query, candidate) { scored.append((HubItem(id: candidate.id, candidate: candidate, positions: hit.positions), hit.score, index)) }
+            if let hit = match(query, candidate, prepared: prepared) { scored.append((HubItem(id: candidate.id, candidate: candidate, positions: hit.positions), hit.score, index)) }
         }
         scored.sort { $0.score != $1.score ? $0.score > $1.score : $0.index < $1.index }
         return scored.prefix(limit).map(\.item)
     }
 
     /// 单个候选的匹配:先模糊匹配标题/路径,再退到关键词包含。
-    private static func match(_ query: String, _ candidate: HubCandidate) -> (score: Int, positions: [Int])? {
+    private static func match(_ query: String, _ candidate: HubCandidate, prepared: [UInt8]?) -> (score: Int, positions: [Int])? {
         let text = candidate.searchText ?? candidate.title
-        if let hit = FuzzyMatcher.match(query: query, path: text) {
+        let fuzzyPossible = prepared.flatMap { FuzzyMatcher.mayMatch(preparedQuery: $0, path: text) } ?? true
+        if fuzzyPossible, let hit = FuzzyMatcher.match(query: query, path: text) {
             // 高亮位置:优先对标题本身再匹配一次(路径上的贪心匹配可能落在目录里),否则按尾部对齐映射
             let positions: [Int]
             if let own = FuzzyMatcher.match(query: query, path: candidate.title) {
