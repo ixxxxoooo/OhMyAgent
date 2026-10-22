@@ -310,7 +310,7 @@ public final class SessionModel {
     @ObservationIgnored private var titleSource: TitleSource = .none
     /// 自动标题生成任务(换会话时取消)
     @ObservationIgnored private var titleTask: Task<Void, Never>?
-    public private(set) var pendingPermissions: [PermissionPrompt] = [] { didSet { if pendingPermissions.isEmpty != oldValue.isEmpty { publishAttention() } } }
+    public internal(set) var pendingPermissions: [PermissionPrompt] = [] { didSet { if pendingPermissions.isEmpty != oldValue.isEmpty { publishAttention() } } }
     public private(set) var pendingElicitations: [ElicitationPrompt] = [] { didSet { if pendingElicitations.isEmpty != oldValue.isEmpty { publishAttention() } } }
     /// 终端会话(按终端 ID)
     public internal(set) var terminals: [String: TerminalSession] = [:]
@@ -1332,6 +1332,8 @@ public final class SessionModel {
             if error == nil, self.stallMessage == nil, let reason, reason != .cancelled {
                 self.timeline.appendTurnSummary(TurnSummary(model: summaryModel, durationSeconds: Double(turnMs) / 1000, usage: usage, brand: summaryBrand, finishedAt: Date()))
             }
+            // OpenCode 的计划模式没有 ExitPlanMode:回合结束时把最后的计划合成一张待批准的计划卡
+            if error == nil, reason == .endTurn { self.proposeOpenCodePlanIfNeeded() }
             self.isRunning = false
             self.turnStartedAt = nil
             self.promptTask = nil
@@ -2011,7 +2013,7 @@ public final class SessionModel {
     /// 计划批准请求到达时:把计划作为计划卡立即放进时间线(待批准),让用户先看到计划文档再决定;
     /// 计划文件优先用 Claude Code 自己写的那份(编辑它就是编辑真正的计划),没有才另存一份。
     /// - Parameter prompt: 计划批准请求
-    private func proposePlanIfNeeded(for prompt: PermissionPrompt) {
+    func proposePlanIfNeeded(for prompt: PermissionPrompt) {
         guard prompt.isPlanApproval, prompt.planEntry == nil, let plan = prompt.planText else { return }
         let entry = timeline.appendPlanDoc(plan)
         entry.planPending = true

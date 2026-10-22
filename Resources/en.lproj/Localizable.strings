@@ -2913,3 +2913,7 @@
 "在终端运行:%@\n安装完成后重新打开文件即可生效" = "Runs in a terminal: %@\nReopen the file after installing.";
 "未找到语言服务器" = "Language server not found";
 "语言服务器不可用" = "Language server unavailable";
+"切到 Build 并执行" = "Switch to Build & run";
+"把 OpenCode 切到 build 模式,并让它按上面的计划开始执行" = "Switch OpenCode to build mode and have it carry out the plan above";
+"找不到可用于执行计划的模式,请手动切换到 build 后发送「按计划执行」。" = "No mode available to run the plan. Switch to build manually and send \"run the plan\".";
+"请按上面的计划开始执行。" = "Please carry out the plan above.";

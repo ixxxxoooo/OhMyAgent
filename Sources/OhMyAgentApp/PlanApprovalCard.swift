@@ -72,6 +72,7 @@ struct PlanApprovalCard: View {
         case "exit-plan-auto": return String(localized: "Build · 自动模式")
         case "exit-plan-clear-auto": return String(localized: "清空上下文后 Build")
         case "exit-plan-bypass": return String(localized: "Build · 跳过权限确认")
+        case "opencode-build": return String(localized: "切到 Build 并执行")
         default: break
         }
         switch option.kind {
@@ -89,13 +90,14 @@ struct PlanApprovalCard: View {
         case "exit-plan-auto": return String(localized: "按计划实施,自动模式下由分类器判断哪些操作无需确认")
         case "exit-plan-clear-auto": return String(localized: "先清空当前对话上下文(计划保留),再用自动模式实施,适合上下文已经很长时")
         case "exit-plan-bypass": return String(localized: "按计划实施,并跳过所有权限确认——只在完全信任这个计划时使用")
+        case "opencode-build": return String(localized: "把 OpenCode 切到 build 模式,并让它按上面的计划开始执行")
         default: return option.name
         }
     }
 
     /// 样式:逐项确认(最稳妥的 Build)是唯一的实心主操作(暖色),其余为次按钮。
     private func style(for option: PermissionOption) -> OMButtonStyle {
-        let isPrimary = option.optionId == "exit-plan-default"
+        let isPrimary = option.optionId == "exit-plan-default" || option.optionId == "opencode-build"
             || (option.optionId != "exit-plan-auto" && option.optionId != "exit-plan-clear-auto" && option.optionId != "exit-plan-bypass" && option.kind == .allowAlways)
         return isPrimary ? OMButtonStyle(.warm) : OMButtonStyle(.secondary)
     }
