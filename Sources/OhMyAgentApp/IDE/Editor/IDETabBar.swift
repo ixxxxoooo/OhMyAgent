@@ -35,22 +35,26 @@ struct IDETabBar: View {
     let group: TabGroup
     let isFocused: Bool
     @State private var isDropTargeted = false
+    /// 标签总宽(用于算出标签之后空白区的宽度)
+    @State private var tabsWidth: CGFloat = 0
 
     var body: some View {
         GeometryReader { geo in ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 0) {
-                    ForEach(group.tabs) { tab in
-                        IDETabItem(workspace: workspace, tab: tab, isActive: tab.id == group.activeID, groupFocused: isFocused, groupID: group.id)
-                            .id(tab.id)
+                    HStack(spacing: 0) {
+                        ForEach(group.tabs) { tab in
+                            IDETabItem(workspace: workspace, tab: tab, isActive: tab.id == group.activeID, groupFocused: isFocused, groupID: group.id)
+                                .id(tab.id)
+                        }
                     }
-                    // 标签之后的空白区:双击新建文件(同 VS Code 标签栏空白处双击新建)
-                    Color.clear.frame(minWidth: 24, maxWidth: .infinity, minHeight: IDETabMetrics.height)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { tabsWidth = $0 }
+                    // 标签之后的空白区:双击新建文件(同 VS Code 标签栏空白处双击新建)。
+                    // 水平 ScrollView 里 `maxWidth: .infinity` 拿不到剩余宽度,这里按「栏宽 − 标签总宽」显式撑满
+                    Color.clear.frame(width: max(24, geo.size.width - tabsWidth), height: IDETabMetrics.height)
                         .contentShape(Rectangle())
                         .onTapGesture(count: 2) { if let root = workspace.root { workspace.create(in: root, isDirectory: false) } }
                 }
-                // 内容至少与标签栏等宽,空白区才有足够大的双击区域
-                .frame(minWidth: geo.size.width, alignment: .leading)
             }
             .onChange(of: group.activeID) { _, id in
                 guard let id else { return }
