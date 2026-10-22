@@ -487,6 +487,29 @@ struct WorkbenchTests {
         model.shutdownAll()
     }
 
+    @Test("融合模式查询:按项目列出会话标签,当前会话标签跟随最近激活")
+    func chatTabsForFusion() throws {
+        let env = try makeEnvironment()
+        defer { try? FileManager.default.removeItem(at: env.root) }
+        let model = makeModel(env.store)
+        let alpha = try #require(model.openProject(env.dirs[0]))
+        let beta = try #require(model.openProject(env.dirs[1]))
+        #expect(model.chatTabs(in: alpha).count == 1)
+        #expect(model.chatTabs(in: beta).count == 1)
+        #expect(model.chatTabs(in: "/不存在").isEmpty)
+        #expect(model.activeChatTabID(in: alpha) == model.chatTabs(in: alpha).first?.id)
+        // 在 alpha 下再打开一个历史会话:alpha 有两个标签,当前会话标签是新开的那个,beta 不受影响
+        model.openHistory(project: alpha, sessionId: "s-1", title: "历史")
+        let tabs = model.chatTabs(in: alpha)
+        #expect(tabs.count == 2)
+        #expect(model.chatTabs(in: beta).count == 1)
+        #expect(model.activeChatTabID(in: alpha) == tabs.last?.id)
+        // 切回第一个标签后,当前会话跟着回到第一个
+        if let first = tabs.first { model.activateTab(first.id) }
+        #expect(model.activeChatTabID(in: alpha) == tabs.first?.id)
+        model.shutdownAll()
+    }
+
     @Test("侧栏菜单:重命名会话/项目、批量归档")
     func sidebarMenuActions() throws {
         let env = try makeEnvironment()

@@ -9,6 +9,8 @@ import Foundation
 public enum ClientPrefs {
     public enum Key {
         public static let restoreWindows = "general.restoreWindows"
+        /// 融合模式:Agent 窗口与 IDE 窗口原地互切(同一外框),共用同一份会话与项目(默认关闭)
+        public static let fusionMode = "general.fusionMode"
         public static let showDock = "general.showDock"
         public static let showMenuBar = "general.showMenuBar"
         public static let notifyFinished = "notify.finished"
