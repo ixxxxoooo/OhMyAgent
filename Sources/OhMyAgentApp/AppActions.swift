@@ -68,6 +68,12 @@ final class AppActions {
             return
         }
         if let page { SettingsRouter.shared.go(page) }
+        // 融合模式下从 IDE 窗口打开:设置页内嵌在该 IDE 窗口里,不切窗口
+        if FusionMode.shared.isEnabled, let ide = WindowContext.shared.ideModel {
+            ide.settingsShown = true
+            IDEWindowManager.shared.controller(for: ide)?.window?.makeKeyAndOrderFront(nil)
+            return
+        }
         AppEnvironment.shared.workbench.openSettings()
         showMainWindow()
     }
@@ -120,11 +126,18 @@ final class AppActions {
     /// - Parameter text: 要插入的文本(如 `/review ` 或 `@agent-explorer `)
     func insertIntoComposer(_ text: String) {
         let workbench = AppEnvironment.shared.workbench
-        workbench.closeSettings()
+        // 设置页内嵌在 IDE 窗口时:关闭它并显示 Agent 面板,草稿写入后留在原窗口
+        let embedded = WindowContext.shared.ideModel.flatMap { $0.settingsShown ? $0 : nil }
+        if let embedded {
+            embedded.settingsShown = false
+            embedded.agentPaneVisible = true
+        } else {
+            workbench.closeSettings()
+        }
         guard let id = workbench.selectedProjectID, let model = workbench.sessions[id] else { return }
         let separator = model.draft.isEmpty || model.draft.hasSuffix(" ") || model.draft.hasSuffix("\n") ? "" : " "
         model.draft += separator + text
-        showMainWindow()
+        if embedded == nil { showMainWindow() }
     }
 
     /// 把所有文件标签的「未保存」标记与文档状态对齐(保存/重新载入后调用)。

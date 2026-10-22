@@ -153,6 +153,10 @@ enum SettingsContext {
 /// 设置整页(并入主窗口):左侧分组导航 + 搜索,右侧内容居中;「返回」回到工作台。
 struct SettingsView: View {
     let workbench: WorkbenchModel
+    /// 顶部为红绿灯预留的高度(嵌在 IDE 窗口里时自带标题栏,传 0)
+    var topInset: CGFloat = TitlebarMetrics.height
+    /// 返回动作:默认回到工作台;IDE 窗口内嵌时只关闭本窗口的设置页
+    var onClose: (() -> Void)?
     private let router = SettingsRouter.shared
     @State private var model = ClaudeSettingsModel(paths: ClaudePaths(workspace: SettingsContext.workspace))
     @State private var center = ConfigCenter(paths: ClaudePaths(workspace: SettingsContext.workspace))
@@ -169,12 +173,12 @@ struct SettingsView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            SettingsSidebar(workbench: workbench)
+            SettingsSidebar(workbench: workbench, topInset: topInset, onClose: close)
                 .frame(width: CGFloat(PanelMetrics.clamp(workbench.layout.leftWidth, side: .left)))
             Divider()
             VStack(spacing: 0) {
                 // 顶部标题栏高度的可拖动区域:内容不会顶到红绿灯所在行
-                Color.clear.frame(height: TitlebarMetrics.height).background(WindowDragArea())
+                if topInset > 0 { Color.clear.frame(height: topInset).background(WindowDragArea()) }
                 if let error = model.lastError {
                     Label(error, om: "xmark.octagon.fill")
                         .font(OMFonts.small).foregroundStyle(OMColors.danger)
@@ -205,7 +209,7 @@ struct SettingsView: View {
         .ignoresSafeArea(.container, edges: .top)
         .navigationTitle(shownPage.title)
         .tint(appearance.tint)
-        .onExitCommand { workbench.closeSettings() }
+        .onExitCommand { close() }
         .onAppear { keepAlive.visit(shownPage) }
         // 只在这个不可见子视图里读 router.page:选中变化时本视图 body 不重算。
         // 换页排在本轮渲染提交之后(侧栏高亮先上屏),新页面的构建与布局放到下一帧
@@ -226,6 +230,11 @@ struct SettingsView: View {
             }
         }
         .onDisappear { model.stop(); center.stop() }
+    }
+
+    /// 关闭设置页。
+    private func close() {
+        if let onClose { onClose() } else { workbench.closeSettings() }
     }
 
     /// 切换右侧显示的页面并记录保活;先让隐藏页里的输入框交出焦点,避免键入落到看不见的页面。

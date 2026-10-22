@@ -17,8 +17,13 @@ struct IDEShellView: View {
         VStack(spacing: 0) {
             IDETitleBar(model: model)
             Rectangle().fill(OMColors.hairline).frame(height: 1)
-            GeometryReader { geo in
-                workArea(size: geo.size)
+            if model.settingsShown {
+                // 设置页内嵌在本窗口:与 Agent 窗口共用同一套设置视图,不切窗口
+                SettingsView(workbench: AppEnvironment.shared.workbench, topInset: 0) { model.settingsShown = false }
+            } else {
+                GeometryReader { geo in
+                    workArea(size: geo.size)
+                }
             }
             Rectangle().fill(OMColors.hairline).frame(height: 1)
             IDEStatusBar(workspace: workspace)

@@ -13,17 +13,23 @@ import WorkbenchKit
 /// 设置页左侧导航:返回、搜索、分组页面列表。
 struct SettingsSidebar: View {
     let workbench: WorkbenchModel
+    /// 顶部为红绿灯预留的高度(嵌在 IDE 窗口里时自带标题栏,传 0)
+    var topInset: CGFloat = TitlebarMetrics.height
+    /// 点「返回」的动作
+    var onClose: () -> Void
     @Bindable private var router = SettingsRouter.shared
     @State private var query = ""
 
     var body: some View {
         VStack(spacing: 0) {
             // 第一行留给红绿灯(整行可拖动窗口);「返回」放在红绿灯下面一行,不与红绿灯并排
-            Color.clear
-                .frame(height: TitlebarMetrics.height)
-                .background(WindowDragArea())
+            if topInset > 0 {
+                Color.clear
+                    .frame(height: topInset)
+                    .background(WindowDragArea())
+            }
             HStack {
-                Button { workbench.closeSettings() } label: {
+                Button { onClose() } label: {
                     Label("返回", om: "arrow.left")
                         .font(OMFonts.body)
                         .frame(height: 26)
