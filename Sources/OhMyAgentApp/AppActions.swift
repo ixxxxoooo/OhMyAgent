@@ -230,8 +230,7 @@ final class AppActions {
         let directory = TerminalPrefs.load().startDirectoryPath(project: workbench.selectedProjectID)
         let id = UUID().uuidString
         TerminalStore.shared.register(id: id, directory: directory)
-        let index = workbench.terminalTabs.count + 1
-        let name = title ?? (String(localized: "终端") + (index > 1 ? " \(index)" : ""))
+        let name = title ?? ProjectTerminals.shared.nextTitle(for: workbench.selectedProjectID)
         // 先登记到项目共享表(IDE 窗口的终端页读同一份),再开标签
         ProjectTerminals.shared.add(id: id, title: name, project: workbench.selectedProjectID)
         workbench.openTerminal(id: id, title: name)

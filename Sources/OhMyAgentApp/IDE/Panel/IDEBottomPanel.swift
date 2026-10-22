@@ -156,7 +156,7 @@ private struct IDETerminalsView: View {
         let active = id == activeID
         return HStack(spacing: 6) {
             Image.om("square-terminal", size: 12)
-            Text(String(localized: "终端") + " \(index + 1)").font(OMFonts.small).lineLimit(1)
+            Text(workspace.terminalTitle(id)).font(OMFonts.small).lineLimit(1)
             Spacer(minLength: 0)
             Button { workspace.closeTerminal(id) } label: { Image.om("x", size: 12) }
                 .buttonStyle(.omIcon)

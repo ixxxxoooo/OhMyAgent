@@ -42,6 +42,11 @@ extension IDEWorkspace {
     /// 本项目的共享终端标识(与 Agent 窗口的终端标签是同一份,见 `ProjectTerminals`)。
     var terminalIDs: [String] { ProjectTerminals.shared.entries(for: root).map(\.id) }
 
+    /// 终端标题(取共享表里的标题,与 Agent 窗口的标签名一致)。
+    func terminalTitle(_ id: String) -> String {
+        ProjectTerminals.shared.entries(for: root).first { $0.id == id }?.title ?? String(localized: "终端")
+    }
+
     /// 当前显示的终端:窗口记录的活动终端不在列表里(如被另一个窗口关掉)时取最后一个。
     var activeTerminalID: String? {
         let ids = terminalIDs
@@ -70,7 +75,7 @@ extension IDEWorkspace {
     func newTerminal() {
         let id = UUID().uuidString
         TerminalStore.shared.register(id: id, directory: TerminalPrefs.load().startDirectoryPath(project: root))
-        ProjectTerminals.shared.add(id: id, title: Self.nextTerminalTitle(count: terminalIDs.count), project: root)
+        ProjectTerminals.shared.add(id: id, title: ProjectTerminals.shared.nextTitle(for: root), project: root)
         model.activeTerminalID = id
         model.showPanel(.terminal)
     }
@@ -82,12 +87,6 @@ extension IDEWorkspace {
         if model.activeTerminalID == id { model.activeTerminalID = remaining.last }
         ProjectTerminals.shared.remove(id: id)
         TerminalStore.shared.remove(id)
-    }
-
-    /// 新终端的标题。
-    /// - Parameter count: 项目里已有的终端数
-    static func nextTerminalTitle(count: Int) -> String {
-        String(localized: "终端") + (count > 0 ? " \(count + 1)" : "")
     }
 
     /// 窗口关闭时的终端处理:融合模式下终端属于项目、Agent 窗口还在用,保留;否则结束本项目的全部终端(防止 shell 残留)。

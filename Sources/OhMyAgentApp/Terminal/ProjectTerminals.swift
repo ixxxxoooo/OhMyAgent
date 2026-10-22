@@ -43,6 +43,18 @@ final class ProjectTerminals {
         return entries.filter { $0.project == key }
     }
 
+    /// 项目里下一个新终端的标题:「终端」「终端 2」…取最小的未被占用的编号(关掉中间的也不会重名)。
+    /// Agent 窗口与 IDE 窗口新建终端都用它,两边的名字因此一致。
+    /// - Parameter project: 项目路径
+    func nextTitle(for project: String?) -> String {
+        let base = String(localized: "终端")
+        let used = Set(entries(for: project).map(\.title))
+        if !used.contains(base) { return base }
+        var number = 2
+        while used.contains("\(base) \(number)") { number += 1 }
+        return "\(base) \(number)"
+    }
+
     /// 登记一个终端(同 id 已存在则忽略)。
     /// - Parameters:
     ///   - id: 终端标识,不能为空
