@@ -121,13 +121,13 @@ struct IDELeakTests {
         let workspace = IDEWorkspace(model: model)
         workspace.newTerminal()
         workspace.newTerminal()
-        let ids = model.terminalIDs
+        let ids = workspace.terminalIDs
         #expect(ids.count == 2)
         // 真正创建控制器(会启动 shell),模拟面板显示过
         for id in ids { _ = TerminalStore.shared.controller(for: id, fallbackDirectory: root) }
         #expect(ids.allSatisfy { TerminalStore.shared.controllers[$0] != nil })
         workspace.closeAllTerminals()
-        #expect(model.terminalIDs.isEmpty)
+        #expect(workspace.terminalIDs.isEmpty)
         #expect(ids.allSatisfy { TerminalStore.shared.controllers[$0] == nil }, "终端控制器仍留在仓库里")
     }
 

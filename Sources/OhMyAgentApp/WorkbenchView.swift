@@ -57,10 +57,15 @@ struct WorkbenchView: View {
             actions.capture(openWindow: openWindow)
             MouseNavigationMonitor.install(workbench: workbench)
         }
-        .onChange(of: workbench.allDockTabs.compactMap(\.terminalID)) { _, ids in
-            // 终端标签被关闭 → 结束其 shell 进程
-            TerminalStore.shared.prune(keeping: Set(ids))
+        .onChange(of: workbench.allDockTabs.compactMap(\.terminalID)) { old, ids in
+            // 终端标签被关闭 → 从项目共享表移除(IDE 窗口的终端页同步消失),并结束其 shell 进程;
+            // 仍登记在共享表里的终端(IDE 窗口新建的)不算「无人引用」
+            for id in Set(old).subtracting(ids) { ProjectTerminals.shared.remove(id: id) }
+            TerminalStore.shared.prune(keeping: Set(ids).union(ProjectTerminals.shared.ids))
         }
+        // 共享终端表变化(IDE 窗口新建/关闭终端)→ 右栏终端标签同步增减
+        .onChange(of: ProjectTerminals.shared.entries) { old, new in syncTerminalTabs(old: old, new: new) }
+        .onAppear { syncTerminalTabs(old: [], new: ProjectTerminals.shared.entries) }
         .onChange(of: workbench.selectedProject?.id, initial: true) { _, id in WorkspaceWatchCenter.shared.watch(root: id, extras: workbench.selectedProject?.extraFolders ?? []) }
         .onChange(of: workbench.selectedProject?.extraFolders ?? []) { _, extras in WorkspaceWatchCenter.shared.watch(root: workbench.selectedProject?.id, extras: extras) }
         .onChange(of: workbench.activeSession?.uid) { _, _ in updateFocus() }
@@ -101,6 +106,18 @@ struct WorkbenchView: View {
         .navigationTitle(title)
         .onAppear { workbench.recordNavigation() }
         .onChange(of: navigationSignature) { _, _ in workbench.recordNavigation() }
+    }
+
+    /// 把共享终端表的增减同步到右栏终端标签:新增的补开标签,被移除的关闭标签(其余标签不动)。
+    private func syncTerminalTabs(old: [ProjectTerminals.Entry], new: [ProjectTerminals.Entry]) {
+        let oldIDs = Set(old.map(\.id))
+        let newIDs = Set(new.map(\.id))
+        for entry in new where !oldIDs.contains(entry.id) && workbench.existingTab(for: .terminal(id: entry.id)) == nil {
+            workbench.openTerminal(id: entry.id, title: entry.title)
+        }
+        for id in oldIDs.subtracting(newIDs) {
+            if let found = workbench.existingTab(for: .terminal(id: id)) { workbench.closeTab(found.tab.id) }
+        }
     }
 
     /// 面板显隐动画。

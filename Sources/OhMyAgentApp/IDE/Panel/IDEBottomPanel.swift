@@ -33,7 +33,7 @@ struct IDEBottomPanel: View {
             if model.panelTab == .terminal {
                 iconButton("plus", String(localized: "新建终端")) { workspace.newTerminal() }
                 iconButton("trash", String(localized: "结束当前终端")) {
-                    if let id = model.activeTerminalID { workspace.closeTerminal(id) }
+                    if let id = workspace.activeTerminalID { workspace.closeTerminal(id) }
                 }
             }
             iconButton(model.panelMaximized ? "minimize-2" : "maximize-2", model.panelMaximized ? String(localized: "还原面板大小") : String(localized: "最大化面板")) {
@@ -87,28 +87,32 @@ struct IDEBottomPanel: View {
 private struct IDETerminalsView: View {
     let workspace: IDEWorkspace
     private var model: IDEWindowModel { workspace.model }
+    /// 本项目的共享终端(与 Agent 窗口同一份)
+    private var terminalIDs: [String] { workspace.terminalIDs }
+    /// 当前显示的终端:窗口记录的活动终端不在列表里(如被另一个窗口关掉)时取最后一个
+    private var activeID: String? { workspace.activeTerminalID }
 
     var body: some View {
         HStack(spacing: 0) {
             ZStack {
-                ForEach(model.terminalIDs, id: \.self) { id in
-                    let active = id == model.activeTerminalID
+                ForEach(terminalIDs, id: \.self) { id in
+                    let active = id == activeID
                     TerminalTabView(id: id, fallbackDirectory: workspace.root ?? NSHomeDirectory(), focusOnAppear: active)
                         .opacity(active ? 1 : 0)
                         .allowsHitTesting(active)
                         .accessibilityHidden(!active)
                 }
-                if model.terminalIDs.isEmpty {
+                if terminalIDs.isEmpty {
                     OMEmptyState { Label("还没有终端", om: "square-terminal") } description: { Text("新建一个终端来运行命令") } actions: {
                         Button("新建终端") { workspace.newTerminal() }
                     }
                 }
             }
-            if model.terminalIDs.count > 1 {
+            if terminalIDs.count > 1 {
                 Rectangle().fill(OMColors.hairline).frame(width: 1)
                 ScrollView {
                     VStack(spacing: 0) {
-                        ForEach(Array(model.terminalIDs.enumerated()), id: \.element) { index, id in
+                        ForEach(Array(terminalIDs.enumerated()), id: \.element) { index, id in
                             row(id: id, index: index)
                         }
                     }
@@ -116,11 +120,11 @@ private struct IDETerminalsView: View {
                 .frame(width: 140)
             }
         }
-        .task { if model.terminalIDs.isEmpty { workspace.newTerminal() } }
+        .task { if terminalIDs.isEmpty { workspace.newTerminal() } }
     }
 
     private func row(id: String, index: Int) -> some View {
-        let active = id == model.activeTerminalID
+        let active = id == activeID
         return HStack(spacing: 6) {
             Image.om("square-terminal", size: 12)
             Text(String(localized: "终端") + " \(index + 1)").font(OMFonts.small).lineLimit(1)
