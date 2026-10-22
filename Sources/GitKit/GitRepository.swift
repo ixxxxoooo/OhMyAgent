@@ -5,6 +5,7 @@
 import DiffKit
 import Foundation
 import OMLog
+import Synchronization
 
 public struct GitRepository: Sendable {
     /// 仓库根目录(工作区顶层)
@@ -66,7 +67,12 @@ public struct GitRepository: Sendable {
 
     @discardableResult
     func git(_ arguments: [String], input: Data? = nil, timeout: TimeInterval = 60, lockFree: Bool = true) async throws -> GitOutput {
-        let output = try await GitProcess.run(arguments, in: root, input: input, timeout: timeout, lockFree: lockFree)
+        // 只读命令(无输入、不写锁)合并并发的相同调用;所有命令经仓库级闸门限制并发
+        let directory = root
+        let dedupeKey = (input == nil && lockFree) ? root.path + "\u{1}" + arguments.joined(separator: "\u{0}") : nil
+        let output = try await GitGate.shared.run(root: root.path, dedupeKey: dedupeKey) {
+            try await GitProcess.run(arguments, in: directory, input: input, timeout: timeout, lockFree: lockFree)
+        }
         guard output.status == 0 else {
             let message = output.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
             Log.git.warning("git 命令失败", ["cmd": arguments.first ?? "", "status": "\(output.status)", "message": String(message.prefix(300))])
@@ -101,8 +107,32 @@ public struct GitRepository: Sendable {
 
     /// 读取仓库状态(含分支、领先/落后、各文件变化)。
     public func status() async throws -> GitStatus {
-        let output = try await git(["status", "--porcelain=v2", "--branch", "-z", "--untracked-files=all"])
+        let arguments = ["status", "--porcelain=v2", "--branch", "-z", "--untracked-files=all"]
+        // 默认不写可选锁(不干扰用户并行的 git 操作);但长期不刷新索引会让大仓库每次 status 都重新比对文件内容,
+        // 所以每个仓库每隔一段时间放行一次带锁的 status,顺便启用未跟踪缓存,后续刷新就快了
+        if Self.claimIndexRefresh(root: root.path) {
+            let output = try await git(["-c", "core.untrackedCache=true"] + arguments, lockFree: false)
+            return GitParsers.parseStatus(output.stdout)
+        }
+        let output = try await git(arguments)
         return GitParsers.parseStatus(output.stdout)
+    }
+
+    /// 各仓库上次放行「刷新索引」status 的时刻。
+    private static let indexRefreshes = Mutex<[String: ContinuousClock.Instant]>([:])
+    /// 带锁刷新索引的最小间隔
+    static let indexRefreshInterval: Duration = .seconds(90)
+
+    /// 是否该放行一次带锁(刷新索引)的 status;放行即记录时刻。
+    /// - Parameters:
+    ///   - root: 仓库根路径
+    ///   - now: 当前时刻(测试可注入)
+    static func claimIndexRefresh(root: String, now: ContinuousClock.Instant = .now) -> Bool {
+        indexRefreshes.withLock { table in
+            if let last = table[root], now - last < indexRefreshInterval { return false }
+            table[root] = now
+            return true
+        }
     }
 
     /// 未提交改动的行数统计(已跟踪文件相对 HEAD + 未跟踪文本文件的全部行)。

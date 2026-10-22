@@ -133,12 +133,119 @@ enum GitProcess {
         return output
     }
 
-    /// 在全局队列上读尽管道(阻塞读取不占用协作线程池)。
+    /// 读尽管道:用 `readabilityHandler` 事件驱动,不占用任何线程阻塞等待
+    /// (原先每个 git 进程占两个全局队列线程做阻塞读取,并发多个 git 时会耗尽线程)。
     private static func readAll(_ pipe: Pipe) async -> Data {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global().async {
-                continuation.resume(returning: (try? pipe.fileHandleForReading.readToEnd()) ?? Data())
+        let handle = pipe.fileHandleForReading
+        let box = PipeBuffer()
+        return await withCheckedContinuation { continuation in
+            handle.readabilityHandler = { readable in
+                let chunk = readable.availableData
+                if chunk.isEmpty {
+                    // EOF:摘掉处理器并交付(只会走到一次)
+                    readable.readabilityHandler = nil
+                    continuation.resume(returning: box.take())
+                } else {
+                    box.append(chunk)
+                }
             }
+        }
+    }
+}
+
+/// 管道读取缓冲(处理器在私有队列上串行调用,锁只为满足 Sendable)。
+private final class PipeBuffer: Sendable {
+    private let data = Mutex(Data())
+
+    func append(_ chunk: Data) { data.withLock { $0.append(chunk) } }
+
+    func take() -> Data { data.withLock { current in
+        defer { current = Data() }
+        return current
+    } }
+}
+
+/// 仓库级 git 调度:同一仓库同时最多 `limit` 个 git 进程(超出的排队,可取消);
+/// 相同的只读命令并发时合并为一次执行(多个面板同时刷新同一份 status/log 时只跑一个进程)。
+actor GitGate {
+    static let shared = GitGate()
+
+    /// 单仓库并发上限
+    let limit: Int
+    private struct Waiter {
+        let id: UUID
+        let continuation: CheckedContinuation<Void, Error>
+    }
+    private var running: [String: Int] = [:]
+    private var waiters: [String: [Waiter]] = [:]
+    private var inflight: [String: Task<GitOutput, Error>] = [:]
+    private var epochs: [String: Int] = [:]
+    /// 合并执行的累计次数(诊断/测试用)
+    private(set) var mergedCount = 0
+
+    init(limit: Int = 2) { self.limit = max(limit, 1) }
+
+    /// 当前仓库正在运行的进程数(测试用)。
+    func runningCount(root: String) -> Int { running[root] ?? 0 }
+
+    /// 在闸门内执行。
+    /// - Parameters:
+    ///   - root: 仓库根路径(闸门按它分组)
+    ///   - dedupeKey: 非 nil 时,同键的并发调用共享同一次执行(只用于只读命令)
+    ///   - work: 实际执行
+    func run(root: String, dedupeKey: String?, _ work: @escaping @Sendable () async throws -> GitOutput) async throws -> GitOutput {
+        guard let dedupeKey else {
+            // 写命令:前后各推进一次仓库「纪元」,在它之前开始的只读执行不会再被后来的读取合并(避免读到写之前的旧状态)
+            epochs[root, default: 0] += 1
+            defer { epochs[root, default: 0] += 1 }
+            return try await gated(root: root, work)
+        }
+        let key = dedupeKey + "\u{2}\(epochs[root] ?? 0)"
+        if let existing = inflight[key] {
+            mergedCount += 1
+            return try await existing.value
+        }
+        let task = Task<GitOutput, Error> { [self] in try await gated(root: root, work) }
+        inflight[key] = task
+        defer { inflight[key] = nil }
+        return try await task.value
+    }
+
+    private func gated(root: String, _ work: @Sendable () async throws -> GitOutput) async throws -> GitOutput {
+        try await acquire(root: root)
+        defer { release(root: root) }
+        return try await work()
+    }
+
+    private func acquire(root: String) async throws {
+        if (running[root] ?? 0) < limit {
+            running[root, default: 0] += 1
+            return
+        }
+        let id = UUID()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                waiters[root, default: []].append(Waiter(id: id, continuation: continuation))
+            }
+        } onCancel: {
+            Task { await self.cancelWaiter(root: root, id: id) }
+        }
+    }
+
+    private func cancelWaiter(root: String, id: UUID) {
+        guard let index = waiters[root]?.firstIndex(where: { $0.id == id }), let waiter = waiters[root]?.remove(at: index) else { return }
+        waiter.continuation.resume(throwing: CancellationError())
+    }
+
+    private func release(root: String) {
+        if var queue = waiters[root], !queue.isEmpty {
+            // 名额直接移交给队首,运行数不变
+            let next = queue.removeFirst()
+            waiters[root] = queue.isEmpty ? nil : queue
+            next.continuation.resume()
+        } else {
+            let remaining = (running[root] ?? 1) - 1
+            running[root] = remaining > 0 ? remaining : nil
         }
     }
 }

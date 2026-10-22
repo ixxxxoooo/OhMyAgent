@@ -80,15 +80,10 @@ private struct SCMContent: View {
             if let error = model.lastError { errorBanner(error) }
         }
         .task {
-            // 面板可见期间轮询(状态不变时逐步退避,大仓库按单次耗时放慢);操作完成后另有即时刷新
-            var delay = 3.0
-            while !Task.isCancelled {
-                let before = model.status
-                let started = ContinuousClock.now
+            // 面板可见期间由文件系统事件驱动刷新(有兜底定时);操作完成后另有即时刷新
+            await model.refresh(full: model.branches.isEmpty)
+            await WorkspaceWatchCenter.shared.followProject(model.projectPath, poll: .seconds(5)) {
                 await model.refresh(full: model.branches.isEmpty)
-                let took = (ContinuousClock.now - started).seconds
-                delay = PollBackoff.next(previous: delay, changed: model.status != before, duration: took)
-                try? await Task.sleep(for: .seconds(delay))
             }
         }
     }

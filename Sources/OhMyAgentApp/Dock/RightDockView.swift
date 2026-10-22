@@ -24,20 +24,15 @@ struct RightDockView: View {
             .background(OMColors.surface)
     }
 
-    /// 轻量轮询 Git 状态(应用在前台才刷新,状态不变时退避):保证资源管理器的 Git 装饰及时出现。
+    /// 保持 Git 状态新鲜:先取一次,之后由文件系统事件驱动刷新(未被监听覆盖时才低频轮询),
+    /// 保证资源管理器的 Git 装饰及时出现,且空闲时零开销。
     private func pollGitBadge() async {
-        guard let model = gitModel else { return }
-        var delay = 6.0
-        while !Task.isCancelled {
-            // 应用在后台时跳过轮询;但首次(仓库还没发现)总要取一次,否则 Git 装饰迟迟不出现
-            if NSApp.isActive || model.phase == .unknown {
-                let before = model.status
-                let started = ContinuousClock.now
-                await model.refresh(full: false)
-                let took = (ContinuousClock.now - started).seconds
-                delay = PollBackoff.next(previous: delay, changed: model.status != before, duration: took, base: 6, maximum: 60)
-            }
-            try? await Task.sleep(for: .seconds(delay))
+        guard let model = gitModel, let project = workbench.selectedProjectID else { return }
+        await model.refresh(full: false)
+        await WorkspaceWatchCenter.shared.followProject(project, poll: .seconds(15)) {
+            // 应用在后台时跳过(切回前台后的下一次事件或兜底刷新会补上);仓库尚未发现时总要取一次
+            guard NSApp.isActive || model.phase == .unknown else { return }
+            await model.refresh(full: false)
         }
     }
 }

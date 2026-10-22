@@ -229,6 +229,52 @@ final class WorkspaceWatchCenter {
         }
     }
 
+    /// 跟随某个项目目录的变化直到任务取消(源代码管理等用):文件系统事件驱动(防抖 + 最小间隔合并突发写入),
+    /// 另有低频兜底刷新;项目未被监听覆盖时退回按 `poll` 间隔轮询。取代原先固定间隔的 `git status` 轮询。
+    /// - Parameters:
+    ///   - projectRoot: 项目根目录
+    ///   - poll: 未被监听覆盖时的轮询间隔
+    ///   - safety: 被覆盖时的兜底刷新间隔(防止事件丢失)
+    ///   - debounce: 收到事件后再等多久(合并连续写入)
+    ///   - minInterval: 两次刷新之间的最小间隔
+    ///   - onChange: 可能有变化时的回调
+    func followProject(_ projectRoot: String, poll: Duration, safety: Duration = .seconds(90), debounce: Duration = .milliseconds(300),
+                       minInterval: Duration = .seconds(1), _ onChange: () async -> Void) async {
+        while !Task.isCancelled {
+            guard coversRoot(projectRoot) else {
+                try? await Task.sleep(for: poll)
+                guard !Task.isCancelled else { return }
+                await onChange()
+                continue
+            }
+            // 事件与兜底定时合并成一条信号流
+            let (signals, continuation) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+            let events = Task { for await _ in changes() { continuation.yield() }; continuation.finish() }
+            let timer = Task {
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: safety)
+                    continuation.yield()
+                }
+            }
+            for await _ in signals {
+                if debounce > .zero { try? await Task.sleep(for: debounce) }
+                guard !Task.isCancelled else { break }
+                await onChange()
+                if minInterval > .zero { try? await Task.sleep(for: minInterval) }
+            }
+            events.cancel()
+            timer.cancel()
+            guard !Task.isCancelled else { return }
+            // 监听范围切换导致事件流结束:补查一次再重新判断
+            await onChange()
+        }
+    }
+
+    /// 项目根目录本身是否被监听覆盖(主目录或附加文件夹)。
+    func coversRoot(_ projectRoot: String) -> Bool {
+        projectRoot == root || extraRoots.contains(projectRoot)
+    }
+
     /// 该路径的变化是否由监听覆盖(在被监听的目录内,且不属于 `.git`/构建产物等噪声);未覆盖的调用方需自行低频轮询。
     func covers(_ path: String) -> Bool {
         ((root.map { [$0] } ?? []) + extraRoots).contains { folder in
