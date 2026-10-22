@@ -476,7 +476,7 @@ struct NoticeView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
-/// 输入区上方的待办折叠卡:默认收起为一行「已完成 x / n」,点击展开完整计划。
+/// 输入区上方的待办折叠卡:默认收起为一行「已完成 x / n」,点击向上展开完整计划(标题行在下,位置不动)。
 struct PlanDock: View {
     let model: SessionModel
     @State private var expanded = false
@@ -484,12 +484,17 @@ struct PlanDock: View {
     var body: some View {
         if let entry = model.timeline.entries.last(where: { $0.kind == .plan }), !entry.plan.isEmpty {
             let done = entry.plan.filter { $0.status == "completed" }.count
+            // 标题行在下、清单在上:输入区贴底固定,展开时清单向上长出,标题行位置不变,
+            // 点一下展开、再点一下收起都不用移动鼠标
             VStack(spacing: 0) {
+                if expanded {
+                    PlanView(entry: entry).padding([.horizontal, .top], 4)
+                }
                 Button {
                     omWithAnimation { expanded.toggle() }
                 } label: {
                     HStack(spacing: 6) {
-                        Image.om(expanded ? "chevron.down" : "chevron.right", size: 10)
+                        Image.om(expanded ? "chevron-down" : "chevron-up", size: 10)
                         Image.om("list-checks", size: 12)
                         Text("待办 \(done)/\(entry.plan.count)").font(OMFonts.small.weight(.medium))
                         Spacer()
@@ -501,9 +506,6 @@ struct PlanDock: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(expanded ? String(localized: "收起待办") : String(localized: "展开待办"))
-                if expanded {
-                    PlanView(entry: entry).padding([.horizontal, .bottom], 4)
-                }
             }
             .omGlassCard(cornerRadius: OMRadius.floating)
             .omCollapseOnOutsideClick(isActive: expanded) { omWithAnimation { expanded = false } }
