@@ -56,7 +56,7 @@ struct IDEAgentPane: View {
                            workspace.model.agentPaneMaximized ? String(localized: "还原 Agent 面板") : String(localized: "最大化 Agent 面板")) {
                     workspace.model.toggleAgentMaximized()
                 }
-                iconButton("panel-right-close", String(localized: "关闭")) { workspace.model.toggleAgentPane() }
+                iconButton("panel-right", String(localized: "关闭")) { workspace.model.toggleAgentPane() }
             }
             .padding(.horizontal, 8)
         }
