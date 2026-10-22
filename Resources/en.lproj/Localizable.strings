@@ -2883,3 +2883,11 @@
 "没有可用的快速修复" = "No quick fixes available";
 "时间线" = "Timeline";
 "没有提交历史" = "No commit history";
+"未提交的更改" = "Uncommitted changes";
+"Agent 更改 %lld/%lld" = "Agent change %lld/%lld";
+"上一处更改" = "Previous change";
+"下一处更改" = "Next change";
+"还原此块" = "Revert this hunk";
+"保留此块" = "Keep this hunk";
+"全部还原" = "Revert all";
+"全部保留" = "Keep all";

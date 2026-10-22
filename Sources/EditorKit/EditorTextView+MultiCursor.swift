@@ -3,6 +3,7 @@
 // NSTextView 原生在多选区下键入一次后会塌缩成单光标,这里自己把每个选区的编辑合成一次替换。
 
 import AppKit
+import DesignSystem
 
 extension EditorTextView {
     /// 选区总数(主选区若干 + 额外空光标)。
@@ -114,6 +115,28 @@ extension EditorTextView {
         // 移动后可能重合,去重
         var seen = Set<Int>()
         setAllSelections(moved.filter { seen.insert($0.location).inserted })
+    }
+
+    /// 在光标所在行的行尾绘制内联提示(只在单光标、无选区、有焦点时)。
+    func drawInlineNote(in dirtyRect: NSRect) {
+        guard let inlineNote, selectionCount == 1, selectedRange().length == 0, let window, window.firstResponder === self else { return }
+        let caret = selectedRange().location
+        guard let note = inlineNote(caret), !note.isEmpty else { return }
+        let ns = string as NSString
+        var lineStart = 0, lineEnd = 0, contentsEnd = 0
+        ns.getLineStart(&lineStart, end: &lineEnd, contentsEnd: &contentsEnd, for: NSRange(location: min(caret, ns.length), length: 0))
+        var actual = NSRange(location: 0, length: 0)
+        let screen = firstRect(forCharacterRange: NSRange(location: contentsEnd, length: 0), actualRange: &actual)
+        guard screen != .zero else { return }
+        let rect = convert(window.convertFromScreen(screen), from: nil)
+        let size = max((font?.pointSize ?? 12) - 1, 9)
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: size), .foregroundColor: NSColor(OMColors.tertiaryText),
+        ]
+        let text = NSAttributedString(string: note, attributes: attributes)
+        let textSize = text.size()
+        let origin = NSPoint(x: rect.minX + 24, y: rect.minY + (rect.height - textSize.height) / 2)
+        if NSRect(origin: origin, size: textSize).intersects(dirtyRect) { text.draw(at: origin) }
     }
 
     /// 绘制额外的空光标(细竖线,随主题的插入点颜色)。

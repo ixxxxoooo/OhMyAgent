@@ -74,6 +74,17 @@ public final class CodeEditorView: NSView {
     /// 用户编辑后回调(传出完整文本)。程序化 `setText` 不触发。
     public var onTextChange: ((String) -> Void)?
 
+    /// 当前行末的内联提示(Git blame 等):入参为光标所在行(0 起始),返回文字;nil 不显示。
+    public var inlineNote: ((_ line: Int) -> String?)? {
+        didSet {
+            guard let inlineNote else { textView.inlineNote = nil; return }
+            textView.inlineNote = { [weak self] offset in
+                guard let self else { return nil }
+                return inlineNote(self.lineIndex.line(containing: offset))
+            }
+        }
+    }
+
     /// 语言智能回调(LSP 等);变更后立即接入文本视图。
     public var features = EditorLanguageFeatures() {
         didSet { wireFeatures() }

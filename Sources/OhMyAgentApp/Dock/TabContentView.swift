@@ -6,6 +6,7 @@ import ChatKit
 import DesignSystem
 import DiffKit
 import EditorKit
+import GitKit
 import IconKit
 import OMLog
 import SwiftUI
@@ -101,7 +102,7 @@ struct FileTabView: View {
     /// 标签是否可见(保活的后台标签不做轮询)
     @Environment(\.tabIsActive) private var isActive
     /// IDE 窗口里的宿主(非 nil 时脏标记、跳转与项目根改走 IDE 窗口;Agent 窗口里为 nil)
-    @Environment(\.ideFileHost) private var ideHost
+    @Environment(\.ideFileHost) var ideHost
     @AppStorage(ClientPrefs.Key.editorLSP) private var lspEnabled = true
     @State private var lsp: EditorLSPController?
     /// 最近一次 Agent 改动在新文件中新增的行(仅当文本仍等于 Agent 写入的内容时显示)
@@ -109,6 +110,11 @@ struct FileTabView: View {
     /// 相对 HEAD 的改动标记(仅 IDE 窗口;按未保存的缓冲区内容计算)
     @State private var gitMarks: [Int: LineMarker] = [:]
     @State private var gutterTask: Task<Void, Never>?
+    /// 逐行 blame(仅 IDE 窗口;行末内联显示当前行的作者与时间)
+    @State var blameLines: [GitBlameLine] = []
+    /// Agent 改动块的审阅状态:已「保留」的块标识与当前所在块序号
+    @State var acceptedHunks: Set<Int> = []
+    @State var reviewIndex = 0
     /// 是否在编辑区叠加显示「对比 HEAD」的 Git 差异(编辑器保持挂载,切回不丢状态)
     @State private var comparing = false
 
@@ -162,6 +168,7 @@ struct FileTabView: View {
                 filesControls: filesControls
             )
             banner(doc)
+            agentReviewBar(doc)
             Group {
                 if let text = doc.text {
                     CodeEditor(text: text, language: SyntaxLanguage.detect(path: path), isEditable: !doc.isReadOnly, revealLine: tab.line, markers: markers,
@@ -169,6 +176,7 @@ struct FileTabView: View {
                                onReferenceSelection: { range in referenceSelection(range, text: doc.text ?? text) },
                                chrome: ideHost == nil ? [] : [.minimap, .stickyScroll, .folding],
                                onCaretChange: ideHost.map { host in { host.caret(path, $0) } },
+                               inlineNote: ideHost != nil && !doc.isDirty && !blameLines.isEmpty ? { blameNote($0) } : nil,
                                onChange: { newText in doc.text = newText })
                         .environment(\.tabIsActive, isActive && mode.showsEditor)
                         .opacity(mode.showsEditor ? 1 : 0)
@@ -217,6 +225,8 @@ struct FileTabView: View {
             refreshGutter(doc.text, delay: .milliseconds(200))
         }
         .onAppear { refreshGutter(doc.text, delay: .zero) }
+        .task(id: blameKey(doc)) { await loadBlame(doc) }
+        .onChange(of: acceptedHunks) { refreshAgentMarks() }
         .onChange(of: lsp?.diagnostics ?? []) { _, items in
             // IDE 窗口:把诊断汇总到「问题」面板
             ideHost?.report(path, items, doc.text ?? "")
@@ -237,6 +247,12 @@ struct FileTabView: View {
             // 工作区内由文件系统事件驱动;工作区之外(含切换项目后的旧项目文件)低频轮询磁盘修改时间
             await WorkspaceWatchCenter.shared.follow(path, poll: .seconds(2)) { await store.checkExternalChange(path) }
         }
+    }
+
+    /// 内联 blame 的刷新键:文件 + 仓库 HEAD + 是否有未保存修改。
+    private func blameKey(_ doc: FileDocument) -> String {
+        let head = ideHost?.root.map { GitStore.shared.model(for: $0).status.headOID ?? "" } ?? ""
+        return "\(path)|\(head)|\(doc.isDirty)"
     }
 
     /// 重算相对 HEAD 的行号栏改动标记(IDE 窗口专用;防抖、后台计算、2MB 以上文件不计算)。
@@ -281,7 +297,7 @@ struct FileTabView: View {
             assign(nil)
             return
         }
-        let lines = found.change.diff.hunks.flatMap(\.lines).filter { $0.kind == .added }.compactMap(\.newNumber)
+        let lines = AgentHunkKey.pending(found.change.diff.hunks, accepted: acceptedHunks).flatMap(\.lines).filter { $0.kind == .added }.compactMap(\.newNumber)
         assign(lines.isEmpty ? nil : AgentMarks(text: found.change.current, lines: Set(lines)))
     }
 
@@ -352,7 +368,7 @@ struct FileTabView: View {
 
 /// 在所有会话的时间线中查找某文件最近一次改动。
 @MainActor
-private func latestChange(for path: String, in workbench: WorkbenchModel) -> (model: SessionModel, change: FileChange)? {
+func latestChange(for path: String, in workbench: WorkbenchModel) -> (model: SessionModel, change: FileChange)? {
     for model in workbench.allSessions {
         for entry in model.timeline.entries.reversed() where entry.kind == .changes {
             if let change = entry.changes.first(where: { $0.path == path }) { return (model, change) }

@@ -25,6 +25,8 @@ public struct CodeEditor: NSViewRepresentable {
     public var chrome: EditorChrome = []
     /// 光标/选区变化回调(状态栏的「行 列」用);nil 时不计算
     public var onCaretChange: ((EditorCaret) -> Void)?
+    /// 光标所在行末的内联提示(0 起始行号 → 文字),如 Git blame;nil 不显示
+    public var inlineNote: ((_ line: Int) -> String?)?
 
     /// 创建编辑器。
     /// - Parameters:
@@ -37,7 +39,8 @@ public struct CodeEditor: NSViewRepresentable {
     ///   - features: 语言智能回调
     ///   - onReferenceSelection: 引用选区回调
     ///   - onChange: 编辑回调
-    public init(text: String, language: SyntaxLanguage, isEditable: Bool = false, revealLine: Int? = nil, markers: [Int: LineMarker] = [:], diagnostics: [EditorDiagnostic] = [], features: EditorLanguageFeatures = EditorLanguageFeatures(), onReferenceSelection: ((NSRange) -> Void)? = nil, markdownMode: MarkdownEditorMode = .off, chrome: EditorChrome = [], onCaretChange: ((EditorCaret) -> Void)? = nil, onChange: ((String) -> Void)? = nil) {
+    public init(text: String, language: SyntaxLanguage, isEditable: Bool = false, revealLine: Int? = nil, markers: [Int: LineMarker] = [:], diagnostics: [EditorDiagnostic] = [], features: EditorLanguageFeatures = EditorLanguageFeatures(), onReferenceSelection: ((NSRange) -> Void)? = nil, markdownMode: MarkdownEditorMode = .off, chrome: EditorChrome = [], onCaretChange: ((EditorCaret) -> Void)? = nil, inlineNote: ((_ line: Int) -> String?)? = nil, onChange: ((String) -> Void)? = nil) {
+        self.inlineNote = inlineNote
         self.onCaretChange = onCaretChange
         self.chrome = chrome
         self.markdownMode = markdownMode
@@ -69,6 +72,7 @@ public struct CodeEditor: NSViewRepresentable {
         view.features = features
         view.onReferenceSelection = onReferenceSelection
         view.onCaretChange = onCaretChange
+        view.inlineNote = inlineNote
         view.chrome = chrome
         view.setDiagnostics(diagnostics)
         return view
@@ -96,6 +100,7 @@ public struct CodeEditor: NSViewRepresentable {
         view.features = features
         view.onReferenceSelection = onReferenceSelection
         view.onCaretChange = onCaretChange
+        view.inlineNote = inlineNote
         view.chrome = chrome
         view.setDiagnostics(diagnostics)
         view.lineMarkers = markers

@@ -93,6 +93,10 @@ public final class EditorTextView: NSTextView {
     var secondaryCarets: [Int] = [] {
         didSet { if oldValue != secondaryCarets { needsDisplay = true } }
     }
+    /// 当前行末的内联提示(如 Git blame):入参为光标偏移,返回要显示的文字;nil 不显示
+    var inlineNote: ((Int) -> String?)? {
+        didSet { needsDisplay = true }
+    }
     /// 正在应用多光标编辑(此时选区/文本变化不应清空额外光标)
     var isApplyingMultiEdit = false
 
@@ -367,6 +371,7 @@ public final class EditorTextView: NSTextView {
     public override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         drawSecondaryCarets(in: dirtyRect)
+        drawInlineNote(in: dirtyRect)
     }
 
     public override func deleteForward(_ sender: Any?) {
