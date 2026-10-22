@@ -1,5 +1,5 @@
 // @author ixxxxoooo
-// 模式切换按钮:Agent 窗口右上角的「编辑器 ↗」与 IDE 窗口右上角的「Agents Window ↗」共用,
+// 模式切换按钮:Agent 窗口右上角的「IDE ↗」与 IDE 窗口右上角的「Agents Window ↗」共用,
 // 宽度同为 `TitlebarMetrics.modeSwitchWidth`,标题栏右侧簇在两个窗口间不跳动。⌥ 点击(Agent → IDE)强制新开窗口。
 
 import AppKit
@@ -28,14 +28,14 @@ struct ModeSwitchButton: View {
             }
             .frame(maxWidth: .infinity)
         }
-        .buttonStyle(target == .agent ? OMButtonStyle.omPrimary : OMButtonStyle.omSecondary)
+        .buttonStyle(OMButtonStyle.omSecondary)
         .frame(width: TitlebarMetrics.modeSwitchWidth)
         .omTooltip(tooltip + " (\(shortcut))")
         .accessibilityLabel(tooltip)
     }
 
     private var title: String {
-        target == .ide ? String(localized: "编辑器") : String(localized: "Agents Window")
+        target == .ide ? "IDE" : String(localized: "Agents Window")
     }
 
     private var tooltip: String {
