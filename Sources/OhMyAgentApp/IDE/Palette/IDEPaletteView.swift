@@ -54,6 +54,12 @@ private struct IDEPaletteCard: View {
         .omGlassCard(cornerRadius: OMRadius.modal)
         .omFloatingShadow()
         .onAppear { focused = true }
+        // 打开面板时焦点可能还在终端/编辑器(AppKit 第一响应者):等视图就位后再抢一次,确保唤醒即可直接输入
+        .task(id: palette.focusToken) {
+            focused = true
+            try? await Task.sleep(for: .milliseconds(60))
+            focused = true
+        }
         .onKeyPress(.upArrow) { moveHighlight(-1, items) }
         .onKeyPress(.downArrow) { moveHighlight(1, items) }
         .onKeyPress(.escape) { palette.dismiss(); return .handled }

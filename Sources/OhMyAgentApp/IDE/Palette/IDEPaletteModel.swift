@@ -57,6 +57,8 @@ final class IDEPaletteModel {
     var text = "" { didSet { if text != oldValue { highlighted = 0 } } }
     /// 高亮行
     var highlighted = 0
+    /// 每次打开面板递增:视图据此重新把焦点交给输入框(焦点可能还在终端或编辑器上)
+    private(set) var focusToken = 0
     /// 工作区相对路径索引
     private(set) var files: [String] = []
     /// 命令注册表(含最近使用)
@@ -81,6 +83,7 @@ final class IDEPaletteModel {
         customPlaceholder = placeholder
         text = ""
         highlighted = 0
+        focusToken += 1
         isPresented = true
     }
 
@@ -92,6 +95,7 @@ final class IDEPaletteModel {
         customItems = nil
         text = prefix
         highlighted = 0
+        focusToken += 1
         isPresented = true
         refreshIndex(root: root)
     }

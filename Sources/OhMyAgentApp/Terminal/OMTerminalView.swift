@@ -49,6 +49,20 @@ final class OMTerminalView: TerminalView {
         super.setFrameSize(size)
     }
 
+    /// SwiftTerm 内置的竖向滚动条(私有属性,这里按类型找子视图)。
+    private weak var terminalScroller: NSScroller?
+
+    /// SwiftTerm 的滚动条固定为常驻(legacy)样式,没有滚动内容时也画一条空轨道。
+    /// 没有可滚内容(滚动条被禁用)时隐藏它,有回滚内容时才出现。
+    override func viewWillDraw() {
+        super.viewWillDraw()
+        if terminalScroller == nil { terminalScroller = subviews.lazy.compactMap { $0 as? NSScroller }.first }
+        if let scroller = terminalScroller {
+            let alpha: CGFloat = scroller.isEnabled ? 1 : 0
+            if scroller.alphaValue != alpha { scroller.alphaValue = alpha }
+        }
+    }
+
     override func viewDidEndLiveResize() {
         super.viewDidEndLiveResize()
         flushPending()
