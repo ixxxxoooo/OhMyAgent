@@ -419,6 +419,9 @@ public actor HighlightEngine {
     /// 最近一次 tree-sitter 解析是否为增量(测试与诊断用)。
     public var lastParseWasIncremental: Bool { treeSitter?.lastWasIncremental ?? false }
 
+    /// 最近一次 tree-sitter 解析本身的耗时(毫秒,不含文本拷贝与差分;基准说明用)。
+    public var lastParseMs: Double { treeSitter?.lastParseMs ?? 0 }
+
     /// 语法树根节点是否含错误(测试用)。
     public var treeHasErrors: Bool { treeSitter?.hasErrors ?? false }
 

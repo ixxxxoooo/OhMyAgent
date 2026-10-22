@@ -4,15 +4,22 @@
 import AppKit
 import DesignSystem
 import OMLog
+import Synchronization
 
 /// 行标记(用于 Diff 与 Agent 跟随)。
 public enum LineMarker: Sendable {
     case added, removed, modified, agent
 }
 
+/// 存活的编辑器实例计数(全局原子量:`deinit` 非隔离,不能碰主 actor 静态属性)。
+private let editorLiveCounter = Atomic<Int>(0)
+
 /// 代码编辑器视图(滚动视图 + 文本视图 + 行号标尺)。
 @MainActor
 public final class CodeEditorView: NSView {
+    /// 当前存活的编辑器实例数(诊断与泄漏测试用:挂载/卸载标签后数量应回落到保活预算内)。
+    public static var liveCount: Int { editorLiveCounter.load(ordering: .relaxed) }
+
     /// 超过该行数进入大文件模式(仅高亮视口附近;不再因此强制换行)。
     public static var largeFileLineThreshold: Int {
         let value = UserDefaults.standard.object(forKey: "editor.largeFileLines") as? Int ?? 20_000
@@ -119,6 +126,7 @@ public final class CodeEditorView: NSView {
         self.textView = EditorTextView(usingTextLayoutManager: true)
         self.ruler = LineNumberRulerView(scrollView: scrollView, theme: theme)
         super.init(frame: .zero)
+        editorLiveCounter.add(1, ordering: .relaxed)
         configure(isEditable: isEditable)
     }
 
@@ -300,6 +308,7 @@ public final class CodeEditorView: NSView {
     }
 
     deinit {
+        editorLiveCounter.subtract(1, ordering: .relaxed)
         NotificationCenter.default.removeObserver(self)
     }
 
