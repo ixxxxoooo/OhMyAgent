@@ -111,6 +111,36 @@ struct SessionArchiveTests {
         #expect(FileManager.default.fileExists(atPath: archive.syncURL(key).path) == false)
     }
 
+    @Test("同步期间不写临时文件(内容攒在内存),结束时一次落盘")
+    func syncDefersWrites() async throws {
+        let (archive, root) = makeArchive()
+        defer { try? FileManager.default.removeItem(at: root) }
+        archive.beginSync(key, cwd: "/tmp/p")
+        for index in 0..<50 { archive.record(key, cwd: nil, update: chunk("tool_call", "t\(index)")) }
+        try await Task.sleep(for: .milliseconds(120))   // 远超 writeDelay(10ms):若在写盘,临时文件早已存在
+        #expect(FileManager.default.fileExists(atPath: archive.syncURL(key).path) == false)
+        #expect(await archive.endSync(key, success: true) == .created)
+        #expect(await archive.load(key)?.updates.count == 50)
+    }
+
+    @Test("按字节比较更新行:相同判为相同,头信息/元数据行不影响;旧格式与不同内容退回解析")
+    func sameUpdateLines() {
+        func file(_ updates: [JSONValue], created: String, synced: String) -> Data {
+            var data = SessionArchiveFormat.line(["t": "h", "schema": .int(SessionArchiveFormat.schema), "createdAt": .string(created)]) ?? Data()
+            for update in updates { data.append(SessionArchiveFormat.line(SessionArchiveFormat.update(update)) ?? Data()) }
+            data.append(SessionArchiveFormat.line(SessionArchiveFormat.meta(syncedAt: Date(timeIntervalSince1970: 0))) ?? Data())
+            _ = synced
+            return data
+        }
+        let a = [chunk("agent_message_chunk", "一", id: "m1"), chunk("agent_message_chunk", "二", id: "m2")]
+        #expect(SessionArchiveFormat.sameUpdateLines(file(a, created: "x", synced: "1"), file(a, created: "y", synced: "2")))
+        #expect(!SessionArchiveFormat.sameUpdateLines(file(a, created: "x", synced: "1"), file(Array(a.dropLast()), created: "x", synced: "1")))
+        // 没有任何更新行 / 含无法识别的行:不能判定相同
+        #expect(!SessionArchiveFormat.sameUpdateLines(Data(), Data()))
+        let legacy = Data("{\"u\":{\"sessionUpdate\":\"plan\"},\"t\":\"u\"}\n".utf8)
+        #expect(!SessionArchiveFormat.sameUpdateLines(legacy, legacy))
+    }
+
     @Test("同步期间引擎没有返回内容:不建档")
     func syncEmpty() async {
         let (archive, root) = makeArchive()

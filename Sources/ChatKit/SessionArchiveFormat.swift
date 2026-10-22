@@ -78,7 +78,8 @@ enum SessionArchiveFormat {
 
     private static let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
-        encoder.outputFormatting = [.withoutEscapingSlashes]
+        // 排序键:同一份内容总是编码成同样的字节,存档同步结束时才能直接按字节比较「是否有变化」
+        encoder.outputFormatting = [.withoutEscapingSlashes, .sortedKeys]
         return encoder
     }()
 
@@ -87,6 +88,38 @@ enum SessionArchiveFormat {
         guard var data = try? encoder.encode(value) else { return nil }
         data.append(0x0A)
         return data
+    }
+
+    /// 更新行的固定前缀(排序键编码下 `t` 排在 `u` 前)。
+    private static let updatePrefix = Data(#"{"t":"u","u":"#.utf8)
+
+    /// 两份存档的更新行是否逐字节相同(只比较更新行,忽略头信息与元数据行)。
+    /// 只有在两边都是排序键编码、能确定识别更新行时才可能返回 true;无法确定(旧格式、含无法识别的行)或不同都返回 false,
+    /// 调用方应退回完整解析比较。
+    /// - Parameters:
+    ///   - lhs: 存档数据
+    ///   - rhs: 存档数据
+    static func sameUpdateLines(_ lhs: Data, _ rhs: Data) -> Bool {
+        guard let left = updateLines(lhs), let right = updateLines(rhs), !left.isEmpty else { return false }
+        return left == right
+    }
+
+    /// 取出全部更新行;遇到既不是更新行也不是头信息/元数据行的内容返回 nil。
+    private static func updateLines(_ data: Data) -> [Data]? {
+        var result: [Data] = []
+        for slice in data.split(separator: 0x0A, omittingEmptySubsequences: true) {
+            if slice.starts(with: updatePrefix) {
+                result.append(Data(slice))
+            } else if !isHeaderOrMetaLine(slice) {
+                return nil
+            }
+        }
+        return result
+    }
+
+    /// 是否是头信息或元数据行:排序键编码下 `"t":"h"` / `"t":"m"` 位于对象末尾。
+    private static func isHeaderOrMetaLine(_ line: Data.SubSequence) -> Bool {
+        line.starts(with: Data(#"{"#.utf8)) && (line.suffix(9).elementsEqual(Data(#","t":"h"}"#.utf8)) || line.suffix(9).elementsEqual(Data(#","t":"m"}"#.utf8)))
     }
 
     /// 头信息行。

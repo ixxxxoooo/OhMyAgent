@@ -35,12 +35,14 @@ extension SessionArchive {
             finalizePending(&writer)
             writer.pending = (update, text)
             writers[key] = writer
-            if !writer.buffer.isEmpty { scheduleWrite(key) }
+            // 全量同步(引擎回放)期间不落盘:内容先攒在内存,结束时一次写入并比对,省掉回放全程的磁盘写入与随后的整文件重读
+            if !writer.buffer.isEmpty, !writer.syncing { scheduleWrite(key) }
             return
         }
         finalizePending(&writer)
         append(SessionArchiveFormat.update(update), to: &writer, key: key)
         writers[key] = writer
+        if writer.syncing { return }
         if writer.buffer.count >= bufferLimit { writeBuffer(key) } else { scheduleWrite(key) }
     }
 
@@ -100,25 +102,29 @@ extension SessionArchive {
         writers[key] = writer
         writeBuffer(key)
         writers[key]?.syncing = false
-        let fresh = (try? Data(contentsOf: temp)).flatMap(SessionArchiveFormat.parse)
-        guard let fresh, !fresh.updates.isEmpty else {
+        let freshData = try? Data(contentsOf: temp)
+        let currentData = try? Data(contentsOf: target)
+        // 快速比对:两边的更新行逐字节相同就是没变化,不必把两份存档整体解析成 JSON 再深比较
+        let textuallySame = freshData.flatMap { fresh in currentData.map { SessionArchiveFormat.sameUpdateLines(fresh, $0) } } ?? false
+        let fresh = textuallySame ? nil : freshData.flatMap(SessionArchiveFormat.parse)
+        if !textuallySame, fresh?.updates.isEmpty != false {
             try? fm.removeItem(at: temp)
             return .empty
         }
-        let current = (try? Data(contentsOf: target)).flatMap(SessionArchiveFormat.parse)
+        let current = textuallySame ? nil : currentData.flatMap(SessionArchiveFormat.parse)
         do {
-            if let current, current.updates == fresh.updates {
+            if textuallySame || (current != nil && current?.updates == fresh?.updates) {
                 try? fm.removeItem(at: temp)
                 try appendData(SessionArchiveFormat.line(SessionArchiveFormat.meta(syncedAt: Date())) ?? Data(), to: target, header: nil)
                 return .unchanged
             }
             if fm.fileExists(atPath: target.path) {
                 _ = try fm.replaceItemAt(target, withItemAt: temp)
-                log.info("会话存档已替换", ["session": String(key.sessionId.prefix(8)), "updates": "\(fresh.updates.count)"])
+                log.info("会话存档已替换", ["session": String(key.sessionId.prefix(8)), "updates": "\(fresh?.updates.count ?? 0)"])
                 return .replaced
             }
             try fm.moveItem(at: temp, to: target)
-            log.info("会话存档已建立", ["session": String(key.sessionId.prefix(8)), "updates": "\(fresh.updates.count)"])
+            log.info("会话存档已建立", ["session": String(key.sessionId.prefix(8)), "updates": "\(fresh?.updates.count ?? 0)"])
             return .created
         } catch {
             log.error("会话存档同步落盘失败", error: error, ["session": String(key.sessionId.prefix(8))])
