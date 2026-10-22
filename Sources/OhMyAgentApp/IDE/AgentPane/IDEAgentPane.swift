@@ -103,7 +103,7 @@ struct IDEAgentPane: View {
         }
         let session = workspace.agentSession
         let title = session?.sessionTitle.flatMap { $0.isEmpty ? nil : $0 } ?? String(localized: "新对话")
-        return [PaneTab(id: workspace.model.id, title: title, isActive: true, isRunning: session?.isRunning ?? false, closable: false)]
+        return [PaneTab(id: workspace.model.id, title: title, isActive: true, isRunning: session?.isRunning ?? false, closable: true)]
     }
 
     /// 历史对话下拉的条目(新的在前;已归档/已删除的不列出)。
@@ -240,11 +240,18 @@ extension IDEWorkspace {
         AppEnvironment.shared.workbench.activateTab(tabID)
     }
 
-    /// 关闭标签条里的某个会话标签(仅融合模式)。
+    /// 关闭标签条里的某个会话标签。
     /// - Parameter tabID: 工作台会话标签 ID
     func closeAgentTab(_ tabID: UUID) {
-        guard FusionMode.shared.isEnabled else { return }
-        AppEnvironment.shared.workbench.closeTab(tabID)
+        guard FusionMode.shared.isEnabled else {
+            // 非融合:本面板只有一个会话。空白会话关闭 = 收起面板;已有内容的会话关闭 = 换成新的空白对话(旧的留在历史里)
+            if agentSession?.isPristine == true { model.agentPaneVisible = false } else { newAgentConversation() }
+            return
+        }
+        let workbench = AppEnvironment.shared.workbench
+        // 会话标签还没建立时(占位标签):关闭 = 收起面板
+        guard workbench.anyTab(tabID) != nil else { model.agentPaneVisible = false; return }
+        workbench.closeTab(tabID)
     }
 
     /// 打开历史对话。融合模式:在工作台新开(或切到已打开的)会话标签,Agent 窗口同步;
