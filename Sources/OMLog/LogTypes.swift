@@ -68,12 +68,42 @@ public struct LogEntry: Sendable, Hashable, Identifiable {
 
 /// 行格式辅助。
 public enum LogFormat {
-    /// 本地时间戳(毫秒精度);每次新建格式化器以保证线程安全。
+    /// 本地时间戳(毫秒精度),格式 `yyyy-MM-dd HH:mm:ss.SSS`。
+    /// 用 `localtime_r` 手写拼装:线程安全且不创建 `DateFormatter`(其构造开销是日志热路径的主要成本)。
     public static func timestamp(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
-        return formatter.string(from: date)
+        // 先四舍五入到整毫秒再拆分秒与毫秒,避免浮点截断少 1ms 或进位错误
+        let totalMillis = Int((date.timeIntervalSince1970 * 1000).rounded())
+        var seconds = time_t(totalMillis >= 0 ? totalMillis / 1000 : (totalMillis - 999) / 1000)
+        var parts = tm()
+        localtime_r(&seconds, &parts)
+        let millis = totalMillis - Int(seconds) * 1000
+        var bytes = [UInt8](repeating: 0x30, count: 23)
+        func put(_ value: Int, _ offset: Int, _ width: Int) {
+            var rest = value
+            var index = offset + width - 1
+            while index >= offset {
+                bytes[index] = UInt8(0x30 + rest % 10)
+                rest /= 10
+                index -= 1
+            }
+        }
+        put(Int(parts.tm_year) + 1900, 0, 4); bytes[4] = 0x2D
+        put(Int(parts.tm_mon) + 1, 5, 2); bytes[7] = 0x2D
+        put(Int(parts.tm_mday), 8, 2); bytes[10] = 0x20
+        put(Int(parts.tm_hour), 11, 2); bytes[13] = 0x3A
+        put(Int(parts.tm_min), 14, 2); bytes[16] = 0x3A
+        put(Int(parts.tm_sec), 17, 2); bytes[19] = 0x2E
+        put(millis, 20, 3)
+        return String(decoding: bytes, as: UTF8.self)
+    }
+
+    /// 本地日期 `yyyyMMdd`(用于日志文件名;同样不创建 `DateFormatter`)。
+    public static func dayStamp(_ date: Date) -> String {
+        var seconds = time_t(date.timeIntervalSince1970.rounded(.down))
+        var parts = tm()
+        localtime_r(&seconds, &parts)
+        let year = Int(parts.tm_year) + 1900
+        return String(format: "%04d%02d%02d", year, Int(parts.tm_mon) + 1, Int(parts.tm_mday))
     }
 
     /// 值中含空白/等号/引号时加引号,并转义换行,保证一条日志一行。

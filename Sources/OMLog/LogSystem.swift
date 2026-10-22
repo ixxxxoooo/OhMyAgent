@@ -30,14 +30,21 @@ public final class LogSystem: @unchecked Sendable {
         var hideHome = false
         var process = "app"
         var nextID: UInt64 = 1
-        var ring: [LogEntry] = []
+        var ring = LogRing(capacity: 2000)
         var continuations: [UUID: AsyncStream<LogEntry>.Continuation] = [:]
         var writer: LogFileWriter?
         var trafficWriter: LogFileWriter?
     }
 
     private let state = OSAllocatedUnfairLock(initialState: State())
-    private let ringCapacity = 2000
+    /// 后台串行队列:脱敏、行格式化、环形缓冲、订阅分发、落盘与 os.Logger 都在这里完成,调用线程只做入队。
+    private let queue = DispatchQueue(label: "com.ixxxxoooo.OhMyAgent.logsystem", qos: .utility)
+    /// 已入队未处理的条数(洪泛保护)。
+    private let pendingCount = OSAllocatedUnfairLock(initialState: 0)
+    /// 待处理条数上限:超过后丢弃 debug 级别,避免日志洪泛时内存无界增长。
+    private static let pendingLimit = 20_000
+    /// 被洪泛保护丢弃的条数(下次处理时汇报一次)。
+    private let droppedCount = OSAllocatedUnfairLock(initialState: 0)
     private var loggers: [LogCategory: Logger] = [:]
     private let osEnabled: Bool
     private static let pidText = "\(ProcessInfo.processInfo.processIdentifier)"
@@ -121,31 +128,56 @@ public final class LogSystem: @unchecked Sendable {
     ///   - message: 延迟求值的消息(级别不满足时不会计算)
     ///   - fields: 附加键值
     public func log(_ level: LogLevel, _ category: LogCategory, _ message: @autoclosure () -> String, fields: [String: String] = [:]) {
-        let snapshot = state.withLock { ($0.categoryLevels[category] ?? $0.level, $0.hideHome, $0.writer) }
-        guard level >= snapshot.0 else { return }
-        let hide = snapshot.1
-        let text = LogRedactor.redact(message(), hideHome: hide)
-        var redacted = fields.mapValues { LogRedactor.redact($0, hideHome: hide) }
+        let gate: (id: UInt64, process: String)? = state.withLock { state in
+            guard level >= (state.categoryLevels[category] ?? state.level) else { return nil }
+            defer { state.nextID += 1 }
+            return (state.nextID, state.process)
+        }
+        guard let gate else { return }
+        let pending = PendingLog(id: gate.id, date: Date(), level: level, category: category, message: message(), fields: fields, process: gate.process)
+        // error 级别同步处理:崩溃前的最后几条错误必须落盘;同时保证与此前入队的条目顺序一致
+        if level == .error {
+            queue.sync { self.process(pending) }
+            return
+        }
+        let over = pendingCount.withLock { count -> Bool in
+            if level == .debug, count >= Self.pendingLimit { return true }
+            count += 1
+            return false
+        }
+        if over { droppedCount.withLock { $0 += 1 }; return }
+        queue.async { [self] in
+            process(pending)
+            pendingCount.withLock { $0 -= 1 }
+        }
+    }
+
+    /// 在后台队列上完成一条日志的脱敏、格式化、缓冲、分发与落盘。
+    /// - Parameter pending: 调用线程采集的原始日志
+    private func process(_ pending: PendingLog) {
+        let (hide, writer) = state.withLock { ($0.hideHome, $0.writer) }
+        let text = LogRedactor.redact(pending.message, hideHome: hide)
+        var redacted = pending.fields.mapValues { LogRedactor.redact($0, hideHome: hide) }
         // 多个进程(开发版、安装版、辅助进程)可能写同一个日志目录:每行带 pid,报告才能按进程拆分
         if redacted["pid"] == nil { redacted["pid"] = Self.pidText }
-        let safeFields = redacted
-        let entry: LogEntry = state.withLock { state in
-            let entry = LogEntry(id: state.nextID, date: Date(), level: level, category: category, message: text, fields: safeFields, process: state.process)
-            state.nextID += 1
+        let entry = LogEntry(id: pending.id, date: pending.date, level: pending.level, category: pending.category, message: text, fields: redacted, process: pending.process)
+        state.withLock { state in
             state.ring.append(entry)
-            if state.ring.count > ringCapacity { state.ring.removeFirst(state.ring.count - ringCapacity) }
             for continuation in state.continuations.values { continuation.yield(entry) }
-            return entry
         }
-        snapshot.2?.append(entry.line)
-        if osEnabled, let logger = loggers[category] {
-            let line = entry.line
-            switch level {
+        let line = entry.line
+        writer?.append(line)
+        if osEnabled, let logger = loggers[pending.category] {
+            switch pending.level {
             case .debug: logger.debug("\(line, privacy: .public)")
             case .info: logger.info("\(line, privacy: .public)")
             case .warning: logger.warning("\(line, privacy: .public)")
             case .error: logger.error("\(line, privacy: .public)")
             }
+        }
+        let dropped = droppedCount.withLock { value -> Int in defer { value = 0 }; return value }
+        if dropped > 0 {
+            log(.warning, .log, "日志洪泛,已丢弃 debug 日志", fields: ["dropped": "\(dropped)"])
         }
     }
 
@@ -157,14 +189,20 @@ public final class LogSystem: @unchecked Sendable {
     public func traffic(_ direction: String, _ summary: String, payload: @autoclosure () -> String = "") {
         let (enabled, hide, trafficWriter) = state.withLock { ($0.traffic, $0.hideHome, $0.trafficWriter) }
         guard enabled, let trafficWriter else { return }
-        let body = LogRedactor.truncate(LogRedactor.redact(payload(), hideHome: hide))
-        trafficWriter.append("\(LogFormat.timestamp(Date())) \(direction) \(summary)\(body.isEmpty ? "" : " " + body.replacingOccurrences(of: "\n", with: "\\n"))")
+        let raw = payload()
+        let date = Date()
+        // 脱敏与截断较重(载荷可达数百 KB),放到后台队列
+        queue.async {
+            let body = LogRedactor.truncate(LogRedactor.redact(raw, hideHome: hide))
+            trafficWriter.append("\(LogFormat.timestamp(date)) \(direction) \(summary)\(body.isEmpty ? "" : " " + body.replacingOccurrences(of: "\n", with: "\\n"))")
+        }
     }
 
     /// 最近的日志(新→旧不保证,按时间升序返回)。
     /// - Parameter limit: 最多条数
     public func recent(limit: Int = 500) -> [LogEntry] {
-        state.withLock { Array($0.ring.suffix(limit)) }
+        queue.sync {}   // 先排空后台队列,保证读到此前所有日志
+        return state.withLock { $0.ring.suffix(limit) }
     }
 
     /// 订阅新日志(用于输出面板实时尾随)。
@@ -180,6 +218,7 @@ public final class LogSystem: @unchecked Sendable {
 
     /// 等待文件写入完成。
     public func flush() {
+        queue.sync {}
         let (a, b) = state.withLock { ($0.writer, $0.trafficWriter) }
         a?.flush(); b?.flush()
     }
@@ -294,5 +333,44 @@ public enum Log {
             "version": "\(info?["CFBundleShortVersionString"] as? String ?? "-")(\(info?["CFBundleVersion"] as? String ?? "-"))",
             "os": ProcessInfo.processInfo.operatingSystemVersionString,
         ])
+    }
+}
+
+/// 调用线程采集、尚未脱敏与格式化的日志。
+private struct PendingLog: Sendable {
+    let id: UInt64
+    let date: Date
+    let level: LogLevel
+    let category: LogCategory
+    let message: String
+    let fields: [String: String]
+    let process: String
+}
+
+/// 固定容量环形缓冲:追加 O(1),避免数组 `removeFirst` 的整体搬移。
+struct LogRing: Sendable {
+    private var storage: [LogEntry] = []
+    private var head = 0
+    let capacity: Int
+
+    init(capacity: Int) { self.capacity = max(capacity, 1) }
+
+    /// 追加一条;满后覆盖最旧的一条。
+    mutating func append(_ entry: LogEntry) {
+        if storage.count < capacity {
+            storage.append(entry)
+        } else {
+            storage[head] = entry
+            head = (head + 1) % capacity
+        }
+    }
+
+    /// 按时间升序返回最近 `limit` 条。
+    func suffix(_ limit: Int) -> [LogEntry] {
+        let count = storage.count
+        let take = min(max(limit, 0), count)
+        guard take > 0 else { return [] }
+        let start = count - take
+        return (start..<count).map { storage[(head + $0) % count] }
     }
 }

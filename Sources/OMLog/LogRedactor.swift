@@ -39,6 +39,58 @@ public enum LogRedactor {
     /// - Returns: 脱敏后的文本
     public static func redact(_ text: String, hideHome: Bool = false) -> String {
         var result = text
+        if mayContainSecret(text) { result = redactSecrets(result) }
+        if hideHome {
+            result = result.replacingOccurrences(of: NSHomeDirectory(), with: "~")
+        }
+        return result
+    }
+
+    /// 触发词(小写,ASCII):正则命中必然包含其中之一,不含任何触发词的文本可跳过全部正则。
+    private static let triggers: [[UInt8]] = [
+        "sk-", "ghp_", "gho_", "ghu_", "ghs_", "ghr_", "akia", "xox", "bearer",
+        "api-key", "api_key", "apikey", "token", "secret", "password", "passwd", "auth", "credential",
+    ].map { Array($0.utf8) }
+
+    /// 触发词首字节表(避免逐位置逐词比较)。
+    private static let triggerStarts: [Bool] = {
+        var table = [Bool](repeating: false, count: 256)
+        for word in triggers { if let first = word.first { table[Int(first)] = true } }
+        return table
+    }()
+
+    /// 快速判断文本是否可能含需要脱敏的内容(仅可能多报,不会漏报)。
+    /// - Parameter text: 原文
+    static func mayContainSecret(_ text: String) -> Bool {
+        var text = text
+        return text.withUTF8 { buffer in
+            let count = buffer.count
+            var index = 0
+            while index < count {
+                var byte = buffer[index]
+                if byte >= 0x41, byte <= 0x5A { byte += 0x20 }
+                if triggerStarts[Int(byte)] {
+                    for word in triggers where word[0] == byte && index + word.count <= count {
+                        var matched = true
+                        var offset = 1
+                        while offset < word.count {
+                            var other = buffer[index + offset]
+                            if other >= 0x41, other <= 0x5A { other += 0x20 }
+                            if other != word[offset] { matched = false; break }
+                            offset += 1
+                        }
+                        if matched { return true }
+                    }
+                }
+                index += 1
+            }
+            return false
+        }
+    }
+
+    /// 执行全部脱敏正则(调用前应已用 `mayContainSecret` 过滤)。
+    private static func redactSecrets(_ text: String) -> String {
+        var result = text
         for regex in patterns {
             result = regex.stringByReplacingMatches(in: result, range: NSRange(result.startIndex..., in: result), withTemplate: "‹已脱敏›")
         }
@@ -50,9 +102,6 @@ public enum LogRedactor {
         }
         if let jsonField {
             result = jsonField.stringByReplacingMatches(in: result, range: NSRange(result.startIndex..., in: result), withTemplate: "$1\"‹已脱敏›\"")
-        }
-        if hideHome {
-            result = result.replacingOccurrences(of: NSHomeDirectory(), with: "~")
         }
         return result
     }

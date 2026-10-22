@@ -47,10 +47,7 @@ public final class LogFileWriter: @unchecked Sendable {
 
     /// 当前日期对应的文件名。
     private func fileName(for date: Date = Date(), index: Int = 0) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyyMMdd"
-        let base = "\(prefix)-\(formatter.string(from: date))"
+        let base = "\(prefix)-\(LogFormat.dayStamp(date))"
         return index == 0 ? "\(base).log" : "\(base).\(index).log"
     }
 
