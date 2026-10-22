@@ -29,6 +29,8 @@ public final class IDEWindowModel: Identifiable {
     public var panelMaximized = false
     /// Agent 面板最大化(⌥⌘E):隐藏侧栏与编辑区,对话占满窗口(仅界面状态,不持久化)
     public var agentPaneMaximized = false
+    /// 性能 HUD(帧率/内存/CPU)是否显示(仅界面状态,不持久化)
+    public var perfHUDVisible = false
     public var agentPaneVisible: Bool { didSet { if agentPaneVisible != oldValue { changed() } } }
     public var agentPaneWidth: Double { didSet { if agentPaneWidth != oldValue { changed() } } }
     /// 窗口外框(由窗口控制器在移动/缩放后回写)

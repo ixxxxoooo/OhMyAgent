@@ -28,6 +28,7 @@ struct IDEShellView: View {
         .tint(appearance.tint)
         .omScrollbarPolicy()
         .overlay { IDEPaletteOverlay(workspace: workspace) }
+        .overlay { IDEPerfHUD(model: model).padding(.top, IDEMetrics.titleBarHeight) }
         .frame(minWidth: IDEMetrics.windowMinWidth, minHeight: IDEMetrics.windowMinHeight)
     }
 

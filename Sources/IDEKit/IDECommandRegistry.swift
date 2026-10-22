@@ -174,6 +174,7 @@ public struct IDECommandRegistry: Sendable {
             IDECommand(id: "view.toggleSidebar", title: String(localized: "切换侧栏"), category: view, shortcut: "⌘B"),
             IDECommand(id: "view.togglePanel", title: String(localized: "切换底部面板"), category: view, shortcut: "⌘J"),
             IDECommand(id: "view.maximizeAgentPane", title: String(localized: "最大化 / 还原 Agent 面板"), category: view, shortcut: "⌥⌘E"),
+            IDECommand(id: "view.perfHUD", title: String(localized: "显示 / 隐藏性能 HUD"), category: view),
             IDECommand(id: "view.toggleAgentPane", title: String(localized: "切换 Agent 面板"), category: view, shortcut: "⌥⌘B"),
             IDECommand(id: "view.explorer", title: String(localized: "显示资源管理器"), category: view, shortcut: "⇧⌘E", when: .hasFolder),
             IDECommand(id: "view.search", title: String(localized: "在文件中搜索"), category: view, shortcut: "⇧⌘F", when: .hasFolder),

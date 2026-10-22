@@ -2893,3 +2893,9 @@
 "全部保留" = "Keep all";
 "最大化 / 还原 Agent 面板" = "Maximize / Restore Agent Pane";
 "最大化 Agent 面板" = "Maximize Agent Pane";
+"显示 / 隐藏性能 HUD" = "Show / Hide Performance HUD";
+"性能 HUD" = "Performance HUD";
+"帧率" = "Frame rate";
+"掉帧 / 最长" = "Dropped / Longest";
+"CPU" = "CPU";
+"IDE 窗口" = "IDE Windows";

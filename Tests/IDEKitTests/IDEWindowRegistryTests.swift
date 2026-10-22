@@ -87,6 +87,16 @@ struct IDEWindowRegistryTests {
         #expect(rb?.frame == IDEWindowFrame(x: 10, y: 20, width: 900, height: 700))
     }
 
+    @Test("性能 HUD 开关只是界面状态:默认关闭,不进入快照")
+    func perfHUDIsTransient() {
+        let registry = IDEWindowRegistry(store: tempStore())
+        let model = registry.open(root: "/tmp/hud").model
+        #expect(!model.perfHUDVisible)
+        model.perfHUDVisible = true
+        let restored = IDEWindowModel(snapshot: model.snapshot())
+        #expect(!restored.perfHUDVisible)
+    }
+
     @Test("⌥⌘E:最大化 Agent 面板(未显示时先显示),隐藏面板会还原,且不持久化")
     func maximizeAgentPane() {
         let store = tempStore()
