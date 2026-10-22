@@ -40,9 +40,12 @@ enum AgentHunkKey {
 extension FileTabView {
     // MARK: 内联 blame
 
-    /// 读取 blame(仅 IDE 窗口、已保存、≤ 1MB 的已跟踪文件);失败或无仓库时清空。
+    /// 内联 blame 取哪个仓库:IDE 窗口用窗口的工作区根,Agent 窗口用当前选中的项目。
+    var blameRoot: String? { ideHost?.root ?? workbench.selectedProjectID }
+
+    /// 读取 blame(已保存、≤ 1MB 的已跟踪文件;IDE 窗口与 Agent 窗口的文件标签都支持);失败或无仓库时清空。
     func loadBlame(_ doc: FileDocument) async {
-        guard let ideHost, let root = ideHost.root, !doc.isDirty, let text = doc.text, text.utf8.count <= 1_000_000 else {
+        guard let root = blameRoot, !doc.isDirty, let text = doc.text, text.utf8.count <= 1_000_000 else {
             if !blameLines.isEmpty { blameLines = [] }
             return
         }

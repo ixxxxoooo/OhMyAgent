@@ -176,7 +176,7 @@ struct FileTabView: View {
                                onReferenceSelection: { range in referenceSelection(range, text: doc.text ?? text) },
                                chrome: ideHost == nil ? [] : [.minimap, .stickyScroll, .folding],
                                onCaretChange: ideHost.map { host in { host.caret(path, $0) } },
-                               inlineNote: ideHost != nil && !doc.isDirty && !blameLines.isEmpty ? { blameNote($0) } : nil,
+                               inlineNote: !doc.isDirty && !blameLines.isEmpty ? { blameNote($0) } : nil,
                                onChange: { newText in doc.text = newText })
                         .environment(\.tabIsActive, isActive && mode.showsEditor)
                         .opacity(mode.showsEditor ? 1 : 0)
@@ -252,7 +252,7 @@ struct FileTabView: View {
 
     /// 内联 blame 的刷新键:文件 + 仓库 HEAD + 是否有未保存修改。
     private func blameKey(_ doc: FileDocument) -> String {
-        let head = ideHost?.root.map { GitStore.shared.model(for: $0).status.headOID ?? "" } ?? ""
+        let head = blameRoot.map { GitStore.shared.model(for: $0).status.headOID ?? "" } ?? ""
         return "\(path)|\(head)|\(doc.isDirty)"
     }
 
