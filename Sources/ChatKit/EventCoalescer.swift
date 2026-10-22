@@ -87,14 +87,78 @@ public final class EventCoalescer: Sendable {
     }
 
     /// 立即投递缓冲中的事件。
+    /// 同一条消息里相邻的文本增量先合并成一个事件(见 `merge`),主线程每批每条消息只追加一次文本、只触发一次观察通知。
     public func flush() {
-        let batch = state.withLock { state -> [ClientEvent] in
+        let (batch, merged) = state.withLock { state -> ([ClientEvent], Int) in
             state.scheduled = false
-            let batch = state.buffer
+            let original = state.buffer
             state.buffer.removeAll(keepingCapacity: true)
-            return batch
+            let batch = Self.merge(original)
+            // 被合并掉的事件不会再经过 `markApplied`/积压消费:这里直接记为已应用
+            let dropped = original.count - batch.count
+            state.applied += dropped
+            return (batch, dropped)
         }
+        if merged > 0 { Self.backlog.consumed(merged) }
         if !batch.isEmpty { continuation.yield(batch) }
+    }
+
+    /// 合并批次里相邻的文本增量:同会话、同种消息块(用户/助手/思考)、同 messageId、都是纯文本时拼成一个事件。
+    /// 只合并「相邻」事件,不会越过其他事件重排,时间线语义不变。
+    /// - Parameter events: 一个窗口内按序到达的事件
+    /// - Returns: 合并后的事件(顺序不变)
+    static func merge(_ events: [ClientEvent]) -> [ClientEvent] {
+        guard events.count > 1 else { return events }
+        var result: [ClientEvent] = []
+        result.reserveCapacity(events.count)
+        var pendingText: String?
+        for event in events {
+            if case .sessionUpdate(let id, let update) = event, let next = TextChunk(update),
+               let last = result.last, case .sessionUpdate(let lastID, let lastUpdate) = last, lastID == id,
+               let previous = TextChunk(lastUpdate), previous.isSameStream(as: next) {
+                // 累加到 pendingText(就地追加),最后一次性生成合并后的事件,避免每次都重建 ContentBlock
+                if pendingText == nil { pendingText = previous.text }
+                pendingText?.append(next.text)
+                result[result.count - 1] = .sessionUpdate(sessionId: id, update: next.rebuilt(text: pendingText ?? next.text))
+                continue
+            }
+            pendingText = nil
+            result.append(event)
+        }
+        return result
+    }
+
+    /// 纯文本增量的拆解视图(用户/助手/思考三类)。
+    private struct TextChunk {
+        enum Kind { case user, agent, thought }
+        let kind: Kind
+        let messageId: String?
+        var text: String
+
+        init?(_ update: SessionUpdate) {
+            switch update {
+            case .userMessageChunk(let id, .text(let value)): self.init(kind: .user, messageId: id, text: value)
+            case .agentMessageChunk(let id, .text(let value)): self.init(kind: .agent, messageId: id, text: value)
+            case .agentThoughtChunk(let id, .text(let value)): self.init(kind: .thought, messageId: id, text: value)
+            default: return nil
+            }
+        }
+
+        private init(kind: Kind, messageId: String?, text: String) {
+            self.kind = kind
+            self.messageId = messageId
+            self.text = text
+        }
+
+        func isSameStream(as other: TextChunk) -> Bool { kind == other.kind && messageId == other.messageId }
+
+        func rebuilt(text: String) -> SessionUpdate {
+            switch kind {
+            case .user: .userMessageChunk(messageId: messageId, content: .text(text))
+            case .agent: .agentMessageChunk(messageId: messageId, content: .text(text))
+            case .thought: .agentThoughtChunk(messageId: messageId, content: .text(text))
+            }
+        }
     }
 
     /// 主 actor 应用完一批后调用,用于判断积压是否清空,并据处理耗时调整后续窗口。

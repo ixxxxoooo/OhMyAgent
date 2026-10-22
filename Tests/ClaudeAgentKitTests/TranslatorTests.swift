@@ -194,3 +194,44 @@ struct PromptConverterTests {
         #expect(split.description == "正文")
     }
 }
+
+@Suite("流式入参与分块的就地累加")
+struct StreamedAccumulationTests {
+    @Test("入参扫描按字节记录顶层逗号,含中文与转义时前缀恢复正确")
+    func scanHandlesMultibyteAndEscapes() {
+        var state = StreamedToolInput(id: "t", name: "Edit")
+        let pieces = ["{\"file_path\":\"/文件/a.swift\",", "\"old\":\"带\\\"引号,逗号\",", "\"new\":\"x\"", "}"]
+        var complete = false
+        var recovered: [String] = []
+        for piece in pieces {
+            complete = state.scan(piece)
+            if let input = state.recoveredInput() { recovered.append(input["file_path"]?.stringValue ?? "") }
+        }
+        #expect(complete)
+        #expect(recovered.first == "/文件/a.swift")
+        let last = state.recoveredInput()
+        #expect(last?["old"]?.stringValue == "带\"引号,逗号")
+        #expect(last?["new"] == nil)   // 最后一个顶层逗号之前的前缀不含 new
+    }
+
+    @Test("分块累加:同索引同类型接在最后一块,否则新建")
+    func appendStreamedBlocks() {
+        var blocks: [StreamedBlock] = []
+        MessageTranslator.appendStreamed(&blocks, index: 0, type: "text", text: "你")
+        MessageTranslator.appendStreamed(&blocks, index: 0, type: "text", text: "好")
+        MessageTranslator.appendStreamed(&blocks, index: 0, type: "thinking", text: "想")
+        MessageTranslator.appendStreamed(&blocks, index: 1, type: "thinking", text: "想")
+        #expect(blocks.map(\.text) == ["你好", "想", "想"])
+    }
+
+    @Test("大入参逐字节流式扫描不会退化成平方复杂度(量级守卫)")
+    func largeInputIsLinear() {
+        var state = StreamedToolInput(id: "t", name: "Write")
+        _ = state.scan("{\"content\":\"")
+        let piece = String(repeating: "a", count: 64)
+        let clock = ContinuousClock()
+        let elapsed = clock.measure { for _ in 0..<20_000 { _ = state.scan(piece) } }   // 约 1.2MB
+        #expect(elapsed < .seconds(2))
+        #expect(state.byteCount > 1_000_000)
+    }
+}

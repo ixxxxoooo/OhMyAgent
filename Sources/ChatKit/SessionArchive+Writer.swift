@@ -22,11 +22,13 @@ extension SessionArchive {
     /// 处理一条更新:瞬时状态丢弃;同一消息的文本片段合并;其他更新先结束合并中的片段再追加。
     func recordNow(_ key: SessionArchiveKey, cwd: String?, update: JSONValue) {
         guard !purged.contains(key.sessionId), let kind = update["sessionUpdate"]?.stringValue, !SessionArchiveFormat.transientKinds.contains(kind) else { return }
-        var writer = writers[key] ?? ArchiveWriter(cwd: cwd)
+        // 先把 writer 从字典里取出(而不是拷贝):字典不再持有引用,下面对 pending.text 的追加才是就地的,
+        // 否则长回答的每个增量都会复制整段已拼接文本(O(n²))
+        var writer = writers.removeValue(forKey: key) ?? ArchiveWriter(cwd: cwd)
         if writer.cwd == nil { writer.cwd = cwd }
         if let text = Self.mergeableText(update) {
             if let pending = writer.pending, Self.sameMessage(pending.update, update) {
-                writer.pending = (pending.update, pending.text + text)
+                writer.pending?.text += text
                 writers[key] = writer
                 return
             }

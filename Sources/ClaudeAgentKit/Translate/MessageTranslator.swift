@@ -24,38 +24,45 @@ struct StreamedToolInput {
     var lastTopLevelComma = -1
     var emittedThroughComma = -1
 
+    /// 已累计的 UTF-8 字节数(顶层逗号位置以字节偏移记录,避免每次对整串求 UTF-16 长度)
+    var byteCount = 0
+
     /// 追加一段入参片段并扫描结构。
+    /// 调用方须通过字典就地修改(`dict[key]?[index]?.scan(_:)`),不要先拷贝出来再写回,否则每个增量都会整串复制。
     /// - Parameter fragment: `input_json_delta` 的 `partial_json`
     /// - Returns: 顶层对象是否已闭合
     mutating func scan(_ fragment: String) -> Bool {
-        let offset = partialJSON.utf16.count
+        let offset = byteCount
         partialJSON += fragment
         var complete = false
-        for (index, character) in fragment.enumerated() {
+        var position = offset
+        // JSON 结构字符都是 ASCII,多字节 UTF-8 的任何字节都不会与它们相等,按字节扫描即可
+        for byte in fragment.utf8 {
+            defer { position += 1 }
             if inString {
-                if escaped { escaped = false } else if character == "\\" { escaped = true } else if character == "\"" { inString = false }
+                if escaped { escaped = false } else if byte == UInt8(ascii: "\\") { escaped = true } else if byte == UInt8(ascii: "\"") { inString = false }
                 continue
             }
-            switch character {
-            case "\"": inString = true
-            case "{": objectDepth += 1
-            case "}":
+            switch byte {
+            case UInt8(ascii: "\""): inString = true
+            case UInt8(ascii: "{"): objectDepth += 1
+            case UInt8(ascii: "}"):
                 objectDepth -= 1
                 if objectDepth == 0 { complete = true }
-            case "[": arrayDepth += 1
-            case "]": arrayDepth -= 1
-            case "," where objectDepth == 1 && arrayDepth == 0: lastTopLevelComma = offset + index
+            case UInt8(ascii: "["): arrayDepth += 1
+            case UInt8(ascii: "]"): arrayDepth -= 1
+            case UInt8(ascii: ",") where objectDepth == 1 && arrayDepth == 0: lastTopLevelComma = position
             default: break
             }
         }
+        byteCount = position
         return complete
     }
 
     /// 取最近一个顶层逗号之前的入参前缀并补全成对象。
     func recoveredInput() -> JSONValue? {
-        let utf16 = Array(partialJSON.utf16)
-        guard lastTopLevelComma >= 0, lastTopLevelComma <= utf16.count else { return nil }
-        let prefix = String(decoding: utf16[0..<lastTopLevelComma], as: UTF16.self) + "}"
+        guard lastTopLevelComma >= 0, lastTopLevelComma <= byteCount else { return nil }
+        let prefix = String(decoding: partialJSON.utf8.prefix(lastTopLevelComma), as: UTF8.self) + "}"
         guard let value = JSONValue.parse(prefix), value.objectValue != nil else { return nil }
         return value
     }
@@ -350,19 +357,17 @@ struct MessageTranslator {
     // MARK: 流式入参
 
     private mutating func partialToolInput(event: JSONValue, delta: JSONValue, key: String, parent: String?) -> [JSONValue] {
-        guard let index = event["index"]?.intValue, var state = streamedToolInputs[key]?[index] else { return [] }
-        let complete = state.scan(delta["partial_json"]?.stringValue ?? "")
+        guard let index = event["index"]?.intValue, streamedToolInputs[key]?[index] != nil else { return [] }
+        // 就地扫描:不把状态拷贝出字典(拷贝会让 partialJSON 的每次追加都整串复制,大入参下是 O(n²))
+        let complete = streamedToolInputs[key]?[index]?.scan(delta["partial_json"]?.stringValue ?? "") ?? false
         if complete {
             streamedToolInputs[key]?[index] = nil
             if streamedToolInputs[key]?.isEmpty == true { streamedToolInputs[key] = nil }
             return []
         }
-        guard state.lastTopLevelComma > state.emittedThroughComma else {
-            streamedToolInputs[key]?[index] = state
-            return []
-        }
-        state.emittedThroughComma = state.lastTopLevelComma
-        streamedToolInputs[key]?[index] = state
+        guard let pending = streamedToolInputs[key]?[index], pending.lastTopLevelComma > pending.emittedThroughComma else { return [] }
+        streamedToolInputs[key]?[index]?.emittedThroughComma = pending.lastTopLevelComma
+        let state = pending
         guard let input = state.recoveredInput(), !(state.name == "TodoWrite" || Self.isTaskTool(state.name)) else { return [] }
         var update = renderer.partialRefinement(id: state.id, name: state.name, input: input, cwd: cwd)
         update = Self.stamp(update, parent: parent)
@@ -378,14 +383,22 @@ struct MessageTranslator {
         default: return
         }
         guard !text.isEmpty else { return }
-        var blocks = streamedBlocks[key] ?? []
-        if var last = blocks.last, last.index == index, last.type == type {
-            last.text += text
-            blocks[blocks.count - 1] = last
+        // 就地追加到字典里的数组:不拷贝出来再写回,避免每个文本增量都复制已累计的整段文本
+        Self.appendStreamed(&streamedBlocks[key, default: []], index: index, type: type, text: text)
+    }
+
+    /// 把一个文本/思考增量并入分块列表:同索引同类型接在最后一块上,否则新建一块。
+    /// - Parameters:
+    ///   - blocks: 分块列表(就地修改)
+    ///   - index: 内容块索引
+    ///   - type: `text` 或 `thinking`
+    ///   - text: 增量文本
+    static func appendStreamed(_ blocks: inout [StreamedBlock], index: Int, type: String, text: String) {
+        if let last = blocks.indices.last, blocks[last].index == index, blocks[last].type == type {
+            blocks[last].text += text
         } else {
             blocks.append(StreamedBlock(index: index, type: type, text: text))
         }
-        streamedBlocks[key] = blocks
     }
 
     /// 完整 assistant 消息里去掉流式阶段已发送的文本/思考部分。
