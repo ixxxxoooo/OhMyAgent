@@ -42,7 +42,13 @@ struct ModeSwitchButton: View {
         target == .ide ? String(localized: "在 IDE 窗口中打开当前项目(⌥ 点击新开窗口)") : String(localized: "回到 Agent 窗口")
     }
 
+    /// 上一次切换的时间:切换含淡入淡出动画,双击的第二下会落在过渡中的窗口上,
+    /// 把刚切过去的窗口又切回来或隐藏掉,所以过渡期内忽略重复点击。
+    private static var lastSwitch = Date.distantPast
+
     private func perform() {
+        guard Date().timeIntervalSince(Self.lastSwitch) > 0.6 else { return }
+        Self.lastSwitch = Date()
         switch target {
         case .ide:
             IDEWindowManager.shared.switchToIDE(forceNew: NSEvent.modifierFlags.contains(.option))

@@ -20,6 +20,8 @@ final class AppActions {
     static let shared = AppActions()
 
     /// 待处理的会话打开请求(由对应工作区窗口消费)
+    /// 融合模式下正在把 IDE 窗口切回 Agent 窗口(`showMainWindow` ⇄ `switchToAgent` 的重入保护)
+    private var isSwitchingFromIDE = false
     var sessionRequest: SessionOpenRequest?
 
     /// 主窗口(由工作台视图登记;窗口关闭后系统会释放它)
@@ -319,7 +321,10 @@ final class AppActions {
     @discardableResult
     func showMainWindow(adopting frame: NSRect? = nil, replacing source: NSWindow? = nil) -> Bool {
         // 融合模式下从 IDE 窗口触发(设置、新对话等):原地换成 Agent 窗口,而不是另开一个窗口
-        if frame == nil, source == nil, FusionMode.shared.isEnabled, WindowContext.shared.isIDE {
+        // (`switchToAgent` 找不到可见的来源窗口时会带着空参数回到这里:重入标记防止两者互相递归直至栈溢出)
+        if frame == nil, source == nil, !isSwitchingFromIDE, FusionMode.shared.isEnabled, WindowContext.shared.isIDE {
+            isSwitchingFromIDE = true
+            defer { isSwitchingFromIDE = false }
             // 切换时选中项目会把主窗口重置回工作台:先记下调用方已设好的模式(如设置页),切完再还原
             let workbench = AppEnvironment.shared.workbench
             let mode = workbench.mode
