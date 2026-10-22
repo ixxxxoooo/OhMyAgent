@@ -208,7 +208,8 @@ struct FileTabView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if let lsp, lsp.status != .off { LSPStatusBar(controller: lsp) }
+            // IDE 窗口里语言服务器状态显示在窗口状态栏,不占编辑区底部
+            if ideHost == nil, let lsp, lsp.status != .off { LSPStatusBar(controller: lsp) }
         }
         .onChange(of: doc.isDirty, initial: true) { wasDirty, dirty in
             if let ideHost { ideHost.setDirty(dirty, path) } else { workbench.setDirty(dirty, for: tab.id) }
@@ -539,5 +540,39 @@ struct DelayedSpinner: View {
                 try? await Task.sleep(for: .milliseconds(250))
                 visible = true
             }
+    }
+}
+
+/// IDE 状态栏里的语言服务器状态(紧凑):就绪显示名称,启动中显示转圈,不可用/失败显示提示(悬停看详情)。
+struct LSPStatusItem: View {
+    let controller: EditorLSPController
+
+    var body: some View {
+        switch controller.status {
+        case .off:
+            EmptyView()
+        case .starting:
+            HStack(spacing: 4) {
+                OMSpinner(.mini)
+                Text("语言服务器启动中…")
+            }
+        case .ready(let name):
+            HStack(spacing: 4) {
+                Image.om("circle-check", size: 12).foregroundStyle(OMColors.success)
+                Text(name)
+            }
+        case .unavailable(let hint):
+            HStack(spacing: 4) {
+                Image.om("info", size: 12)
+                Text("未找到语言服务器")
+            }
+            .omTooltip(hint)
+        case .failed(let message):
+            HStack(spacing: 4) {
+                Image.om("triangle-alert", size: 12).foregroundStyle(OMColors.warning)
+                Text("语言服务器不可用")
+            }
+            .omTooltip(message)
+        }
     }
 }

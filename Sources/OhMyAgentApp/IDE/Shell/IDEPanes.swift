@@ -95,6 +95,8 @@ struct IDEStatusBar: View {
             // 有新版本/下载中/待重启时显示(与 Agent 窗口侧栏底部同一个按钮),无更新时不占位
             UpdateFooterButton(compact: true)
             if let path = model.activeFilePath {
+                // 语言服务器状态(原先显示在编辑区底部)
+                if let controller = workspace.lspControllers[path] { LSPStatusItem(controller: controller) }
                 if let caret = workspace.carets[path] {
                     Button { workspace.openPalette(":") } label: {
                         Text(caret.selectedLength > 0
