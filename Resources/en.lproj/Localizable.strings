@@ -2917,3 +2917,4 @@
 "把 OpenCode 切到 build 模式,并让它按上面的计划开始执行" = "Switch OpenCode to build mode and have it carry out the plan above";
 "找不到可用于执行计划的模式,请手动切换到 build 后发送「按计划执行」。" = "No mode available to run the plan. Switch to build manually and send \"run the plan\".";
 "请按上面的计划开始执行。" = "Please carry out the plan above.";
+"否" = "No";

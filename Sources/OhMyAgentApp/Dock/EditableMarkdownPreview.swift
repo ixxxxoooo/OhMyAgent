@@ -65,7 +65,12 @@ struct EditableMarkdownPreview: View {
         let source = slice(block.range)
         Group {
             if case .frontMatter = block.kind {
-                Text(source.trimmingCharacters(in: .newlines)).font(OMFonts.monoSmall).foregroundStyle(OMColors.tertiaryText)
+                if let fields = FrontMatterParser.parse(source) {
+                    FrontMatterCard(fields: fields)
+                } else {
+                    // 嵌套/多行等复杂 YAML 解析不了:退回等宽源码,不丢信息
+                    Text(source.trimmingCharacters(in: .newlines)).font(OMFonts.monoSmall).foregroundStyle(OMColors.tertiaryText)
+                }
             } else {
                 MarkdownView(text: source)
             }
