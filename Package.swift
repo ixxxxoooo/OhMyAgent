@@ -15,6 +15,24 @@ let package = Package(
         .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", exact: "1.11.2"),
     ],
     targets: [
+        // tree-sitter 运行时(C,v0.25.10,MIT):增量解析与查询,供编辑器语法高亮使用
+        .target(
+            name: "CTreeSitter",
+            path: "Vendor/TreeSitter",
+            exclude: ["LICENSE"],
+            sources: ["src/lib.c"],
+            publicHeadersPath: "include",
+            cSettings: [.headerSearchPath("src"), .headerSearchPath("src/wasm"), .unsafeFlags(["-w", "-O2"])]
+        ),
+        // 各语言 tree-sitter 语法(生成的 C 解析器,体量大,各自随上游许可证)
+        .target(
+            name: "TreeSitterGrammars",
+            dependencies: ["CTreeSitter"],
+            path: "Vendor/TreeSitterGrammars",
+            exclude: ["LICENSE.swift", "LICENSE.javascript", "LICENSE.python", "LICENSE.rust"],
+            publicHeadersPath: "include",
+            cSettings: [.headerSearchPath("typescript/src"), .unsafeFlags(["-w", "-O2"])]
+        ),
         // 统一日志:os.Logger + 文件轮转 + 脱敏 + 协议流量日志
         .target(name: "OMLog"),
         // 协议层:JSON-RPC、ACP v1 模型、连接 actor
@@ -28,7 +46,7 @@ let package = Package(
         // Diff 与检查点
         .target(name: "DiffKit"),
         // AppKit TextKit 2 编辑器
-        .target(name: "EditorKit", dependencies: ["DiffKit", "DesignSystem", "IconKit", "OMLog"]),
+        .target(name: "EditorKit", dependencies: ["DiffKit", "DesignSystem", "IconKit", "OMLog", "CTreeSitter", "TreeSitterGrammars"]),
         // Lucide 原生图标:SVG path 解析 + 模板图像渲染
         .target(name: "IconKit", dependencies: ["OMLog"]),
         // Mermaid 原生渲染:解析 → 分层布局 → 绘制场景(纯 Swift,无 WebView)

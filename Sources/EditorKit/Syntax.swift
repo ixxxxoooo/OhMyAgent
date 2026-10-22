@@ -402,26 +402,54 @@ public enum SimpleLexer {
 }
 
 /// 高亮引擎:在后台 actor 内完成扫描并缓存结果。
+/// tree-sitter 支持的语言走语法树(增量重解析、按视口查询),其余语言与文本过大时走词法扫描。
 public actor HighlightEngine {
     private var spans: [SyntaxSpan] = []
+    private var treeSitter: TreeSitterHighlighter?
+    private var treeLanguage: SyntaxLanguage?
+
+    /// 超过该 UTF-16 长度的文本不走 tree-sitter(首次全量解析太慢),退回词法高亮。
+    public static let treeSitterMaxUnits = 2_000_000
 
     public init() {}
+
+    /// 当前是否由 tree-sitter 提供高亮(测试与诊断用)。
+    public var usesTreeSitter: Bool { treeSitter != nil }
+
+    /// 最近一次 tree-sitter 解析是否为增量(测试与诊断用)。
+    public var lastParseWasIncremental: Bool { treeSitter?.lastWasIncremental ?? false }
+
+    /// 语法树根节点是否含错误(测试用)。
+    public var treeHasErrors: Bool { treeSitter?.hasErrors ?? false }
 
     /// 重新扫描整个文本。
     /// - Parameters:
     ///   - text: 文本
     ///   - language: 语言
-    /// - Returns: 扫描得到的片段数
+    /// - Returns: 扫描得到的片段数(tree-sitter 模式下为根节点的子节点数)
     @discardableResult
     public func rebuild(text: String, language: SyntaxLanguage) -> Int {
+        if TreeSitterLanguage.isSupported(language), text.utf16.count <= Self.treeSitterMaxUnits {
+            if treeLanguage != language || treeSitter == nil {
+                treeSitter = TreeSitterHighlighter(language: language)
+                treeLanguage = language
+            }
+            if let highlighter = treeSitter, highlighter.update(text: text) {
+                spans = []
+                return highlighter.rootChildCount
+            }
+        }
+        treeSitter = nil
+        treeLanguage = nil
         spans = SimpleLexer.lex(text, language: language)
         return spans.count
     }
 
-    /// 取与范围相交的片段。
+    /// 取与范围相交的片段。tree-sitter 模式按文档顺序返回,重叠时后者应覆盖前者;词法模式互不重叠。
     /// - Parameter range: UTF-16 范围
     /// - Returns: 片段数组
     public func spans(in range: NSRange) -> [SyntaxSpan] {
+        if let treeSitter { return treeSitter.spans(in: range) }
         let start = SimpleLexer.firstIndex(in: spans, endingAfter: range.location)
         var result: [SyntaxSpan] = []
         var index = start
