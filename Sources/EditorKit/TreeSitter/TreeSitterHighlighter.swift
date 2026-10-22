@@ -163,13 +163,37 @@ final class TreeSitterHighlighter {
         while suffix < limit - prefix, old[old.count - 1 - suffix] == new[new.count - 1 - suffix] { suffix += 1 }
         let oldEnd = old.count - suffix
         let newEnd = new.count - suffix
+        // 只整篇扫一次得到起点;终点从起点出发只扫改动片段(原先三次整篇扫描在 5 万行文件上占了大头)
+        let start = point(of: prefix, in: old)
         return TSInputEdit(
             start_byte: UInt32(prefix * 2), old_end_byte: UInt32(oldEnd * 2), new_end_byte: UInt32(newEnd * 2),
-            start_point: point(of: prefix, in: old), old_end_point: point(of: oldEnd, in: old), new_end_point: point(of: newEnd, in: new)
+            start_point: start, old_end_point: advance(start, from: prefix, to: oldEnd, in: old), new_end_point: advance(start, from: prefix, to: newEnd, in: new)
         )
     }
 
     /// 某 UTF-16 偏移处的行列(列以字节计)。
+    /// 从已知位置的点出发,扫描 `[from, to)` 得到 `to` 处的点。
+    /// - Parameters:
+    ///   - origin: `from` 处的点(列为字节数)
+    ///   - from: 起始 UTF-16 偏移
+    ///   - to: 目标 UTF-16 偏移(不小于 `from`)
+    ///   - units: 文本
+    private static func advance(_ origin: TSPoint, from: Int, to: Int, in units: [UInt16]) -> TSPoint {
+        var row = origin.row
+        var column = Int(origin.column) / 2
+        var index = from
+        while index < to {
+            if units[index] == 0x0A {
+                row += 1
+                column = 0
+            } else {
+                column += 1
+            }
+            index += 1
+        }
+        return TSPoint(row: row, column: UInt32(column * 2))
+    }
+
     private static func point(of offset: Int, in units: [UInt16]) -> TSPoint {
         var row: UInt32 = 0
         var lineStart = 0
