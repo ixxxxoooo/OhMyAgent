@@ -180,6 +180,8 @@ public final class TimelineStore {
 
     private var toolIndex: [String: TimelineEntry] = [:]
     private var planEntry: TimelineEntry?
+    /// 已识别为「待办写入」的工具调用 ID(OpenCode 的 todowrite):它们的更新全部并入待办清单,不单独成工具行
+    private var todoToolIDs: Set<String> = []
     /// 工具调用状态变化回调(含子 Agent 内部的调用),用于记录检查点等。
     public var onToolChange: ((ToolCall) -> Void)?
 
@@ -379,9 +381,48 @@ public final class TimelineStore {
         }
     }
 
+    /// 把 OpenCode 的待办工具(`rawInput.todos`)转成待办清单更新。
+    /// Claude Code 的适配器会把 TodoWrite 直接译成 ACP `plan` 更新,OpenCode 则只发一个普通工具调用,
+    /// 不转换的话计划模式里的待办只会显示成一行「14 todos」。
+    /// - Parameter update: 协议更新
+    /// - Returns: 已并入待办清单(调用方不再按工具行处理)为 true
+    private func interceptTodoTool(_ update: SessionUpdate) -> Bool {
+        let id: String
+        let input: JSONValue?
+        switch update {
+        case .toolCall(let call):
+            // TodoWrite 有自己的工具卡呈现(Claude Code 系),不在这里转换
+            guard call.name != "TodoWrite" else { return false }
+            (id, input) = (call.toolCallId, call.rawInput)
+        case .toolCallUpdate(let toolCallId, let raw):
+            guard toolIndex[toolCallId]?.tool?.name != "TodoWrite" else { return false }
+            (id, input) = (toolCallId, raw["rawInput"])
+        default: return false
+        }
+        guard let items = Self.todoEntries(in: input) else { return todoToolIDs.contains(id) }
+        todoToolIDs.insert(id)
+        // 先到的是不带入参的占位工具行:撤掉它
+        if let placeholder = toolIndex.removeValue(forKey: id) { entries.removeAll { $0 === placeholder } }
+        apply(.plan(items))
+        return true
+    }
+
+    /// 从工具入参里取待办清单:`todos` 是非空数组且每项都有文字内容。
+    /// - Parameter input: 工具入参
+    /// - Returns: 待办条目;不是待办入参为 nil
+    static func todoEntries(in input: JSONValue?) -> [PlanEntry]? {
+        guard let todos = input?["todos"]?.arrayValue, !todos.isEmpty else { return nil }
+        let items = todos.compactMap { todo -> PlanEntry? in
+            guard let content = todo["content"]?.stringValue, !content.isEmpty else { return nil }
+            return PlanEntry(content: content, priority: todo["priority"]?.stringValue ?? "medium", status: todo["status"]?.stringValue ?? "pending")
+        }
+        return items.count == todos.count ? items : nil
+    }
+
     /// 应用一个会话更新;与时间线无关的更新会被忽略。
     /// - Parameter update: 协议更新
     public func apply(_ update: SessionUpdate) {
+        if interceptTodoTool(update) { return }
         let countBefore = entries.count
         switch update {
         case .userMessageChunk(let messageId, let content):
