@@ -19,9 +19,9 @@ struct SessionOpenRequest: Equatable {
 final class AppActions {
     static let shared = AppActions()
 
-    /// 待处理的会话打开请求(由对应工作区窗口消费)
     /// 融合模式下正在把 IDE 窗口切回 Agent 窗口(`showMainWindow` ⇄ `switchToAgent` 的重入保护)
     private var isSwitchingFromIDE = false
+    /// 待处理的会话打开请求(由对应工作区窗口消费)
     var sessionRequest: SessionOpenRequest?
 
     /// 主窗口(由工作台视图登记;窗口关闭后系统会释放它)

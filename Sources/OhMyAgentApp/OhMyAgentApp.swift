@@ -225,8 +225,12 @@ struct OhMyAgentApp: App {
 struct WorkbenchCommands: Commands {
     private let shortcuts = ShortcutStore.shared
     private let workbench = AppEnvironment.shared.workbench
+    /// 菜单命令在启动时就会求值,早于任何窗口视图:借它登记「打开 Agent 窗口」的动作,
+    /// 否则直接恢复到编辑器模式启动时 Agent 窗口从未创建,切换按钮没有办法把它拉起来。
+    @Environment(\.openWindow) private var openWindow
 
     var body: some Commands {
+        let _ = AppActions.shared.capture(openWindow: openWindow)
         CommandGroup(after: .newItem) {
             Button("新对话") { workbench.newConversationInContext() }
                 .keyboardShortcut(shortcuts.shortcut(for: .newConversation))
