@@ -69,7 +69,8 @@ struct IDETitleBar: View {
         }
         .frame(height: TitlebarMetrics.height)
         .frame(maxWidth: .infinity)
-        .background(OMColors.contentBackground)
+        // 拖动区必须在背景色之上(先加拖动区、再加背景色),否则不透明背景会拦住按下事件
         .background(WindowDragArea())
+        .background(OMColors.contentBackground)
     }
 }
