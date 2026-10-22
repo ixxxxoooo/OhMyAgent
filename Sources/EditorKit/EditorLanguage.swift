@@ -272,6 +272,8 @@ public final class EditorTextView: NSTextView {
             applyEdit(EditorEditing.duplicateLines(text: string, selection: selection, down: action == .duplicateLineDown))
         case .addNextOccurrence:
             addNextOccurrence()
+        case .fold, .unfold, .foldAll, .unfoldAll:
+            break  // 视图级动作,由 `CodeEditorView.perform` 处理
         }
     }
 
@@ -537,4 +539,6 @@ private extension NSString {
 /// 编辑器可被外部(命令面板、菜单)触发的编辑动作。
 public enum EditorAction: Sendable {
     case toggleComment, deleteLine, moveLineUp, moveLineDown, duplicateLineUp, duplicateLineDown, addNextOccurrence
+    /// 折叠/展开(视图级动作,只读文件也可用)
+    case fold, unfold, foldAll, unfoldAll
 }

@@ -2876,3 +2876,5 @@
 "IDE 窗口的编辑器右侧显示代码缩略图,点击或拖动可快速滚动。" = "Show a code minimap on the right of the editor in IDE windows; click or drag to scroll quickly.";
 "粘性滚动" = "Sticky scroll";
 "IDE 窗口的编辑器顶部固定显示当前所在的外层代码块标题(最多 3 行),点击跳转。" = "Pin the headers of the enclosing code blocks (up to 3 lines) at the top of the editor in IDE windows; click to jump.";
+"折叠" = "Fold";
+"全部展开" = "Unfold All";

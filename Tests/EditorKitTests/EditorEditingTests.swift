@@ -213,6 +213,12 @@ struct EditorEditingViewTests {
 
 @Suite("粘性滚动与缩略图采样")
 struct EditorScopesTests {
+    @Test func 只含换行的行是空白行() {
+        #expect(EditorScopes.indent(of: "\n") == nil)
+        #expect(EditorScopes.indent(of: "   \r\n") == nil)
+        #expect(EditorScopes.indent(of: "  x\n") == 2)
+    }
+
     @Test func 行尾换行不影响块头判断() {
         #expect(EditorScopes.opensBlock("func f() {\n"))
         #expect(!EditorScopes.opensBlock("let x = 1\r\n"))
@@ -259,5 +265,67 @@ struct EditorScopesTests {
         let sampled = EditorScopes.minimapLines(lineCount: 1000, rows: 100)
         #expect(sampled.count == 100 && sampled.first == 0 && sampled.last == 990)
         #expect(EditorScopes.minimapLines(lineCount: 0, rows: 5).isEmpty)
+    }
+}
+
+@Suite("代码折叠")
+struct EditorFoldingTests {
+    private static let source = """
+    struct A {
+        func f() {
+            work()
+
+            more()
+        }
+        var y = 1
+    }
+    let z = 2
+    """
+    private static let lines = source.components(separatedBy: "\n").map { $0 + "\n" }
+
+    private func text(_ line: Int) -> String? { Self.lines.indices.contains(line) ? Self.lines[line] : nil }
+
+    @Test("块头的折叠区间:正文含内部空行,闭合行保持可见")
+    func region() {
+        let outer = EditorFolding.region(startingAt: 0, lineCount: Self.lines.count, text: text)
+        #expect(outer == FoldRegion(header: 0, body: 1...6))
+        let inner = EditorFolding.region(startingAt: 1, lineCount: Self.lines.count, text: text)
+        #expect(inner == FoldRegion(header: 1, body: 2...4))
+        #expect(EditorFolding.region(startingAt: 2, lineCount: Self.lines.count, text: text) == nil)
+        #expect(EditorFolding.region(startingAt: 8, lineCount: Self.lines.count, text: text) == nil)
+    }
+
+    @Test("全部区域与最外层区域")
+    func all() {
+        let regions = EditorFolding.allRegions(lineCount: Self.lines.count, text: text)
+        #expect(regions.map(\.header) == [0, 1])
+        #expect(EditorFolding.outermost(regions).map(\.header) == [0])
+    }
+
+    @Test("编辑后隐藏范围平移或展开")
+    func adjust() {
+        let hidden = [NSRange(location: 20, length: 10), NSRange(location: 50, length: 5)]
+        // 在第一段之前插入 3 个字符:两段都平移
+        let shifted = EditorFolding.adjust(hidden: hidden, edited: NSRange(location: 5, length: 3), delta: 3)
+        #expect(shifted == [NSRange(location: 23, length: 10), NSRange(location: 53, length: 5)])
+        // 编辑落在第一段内部:该段展开,第二段平移
+        let opened = EditorFolding.adjust(hidden: hidden, edited: NSRange(location: 25, length: 2), delta: 2)
+        #expect(opened == [NSRange(location: 52, length: 5)])
+        // 编辑在两段之间:第一段不动,第二段平移
+        let between = EditorFolding.adjust(hidden: hidden, edited: NSRange(location: 35, length: 0), delta: 0)
+        #expect(between == hidden)
+        // 删除跨过第二段:展开
+        let deleted = EditorFolding.adjust(hidden: hidden, edited: NSRange(location: 48, length: 0), delta: -6)
+        #expect(deleted == [NSRange(location: 20, length: 10)])
+    }
+
+    @Test("隐藏判断与行区间换算")
+    func hiddenRange() {
+        let hidden = [NSRange(location: 10, length: 5), NSRange(location: 30, length: 4)]
+        #expect(EditorFolding.isHidden(10, in: hidden) && EditorFolding.isHidden(14, in: hidden))
+        #expect(!EditorFolding.isHidden(15, in: hidden) && !EditorFolding.isHidden(9, in: hidden) && EditorFolding.isHidden(33, in: hidden))
+        let starts = [0, 10, 20, 30]
+        #expect(EditorFolding.hiddenRange(for: 1...2, lineStart: { starts.indices.contains($0) ? starts[$0] : nil }, textLength: 40) == NSRange(location: 10, length: 20))
+        #expect(EditorFolding.hiddenRange(for: 3...3, lineStart: { starts.indices.contains($0) ? starts[$0] : nil }, textLength: 40) == NSRange(location: 30, length: 10))
     }
 }

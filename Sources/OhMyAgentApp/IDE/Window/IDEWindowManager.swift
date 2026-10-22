@@ -125,6 +125,7 @@ final class IDEWindowManager {
         case newTerminal, showProblems
         case quickOpen, commandPalette, goToLine, showSearch
         case showSymbols, showReferences, renameSymbol, formatDocument
+        case foldCode, unfoldCode
     }
 
     /// 若当前键盘窗口是 IDE 窗口,执行命令并返回 true;否则返回 false(调用方走 Agent 窗口的默认行为)。
@@ -154,6 +155,8 @@ final class IDEWindowManager {
         case .showReferences: controllers[model.id]?.workspace.showReferences()
         case .renameSymbol: controllers[model.id]?.workspace.renameSymbol()
         case .formatDocument: controllers[model.id]?.workspace.formatDocument()
+        case .foldCode: controllers[model.id]?.workspace.perform("edit.fold")
+        case .unfoldCode: controllers[model.id]?.workspace.perform("edit.unfold")
         case .reopenTab: controllers[model.id]?.workspace.reopenClosed()
         case .nextTab: controllers[model.id]?.workspace.cycleTab(by: 1)
         case .previousTab: controllers[model.id]?.workspace.cycleTab(by: -1)

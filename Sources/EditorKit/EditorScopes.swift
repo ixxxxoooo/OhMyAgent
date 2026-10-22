@@ -12,7 +12,7 @@ public enum EditorScopes {
     public static func indent(of line: String, tabWidth: Int = 4) -> Int? {
         var columns = 0
         for char in line {
-            if char == " " { columns += 1 } else if char == "\t" { columns += tabWidth } else { return columns }
+            if char == " " { columns += 1 } else if char == "\t" { columns += tabWidth } else if char.isNewline { return nil } else { return columns }
         }
         return nil
     }

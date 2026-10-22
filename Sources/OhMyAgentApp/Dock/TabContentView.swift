@@ -167,7 +167,7 @@ struct FileTabView: View {
                     CodeEditor(text: text, language: SyntaxLanguage.detect(path: path), isEditable: !doc.isReadOnly, revealLine: tab.line, markers: markers,
                                diagnostics: lsp?.diagnostics ?? [], features: lsp?.features ?? EditorLanguageFeatures(),
                                onReferenceSelection: { range in referenceSelection(range, text: doc.text ?? text) },
-                               chrome: ideHost == nil ? [] : [.minimap, .stickyScroll],
+                               chrome: ideHost == nil ? [] : [.minimap, .stickyScroll, .folding],
                                onCaretChange: ideHost.map { host in { host.caret(path, $0) } },
                                onChange: { newText in doc.text = newText })
                         .environment(\.tabIsActive, isActive && mode.showsEditor)

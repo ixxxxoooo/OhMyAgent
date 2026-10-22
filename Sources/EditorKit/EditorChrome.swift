@@ -13,6 +13,8 @@ public struct EditorChrome: OptionSet, Sendable {
     public static let minimap = EditorChrome(rawValue: 1 << 0)
     /// 顶部粘性滚动
     public static let stickyScroll = EditorChrome(rawValue: 1 << 1)
+    /// 行号栏折叠箭头与代码折叠
+    public static let folding = EditorChrome(rawValue: 1 << 2)
 }
 
 /// 偏好键(设置 → 编辑器 → 代码编辑)。

@@ -6,11 +6,13 @@
 // - `OMA_IDE_SIDEBAR=explorer|search|scm`:启动后切到该侧栏视图;`OMA_IDE_QUERY=词` 预填搜索词(配合 search);
 // - `OMA_IDE_PANEL=terminal|problems|output`:启动后显示底部面板并切到该标签页;
 // - `OMA_IDE_PALETTE=<输入>`:启动后打开命令面板并预填输入(如 `>保存`、`:12`、`main`);
+// - `OMA_IDE_EDITOR_ACTIONS=动作1;动作2`:打开文件后依次执行编辑器动作(`goto:行`、`foldline:行`、`fold`、`unfold`、`foldAll`、`unfoldAll`、`nextOcc`、`type:文本`、`wait:毫秒`);
 // - `OMA_IDE_SWEEP=N`:开关/切换基准,重复 N 轮「冷开 → 切回 Agent → 热切到 IDE → 关闭」,
 //   perf 日志「IDE 窗口基准」记录每轮耗时与内存漂移(计划预算:热切换 ≤ 50ms、冷开 ≤ 250ms、20 轮漂移 ≤ 10MB)。
 
 import AppKit
 import Foundation
+import EditorKit
 import IDEKit
 import OMLog
 
@@ -59,6 +61,44 @@ enum IDEDebugHooks {
             var line: Int?
             if let colon = raw.lastIndex(of: ":"), let number = Int(raw[raw.index(after: colon)...]) { path = String(raw[..<colon]); line = number }
             workspace.model.openFile(absolute(path), line: line, preview: false)
+        }
+        if let raw = env["OMA_IDE_EDITOR_ACTIONS"], !raw.isEmpty { await runEditorActions(raw) }
+    }
+
+    /// 在所有窗口里找第一个可见的代码编辑器(应用在后台时没有键盘焦点,`activeEditor` 为空)。
+    private static func firstEditor() -> CodeEditorView? {
+        func search(_ view: NSView) -> CodeEditorView? {
+            if let editor = view as? CodeEditorView, !editor.isHiddenOrHasHiddenAncestor { return editor }
+            for child in view.subviews { if let found = search(child) { return found } }
+            return nil
+        }
+        for window in NSApp.windows { if let content = window.contentView, let found = search(content) { return found } }
+        return nil
+    }
+
+    /// 执行 `OMA_IDE_EDITOR_ACTIONS` 的动作序列(验证折叠、多光标等编辑器行为用)。
+    private static func runEditorActions(_ raw: String) async {
+        try? await Task.sleep(for: .milliseconds(1500))
+        for token in raw.split(separator: ";").map({ String($0).trimmingCharacters(in: .whitespaces) }) {
+            let parts = token.split(separator: ":", maxSplits: 1).map(String.init)
+            let argument = parts.count > 1 ? parts[1] : ""
+            guard let editor = CodeEditorView.activeEditor() ?? firstEditor() else {
+                Log.app.warning("编辑器动作:没有活动编辑器", ["action": token])
+                continue
+            }
+            switch parts.first ?? "" {
+            case "goto": editor.goToLine(Int(argument) ?? 1)
+            case "foldline": editor.fold(line: max((Int(argument) ?? 1) - 1, 0))
+            case "fold": editor.perform(.fold)
+            case "unfold": editor.perform(.unfold)
+            case "foldAll": editor.perform(.foldAll)
+            case "unfoldAll": editor.perform(.unfoldAll)
+            case "nextOcc": editor.perform(.addNextOccurrence)
+            case "type": editor.textView.insertText(argument, replacementRange: editor.textView.selectedRange())
+            case "wait": try? await Task.sleep(for: .milliseconds(Int(argument) ?? 500))
+            default: Log.app.warning("编辑器动作:未知", ["action": token])
+            }
+            try? await Task.sleep(for: .milliseconds(300))
         }
     }
 

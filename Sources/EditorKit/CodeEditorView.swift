@@ -25,7 +25,9 @@ public final class CodeEditorView: NSView {
 
     public let scrollView = NSScrollView()
     public let textView: EditorTextView
-    private let ruler: LineNumberRulerView
+    let ruler: LineNumberRulerView
+    /// 被折叠(隐藏)的字符范围,升序且互不重叠(见 `CodeEditorView+Folding.swift`)
+    var foldedRanges: [NSRange] = []
     private let engine = HighlightEngine()
     var theme: EditorTheme
     /// 上次应用的字体族与字号偏好,用来判断偏好是否真的变了
@@ -33,8 +35,8 @@ public final class CodeEditorView: NSView {
     private var appliedSize = EditorFontPrefs.preferredSize
     /// IDE 外围视图(缩略图、粘性滚动);默认都不显示
     public var chrome: EditorChrome = [] { didSet { if chrome != oldValue { applyChrome() } } }
-    private var minimap: EditorMinimapView?
-    private var sticky: EditorStickyView?
+    var minimap: EditorMinimapView?
+    var sticky: EditorStickyView?
     private var scrollTrailing: NSLayoutConstraint?
     private var stickyHeight: NSLayoutConstraint?
     /// 光标变化回调(状态栏用)
@@ -126,6 +128,9 @@ public final class CodeEditorView: NSView {
         scrollView.contentView.postsBoundsChangedNotifications = true
 
         textView.delegate = self
+        textView.textContentStorage?.delegate = self
+        ruler.foldGlyph = { [weak self] line in self?.foldGlyph(forLine: line) ?? .none }
+        ruler.onFoldClick = { [weak self] line in self?.toggleFold(line: line) }
         textView.onGoToLine = { CodeEditorView.goToLineHandler?() }
         textView.currentLineColor = theme.currentLine.withAlphaComponent(0.55)
         textView.bracketColor = theme.foreground.withAlphaComponent(0.16)
@@ -205,6 +210,8 @@ public final class CodeEditorView: NSView {
 
     /// 按 `chrome` 与偏好创建/移除缩略图与粘性滚动视图。
     func applyChrome() {
+        ruler.foldInset = chrome.contains(.folding) ? 14 : 0
+        if !chrome.contains(.folding), !foldedRanges.isEmpty { unfoldAll() }
         let wantsMinimap = chrome.contains(.minimap) && EditorBehaviorPrefs.minimap
         if wantsMinimap, minimap == nil {
             let view = EditorMinimapView(editor: self)
@@ -259,8 +266,9 @@ public final class CodeEditorView: NSView {
 
     /// 文本存储完成一次字符编辑:用编辑范围与长度变化增量更新行索引(属性变更如高亮不会走到这里的字符分支)。
     @objc private func storageDidProcessEditing(_ notification: Notification) {
-        guard let storage = notification.object as? NSTextStorage,
-              storage.editedMask.contains(.editedCharacters), lineIndexIsLive else { return }
+        guard let storage = notification.object as? NSTextStorage, storage.editedMask.contains(.editedCharacters) else { return }
+        adjustFolds(edited: storage.editedRange, delta: storage.changeInLength)
+        guard lineIndexIsLive else { return }
         if lineIndex.applyEdit(editedRange: storage.editedRange, changeInLength: storage.changeInLength, text: storage.mutableString) {
             ruler.lineIndex = lineIndex
         } else {
@@ -296,6 +304,7 @@ public final class CodeEditorView: NSView {
         rebuildTask?.cancel()
         highlightTask?.cancel()
         lineIndexIsLive = false
+        foldedRanges = []
 
         // 新文本使旧诊断失效(属性随文本一起被清掉)
         diagnostics = []
@@ -442,6 +451,7 @@ public final class CodeEditorView: NSView {
         guard let range = lineIndex.range(ofLine: max(line - 1, 0)) else { return }
         let content = max(range.length - ((textView.string as NSString).substring(with: range).hasSuffix("\n") ? 1 : 0), 0)
         let offset = range.location + min(max(column - 1, 0), content)
+        revealFolded(at: offset)
         textView.setSelectedRange(NSRange(location: offset, length: 0))
         textView.scrollRangeToVisible(NSRange(location: offset, length: 0))
         textView.window?.makeFirstResponder(textView)
@@ -452,6 +462,13 @@ public final class CodeEditorView: NSView {
     /// - Parameter action: 动作
     public func perform(_ action: EditorAction) {
         textView.window?.makeFirstResponder(textView)
+        switch action {
+        case .fold: foldAtCaret(); return
+        case .unfold: unfoldAtCaret(); return
+        case .foldAll: foldAll(); return
+        case .unfoldAll: unfoldAll(); return
+        default: break
+        }
         textView.perform(action)
     }
 
@@ -879,6 +896,14 @@ final class LineNumberRulerView: NSRulerView {
     var lineMarkers: [Int: LineMarker] = [:] { didSet { needsDisplay = true } }
     /// 每行最严重的诊断级别(绘制圆点)
     var diagnosticLines: [Int: EditorDiagnostic.Severity] = [:] { didSet { needsDisplay = true } }
+    /// 某行的折叠状态(nil 或返回 `.none` 表示不画箭头)
+    var foldGlyph: ((Int) -> FoldGlyph)?
+    /// 点击折叠箭头
+    var onFoldClick: ((Int) -> Void)?
+    /// 给折叠箭头预留的宽度(0 表示不启用折叠)
+    var foldInset: CGFloat = 0 { didSet { ruleThickness = 52 + foldInset; needsDisplay = true } }
+    /// 鼠标是否在行号栏内(展开状态的箭头只在悬停时显示)
+    private var hovering = false
 
     init(scrollView: NSScrollView, theme: EditorTheme) {
         self.theme = theme
@@ -922,10 +947,13 @@ final class LineNumberRulerView: NSRulerView {
             // 等宽数字:宽度 = 位数 × 数字宽,不必每行构造富文本再量尺寸(5 万行文件输入时标尺重绘是热点)
             let label = String(line + 1) as NSString
             let width = digitWidth * CGFloat(label.length)
-            label.draw(at: NSPoint(x: self.ruleThickness - width - 8, y: pointInRuler.y + (frame.height - digitHeight) / 2), withAttributes: attributes)
+            label.draw(at: NSPoint(x: self.ruleThickness - width - 8 - self.foldInset, y: pointInRuler.y + (frame.height - digitHeight) / 2), withAttributes: attributes)
             if let severity = self.diagnosticLines[line] {
                 CodeEditorView.color(for: severity).setFill()
                 NSBezierPath(ovalIn: NSRect(x: 6, y: pointInRuler.y + (frame.height - 6) / 2, width: 6, height: 6)).fill()
+            }
+            if self.foldInset > 0, let glyph = self.foldGlyph?(line), glyph != .none, glyph == .collapsed || self.hovering {
+                self.drawChevron(collapsed: glyph == .collapsed, centerY: pointInRuler.y + frame.height / 2)
             }
             if let marker = self.lineMarkers[line] {
                 let color: NSColor
@@ -940,5 +968,58 @@ final class LineNumberRulerView: NSRulerView {
             }
             return true
         }
+    }
+
+    /// 在行号栏右侧画折叠箭头(收起 ▸ / 展开 ▾)。
+    private func drawChevron(collapsed: Bool, centerY: CGFloat) {
+        let x = ruleThickness - foldInset - 2
+        let path = NSBezierPath()
+        if collapsed {
+            path.move(to: NSPoint(x: x, y: centerY - 4))
+            path.line(to: NSPoint(x: x + 5, y: centerY))
+            path.line(to: NSPoint(x: x, y: centerY + 4))
+        } else {
+            path.move(to: NSPoint(x: x - 1, y: centerY - 2))
+            path.line(to: NSPoint(x: x + 6, y: centerY - 2))
+            path.line(to: NSPoint(x: x + 2.5, y: centerY + 3))
+        }
+        path.close()
+        theme.gutterForeground.setFill()
+        path.fill()
+    }
+
+    // MARK: 鼠标
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        guard foldInset > 0 else { return }
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self))
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        hovering = true
+        needsDisplay = true
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        hovering = false
+        needsDisplay = true
+    }
+
+    /// 点在折叠箭头区域时切换折叠;其他位置交给默认处理。
+    override func mouseDown(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        guard foldInset > 0, point.x >= ruleThickness - foldInset - 6,
+              let textView = clientView as? NSTextView, let layoutManager = textView.textLayoutManager,
+              let contentStorage = layoutManager.textContentManager as? NSTextContentStorage else {
+            super.mouseDown(with: event)
+            return
+        }
+        let inText = textView.convert(point, from: self)
+        let origin = textView.textContainerOrigin
+        guard let fragment = layoutManager.textLayoutFragment(for: NSPoint(x: origin.x + 1, y: inText.y - origin.y)) else { return }
+        let line = lineIndex.line(containing: contentStorage.nsRange(fragment.rangeInElement).location)
+        if let glyph = foldGlyph?(line), glyph != .none { onFoldClick?(line) }
     }
 }

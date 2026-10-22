@@ -299,6 +299,10 @@ struct WorkbenchCommands: Commands {
                 .keyboardShortcut(functionKeyEquivalent(NSF2FunctionKey), modifiers: [])
             Button("格式化文档") { IDEWindowManager.shared.route(.formatDocument) }
                 .keyboardShortcut("f", modifiers: [.option, .shift])
+            Button("折叠") { IDEWindowManager.shared.route(.foldCode) }
+                .keyboardShortcut("[", modifiers: [.command, .option])
+            Button("展开") { IDEWindowManager.shared.route(.unfoldCode) }
+                .keyboardShortcut("]", modifiers: [.command, .option])
         }
         CommandGroup(replacing: .appSettings) {
             Button("设置…") { AppActions.shared.openSettings() }
