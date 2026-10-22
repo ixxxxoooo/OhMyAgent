@@ -12,6 +12,14 @@ import Observation
 import OMLog
 import WorkbenchKit
 
+/// 底部面板里的一个 Agent 终端(后台命令的实时输出)。
+struct IDEAgentTerminal: Identifiable {
+    /// 终端 ID(与 `TerminalSession.id` 一致)
+    let id: String
+    /// 会话(输出实时更新)
+    let session: TerminalSession
+}
+
 @MainActor
 @Observable
 final class IDEWorkspace {
@@ -35,6 +43,8 @@ final class IDEWorkspace {
     /// (`agentProjectID` 必须可观察:面板在它赋值前渲染过一次,赋值后要能重新取会话)
     var agentProjectID: String?
     @ObservationIgnored var agentSlot: String?
+    /// 在底部终端面板里查看的 Agent 终端(只读,不属于项目共享的 shell 终端)
+    var agentTerminals: [IDEAgentTerminal] = []
     /// 最近关闭的文件标签(供「重新打开已关闭的标签」)
     @ObservationIgnored var closedStack: [TabKind] = []
     /// 各文件的语言服务器会话(`FileTabView` 登记)

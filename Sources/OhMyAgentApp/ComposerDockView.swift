@@ -353,6 +353,7 @@ private struct TerminalDockRow: View {
     private func viewInPanel() { AppActions.shared.viewAgentTerminal(session, model: model) }
 
     private func open() {
+        if let workspace = IDEWindowManager.shared.keyWorkspace { workspace.showAgentTerminal(session); return }
         guard let project = workbench.projectID(of: model) else { return }
         workbench.openAgentTerminal(project: project, terminalID: session.id, title: session.command)
     }

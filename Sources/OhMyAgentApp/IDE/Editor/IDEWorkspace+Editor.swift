@@ -2,6 +2,7 @@
 // IDE 工作区的编辑器操作:标签关闭(含未保存确认)、保存、切换、重新打开已关闭的标签、窗口关闭前的脏文件确认。
 
 import AppKit
+import ChatKit
 import EditorKit
 import IDEKit
 import OMLog
@@ -44,8 +45,25 @@ extension IDEWorkspace {
     /// 当前显示的终端:窗口记录的活动终端不在列表里(如被另一个窗口关掉)时取最后一个。
     var activeTerminalID: String? {
         let ids = terminalIDs
-        if let id = model.activeTerminalID, ids.contains(id) { return id }
+        if let id = model.activeTerminalID, ids.contains(id) || agentTerminals.contains(where: { $0.id == id }) { return id }
         return ids.last
+    }
+
+    /// 在底部终端面板里查看 Agent 的终端(后台命令的实时输出),并显示面板。
+    /// - Parameter session: Agent 终端会话
+    func showAgentTerminal(_ session: TerminalSession) {
+        if !agentTerminals.contains(where: { $0.id == session.id }) {
+            agentTerminals.append(IDEAgentTerminal(id: session.id, session: session))
+        }
+        model.activeTerminalID = session.id
+        model.showPanel(.terminal)
+    }
+
+    /// 关闭面板里的 Agent 终端标签(不影响 Agent 的命令本身)。
+    /// - Parameter id: 终端 ID
+    func closeAgentTerminal(_ id: String) {
+        agentTerminals.removeAll { $0.id == id }
+        if model.activeTerminalID == id { model.activeTerminalID = terminalIDs.last ?? agentTerminals.last?.id }
     }
 
     /// 新建终端并显示面板;登记到项目共享表,Agent 窗口随之出现对应的终端标签。

@@ -268,11 +268,16 @@ final class AppActions {
         AppEnvironment.shared.workbench.cycleTerminalTab(step)
     }
 
-    /// 以右栏只读标签查看 Agent 的终端(后台命令的实时输出)。
+    /// 查看 Agent 的终端(后台命令的实时输出):IDE 窗口里显示在底部终端面板,Agent 窗口里是右栏只读标签。
     /// - Parameters:
     ///   - session: Agent 终端会话
     ///   - model: 该终端所属的会话
     func viewAgentTerminal(_ session: TerminalSession, model: SessionModel) {
+        // 在 IDE 窗口里操作就留在 IDE 窗口的终端面板,不跳到 Agent 窗口
+        if let workspace = IDEWindowManager.shared.keyWorkspace {
+            workspace.showAgentTerminal(session)
+            return
+        }
         let workbench = AppEnvironment.shared.workbench
         if let project = workbench.projectID(of: model) ?? workbench.selectedProjectID {
             workbench.openAgentTerminal(project: project, terminalID: session.id, title: session.command)

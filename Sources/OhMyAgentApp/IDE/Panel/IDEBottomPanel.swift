@@ -33,7 +33,8 @@ struct IDEBottomPanel: View {
             if model.panelTab == .terminal {
                 iconButton("plus", String(localized: "新建终端")) { workspace.newTerminal() }
                 iconButton("trash", String(localized: "结束当前终端")) {
-                    if let id = workspace.activeTerminalID { workspace.closeTerminal(id) }
+                    guard let id = workspace.activeTerminalID else { return }
+                    if workspace.agentTerminals.contains(where: { $0.id == id }) { workspace.closeAgentTerminal(id) } else { workspace.closeTerminal(id) }
                 }
             }
             iconButton(model.panelMaximized ? "minimize-2" : "maximize-2", model.panelMaximized ? String(localized: "还原面板大小") : String(localized: "最大化面板")) {
@@ -102,25 +103,53 @@ private struct IDETerminalsView: View {
                         .allowsHitTesting(active)
                         .accessibilityHidden(!active)
                 }
-                if terminalIDs.isEmpty {
+                ForEach(workspace.agentTerminals) { terminal in
+                    let active = terminal.id == activeID
+                    AgentTerminalContentView(session: terminal.session)
+                        .opacity(active ? 1 : 0)
+                        .allowsHitTesting(active)
+                        .accessibilityHidden(!active)
+                }
+                if terminalIDs.isEmpty && workspace.agentTerminals.isEmpty {
                     OMEmptyState { Label("还没有终端", om: "square-terminal") } description: { Text("新建一个终端来运行命令") } actions: {
                         Button("新建终端") { workspace.newTerminal() }
                     }
                 }
             }
-            if terminalIDs.count > 1 {
+            if terminalIDs.count + workspace.agentTerminals.count > 1 {
                 Rectangle().fill(OMColors.hairline).frame(width: 1)
                 ScrollView {
                     VStack(spacing: 0) {
                         ForEach(Array(terminalIDs.enumerated()), id: \.element) { index, id in
                             row(id: id, index: index)
                         }
+                        ForEach(workspace.agentTerminals) { terminal in agentRow(terminal) }
                     }
                 }
                 .frame(width: 140)
             }
         }
-        .task { if terminalIDs.isEmpty { workspace.newTerminal() } }
+        .task { if terminalIDs.isEmpty && workspace.agentTerminals.isEmpty { workspace.newTerminal() } }
+    }
+
+    /// Agent 终端行:锁图标表示只读,标题为命令。
+    private func agentRow(_ terminal: IDEAgentTerminal) -> some View {
+        let active = terminal.id == activeID
+        return HStack(spacing: 6) {
+            Image.om("lock", size: 12)
+            Text(terminal.session.command).font(OMFonts.small).lineLimit(1)
+            Spacer(minLength: 0)
+            Button { workspace.closeAgentTerminal(terminal.id) } label: { Image.om("x", size: 12) }
+                .buttonStyle(.omIcon)
+                .accessibilityLabel(String(localized: "关闭"))
+        }
+        .foregroundStyle(active ? OMColors.primaryText : OMColors.secondaryText)
+        .padding(.horizontal, 8)
+        .frame(height: 24)
+        .background(active ? OMColors.selectedFill : Color.clear)
+        .contentShape(Rectangle())
+        .onTapGesture { model.activeTerminalID = terminal.id }
+        .accessibilityAddTraits(.isButton)
     }
 
     private func row(id: String, index: Int) -> some View {

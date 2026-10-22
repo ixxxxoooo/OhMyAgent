@@ -43,6 +43,11 @@ final class IDEWindowManager {
     /// - Parameter model: 窗口模型
     func controller(for model: IDEWindowModel) -> IDEWindowController? { controllers[model.id] }
 
+    /// 当前键盘窗口若是 IDE 窗口,返回它的工作区(「在哪个窗口操作就在哪个窗口显示」的路由依据)。
+    var keyWorkspace: IDEWorkspace? {
+        WindowContext.shared.ideModel.flatMap { controllers[$0.id]?.workspace }
+    }
+
     // MARK: 打开与切换
 
     /// 打开(或聚焦)某根目录的 IDE 窗口。
