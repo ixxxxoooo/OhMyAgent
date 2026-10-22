@@ -298,6 +298,15 @@ final class AppActions {
     /// - Returns: 是否已前置(或已请求打开)主窗口;false 表示当前没有任何办法显示它(调用方不应据此隐藏其他窗口)
     @discardableResult
     func showMainWindow(adopting frame: NSRect? = nil, replacing source: NSWindow? = nil) -> Bool {
+        // 融合模式下从 IDE 窗口触发(设置、新对话等):原地换成 Agent 窗口,而不是另开一个窗口
+        if frame == nil, source == nil, FusionMode.shared.isEnabled, WindowContext.shared.isIDE {
+            // 切换时选中项目会把主窗口重置回工作台:先记下调用方已设好的模式(如设置页),切完再还原
+            let workbench = AppEnvironment.shared.workbench
+            let mode = workbench.mode
+            IDEWindowManager.shared.switchToAgent()
+            workbench.mode = mode
+            return true
+        }
         NSApp.activate()
         if let window = mainWindow ?? Self.sceneMainWindow() {
             if let frame { window.adoptFusionFrame(frame) }
