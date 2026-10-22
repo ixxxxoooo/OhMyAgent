@@ -47,11 +47,23 @@ final class TerminalContainerView: NSView {
         guard let window, window.isVisible, !window.isMiniaturized, !ownsTerminal else { return false }
         let view = controller.view
         view.removeFromSuperview()
-        view.frame = bounds
-        view.autoresizingMask = [.width, .height]
+        view.autoresizingMask = []
         addSubview(view)
+        syncTerminalFrame()
         controller.hostToken = self
         return true
+    }
+
+    /// 让终端视图始终等于容器大小。不用自动缩放:终端在窗口/分隔条实时缩放期间会暂存目标尺寸、结束时一次性应用
+    /// (`LiveResizeGate`),自动缩放按「旧尺寸 + 增量」算出的中间值会让暂存的最终尺寸偏小,缩放后停在原地。
+    private func syncTerminalFrame() {
+        guard ownsTerminal, controller.view.frame != bounds else { return }
+        controller.view.frame = bounds
+    }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        syncTerminalFrame()
     }
 
     /// 释放终端视图(宿主销毁时,仅当仍由本容器持有)。
