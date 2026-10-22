@@ -198,6 +198,20 @@ struct OMTableLeafContentTests {
         #expect(metrics.totalWidth == metrics.columnWidths.reduce(0, +) + 60)
     }
 
+    @Test("给定可用宽度时按注水分配:短列保持原宽,长列平分剩余并折行,整表不超过可用宽度")
+    func fitsAvailableWidth() {
+        let metrics = OMLeafContent.tableMetrics(naturalWidths: [30, 600, 600], horizontalPadding: 10, maxTotalWidth: 500)
+        #expect(metrics.columnWidths[0] == OMLeafContent.tableMinColumn)
+        #expect(metrics.columnWidths[1] == metrics.columnWidths[2])
+        #expect(metrics.totalWidth <= 500)
+        // 宽度足够时保持自然宽度(且不受单列 360 上限限制)
+        let roomy = OMLeafContent.tableMetrics(naturalWidths: [30, 600], horizontalPadding: 10, maxTotalWidth: 2000)
+        #expect(roomy.columnWidths == [OMLeafContent.tableMinColumn, 602])
+        // 空间小到每列最小宽度都放不下时,退回最小宽度(此时才横向滚动)
+        let tiny = OMLeafContent.tableMetrics(naturalWidths: [300, 300], horizontalPadding: 10, maxTotalWidth: 50)
+        #expect(tiny.columnWidths == [OMLeafContent.tableMinColumn, OMLeafContent.tableMinColumn])
+    }
+
     @Test("行不足的数据行按空单元格补齐;空表返回空文本")
     func raggedAndEmpty() {
         let text = OMLeafContent.table(header: ["a", "b"], rows: [["1"]])

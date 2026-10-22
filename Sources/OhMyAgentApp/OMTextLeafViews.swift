@@ -112,7 +112,7 @@ struct DiffTextLeaf: View {
     }
 }
 
-/// 表格叶子:`NSTextTable` 原生表格排版,不折行(过长内容在单元格内折行),整表超宽时在叶子内常驻横向滚动条;复制得到制表符分隔文本。
+/// 表格叶子:`NSTextTable` 原生表格排版;列宽按可用宽度分配,长文本在单元格内折行(只有每列压到最小仍放不下时才在叶子内横向滚动);复制得到制表符分隔文本。
 struct TableTextLeaf: View {
     let header: [String]
     let rows: [[String]]
@@ -120,6 +120,8 @@ struct TableTextLeaf: View {
     var aligns: [MarkdownTableAlign] = []
     /// 宽松排版(文档阅读页)
     var roomy = false
+    /// 可用宽度(由外层量得并量化);nil 表示未知,列宽只按单列上限封顶
+    var availableWidth: CGFloat?
 
     var body: some View {
         var hasher = Hasher()
@@ -128,11 +130,12 @@ struct TableTextLeaf: View {
         hasher.combine(aligns)
         hasher.combine(OMLeafStyle.current)
         hasher.combine(roomy)
+        hasher.combine(availableWidth)
         return OMTextLeaf(
             signature: hasher.finalize(),
             // 内边距由单元格自己带;超宽时一律常驻滚动条(悬浮滚动条只在滚动时才出现,用户不知道可以横向滚动)
             config: OMTextLeafConfig(wrap: false, inset: .zero, persistentScroller: true, hugsContent: true)
-        ) { OMLeafContent.table(header: header, rows: rows, aligns: aligns, roomy: roomy) }
+        ) { OMLeafContent.table(header: header, rows: rows, aligns: aligns, roomy: roomy, maxWidth: availableWidth) }
         .accessibilityLabel(String(localized: "表格"))
     }
 }

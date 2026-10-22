@@ -155,15 +155,36 @@ enum OMLeafContent {
     }
 
     /// 由各列单元格的自然(单行)宽度算出列宽方案:夹在 [最小, 最大] 之间,留 2pt 余量避免因取整被意外折行。
+    /// 给出 `maxTotalWidth` 时按可用宽度「注水」分配:短列保持自然宽度,长列平分剩余空间并在单元格内折行,整表不再横向溢出
+    /// (即便每列压到最小宽度仍放不下时才保留横向滚动)。
     /// - Parameters:
     ///   - naturalWidths: 每列最宽单元格的单行宽度
     ///   - horizontalPadding: 单元格左右内边距(单侧)
+    ///   - maxTotalWidth: 整表可用宽度(含内边距);nil 表示不限,仅按单列最大宽度封顶
     /// - Returns: 列宽方案
-    static func tableMetrics(naturalWidths: [CGFloat], horizontalPadding: CGFloat) -> TableMetrics {
-        TableMetrics(
-            columnWidths: naturalWidths.map { min(max(ceil($0) + 2, tableMinColumn), tableMaxColumn) },
-            horizontalPadding: horizontalPadding
-        )
+    static func tableMetrics(naturalWidths: [CGFloat], horizontalPadding: CGFloat, maxTotalWidth: CGFloat? = nil) -> TableMetrics {
+        let natural = naturalWidths.map { max(ceil($0) + 2, tableMinColumn) }
+        guard let maxTotalWidth, maxTotalWidth.isFinite, maxTotalWidth > 0 else {
+            return TableMetrics(columnWidths: natural.map { min($0, tableMaxColumn) }, horizontalPadding: horizontalPadding)
+        }
+        let available = maxTotalWidth - horizontalPadding * 2 * CGFloat(natural.count)
+        if natural.reduce(0, +) <= available { return TableMetrics(columnWidths: natural, horizontalPadding: horizontalPadding) }
+        // 注水:从最窄的列起,自然宽度不超过当前均分额的列保持原样,其余列平分剩下的宽度
+        var widths = [CGFloat](repeating: tableMinColumn, count: natural.count)
+        var remaining = max(available, tableMinColumn * CGFloat(natural.count))
+        var pending = natural.indices.sorted { natural[$0] < natural[$1] }
+        while let first = pending.first {
+            let share = remaining / CGFloat(pending.count)
+            if natural[first] <= share {
+                widths[first] = natural[first]
+                remaining -= natural[first]
+                pending.removeFirst()
+            } else {
+                for index in pending { widths[index] = max(share.rounded(.down), tableMinColumn) }
+                break
+            }
+        }
+        return TableMetrics(columnWidths: widths, horizontalPadding: horizontalPadding)
     }
 
     /// 表格的富文本:用 `NSTextTable` 排版(与 TextEdit/邮件同一套原生表格引擎),每个单元格是真正的表格单元:
@@ -174,8 +195,9 @@ enum OMLeafContent {
     ///   - rows: 数据行
     ///   - aligns: 每列对齐(缺省按左对齐)
     ///   - roomy: 宽松排版(文档阅读页:内边距更大)
+    ///   - maxWidth: 可用宽度;给出时列宽按它分配,长文本在单元格内折行而不是横向滚动
     /// - Returns: 富文本
-    static func table(header: [String], rows: [[String]], aligns: [MarkdownTableAlign] = [], roomy: Bool = false) -> NSAttributedString {
+    static func table(header: [String], rows: [[String]], aligns: [MarkdownTableAlign] = [], roomy: Bool = false, maxWidth: CGFloat? = nil) -> NSAttributedString {
         // 文档排版(整页阅读):字号与会话一致,只放宽单元格内边距
         let size = 11.5 * OMScale.ui
         let padH: CGFloat = roomy ? 14 : 10
@@ -192,7 +214,7 @@ enum OMLeafContent {
                 natural[index] = max(natural[index], width)
             }
         }
-        let metrics = tableMetrics(naturalWidths: natural, horizontalPadding: padH)
+        let metrics = tableMetrics(naturalWidths: natural, horizontalPadding: padH, maxTotalWidth: maxWidth)
         let table = NSTextTable()
         table.numberOfColumns = columns
         table.layoutAlgorithm = .fixedLayoutAlgorithm

@@ -240,11 +240,20 @@ struct TableBlockView: View {
     let rows: [[String]]
     var aligns: [MarkdownTableAlign] = []
     @Environment(\.markdownDocument) private var document
+    /// 可用宽度(8pt 量化,避免拖动窗口时逐像素重建表格);首帧未知时为 nil
+    @State private var availableWidth: CGFloat?
 
     var body: some View {
-        TableTextLeaf(header: header, rows: rows, aligns: aligns, roomy: document)
-            // 表头底色是矩形,按卡片圆角裁切,避免顶部两角溢出
-            .clipShape(RoundedRectangle(cornerRadius: OMMetrics.cardRadius, style: .continuous))
-            .omSolidCard()
+        VStack(alignment: .leading, spacing: 0) {
+            // 零高度的占位撑满整行,用来量出可用宽度;表格卡片仍贴合内容、靠左
+            Color.clear.frame(height: 0).frame(maxWidth: .infinity)
+                .onGeometryChange(for: CGFloat.self) { ($0.size.width / 8).rounded(.down) * 8 } action: { width in
+                    if width > 0, width != availableWidth { availableWidth = width }
+                }
+            TableTextLeaf(header: header, rows: rows, aligns: aligns, roomy: document, availableWidth: availableWidth)
+                // 表头底色是矩形,按卡片圆角裁切,避免顶部两角溢出
+                .clipShape(RoundedRectangle(cornerRadius: OMMetrics.cardRadius, style: .continuous))
+                .omSolidCard()
+        }
     }
 }
