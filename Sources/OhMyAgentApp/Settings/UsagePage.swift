@@ -144,6 +144,10 @@ struct UsagePage: View {
                     .cornerRadius(3)
             }
             .chartXAxis { dayAxis(count: window.count) }
+            .chartHoverTip { proxy, point in
+                guard let day = dayEntry(proxy, point, in: window, key: \.date) else { return nil }
+                return "\(day.date)\n\(String(localized: String.LocalizationValue(metric.title))):\(metric.value(of: day).formatted())"
+            }
             .frame(height: 160)
             .accessibilityLabel(String(localized: "活动趋势图"))
         } header: {
@@ -175,6 +179,11 @@ struct UsagePage: View {
                 }
             }
             .chartLegend(position: .bottom, alignment: .leading)
+            .chartHoverTip { proxy, point in
+                guard let day = dayEntry(proxy, point, in: window, key: \.date) else { return nil }
+                let lines = names.compactMap { name in day.byModel[name].map { "\(name):\(ContextUsage.formatTokens($0))" } }
+                return ([day.date] + lines).joined(separator: "\n")
+            }
             .frame(height: 190)
             .accessibilityLabel(String(localized: "每日 Token 图"))
         } header: {
@@ -209,6 +218,14 @@ struct UsagePage: View {
                 }
             }
             .chartLegend(position: .bottom, alignment: .leading)
+            .chartHoverTip { proxy, point in
+                guard let name = proxy.value(atY: point.y, as: String.self),
+                      let item = top.first(where: { $0.model == name }) else { return nil }
+                return [name,
+                        String(localized: "输入") + ":" + ContextUsage.formatTokens(item.inputTokens),
+                        String(localized: "输出") + ":" + ContextUsage.formatTokens(item.outputTokens),
+                        String(localized: "缓存读取") + ":" + ContextUsage.formatTokens(item.cacheReadTokens)].joined(separator: "\n")
+            }
             .frame(height: CGFloat(max(top.count, 1)) * 34 + 56)
             .accessibilityLabel(String(localized: "按模型用量图"))
             ForEach(top) { item in
@@ -228,6 +245,24 @@ struct UsagePage: View {
     }
 
     // MARK: - 辅助
+
+    /// 鼠标横坐标对应的那一天(按日期取最近的柱)。
+    /// - Parameters:
+    ///   - proxy: 图表代理
+    ///   - point: 绘图区内坐标
+    ///   - window: 窗口内的数据
+    ///   - key: 取日期字符串的路径
+    /// - Returns: 命中的数据项;不在范围内返回 nil
+    private func dayEntry<T>(_ proxy: ChartProxy, _ point: CGPoint, in window: [T], key: KeyPath<T, String>) -> T? {
+        guard let date: Date = proxy.value(atX: point.x),
+              let nearest = window.min(by: { lhs, rhs in
+                  abs((UsageStatsSnapshot.parseDay(lhs[keyPath: key]) ?? .distantPast).timeIntervalSince(date))
+                      < abs((UsageStatsSnapshot.parseDay(rhs[keyPath: key]) ?? .distantPast).timeIntervalSince(date))
+              }),
+              let day = UsageStatsSnapshot.parseDay(nearest[keyPath: key]),
+              abs(day.timeIntervalSince(date)) <= 86_400 else { return nil }
+        return nearest
+    }
 
     /// 横轴:每隔若干天一个刻度,标签只显示月/日。
     private func dayAxis(count: Int) -> some AxisContent {

@@ -26,7 +26,7 @@ public final class OMTooltipCenter {
     ///   - owner: 发起悬停的视图标识(用于只关闭自己的提示)
     ///   - text: 提示文字(空串不显示)
     ///   - icon: 可选 Lucide 图标
-    func schedule(owner: UUID, text: String, icon: String?) {
+    public func schedule(owner: UUID, text: String, icon: String?) {
         guard !text.isEmpty else { return }
         showTask?.cancel()
         self.owner = owner
@@ -40,7 +40,7 @@ public final class OMTooltipCenter {
 
     /// 悬停结束或视图消失:关闭该视图发起的提示。
     /// - Parameter owner: 视图标识;传 nil 无条件关闭
-    func hide(owner: UUID?) {
+    public func hide(owner: UUID?) {
         if let owner, owner != self.owner { return }
         showTask?.cancel()
         self.owner = nil
