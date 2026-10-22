@@ -25,12 +25,12 @@ struct IDEAgentPane: View {
             header
             Rectangle().fill(OMColors.hairline).frame(height: 1)
             // 对话内容有刚性最小宽度(输入区、表格等),比面板窄时会把整个面板撑宽并向两侧溢出,
-            // 顶部栏与对话错位、刻度线越过左边界:这里把内容锁在面板宽度内,左对齐,多出的部分裁掉。
-            GeometryReader { proxy in
-                content
-                    .frame(width: proxy.size.width, height: proxy.size.height, alignment: .leading)
-                    .clipped()
-            }
+            // 顶部栏与对话错位、刻度线越过左边界:用 overlay 承载内容(不参与父级尺寸计算),左对齐,多出的部分裁掉。
+            // (不能用 GeometryReader + 固定 frame:长会话的时间线会整屏空白)
+            Color.clear
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .overlay(alignment: .topLeading) { content }
+                .clipped()
         }
         .frame(maxHeight: .infinity)
         .background(OMColors.surface)
