@@ -11,6 +11,8 @@ import WorkbenchKit
 /// 对话视图。
 struct ChatView: View {
     let model: SessionModel
+    /// 是否在左缘显示「对话锚点」迷你导航条(IDE 的 Agent 面板窄,关掉)
+    var showsAnchorRail = true
     @State private var position = ScrollPosition(edge: .bottom)
     /// 跟随底部状态(`FollowState` 的观察包装:逐帧暂存字段不触发 body 重算,见 FollowTracker)
     @State private var follow = FollowTracker()
@@ -226,7 +228,7 @@ struct ChatView: View {
             }
         }
         .overlay(alignment: .leading) {
-            ConversationAnchorRail(model: model, sticky: sticky, jump: anchorJump)
+            if showsAnchorRail { ConversationAnchorRail(model: model, sticky: sticky, jump: anchorJump) }
         }
         .onChange(of: tabActive) { _, active in
             if active { scheduleBlankCheck(after: .milliseconds(300)) } else { blankGuard.cancel() }
