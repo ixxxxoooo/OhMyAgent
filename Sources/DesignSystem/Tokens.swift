@@ -137,8 +137,9 @@ public enum OMColors {
     public static var statusIdle: Color { ResolvedTokens.current.statusIdle }
     /// 全窗遮罩(搜索窗等模态浮层背后):随主题明暗。
     public static var scrim: Color { ResolvedTokens.current.scrim }
-    /// 系统主题的内容区背景:浅色 #F6F6F7、深色 #1E1F22。
-    public static var contentBackground: Color { systemContentBackground }
+    /// 内容区背景:跟随当前主题(等同 `surface`);系统主题下浅色 #F6F6F7、深色 #1E1F22。
+    /// 需要「与主题无关的系统色」时用 `systemContentBackground`。
+    public static var contentBackground: Color { surface }
     /// 系统主题的内容区背景(与是否选了主题包无关;主题卡片预览取样用)。
     public static let systemContentBackground = Color(nsColor: NSColor(name: nil) { appearance in
         appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
