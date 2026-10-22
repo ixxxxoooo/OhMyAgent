@@ -124,6 +124,72 @@ public enum FuzzyMatcher {
         return FuzzyMatch(path: path, score: score, positions: positions)
     }
 
+    /// 把查询规整为小写、去空白的 ASCII 字节;含非 ASCII 返回 nil(走通用路径)。
+    /// - Parameter query: 查询
+    static func asciiQuery(_ query: String) -> [UInt8]? {
+        var result: [UInt8] = []
+        for byte in query.utf8 {
+            if byte >= 0x80 { return nil }
+            if byte == 0x20 || (byte >= 0x09 && byte <= 0x0D) { continue }
+            result.append(byte >= 65 && byte <= 90 ? byte | 0x20 : byte)
+        }
+        return result.isEmpty ? nil : result
+    }
+
+    /// `match` 的 ASCII 字节快路径:评分规则与 `match` 完全一致。
+    /// - Parameters:
+    ///   - query: 已规整的查询字节(见 `asciiQuery`)
+    ///   - path: 候选路径
+    ///   - withPositions: 是否记录命中位置(只需排序时关闭以免分配)
+    /// - Returns: `nil` 表示路径含非 ASCII,应走通用路径;`.some(nil)` 表示不匹配;`.some(.some(m))` 为命中。
+    static func matchASCII(query q: [UInt8], path: String, withPositions: Bool = true) -> ASCIIMatch? {
+        var copy = path
+        return copy.withUTF8 { buf -> ASCIIMatch? in
+            for byte in buf where byte >= 0x80 { return nil }
+            let count = buf.count
+            var nameStart = 0
+            for index in stride(from: count - 1, through: 0, by: -1) where buf[index] == 0x2F { nameStart = index + 1; break }
+            @inline(__always) func lowered(_ byte: UInt8) -> UInt8 { byte >= 65 && byte <= 90 ? byte | 0x20 : byte }
+            // 先做一次纯子序列判断,绝大多数不匹配的路径在此返回,不分配数组
+            var probe = 0
+            for byte in buf where probe < q.count && lowered(byte) == q[probe] { probe += 1 }
+            guard probe == q.count else { return ASCIIMatch(value: nil) }
+            var positions: [Int] = []
+            if withPositions { positions.reserveCapacity(q.count) }
+            var score = 0
+            var qi = 0
+            var last = -2
+            for index in 0..<count where qi < q.count && lowered(buf[index]) == q[qi] {
+                if withPositions { positions.append(index) }
+                if index == last + 1 { score += 8 }
+                let previous: UInt8 = index > 0 ? buf[index - 1] : 0
+                if index == 0 || previous == 0x2F || previous == 0x5F || previous == 0x2D || previous == 0x2E || previous == 0x20 { score += 10 }
+                else if buf[index] >= 65 && buf[index] <= 90, previous >= 97 && previous <= 122 { score += 8 }
+                if index >= nameStart { score += 4 }
+                score += 1
+                last = index
+                qi += 1
+            }
+            // 文件名完整包含查询时大幅加分
+            if nameStart + q.count <= count {
+                var found = false
+                var start = nameStart
+                while start + q.count <= count, !found {
+                    var matched = true
+                    for offset in 0..<q.count where lowered(buf[start + offset]) != q[offset] { matched = false; break }
+                    found = matched
+                    start += 1
+                }
+                if found { score += 30 }
+            }
+            score -= count / 8
+            return ASCIIMatch(value: FuzzyMatch(path: path, score: score, positions: positions))
+        }
+    }
+
+    /// 快路径结果包装(区分「需走通用路径」与「不匹配」)。
+    struct ASCIIMatch { let value: FuzzyMatch? }
+
     /// 过滤并按得分排序。
     /// - Parameters:
     ///   - query: 查询
@@ -133,8 +199,24 @@ public enum FuzzyMatcher {
         if query.trimmingCharacters(in: .whitespaces).isEmpty {
             return paths.prefix(limit).map { FuzzyMatch(path: $0, score: 0, positions: []) }
         }
-        let matches = paths.compactMap { match(query: query, path: $0) }
-        return Array(matches.sorted { $0.score != $1.score ? $0.score > $1.score : $0.path < $1.path }.prefix(limit))
+        // 查询为纯 ASCII 时走字节快路径:先只打分(不分配位置数组),排序截断后再给前 limit 名补命中位置
+        let prepared = asciiQuery(query)
+        let matches = paths.compactMap { path -> FuzzyMatch? in
+            if let prepared, let result = matchASCII(query: prepared, path: path, withPositions: false) { return result.value }
+            return match(query: query, path: path)
+        }
+        // 先按分数取第 limit 名的阈值,只对不低于阈值的候选做完整排序(同分比路径串很慢,别对全部命中做)
+        var candidates = matches
+        if limit > 0, matches.count > limit * 4 {
+            let threshold = matches.map(\.score).sorted(by: >)[limit - 1]
+            candidates = matches.filter { $0.score >= threshold }
+        }
+        let top = Array(candidates.sorted { $0.score != $1.score ? $0.score > $1.score : $0.path < $1.path }.prefix(limit))
+        guard let prepared else { return top }
+        return top.map { item in
+            if !item.positions.isEmpty { return item }
+            return matchASCII(query: prepared, path: item.path, withPositions: true)?.value ?? item
+        }
     }
 }
 

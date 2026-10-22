@@ -55,6 +55,36 @@ struct WorkspaceFilesTests {
         #expect(a?.positions.count == 3)
     }
 
+    @Test("模糊匹配:ASCII 字节快路径与通用路径的得分、位置逐项一致")
+    func fuzzyFastPathMatchesSlowPath() {
+        let paths = [
+            "src/main.swift", "src/deep/Model.swift", "docs/maintenance/notes.md", "a/b/c/domain.swift",
+            "Sources/OhMyAgentApp/IDE/Shell/IDEShellView.swift", "README.md", "x_y-z.v1/Foo Bar.txt",
+            "lib/HTTPServer/serverMain.rs", "m", "A/B", "src/中文/main.swift",
+        ]
+        let queries = ["m", "ma", "main", "MAIN", "mdl", "ide", "shell view", "fb", "hs", "zzz", "swift", "x.v", "中", "a b"]
+        for query in queries {
+            let fast = FuzzyMatcher.rank(query: query, in: paths, limit: 100)
+            let slow = paths.compactMap { FuzzyMatcher.match(query: query, path: $0) }
+                .sorted { $0.score != $1.score ? $0.score > $1.score : $0.path < $1.path }
+            #expect(fast.map(\.path) == slow.map(\.path), "查询 \(query) 排序不一致")
+            #expect(fast.map(\.score) == slow.map(\.score), "查询 \(query) 得分不一致")
+            #expect(fast.map(\.positions) == slow.map(\.positions), "查询 \(query) 位置不一致")
+        }
+    }
+
+    @Test("模糊匹配:候选很多时的阈值截断与完整排序结果一致(含同分按路径排序)")
+    func fuzzyThresholdTruncation() {
+        let paths = (0..<600).map { "dir\($0 % 17)/sub\($0 % 5)/file\($0).swift" } + (0..<100).map { "m\($0).txt" }
+        for query in ["m", "f", "file1", "sw", "d1"] {
+            let fast = FuzzyMatcher.rank(query: query, in: paths, limit: 20)
+            let slow = Array(paths.compactMap { FuzzyMatcher.match(query: query, path: $0) }
+                .sorted { $0.score != $1.score ? $0.score > $1.score : $0.path < $1.path }.prefix(20))
+            #expect(fast.map(\.path) == slow.map(\.path), "查询 \(query) 截断后排序不一致")
+            #expect(fast.map(\.positions) == slow.map(\.positions))
+        }
+    }
+
     @Test("全局搜索:忽略大小写、二进制与依赖目录")
     func searching() async throws {
         let root = try makeWorkspace()
