@@ -32,7 +32,8 @@ final class IDEWorkspace {
     /// 命令面板/快速打开(每窗口一份)
     let palette = IDEPaletteModel()
     /// Agent 面板所用会话的项目标识与槽位(每窗口一个专属槽位,不与 Agents Window 的会话标签冲突)
-    @ObservationIgnored var agentProjectID: String?
+    /// (`agentProjectID` 必须可观察:面板在它赋值前渲染过一次,赋值后要能重新取会话)
+    var agentProjectID: String?
     @ObservationIgnored var agentSlot: String?
     /// 最近关闭的文件标签(供「重新打开已关闭的标签」)
     @ObservationIgnored var closedStack: [TabKind] = []
