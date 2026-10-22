@@ -585,6 +585,8 @@ public final class CodeEditorView: NSView {
         Task { [weak self] in
             var parts = covering.map { "\(Self.symbol(for: $0.severity)) \($0.message)" }
             if let hover, let text = await hover(offset) { parts.append(Self.plainText(fromMarkdown: text)) }
+            // 服务器可能返回空文本或只有围栏标记(去围栏后为空):空内容不弹,否则会出现一个空的小卡片
+            parts = parts.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             guard let self, self.hoverGeneration == generation, !parts.isEmpty else { return }
             self.presentHover(parts.joined(separator: "\n\n"), rect: rect)
         }
