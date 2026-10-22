@@ -77,7 +77,7 @@ struct IDEAgentPane: View {
                         .contentShape(Rectangle())
                         .onTapGesture(count: 2) { workspace.newAgentConversation() }
                 }
-                .frame(minWidth: geo.size.width)
+                .frame(minWidth: geo.size.width, alignment: .leading)
             }
             .scrollBounceBehavior(.basedOnSize)
         }

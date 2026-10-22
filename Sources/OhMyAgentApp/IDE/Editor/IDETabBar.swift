@@ -50,7 +50,7 @@ struct IDETabBar: View {
                         .onTapGesture(count: 2) { if let root = workspace.root { workspace.create(in: root, isDirectory: false) } }
                 }
                 // 内容至少与标签栏等宽,空白区才有足够大的双击区域
-                .frame(minWidth: geo.size.width)
+                .frame(minWidth: geo.size.width, alignment: .leading)
             }
             .onChange(of: group.activeID) { _, id in
                 guard let id else { return }
