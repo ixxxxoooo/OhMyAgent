@@ -20,6 +20,7 @@ struct GeneralPage: View {
     @AppStorage(ClientPrefs.Key.maxLiveSessions) private var maxLive = 3
     @AppStorage(ClientPrefs.Key.hibernateEnabled) private var hibernateEnabled = true
     @AppStorage(ClientPrefs.Key.hibernateUnderPressure) private var hibernateUnderPressure = true
+    @Bindable private var fusion = FusionMode.shared
     @State private var language = Self.currentLanguage()
     @State private var confirmReset = false
     @State private var restartHint = false
@@ -40,6 +41,10 @@ struct GeneralPage: View {
                     restartHint = true
                 }
                 if restartHint { Note("语言在重新启动 OhMyAgent 后生效。") }
+            }
+            Section("融合模式") {
+                Toggle("开启融合模式", isOn: $fusion.isEnabled)
+                Note("开启后,Agent 窗口与编辑器(IDE 窗口)原地互切:切换时沿用同一外框,当前项目保持一致;两边共用同一份会话(提问、输出、草稿、对话标签实时同步),IDE 面板的新对话与历史也会同步到 Agent 窗口。离开编辑器时会自动保存未保存的文件,保证 Agent 读到的就是你改过的内容。可随时用快捷键切换(默认 ⌃⌘I,可在「快捷键」里修改),或点标题栏右上角的切换按钮。")
             }
             Section("输入") {
                 Picker("发送键", selection: $sendKey) {
@@ -84,6 +89,7 @@ struct GeneralPage: View {
         .confirmationDialog("重置所有客户端设置?", isPresented: $confirmReset) {
             Button("重置", role: .destructive) {
                 ClientPrefs.resetAll()
+                FusionMode.shared.reload()
                 AppearanceModel.shared.reset()
                 restoreWindows = true; showDock = true; showMenuBar = true; notifyFinished = true; notifySound = true; sendKey = SendKey.enter.rawValue; runningSend = RunningSendMode.steer.rawValue
                 NSApp.setActivationPolicy(.regular)

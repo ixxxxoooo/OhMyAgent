@@ -292,9 +292,11 @@ final class AppActions {
     }
 
     /// 前置主窗口;窗口已被关闭时重新打开。
-    func showMainWindow() {
+    /// - Parameter frame: 融合模式下沿用的来源窗口外框(nil 保持主窗口原外框)
+    func showMainWindow(adopting frame: NSRect? = nil) {
         NSApp.activate()
         if let window = mainWindow {
+            if let frame { window.adoptFusionFrame(frame) }
             if window.isMiniaturized { window.deminiaturize(nil) }
             window.makeKeyAndOrderFront(nil)
         } else {

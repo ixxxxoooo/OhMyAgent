@@ -50,24 +50,34 @@ final class IDEWindowManager {
     ///   - root: 工作区根目录;nil 为空窗口
     ///   - forceNew: 强制新开
     /// - Returns: 窗口模型
+    ///   - adoptFrame: 融合模式下沿用的来源窗口外框
     @discardableResult
-    func open(root: String?, forceNew: Bool = false) -> IDEWindowModel {
+    func open(root: String?, forceNew: Bool = false, adoptFrame: NSRect? = nil) -> IDEWindowModel {
         let (model, _) = registry.open(root: root, forceNew: forceNew)
-        show(model, reason: "open")
+        show(model, reason: "open", adoptFrame: adoptFrame)
         return model
     }
 
     /// Agent → IDE:聚焦当前项目的 IDE 窗口,没有就新建。
+    /// 融合模式下:IDE 窗口沿用 Agent 窗口的外框,并隐藏 Agent 窗口(原地换模式);会话与项目本就共用。
     /// - Parameter forceNew: ⌥ 点击强制新开
     func switchToIDE(forceNew: Bool = false) {
         let root = AppEnvironment.shared.workbench.selectedProject?.id
-        open(root: root, forceNew: forceNew)
+        let source = Self.fusionSource(AppActions.shared.mainWindow)
+        open(root: root, forceNew: forceNew, adoptFrame: source?.frame)
+        source?.orderOut(nil)
     }
 
     /// IDE → Agent:前置 Agent 窗口,并选中该 IDE 窗口对应的项目(项目不在工作台时加入)。
     func switchToAgent() {
         let span = Log.perf.span("IDE 切换到 Agent", warnMs: 50, quiet: true)
         let workbench = AppEnvironment.shared.workbench
+        // 融合模式:离开前保存未保存的文件(Agent 读磁盘,两边内容才一致),并记下 IDE 窗口以便沿用外框、随后隐藏
+        var source: NSWindow?
+        if case .ide(let id) = WindowContext.shared.kind, FusionMode.shared.isEnabled, let controller = controllers[id] {
+            source = Self.fusionSource(controller.window)
+            if source != nil { controller.workspace.saveAll() }
+        }
         if case .ide(let id) = WindowContext.shared.kind, let root = registry.window(id: id)?.workspaceRoot {
             if workbench.projects.contains(where: { $0.id == root }) {
                 if workbench.selectedProjectID != root { workbench.select(project: root) }
@@ -75,8 +85,17 @@ final class IDEWindowManager {
                 workbench.openProject(URL(fileURLWithPath: root))
             }
         }
-        AppActions.shared.showMainWindow()
+        AppActions.shared.showMainWindow(adopting: source?.frame)
+        source?.orderOut(nil)
         span.end()
+    }
+
+    /// 融合模式下可作为「来源」的窗口:模式开启、窗口存在且不在全屏(全屏窗口不能原地隐藏换位)。
+    /// - Parameter window: 来源窗口
+    /// - Returns: 可用的来源窗口;否则 nil(走普通的两窗口切换)
+    private static func fusionSource(_ window: NSWindow?) -> NSWindow? {
+        guard FusionMode.shared.isEnabled, let window, window.isVisible, !window.styleMask.contains(.fullScreen) else { return nil }
+        return window
     }
 
     /// ⌃⌘I:在 Agent 窗口与 IDE 窗口之间切换。
@@ -172,6 +191,10 @@ final class IDEWindowManager {
     /// 窗口成为键盘窗口:提升到最近使用首位。
     func windowDidBecomeKey(_ model: IDEWindowModel) {
         registry.activate(model.id)
+        // 融合模式:IDE 窗口成为键盘窗口时,工作台当前项目跟随它(两边始终是同一个项目)
+        guard FusionMode.shared.isEnabled, let root = model.workspaceRoot else { return }
+        let workbench = AppEnvironment.shared.workbench
+        if workbench.selectedProjectID != root, workbench.projects.contains(where: { $0.id == root }) { workbench.select(project: root) }
     }
 
     /// 窗口即将关闭:释放控制器;非退出流程下从注册表移除(退出时保留以便恢复)。
@@ -195,7 +218,7 @@ final class IDEWindowManager {
     // MARK: 显示
 
     /// 显示窗口(必要时创建控制器),并记录冷开/热切换耗时。
-    private func show(_ model: IDEWindowModel, reason: String, activate: Bool = true) {
+    private func show(_ model: IDEWindowModel, reason: String, activate: Bool = true, adoptFrame: NSRect? = nil) {
         let cold = controllers[model.id] == nil
         let span = Log.perf.span(cold ? "IDE 窗口冷开" : "IDE 窗口切换", warnMs: cold ? 250 : 50, quiet: true, ["reason": reason])
         let controller: IDEWindowController
@@ -208,9 +231,20 @@ final class IDEWindowManager {
         }
         NSApp.activate()
         if let window = controller.window {
+            if let adoptFrame { window.adoptFusionFrame(adoptFrame) }
             if window.isMiniaturized { window.deminiaturize(nil) }
             if activate { window.makeKeyAndOrderFront(nil) } else { window.orderFront(nil) }
         }
         span.end(["windows": "\(controllers.count)"])
+    }
+}
+
+extension NSWindow {
+    /// 融合模式:沿用另一个窗口的外框(无动画;外框无效或在全屏时保持原样)。
+    /// - Parameter frame: 来源窗口外框
+    func adoptFusionFrame(_ frame: NSRect) {
+        guard !styleMask.contains(.fullScreen),
+              let target = FusionFrame.adopted(frame, minSize: minSize, screens: NSScreen.screens.map(\.visibleFrame)) else { return }
+        setFrame(target, display: false)
     }
 }

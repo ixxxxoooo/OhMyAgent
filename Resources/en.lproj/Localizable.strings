@@ -2899,3 +2899,10 @@
 "掉帧 / 最长" = "Dropped / Longest";
 "CPU" = "CPU";
 "IDE 窗口" = "IDE Windows";
+"融合模式" = "Fusion Mode";
+"开启融合模式" = "Enable Fusion Mode";
+"开启后,Agent 窗口与编辑器(IDE 窗口)原地互切:切换时沿用同一外框,当前项目保持一致;两边共用同一份会话(提问、输出、草稿、对话标签实时同步),IDE 面板的新对话与历史也会同步到 Agent 窗口。离开编辑器时会自动保存未保存的文件,保证 Agent 读到的就是你改过的内容。可随时用快捷键切换(默认 ⌃⌘I,可在「快捷键」里修改),或点标题栏右上角的切换按钮。" = "When enabled, the Agent window and the editor (IDE window) switch in place: the same window frame and the same project are kept, and both sides share one conversation (prompts, output, drafts and chat tabs stay in sync; new chats and history opened in the IDE panel also appear in the Agent window). Unsaved files are saved automatically when you leave the editor so the Agent reads what you edited. Switch any time with the shortcut (default ⌃⌘I, configurable under Shortcuts) or the switch button at the top right of the title bar.";
+"历史对话" = "Chat History";
+"搜索历史对话" = "Search chat history";
+"还原 Agent 面板" = "Restore Agent Panel";
+"关闭对话" = "Close Chat";
