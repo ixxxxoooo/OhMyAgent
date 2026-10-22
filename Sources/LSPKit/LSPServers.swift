@@ -28,6 +28,17 @@ public enum LSPServerKind: String, Sendable, CaseIterable, Hashable {
         }
     }
 
+    /// 一键安装用的 shell 命令;没有可自动安装的方式时为 nil(如 Swift 需要装 Xcode)。
+    /// Python 优先用 npm 装 pyright,没有 npm 时退回 pip 装 basedpyright。
+    public var installCommand: String? {
+        switch self {
+        case .swift: return nil
+        case .typescript: return "npm i -g typescript-language-server typescript"
+        case .python: return "if command -v npm >/dev/null 2>&1; then npm i -g pyright; else pip3 install basedpyright; fi"
+        case .go: return "go install golang.org/x/tools/gopls@latest"
+        }
+    }
+
     /// 候选可执行文件名(按优先级)。
     var executableNames: [String] {
         switch self {

@@ -61,6 +61,8 @@ final class EditorLSPController {
     let projectRoot: String
     @ObservationIgnored private let manager: LSPManager
     private(set) var status: Status = .off
+    /// 状态为「未安装」时对应的服务器种类(供「安装」按钮取安装命令)
+    private(set) var missingKind: LSPServerKind?
     private(set) var diagnostics: [EditorDiagnostic] = []
 
     /// 错误数。
@@ -115,6 +117,7 @@ final class EditorLSPController {
         case .unsupported:
             status = .off
         case .unavailable(let kind):
+            missingKind = kind
             status = .unavailable(kind.installHint)
             Log.lsp.info("语言服务器未安装", ["kind": kind.rawValue, "file": (path as NSString).lastPathComponent])
         case .failed(_, let message):

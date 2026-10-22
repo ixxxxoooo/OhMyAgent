@@ -515,6 +515,7 @@ struct LSPStatusBar: View {
             case .unavailable(let hint):
                 Image.om("info", size: 12).foregroundStyle(OMColors.secondaryText)
                 Text("未找到语言服务器:\(hint)").foregroundStyle(OMColors.secondaryText).lineLimit(1)
+                LSPInstallButton(controller: controller)
             case .failed(let message):
                 Image.om("triangle-alert", size: 12).foregroundStyle(OMColors.warning)
                 Text("语言服务器不可用:\(message)").foregroundStyle(OMColors.secondaryText).lineLimit(1)
@@ -543,6 +544,19 @@ struct DelayedSpinner: View {
     }
 }
 
+/// 「安装」按钮:在终端里运行安装命令(没有自动安装方式的服务器不显示)。安装完成后重新打开文件即可生效。
+struct LSPInstallButton: View {
+    let controller: EditorLSPController
+
+    var body: some View {
+        if let command = controller.missingKind?.installCommand {
+            Button("安装") { AppActions.shared.runInNewTerminal(command) }
+                .buttonStyle(.omSecondary)
+                .omTooltip(String(localized: "在终端运行:\(command)\n安装完成后重新打开文件即可生效"))
+        }
+    }
+}
+
 /// IDE 状态栏里的语言服务器状态(紧凑):就绪显示名称,启动中显示转圈,不可用/失败显示提示(悬停看详情)。
 struct LSPStatusItem: View {
     let controller: EditorLSPController
@@ -562,11 +576,14 @@ struct LSPStatusItem: View {
                 Text(name)
             }
         case .unavailable(let hint):
-            HStack(spacing: 4) {
-                Image.om("info", size: 12)
-                Text("未找到语言服务器")
+            HStack(spacing: 6) {
+                HStack(spacing: 4) {
+                    Image.om("info", size: 12)
+                    Text("未找到语言服务器")
+                }
+                .omTooltip(hint)
+                LSPInstallButton(controller: controller)
             }
-            .omTooltip(hint)
         case .failed(let message):
             HStack(spacing: 4) {
                 Image.om("triangle-alert", size: 12).foregroundStyle(OMColors.warning)

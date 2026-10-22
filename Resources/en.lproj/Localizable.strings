@@ -2909,3 +2909,5 @@
 "颜色主题" = "Color Theme";
 "首选项" = "Preferences";
 "选择颜色主题(↑↓ 预览,↩ 应用,Esc 取消)" = "Select a color theme (↑↓ preview, ↩ apply, Esc cancel)";
+"安装" = "Install";
+"在终端运行:%@\n安装完成后重新打开文件即可生效" = "Runs in a terminal: %@\nReopen the file after installing.";

@@ -223,9 +223,29 @@ final class AppActions {
         for id in ids { requestCloseTab(id) }
     }
 
+    /// 在当前窗口的终端里运行一条命令(如安装语言服务器):IDE 窗口用底部面板,Agent 窗口用右栏终端标签。
+    /// 新建一个终端来跑,不打扰正在使用的终端。
+    /// - Parameter command: shell 命令,不能为空
+    func runInNewTerminal(_ command: String) {
+        guard !command.isEmpty else { return }
+        let id: String
+        if let workspace = IDEWindowManager.shared.keyWorkspace {
+            workspace.newTerminal()
+            guard let created = workspace.activeTerminalID else { return }
+            id = created
+        } else {
+            id = openTerminal()
+        }
+        let directory = TerminalPrefs.load().startDirectoryPath(project: AppEnvironment.shared.workbench.selectedProjectID)
+        TerminalStore.shared.controller(for: id, fallbackDirectory: directory).send(command + "\r")
+        Log.ui.info("在终端运行命令", ["terminal": id])
+    }
+
     /// 在当前项目目录新建终端标签(每个终端是右栏里一个独立标签)。
     /// - Parameter title: 标签标题;nil 时按「终端 / 终端 2…」编号
-    func openTerminal(title: String? = nil) {
+    /// - Returns: 新终端标识
+    @discardableResult
+    func openTerminal(title: String? = nil) -> String {
         let workbench = AppEnvironment.shared.workbench
         let directory = TerminalPrefs.load().startDirectoryPath(project: workbench.selectedProjectID)
         let id = UUID().uuidString
@@ -236,6 +256,7 @@ final class AppActions {
         workbench.openTerminal(id: id, title: name)
         workbench.layout.rightVisible = true
         showMainWindow()
+        return id
     }
 
     /// 右栏「+」菜单:按条目 id 新增/聚焦对应标签。
