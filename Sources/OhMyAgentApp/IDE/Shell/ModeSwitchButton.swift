@@ -28,7 +28,7 @@ struct ModeSwitchButton: View {
             }
             .frame(maxWidth: .infinity)
         }
-        .buttonStyle(OMButtonStyle.omSecondary)
+        .buttonStyle(OMButtonStyle.omPrimary)
         .frame(width: TitlebarMetrics.modeSwitchWidth)
         .omTooltip(tooltip + " (\(shortcut))")
         .accessibilityLabel(tooltip)
