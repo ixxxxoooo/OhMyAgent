@@ -201,7 +201,7 @@ struct MarkdownStyler {
         guard isLive else { return monoFont }
         switch kind {
         case .heading(let level): return headingFont(level)
-        case .code, .table, .frontMatter: return NSFont.monospacedSystemFont(ofSize: monoSize - 0.5, weight: .regular)
+        case .code, .table, .frontMatter, .htmlComment: return NSFont.monospacedSystemFont(ofSize: monoSize - 0.5, weight: .regular)
         default: return proseFont
         }
     }
@@ -249,7 +249,7 @@ struct MarkdownStyler {
         case .rule:
             attributes[.foregroundColor] = dimColor
             attributes[.strikethroughStyle] = NSUnderlineStyle.single.rawValue
-        case .frontMatter:
+        case .frontMatter, .htmlComment:
             attributes[.font] = font
             attributes[.foregroundColor] = dimColor
         case .paragraph:

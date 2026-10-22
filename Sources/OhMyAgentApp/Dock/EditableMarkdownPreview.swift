@@ -23,7 +23,7 @@ struct EditableMarkdownPreview: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 16) {
-                ForEach(0..<layout.blocks.count, id: \.self) { (index: Int) in
+                ForEach(visibleIndices, id: \.self) { (index: Int) in
                     if editing == index {
                         BlockEditor(text: $draft, onDone: { commit() })
                     } else {
@@ -44,6 +44,14 @@ struct EditableMarkdownPreview: View {
         .task(id: text) {
             guard editing == nil else { return }
             layout = await Task.detached(priority: .userInitiated) { MarkdownLiveRenderer.layout(for: text) }.value
+        }
+    }
+
+    /// 参与渲染的块下标:HTML 注释块在阅读页隐藏(与 GitHub 一致),要改请切到源码。
+    private var visibleIndices: [Int] {
+        layout.blocks.indices.filter { index in
+            if case .htmlComment = layout.blocks[index].kind { return editing == index }
+            return true
         }
     }
 

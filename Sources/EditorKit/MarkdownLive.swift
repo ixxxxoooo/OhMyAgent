@@ -16,6 +16,8 @@ public enum MarkdownLiveBlockKind: Sendable, Equatable {
     case table
     case rule
     case frontMatter
+    /// HTML 注释块(`<!-- … -->`,可含空行):预览里隐藏,源码里淡色显示
+    case htmlComment
 }
 
 /// 内联字体特征。
@@ -146,7 +148,9 @@ public enum MarkdownLiveRenderer {
                 let line = lines[i]
                 let content = text(line.content)
                 if isBlank(content) { i += 1; continue }
-                if let fence = fenceInfo(content) {
+                if content.trimmingCharacters(in: .whitespaces).hasPrefix("<!--") {
+                    i = parseHtmlComment(from: i)
+                } else if let fence = fenceInfo(content) {
                     i = parseFence(from: i, fence: fence)
                 } else if let level = headingLevel(content) {
                     parseHeading(at: i, level: level)
@@ -170,6 +174,16 @@ public enum MarkdownLiveRenderer {
             let start = lines[range.lowerBound].full.location
             let end = NSMaxRange(lines[range.upperBound].full)
             blocks.append(MarkdownLiveBlock(kind: kind, range: NSRange(location: start, length: end - start), spans: spans))
+        }
+
+        /// HTML 注释块:从 `<!--` 行到含 `-->` 的行(未闭合则到文末),中间的空行也属于注释。
+        /// - Parameter start: 起始行下标
+        /// - Returns: 下一个待解析的行下标
+        mutating func parseHtmlComment(from start: Int) -> Int {
+            var end = start
+            while end < lines.count - 1, !text(lines[end].content).contains("-->") { end += 1 }
+            emit(.htmlComment, lines: start...end, spans: [])
+            return end + 1
         }
 
         // 围栏代码
@@ -380,7 +394,8 @@ public enum MarkdownLiveRenderer {
                 let content = text(lines[j].content)
                 if isBlank(content) { break }
                 if j > start, fenceInfo(content) != nil || headingLevel(content) != nil || isRule(content)
-                    || content.trimmingCharacters(in: .whitespaces).hasPrefix(">") || listMarker(content) != nil { break }
+                    || content.trimmingCharacters(in: .whitespaces).hasPrefix(">") || listMarker(content) != nil
+                    || content.trimmingCharacters(in: .whitespaces).hasPrefix("<!--") { break }
                 spans += inlineSpans(in: lines[j].content)
                 j += 1
             }

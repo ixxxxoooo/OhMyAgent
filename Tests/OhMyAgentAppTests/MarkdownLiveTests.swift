@@ -39,6 +39,30 @@ struct MarkdownLiveTests {
         for (a, b) in zip(layout.blocks, layout.blocks.dropFirst()) { #expect(NSMaxRange(a.range) <= b.range.location) }
     }
 
+    @Test("HTML 注释(含空行、任务框文字)合成一个块,前后块不受影响")
+    func htmlCommentBlock() {
+        let source = """
+        前文
+        <!--
+          Thanks!
+
+          - [x] done
+        -->
+
+        ### Description
+        """
+        let layout = MarkdownLiveRenderer.layout(for: source)
+        #expect(layout.blocks.map(\.kind) == [.paragraph, .htmlComment, .heading(3)])
+        let comment = (source as NSString).substring(with: layout.blocks[1].range)
+        #expect(comment.hasPrefix("<!--") && comment.contains("- [x] done") && comment.contains("-->"))
+    }
+
+    @Test("未闭合的 HTML 注释一直到文末")
+    func unclosedHtmlComment() {
+        let layout = MarkdownLiveRenderer.layout(for: "<!--\n草稿\n\n更多")
+        #expect(layout.blocks.map(\.kind) == [.htmlComment])
+    }
+
     @Test("标题标记符范围包含井号与空格")
     func headingMarker() {
         let source = "## Hello **world**\n"
