@@ -65,7 +65,8 @@ final class IDEWindowManager {
         let root = AppEnvironment.shared.workbench.selectedProject?.id
         let source = Self.fusionSource(AppActions.shared.mainWindow)
         open(root: root, forceNew: forceNew, adoptFrame: source?.frame)
-        source?.orderOut(nil)
+        source?.orderOut(nil)  // IDE 窗口一定会被创建并显示,来源窗口可放心隐藏
+        if FusionMode.shared.isEnabled { UserDefaults.standard.set(true, forKey: Self.fusionLastIDEKey) }
     }
 
     /// IDE → Agent:前置 Agent 窗口,并选中该 IDE 窗口对应的项目(项目不在工作台时加入)。
@@ -85,8 +86,12 @@ final class IDEWindowManager {
                 workbench.openProject(URL(fileURLWithPath: root))
             }
         }
-        AppActions.shared.showMainWindow(adopting: source?.frame)
-        source?.orderOut(nil)
+        // 只有 Agent 窗口确实显示出来才隐藏 IDE 窗口,避免两个窗口都不可见
+        let shown = AppActions.shared.showMainWindow(adopting: source?.frame)
+        if shown {
+            source?.orderOut(nil)
+            if FusionMode.shared.isEnabled { UserDefaults.standard.set(false, forKey: Self.fusionLastIDEKey) }
+        }
         span.end()
     }
 
@@ -128,12 +133,33 @@ final class IDEWindowManager {
     }
 
     /// 启动时恢复上次打开的 IDE 窗口(最近使用的最后显示,落在最前)。
+    /// 融合模式:上次退出时停在 Agent 模式就不恢复 IDE 窗口(它们已被隐藏);停在编辑器模式则恢复并隐藏 Agent 窗口(两个窗口不叠在一起)。
     func restoreWindows() {
         let models = registry.windows
         guard !models.isEmpty else { return }
-        Log.app.info("恢复 IDE 窗口", ["count": "\(models.count)"])
+        let fusion = FusionMode.shared.isEnabled
+        if fusion, !UserDefaults.standard.bool(forKey: Self.fusionLastIDEKey) {
+            Log.app.info("融合模式:上次停在 Agent 模式,不恢复 IDE 窗口", ["count": "\(models.count)"])
+            return
+        }
+        Log.app.info("恢复 IDE 窗口", ["count": "\(models.count)", "fusion": "\(fusion)"])
         for model in models.reversed() { show(model, reason: "restore", activate: model === models.first) }
+        if fusion { Task { await hideMainWindowWhenReady() } }
     }
+
+    /// 融合模式启动恢复到编辑器模式后,等 Agent 窗口登记完成再把它隐藏(最多等 6 秒)。
+    private func hideMainWindowWhenReady() async {
+        for _ in 0..<60 {
+            if let window = AppActions.shared.mainWindow {
+                window.orderOut(nil)
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+    }
+
+    /// 融合模式下最近一次停留的模式(true 为编辑器),退出后下次启动据此恢复。
+    private static let fusionLastIDEKey = "general.fusionLastIDE"
 
     // MARK: 命令路由
 

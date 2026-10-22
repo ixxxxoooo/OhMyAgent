@@ -293,14 +293,29 @@ final class AppActions {
 
     /// 前置主窗口;窗口已被关闭时重新打开。
     /// - Parameter frame: 融合模式下沿用的来源窗口外框(nil 保持主窗口原外框)
-    func showMainWindow(adopting frame: NSRect? = nil) {
+    /// - Returns: 是否已前置(或已请求打开)主窗口;false 表示当前没有任何办法显示它(调用方不应据此隐藏其他窗口)
+    @discardableResult
+    func showMainWindow(adopting frame: NSRect? = nil) -> Bool {
         NSApp.activate()
-        if let window = mainWindow {
+        if let window = mainWindow ?? Self.sceneMainWindow() {
             if let frame { window.adoptFusionFrame(frame) }
             if window.isMiniaturized { window.deminiaturize(nil) }
             window.makeKeyAndOrderFront(nil)
-        } else {
-            openWindowAction?(id: "main")
+            return true
+        }
+        guard let openWindowAction else {
+            Log.app.warning("无法显示 Agent 窗口:主窗口尚未创建且没有打开动作")
+            return false
+        }
+        openWindowAction(id: "main")
+        return true
+    }
+
+    /// 在应用窗口里找 SwiftUI 主窗口场景(`Window(id: "main")`)对应的 `NSWindow`:
+    /// 主窗口视图从未出现过(例如启动时只恢复了 IDE 窗口)时 `mainWindow` 还没登记,靠场景标识兜底。
+    private static func sceneMainWindow() -> NSWindow? {
+        NSApp.windows.first { window in
+            !(window is NSPanel) && window.identifier?.rawValue.hasPrefix("main") == true
         }
     }
 }
