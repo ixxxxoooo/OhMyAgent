@@ -24,7 +24,12 @@ enum DemoLaunch {
     static func activateIfRequested() {
         guard let demo = DemoEnvironment.current() else { return }
         environment = demo
+        // 沙盒准备必须早于主目录重定向与任何用户数据读取,所以这里只能同步等待(沙盒版本一致时几乎无耗时);
+        // 单独打点,启动阶段增量能直接显示它的代价
+        let span = Log.perf.span("演示沙盒准备", warnMs: 500, quiet: true)
         projects = demo.prepareBlocking()
+        span.end(["projects": "\(projects.count)"])
+        LaunchTrace.mark("演示沙盒就绪")
         demo.redirectHome()
         RecentStore.useSuite(DemoEnvironment.defaultsSuiteName)
         Log.app.info("演示模式已启用", ["root": demo.paths.root.path, "projects": "\(projects.count)", "reset": "\(demo.reset)"])

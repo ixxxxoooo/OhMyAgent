@@ -123,10 +123,10 @@ def report(entries):
             extra = f"  最长 {max(ms):.0f}ms"
         print(f"  {name}: {len(hits)}{extra}")
 
-    print("\n== 启动阶段(sinceLaunchMs) ==")
+    print("\n== 启动阶段(sinceLaunchMs,+ 为相对上一阶段增量) ==")
     stages = [e for e in entries if e[3] == "启动阶段"][-8:]
     for e in stages:
-        print(f"  {e[4].get('stage', '-'):<14} {e[4].get('sinceLaunchMs', '-')} ms")
+        print(f"  {e[4].get('stage', '-'):<14} {e[4].get('sinceLaunchMs', '-')} ms  (+{e[4].get('deltaMs', '-')} ms)")
 
     print("\n== 回合 ==")
     print(dist("首 token 耗时(ttftMs)", [num(e[4]["ttftMs"]) for e in entries if e[3] == "首个输出" and "ttftMs" in e[4]]))
