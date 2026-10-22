@@ -49,10 +49,20 @@ public enum TranscriptTurns {
         var turns: [TranscriptTurn] = []
         // 同一条助手消息会按内容块拆成多行并重复携带 usage:按消息 ID 去重,取最后一行(流式累计值)
         var perMessage: [[String: TurnUsage]] = []
+        let userMarker = Data(#""type":"user""#.utf8), assistantMarker = Data(#""type":"assistant""#.utf8)
         for line in data.split(separator: UInt8(ascii: "\n")) {
             // 只解码用户/助手行,跳过体量最大的附件与请求快照行
-            guard line.range(of: Data(#""type":"user""#.utf8)) != nil || line.range(of: Data(#""type":"assistant""#.utf8)) != nil,
-                  let object = (try? JSONSerialization.jsonObject(with: Data(line))) as? [String: Any],
+            guard line.range(of: userMarker) != nil || line.range(of: assistantMarker) != nil else { continue }
+            // 快速路径:字节扫描顶层字段。工具结果回灌行(体量最大)只需要时间戳,不必整行解析成对象树
+            if let fields = line.withUnsafeBytes({ TranscriptLineScanner.scan($0) }) {
+                if fields.isSidechain { continue }
+                if fields.type == "user", fields.hasToolMarker, let stamp = fields.timestamp, let time = parser.date(from: stamp) {
+                    // 不是提问;元信息行不延长完成时间
+                    if !turns.isEmpty, !fields.isMeta { turns[turns.count - 1].end = max(turns[turns.count - 1].end, time) }
+                    continue
+                }
+            }
+            guard let object = (try? JSONSerialization.jsonObject(with: Data(line))) as? [String: Any],
                   let type = object["type"] as? String, object["isSidechain"] as? Bool != true,
                   let stamp = object["timestamp"] as? String, let time = parser.date(from: stamp) else { continue }
             let message = object["message"] as? [String: Any]
