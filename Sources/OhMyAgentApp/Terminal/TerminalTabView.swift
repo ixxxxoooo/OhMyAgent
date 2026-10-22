@@ -107,15 +107,30 @@ struct TerminalTabView: View {
     let fallbackDirectory: String
     var focusOnAppear = true
 
+    /// 终端控制器:创建(含 forkpty 启动 shell)不放在 `body` 求值里,而是首帧之后的 `.task` 中完成,
+    /// 避免在 SwiftUI 的布局事务里起进程;已存在的控制器(标签切换回来)直接复用,没有占位闪烁。
+    /// 创建完成后递增,触发重新求值(仓库本身不是 Observable)。
+    @State private var createdTick = 0
+
     var body: some View {
-        let controller = TerminalStore.shared.controller(for: id, fallbackDirectory: fallbackDirectory)
+        let _ = createdTick
+        let controller = TerminalStore.shared.controllers[id]
         VStack(spacing: 0) {
-            TerminalHostView(controller: controller, focusOnAppear: focusOnAppear)
-                // 实时缩放期间终端保持原尺寸,由这里裁剪到当前布局范围(见 LiveResizeGate)
-                .clipped()
-                .padding(.leading, 6)
-                .background(Color(nsColor: OMTerminalPalette.background))
-            if !controller.isRunning { exitedBar(controller) }
+            if let controller {
+                TerminalHostView(controller: controller, focusOnAppear: focusOnAppear)
+                    // 实时缩放期间终端保持原尺寸,由这里裁剪到当前布局范围(见 LiveResizeGate)
+                    .clipped()
+                    .padding(.leading, 6)
+                    .background(Color(nsColor: OMTerminalPalette.background))
+                if !controller.isRunning { exitedBar(controller) }
+            } else {
+                Color(nsColor: OMTerminalPalette.background)
+            }
+        }
+        .task(id: id) {
+            guard TerminalStore.shared.controllers[id] == nil else { return }
+            _ = TerminalStore.shared.controller(for: id, fallbackDirectory: fallbackDirectory)
+            createdTick += 1
         }
         .accessibilityLabel("终端")
     }

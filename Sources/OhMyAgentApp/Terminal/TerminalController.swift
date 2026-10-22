@@ -27,6 +27,10 @@ final class TerminalController: Identifiable {
     /// 当前持有渲染视图的宿主(见 `TerminalHostView.Coordinator`)
     @ObservationIgnored weak var hostToken: AnyObject?
     @ObservationIgnored private var process: LocalProcess?
+    /// 待喂入终端的输出缓冲(按帧预算分批解析,见 `TerminalOutputBuffer`)
+    @ObservationIgnored private var outputBuffer = TerminalOutputBuffer()
+    /// 是否已安排下一帧的喂入
+    @ObservationIgnored private var flushScheduled = false
     /// 已登记到资源采样的 shell pid(退出时注销)。
     @ObservationIgnored private var registeredPID: Int32?
     /// 自己的子进程退出监听。SwiftTerm 1.11.x 在读到 EOF 时会取消它内部的退出监听,
@@ -162,10 +166,39 @@ final class TerminalController: Identifiable {
         Log.ui.info("终端进程已退出", ["id": id, "code": exitCode.map { String($0) } ?? "signal"])
     }
 
+    /// 收到子进程输出:小块且缓冲为空时直接喂入(键入回显不延迟),否则入缓冲并安排按帧预算分批喂入。
+    /// - Parameter slice: 子进程输出
+    fileprivate func receiveOutput(_ slice: ArraySlice<UInt8>) {
+        if outputBuffer.canFeedDirectly(count: slice.count) && !flushScheduled {
+            view.feed(byteArray: slice)
+            return
+        }
+        outputBuffer.append(slice)
+        scheduleFlush()
+    }
+
+    /// 安排下一帧(约 8ms 后)喂入缓冲里的一批输出。
+    private func scheduleFlush() {
+        guard !flushScheduled else { return }
+        flushScheduled = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(8)) { [weak self] in
+            MainActor.assumeIsolated { self?.flushOutput() }
+        }
+    }
+
+    /// 喂入一帧预算内的输出;还有剩余则继续安排下一帧。
+    private func flushOutput() {
+        flushScheduled = false
+        let frame = outputBuffer.takeFrame()
+        if !frame.isEmpty { view.feed(byteArray: frame) }
+        if !outputBuffer.isEmpty { scheduleFlush() }
+    }
+
     /// 丢弃控制器:移除通知观察者并终止进程(从终端仓库移除时调用,之后不再使用)。
     func dispose() {
         observers.forEach { NotificationCenter.default.removeObserver($0) }
         observers = []
+        outputBuffer.removeAll()
         terminate()
         Self.releaseBuffers(of: view)
     }
@@ -283,7 +316,7 @@ extension TerminalController: LocalProcessDelegate {
     }
 
     nonisolated func dataReceived(slice: ArraySlice<UInt8>) {
-        MainActor.assumeIsolated { view.feed(byteArray: slice) }
+        MainActor.assumeIsolated { receiveOutput(slice) }
     }
 
     nonisolated func getWindowSize() -> winsize {
