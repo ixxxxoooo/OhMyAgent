@@ -153,6 +153,18 @@ public enum MarkdownParser {
                 continue
             }
 
+            // HTML 注释块(CommonMark 第 2 类 HTML 块):从 `<!--` 起到含 `-->` 的行止,渲染时整体隐藏(与 GitHub/VS Code 一致);
+            // 未闭合时直到文末都算注释,流式输出写完 `-->` 后下一次续解析会重新识别
+            if trimmed.hasPrefix("<!--") {
+                flushParagraph()
+                while index < lines.count {
+                    let closed = lines[index].contains("-->")
+                    index += 1
+                    if closed { break }
+                }
+                continue
+            }
+
             // 标题
             if let heading = headingInfo(trimmed) {
                 flushParagraph()
