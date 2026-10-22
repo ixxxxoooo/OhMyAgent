@@ -92,6 +92,8 @@ struct IDEStatusBar: View {
             .omTooltip(String(localized: "显示问题面板"))
             .accessibilityLabel(String(localized: "显示问题面板"))
             Spacer(minLength: 0)
+            // 有新版本/下载中/待重启时显示(与 Agent 窗口侧栏底部同一个按钮),无更新时不占位
+            UpdateFooterButton(compact: true)
             if let path = model.activeFilePath {
                 if let caret = workspace.carets[path] {
                     Button { workspace.openPalette(":") } label: {

@@ -7,6 +7,8 @@ import SwiftUI
 
 /// 侧栏底部更新按钮;没有可用更新时不占位。
 struct UpdateFooterButton: View {
+    /// 紧凑样式(IDE 状态栏):更矮,贴合 22pt 的状态栏
+    var compact = false
     @State private var updates = UpdateModel.shared
 
     var body: some View {
@@ -19,7 +21,7 @@ struct UpdateFooterButton: View {
                 .font(OMFonts.caption.weight(.medium))
                 .foregroundStyle(OMColors.onAccent)
                 .padding(.horizontal, 8)
-                .frame(height: 22)
+                .frame(height: compact ? 16 : 22)
                 .background(OMColors.accent, in: OMPillShape())
                 .contentShape(Rectangle())
             }
