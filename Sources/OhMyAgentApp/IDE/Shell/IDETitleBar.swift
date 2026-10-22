@@ -38,7 +38,7 @@ struct IDETitleBar: View {
         let shortcuts = ShortcutStore.shared
         HStack(spacing: TitlebarMetrics.buttonSpacing) {
             TitleBarIconButton(
-                icon: model.sidebarVisible ? "panel-left-close" : "panel-left",
+                icon: "panel-left",
                 label: (model.sidebarVisible ? String(localized: "隐藏侧栏") : String(localized: "显示侧栏")) + " (\(shortcuts.binding(for: .toggleSidebar).display))",
                 isOn: model.sidebarVisible
             ) { model.toggleSidebar() }
@@ -52,12 +52,12 @@ struct IDETitleBar: View {
                 .allowsHitTesting(false)
             Spacer(minLength: 8)
             TitleBarIconButton(
-                icon: model.panelVisible ? "panel-bottom-close" : "panel-bottom",
+                icon: "panel-bottom",
                 label: (model.panelVisible ? String(localized: "隐藏面板") : String(localized: "显示面板")) + " (\(shortcuts.binding(for: .togglePanel).display))",
                 isOn: model.panelVisible
             ) { model.togglePanel() }
             TitleBarIconButton(
-                icon: model.agentPaneVisible ? "panel-right-close" : "panel-right",
+                icon: "panel-right",
                 label: (model.agentPaneVisible ? String(localized: "隐藏 Agent 面板") : String(localized: "显示 Agent 面板")) + " (\(shortcuts.binding(for: .toggleInspector).display))",
                 isOn: model.agentPaneVisible
             ) { model.toggleAgentPane() }
