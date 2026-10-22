@@ -318,12 +318,25 @@ public struct WorkbenchStore: Sendable {
         }
     }
 
-    /// 写入状态。
+    /// 写入状态(编码 + 写盘;便捷入口,测试与迁移使用)。
     public func save(_ state: WorkbenchState) throws {
-        try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try write(try encode(state))
+    }
+
+    /// 把状态编码为 JSON(不依赖文件系统,可在任意线程、任意锁外执行)。
+    /// 不使用 `prettyPrinted`:状态含大量会话记录时,美化输出的体积与耗时都明显更高;`sortedKeys` 保证相同状态得到相同字节。
+    /// - Parameter state: 状态快照
+    public func encode(_ state: WorkbenchState) throws -> Data {
         let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.outputFormatting = [.sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
-        try encoder.encode(state).write(to: fileURL, options: .atomic)
+        return try encoder.encode(state)
+    }
+
+    /// 原子写入已编码的状态数据(自动创建目录)。
+    /// - Parameter data: `encode(_:)` 的结果
+    public func write(_ data: Data) throws {
+        try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try data.write(to: fileURL, options: .atomic)
     }
 }

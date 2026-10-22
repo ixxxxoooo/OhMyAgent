@@ -2517,7 +2517,7 @@ public final class SessionModel {
     /// 记录最近会话(有会话 ID 与标题时)。
     private func recordRecent() {
         guard !isShuttingDown, let sessionId, let title = sessionTitle, !title.isEmpty else { return }
-        RecentStore.record(RecentSession(workspacePath: workspace.path, sessionId: sessionId, title: title, date: Date()))
+        RecentStore.recordAsync(RecentSession(workspacePath: workspace.path, sessionId: sessionId, title: title, date: Date()))
     }
 
     /// 关闭窗口时调用:终止 Agent 子进程。

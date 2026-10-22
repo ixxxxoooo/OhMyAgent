@@ -38,6 +38,26 @@ struct SaveSequencerTests {
         #expect(store.load()?.layout.leftWidth == 300)
     }
 
+    @Test("相同状态不重复写盘;状态变化后继续写;编码不含美化缩进")
+    func identicalStateSkipsWrite() throws {
+        let root = makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = WorkbenchStore(fileURL: root.appendingPathComponent("workbench.json"))
+        let sequencer = SaveSequencer()
+        var state = WorkbenchState()
+        state.layout.leftWidth = 321
+        #expect(try sequencer.write(generation: sequencer.nextGeneration(), state: state, store: store))
+        #expect(try !sequencer.write(generation: sequencer.nextGeneration(), state: state, store: store))
+        // 文件被外部删除后,相同状态必须重新写出
+        try FileManager.default.removeItem(at: store.fileURL)
+        #expect(try sequencer.write(generation: sequencer.nextGeneration(), state: state, store: store))
+        state.layout.leftWidth = 322
+        #expect(try sequencer.write(generation: sequencer.nextGeneration(), state: state, store: store))
+        #expect(store.load()?.layout.leftWidth == 322)
+        let text = String(decoding: try Data(contentsOf: store.fileURL), as: UTF8.self)
+        #expect(!text.contains("\n  "))
+    }
+
     @Test("后台保存:修改布局后防抖到期即落盘;随后的同步保存不会被旧快照覆盖")
     func backgroundSaveEventuallyWrites() async throws {
         let root = makeRoot()

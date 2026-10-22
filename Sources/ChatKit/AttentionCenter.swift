@@ -181,6 +181,12 @@ public enum RecentStore {
     /// 读取最近会话(新→旧)。
     /// - Parameter defaults: 存储
     public static func sessions(_ defaults: UserDefaults = RecentStore.defaults) -> [RecentSession] {
+        writeQueue.sync {}   // 先排空后台写入,保证读到刚记录的会话
+        return storedSessions(defaults)
+    }
+
+    /// 直接读取存储中的会话列表(不等待后台写入;写入队列内部使用,避免自等死锁)。
+    private static func storedSessions(_ defaults: UserDefaults) -> [RecentSession] {
         guard let data = defaults.data(forKey: sessionsKey), let list = try? JSONDecoder().decode([RecentSession].self, from: data) else { return [] }
         return list.sorted { $0.date > $1.date }
     }
@@ -190,9 +196,22 @@ public enum RecentStore {
         guard !session.sessionId.isEmpty, !session.workspacePath.isEmpty else { return }
         let span = Log.perf.span("记录最近会话", warnMs: 16, quiet: true)
         defer { span.end() }
-        var list = sessions(defaults).filter { $0.sessionId != session.sessionId }
+        var list = storedSessions(defaults).filter { $0.sessionId != session.sessionId }
         list.insert(session, at: 0)
         if let data = try? JSONEncoder().encode(Array(list.prefix(20))) { defaults.set(data, forKey: sessionsKey) }
+    }
+
+    /// 后台写入队列:最近会话的 JSON 编解码与落盘不占调用线程(多为主线程)。
+    private static let writeQueue = DispatchQueue(label: "com.ixxxxoooo.OhMyAgent.recentstore", qos: .utility)
+
+    /// 异步记录一次会话(语义同 `record`,在后台串行队列执行;随后的 `sessions()` 会先等它完成)。
+    /// - Parameters:
+    ///   - session: 会话记录
+    ///   - defaults: 存储
+    public static func recordAsync(_ session: RecentSession, _ defaults: UserDefaults = RecentStore.defaults) {
+        guard !session.sessionId.isEmpty, !session.workspacePath.isEmpty else { return }
+        nonisolated(unsafe) let defaults = defaults   // UserDefaults 线程安全,仅为跨并发边界传递
+        writeQueue.async { record(session, defaults) }
     }
 
     /// 从最近会话里移除某个会话(用户删除会话后调用)。
@@ -200,7 +219,7 @@ public enum RecentStore {
     ///   - sessionId: 协议会话 ID
     ///   - defaults: 存储
     public static func removeSession(_ sessionId: String, _ defaults: UserDefaults = RecentStore.defaults) {
-        let list = sessions(defaults)
+        let list = storedSessions(defaults)
         guard list.contains(where: { $0.sessionId == sessionId }) else { return }
         if let data = try? JSONEncoder().encode(list.filter { $0.sessionId != sessionId }) { defaults.set(data, forKey: sessionsKey) }
     }

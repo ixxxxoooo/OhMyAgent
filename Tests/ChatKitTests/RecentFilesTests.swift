@@ -53,3 +53,20 @@ struct RecentFilesTests {
         #expect(list.count == RecentStore.maxRecentFiles)
     }
 }
+
+@Suite("最近会话异步写入")
+struct RecentSessionAsyncTests {
+    @Test("recordAsync 后立即读取能看到记录,且同会话去重")
+    func asyncRecordVisibleToReaders() throws {
+        let name = "oma-recent-async-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        for index in 0..<30 {
+            RecentStore.recordAsync(RecentSession(workspacePath: "/p", sessionId: "s\(index % 25)", title: "t\(index)", date: Date(timeIntervalSince1970: Double(index))), defaults)
+        }
+        let list = RecentStore.sessions(defaults)
+        #expect(list.count == 20)
+        #expect(Set(list.map(\.sessionId)).count == 20)
+        #expect(list.first?.sessionId == "s4")   // index 29 → s4,时间最新
+    }
+}
