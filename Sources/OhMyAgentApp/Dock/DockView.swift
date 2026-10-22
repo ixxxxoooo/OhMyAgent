@@ -117,6 +117,8 @@ struct DockSplitView: View {
                 liveRatios = nil
             }
         )
+        // 命中区比 1pt 可见线宽,必须盖在两侧子视图(含 AppKit 编辑器)之上,否则一侧的拖动被子视图吞掉
+        .zIndex(2)
         .accessibilityHidden(true)
     }
 }
