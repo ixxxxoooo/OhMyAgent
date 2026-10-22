@@ -35,7 +35,7 @@ enum FilePreviewKind: Equatable {
 
 /// 文件标签的显示模式:
 /// 所有可预览类型都只有「源码」与「阅读」两态,由工具条上的图标(眼睛 ⇄ 代码)原地切换;
-/// Markdown 的阅读页可直接点击块编辑(`EditableMarkdownPreview`)。
+/// Markdown 的阅读页是只读的(`MarkdownPreviewPage`),要修改请切到源码。
 enum FileViewMode: String, CaseIterable, Identifiable {
     case source, preview
     var id: String { rawValue }

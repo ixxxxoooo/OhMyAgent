@@ -185,7 +185,7 @@ struct FileTabView: View {
                         .overlay {
                             if mode == .preview, let previewKind {
                                 if previewKind == .markdown {
-                                    EditableMarkdownPreview(text: text, isEditable: !doc.isReadOnly) { doc.text = $0 }
+                                    MarkdownPreviewPage(text: text)
                                 } else {
                                     TextPreviewView(kind: previewKind, text: text)
                                 }

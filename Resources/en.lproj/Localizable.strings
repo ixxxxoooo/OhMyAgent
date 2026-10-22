@@ -2677,7 +2677,6 @@
 "轻快" = "Snappy";
 "柔和" = "Soft";
 "把鼠标滚轮「一格一跳」的滚动变成连续的平滑滚动,只作用于本应用,无需额外权限;触控板不受影响,立即生效。" = "Turns the step-by-step mouse wheel into continuous smooth scrolling. Applies to this app only and needs no extra permission; trackpads are unaffected. Takes effect immediately.";
-"点击编辑此段" = "Tap to edit this block";
 "撤销未完全成功" = "Undo did not fully succeed";
 "项目已不在原位置" = "The item is no longer at its location";
 "原位置已有同名项目" = "An item with the same name already exists at the original location";
