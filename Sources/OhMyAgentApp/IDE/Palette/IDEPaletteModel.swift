@@ -239,6 +239,7 @@ extension IDEWorkspace {
         case "view.toggleSidebar": model.toggleSidebar()
         case "view.togglePanel": model.togglePanel()
         case "view.toggleAgentPane": model.toggleAgentPane()
+        case "view.maximizeAgentPane": model.toggleAgentMaximized()
         case "view.explorer": model.sidebarVisible = true; model.selectSidebar(.explorer)
         case "view.search": model.sidebarVisible = true; model.selectSidebar(.search); search.requestFocus()
         case "view.scm": model.sidebarVisible = true; model.selectSidebar(.scm)

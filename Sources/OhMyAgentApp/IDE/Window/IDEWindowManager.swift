@@ -120,7 +120,7 @@ final class IDEWindowManager {
 
     /// 在 IDE 窗口里可被菜单/快捷键派发的命令。
     enum Command {
-        case toggleSidebar, togglePanel, toggleAgentPane, closeWindow
+        case toggleSidebar, togglePanel, toggleAgentPane, maximizeAgentPane, closeWindow
         case save, saveAll, closeTab, reopenTab, nextTab, previousTab
         case newTerminal, showProblems
         case quickOpen, commandPalette, goToLine, showSearch
@@ -137,6 +137,7 @@ final class IDEWindowManager {
         case .toggleSidebar: model.toggleSidebar()
         case .togglePanel: model.togglePanel()
         case .toggleAgentPane: model.toggleAgentPane()
+        case .maximizeAgentPane: model.toggleAgentMaximized()
         case .closeWindow: controllers[model.id]?.window?.performClose(nil)
         case .save: controllers[model.id]?.workspace.saveActive()
         case .saveAll: controllers[model.id]?.workspace.saveAll()

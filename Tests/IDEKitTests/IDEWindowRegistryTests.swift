@@ -87,6 +87,25 @@ struct IDEWindowRegistryTests {
         #expect(rb?.frame == IDEWindowFrame(x: 10, y: 20, width: 900, height: 700))
     }
 
+    @Test("⌥⌘E:最大化 Agent 面板(未显示时先显示),隐藏面板会还原,且不持久化")
+    func maximizeAgentPane() {
+        let store = tempStore()
+        let registry = IDEWindowRegistry(store: store)
+        let model = registry.open(root: "/tmp/m").model
+        model.agentPaneVisible = false
+        model.toggleAgentMaximized()
+        #expect(model.agentPaneVisible && model.agentPaneMaximized)
+        model.toggleAgentMaximized()
+        #expect(model.agentPaneVisible && !model.agentPaneMaximized)
+        model.toggleAgentMaximized()
+        model.toggleAgentPane()
+        #expect(!model.agentPaneVisible && !model.agentPaneMaximized)
+        model.toggleAgentMaximized()
+        registry.saveNow()
+        let restored = IDEWindowRegistry(store: store).window(id: model.id)
+        #expect(restored?.agentPaneMaximized == false)
+    }
+
     @Test("损坏的状态文件:备份后以空状态启动")
     func corruptFileFallsBack() throws {
         let store = tempStore()

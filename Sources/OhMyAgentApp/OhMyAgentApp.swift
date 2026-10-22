@@ -328,6 +328,8 @@ struct WorkbenchCommands: Commands {
                 if !IDEWindowManager.shared.route(.togglePanel) { workbench.toggleTerminal() }
             }
             .keyboardShortcut(shortcuts.shortcut(for: .togglePanel))
+            Button("最大化 / 还原 Agent 面板") { IDEWindowManager.shared.route(.maximizeAgentPane) }
+                .keyboardShortcut("e", modifiers: [.command, .option])
             Divider()
             Button("切换 Agent / IDE 窗口") { IDEWindowManager.shared.toggleMode() }
                 .keyboardShortcut(shortcuts.shortcut(for: .switchWindowMode))

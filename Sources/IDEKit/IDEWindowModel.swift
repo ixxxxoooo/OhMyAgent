@@ -27,6 +27,8 @@ public final class IDEWindowModel: Identifiable {
     @ObservationIgnored public let problems = ProblemsStore()
     /// 底部面板最大化(仅界面状态,不持久化)
     public var panelMaximized = false
+    /// Agent 面板最大化(⌥⌘E):隐藏侧栏与编辑区,对话占满窗口(仅界面状态,不持久化)
+    public var agentPaneMaximized = false
     public var agentPaneVisible: Bool { didSet { if agentPaneVisible != oldValue { changed() } } }
     public var agentPaneWidth: Double { didSet { if agentPaneWidth != oldValue { changed() } } }
     /// 窗口外框(由窗口控制器在移动/缩放后回写)
@@ -134,7 +136,16 @@ public final class IDEWindowModel: Identifiable {
     }
 
     /// 切换 Agent 面板显隐。
-    public func toggleAgentPane() { agentPaneVisible.toggle() }
+    public func toggleAgentPane() {
+        agentPaneVisible.toggle()
+        if !agentPaneVisible { agentPaneMaximized = false }
+    }
+
+    /// 最大化/还原 Agent 面板(⌥⌘E);面板未显示时先显示再最大化。
+    public func toggleAgentMaximized() {
+        if !agentPaneVisible { agentPaneVisible = true; agentPaneMaximized = true; return }
+        agentPaneMaximized.toggle()
+    }
 
     /// 设置侧栏宽度(钳制到范围)。
     /// - Parameter value: 期望宽度

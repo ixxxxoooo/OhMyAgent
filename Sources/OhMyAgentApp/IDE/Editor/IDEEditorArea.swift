@@ -39,6 +39,7 @@ struct IDEEditorEmptyState: View {
                 hint(String(localized: "显示 / 隐藏侧栏"), shortcuts.binding(for: .toggleSidebar).display)
                 hint(String(localized: "显示 / 隐藏面板"), shortcuts.binding(for: .togglePanel).display)
                 hint(String(localized: "显示 / 隐藏 Agent 面板"), shortcuts.binding(for: .toggleInspector).display)
+                hint(String(localized: "最大化 Agent 面板"), "⌥⌘E")
                 hint(String(localized: "切换到 Agents Window"), shortcuts.binding(for: .switchWindowMode).display)
                 hint(String(localized: "新建 IDE 窗口"), shortcuts.binding(for: .newIDEWindow).display)
             }

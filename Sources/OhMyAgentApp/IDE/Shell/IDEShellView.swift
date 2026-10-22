@@ -39,7 +39,14 @@ struct IDEShellView: View {
             ? min(model.sidebarWidth, IDEMetrics.sidebarMax(window: width, agentWidth: agentShown ? model.agentPaneWidth : 0)) : 0
         let agentWidth = agentShown
             ? min(model.agentPaneWidth, IDEMetrics.agentMax(window: width, sidebarWidth: sidebarWidth)) : 0
-        return HStack(spacing: 0) {
+        // ⌥⌘E:Agent 面板最大化时只保留活动栏与对话
+        if agentShown, model.agentPaneMaximized {
+            return AnyView(HStack(spacing: 0) {
+                IDEActivityBar(model: model)
+                IDEAgentPane(workspace: workspace).frame(maxWidth: .infinity)
+            })
+        }
+        return AnyView(HStack(spacing: 0) {
             IDEActivityBar(model: model)
             if model.sidebarVisible {
                 IDESidebarPane(workspace: workspace).frame(width: sidebarWidth)
@@ -61,7 +68,7 @@ struct IDEShellView: View {
                 IDEResizer(model: model, kind: .agent, area: size)
                 IDEAgentPane(workspace: workspace).frame(width: agentWidth)
             }
-        }
+        })
     }
 }
 
