@@ -1,0 +1,29 @@
+{
+  "knownOverBudget": [
+    "ide.tab-switch-warm"
+  ],
+  "machine": "arm64",
+  "metrics": {
+    "ide.memory-10-files": 74.016,
+    "ide.memory-3-windows": 20.422,
+    "ide.memory-50k": 72.313,
+    "ide.memory-drift": 6.875,
+    "ide.memory-empty-window": 0.984,
+    "ide.open-50k": 11.941,
+    "ide.open-file": 27.844,
+    "ide.quick-open-key": 13.152,
+    "ide.scroll-frame": 1.667,
+    "ide.search-first": 67.661,
+    "ide.soak-drift": 23.203,
+    "ide.switch-warm": 5.952,
+    "ide.syntax-full": 116.744,
+    "ide.syntax-incremental": 7.924,
+    "ide.tab-switch-cold": 22.733,
+    "ide.tab-switch-warm": 32.933,
+    "ide.typing-max": 10.467,
+    "ide.typing-p95": 6.869,
+    "ide.window-cold": 52.085
+  },
+  "system": "macOS-27.0.1-arm64-arm-64bit",
+  "updated": "2026-10-22"
+}

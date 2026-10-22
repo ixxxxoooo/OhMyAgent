@@ -112,25 +112,35 @@ enum IDEDebugHooks {
     /// - Parameters:
     ///   - rounds: 轮数
     ///   - root: IDE 窗口的根目录;nil 取当前项目
-    static func sweep(rounds: Int, root: String?) async {
+    /// - Returns: 冷开/热切换中位数(毫秒)与内存漂移(MB)
+    @discardableResult
+    static func sweep(rounds: Int, root: String?) async -> (coldMedianMs: Double, warmMedianMs: Double, driftMB: Double) {
         let manager = IDEWindowManager.shared
         let target = root ?? AppEnvironment.shared.workbench.selectedProject?.id
         let clock = ContinuousClock()
         var cold: [Double] = [], warm: [Double] = []
-        // 预热一轮(分配器与首次布局的一次性开销不计入漂移)
-        let warmup = manager.open(root: target, forceNew: true)
-        manager.controller(for: warmup)?.window?.close()
+        // 预热三轮(分配器、字体与首次布局的一次性开销不计入漂移)
+        var warmup = manager.open(root: target, forceNew: true)
+        for _ in 0..<3 {
+            warmup = manager.open(root: target, forceNew: true)
+            manager.controller(for: warmup)?.window?.displayIfNeeded()
+            await settle()
+            manager.controller(for: warmup)?.window?.close()
+            await settle()
+        }
         try? await Task.sleep(for: .milliseconds(500))
         let before = footprintMB()
         for round in 1...rounds {
             // 计入首帧:显示后强制同步排版与绘制,否则只量到「下单」的耗时
-            let coldTime = clock.measure { let model = manager.open(root: target, forceNew: true); manager.controller(for: model)?.window?.displayIfNeeded() }
+            // 记住本轮新开的窗口:应用在后台时窗口不会成为 key,`registry.mostRecent` 不可靠,不能靠它收尾
+            var opened: IDEWindowModel?
+            let coldTime = clock.measure { let model = manager.open(root: target, forceNew: true); opened = model; manager.controller(for: model)?.window?.displayIfNeeded() }
             await settle()
             manager.switchToAgent()
             await settle()
-            let warmTime = clock.measure { manager.switchToIDE(); manager.controller(for: manager.registry.mostRecent ?? warmup)?.window?.displayIfNeeded() }
+            let warmTime = clock.measure { manager.switchToIDE(); manager.controller(for: opened ?? warmup)?.window?.displayIfNeeded() }
             await settle()
-            if let model = manager.registry.mostRecent { manager.controller(for: model)?.window?.close() }
+            if let model = opened { manager.controller(for: model)?.window?.close() }
             await settle()
             cold.append(coldTime.seconds * 1000)
             warm.append(warmTime.seconds * 1000)
@@ -145,6 +155,7 @@ enum IDEDebugHooks {
             "warmMedianMs": String(format: "%.1f", sortedWarm[sortedWarm.count / 2]), "warmMaxMs": String(format: "%.1f", sortedWarm.last ?? 0),
             "driftMB": String(format: "%.1f", drift),
         ])
+        return (sortedCold[sortedCold.count / 2], sortedWarm[sortedWarm.count / 2], drift)
     }
 
     /// 让出若干个 RunLoop 轮次,等窗口动画与布局稳定。

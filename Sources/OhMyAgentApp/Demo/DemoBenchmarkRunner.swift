@@ -23,13 +23,15 @@ final class DemoBenchmarkRunner {
     static let shared = DemoBenchmarkRunner()
 
     /// 当前报告(运行中逐项刷新)
-    private(set) var report = DemoMetricsReport(metrics: DemoBenchmarkCatalog.items.map(\.placeholder))
+    var report = DemoMetricsReport(metrics: DemoBenchmarkCatalog.items.map(\.placeholder))
     /// 是否正在运行
     private(set) var isRunning = false
     /// 正在执行的项目说明
-    private(set) var currentStep = ""
+    var currentStep = ""
     /// 运行取消标志
-    @ObservationIgnored private var cancelled = false
+    @ObservationIgnored var cancelled = false
+    /// IDE 标签切换的耗时分解(运行循环/布局/绘制,三个一组),供基准说明列出
+    @ObservationIgnored var settleBreakdown: [Double] = []
     @ObservationIgnored private var phase = "空闲"
     @ObservationIgnored private var memoryTask: Task<Void, Never>?
     @ObservationIgnored private var startedAt = ContinuousClock.now
@@ -56,6 +58,7 @@ final class DemoBenchmarkRunner {
         if categories.contains(.open) { await runOpen() }
         if categories.contains(.load) || categories.contains(.copy) || categories.contains(.switching) || categories.contains(.memory) { await runLoadCopySwitch(categories: categories) }
         if categories.contains(.render) { await runRender() }
+        if categories.contains(.ide) { await runIDE() }
         if categories.contains(.memory) { await finishMemory(baseline: baseline) }
         report.finishedAt = Date()
         span.end()
@@ -275,20 +278,20 @@ final class DemoBenchmarkRunner {
         report.memory.append(DemoMemoryPoint(seconds: Double((ContinuousClock.now - startedAt).seconds), appMB: sample.footprintMB, childrenMB: sample.childrenFootprintMB, phase: phase))
     }
 
-    private func currentFootprint() -> Double { report.memory.last?.appMB ?? ResourceSampler.shared.sample()?.footprintMB ?? 0 }
+    func currentFootprint() -> Double { report.memory.last?.appMB ?? ResourceSampler.shared.sample()?.footprintMB ?? 0 }
 
     // MARK: 工具
 
-    private func setPhase(_ name: String) { phase = name }
+    func setPhase(_ name: String) { phase = name }
 
-    private func project(named name: String) -> ProjectEntry? { workbench.projects.first { $0.name == name } }
+    func project(named name: String) -> ProjectEntry? { workbench.projects.first { $0.name == name } }
 
     private func model(for sessionId: String, in projectID: String) -> SessionModel? {
         workbench.conversations.first { $0.key.projectID == projectID && $0.value.sessionId == sessionId }?.value
     }
 
     /// 轮询等待条件成立。
-    private func waitUntil(timeout: Double, _ condition: () -> Bool) async -> Bool {
+    func waitUntil(timeout: Double, _ condition: () -> Bool) async -> Bool {
         let deadline = ContinuousClock.now + .seconds(timeout)
         while ContinuousClock.now < deadline {
             if condition() { return true }
@@ -297,19 +300,19 @@ final class DemoBenchmarkRunner {
         return condition()
     }
 
-    private func record(_ id: String, started: ContinuousClock.Instant, end: ContinuousClock.Instant = .now, detail: String, failed: Bool = false) {
+    func record(_ id: String, started: ContinuousClock.Instant, end: ContinuousClock.Instant = .now, detail: String, failed: Bool = false) {
         let elapsed = (end - started).seconds * 1000
         report.record(updated(id) { $0.value = failed ? nil : elapsed; $0.detail = detail })
         log.info("演示基准项", ["id": id, "ms": String(format: "%.1f", elapsed), "detail": detail])
     }
 
-    private func measure(_ id: String, detail: String, _ body: () -> Void) {
+    func measure(_ id: String, detail: String, _ body: () -> Void) {
         let started = ContinuousClock.now
         body()
         record(id, started: started, detail: detail)
     }
 
-    private func updated(_ id: String, _ change: (inout DemoMetric) -> Void) -> DemoMetric {
+    func updated(_ id: String, _ change: (inout DemoMetric) -> Void) -> DemoMetric {
         var metric = report.metrics.first { $0.id == id } ?? DemoBenchmarkCatalog.item(id: id)?.placeholder ?? DemoMetric(id: id, category: .render, title: id, purpose: "")
         change(&metric)
         return metric

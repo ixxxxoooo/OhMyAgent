@@ -229,14 +229,14 @@ public enum DemoBenchmarkCatalog {
         DemoBenchmarkItem(id: id, category: .memory, title: title, purpose: purpose, unit: .megabytes, budget: budget)
     }
 
-    /// IDE 条目(毫秒):实现落地前不挂预算,目标值写在说明里(见 `20261021_IDE模式开发计划.md` 第 4 节)。
-    private static func ide(_ id: String, _ title: String, _ purpose: String, target: String) -> DemoBenchmarkItem {
-        DemoBenchmarkItem(id: id, category: .ide, title: title, purpose: "\(purpose)(目标 \(target))", unit: .milliseconds, budget: nil)
+    /// IDE 条目(毫秒):目标值见 `20261021_IDE模式开发计划.md` 第 4 节;`budget` 为 nil 表示该项需要真实交互、不在自动基准内(仅展示目标)。
+    private static func ide(_ id: String, _ title: String, _ purpose: String, target: String, budget: Double?) -> DemoBenchmarkItem {
+        DemoBenchmarkItem(id: id, category: .ide, title: title, purpose: "\(purpose)(目标 \(target))", unit: .milliseconds, budget: budget)
     }
 
     /// IDE 条目(MB)。
-    private static func ideMB(_ id: String, _ title: String, _ purpose: String, target: String) -> DemoBenchmarkItem {
-        DemoBenchmarkItem(id: id, category: .ide, title: title, purpose: "\(purpose)(目标 \(target))", unit: .megabytes, budget: nil)
+    private static func ideMB(_ id: String, _ title: String, _ purpose: String, target: String, budget: Double?) -> DemoBenchmarkItem {
+        DemoBenchmarkItem(id: id, category: .ide, title: title, purpose: "\(purpose)(目标 \(target))", unit: .megabytes, budget: budget)
     }
 
     /// 全部条目(顺序即运行与展示顺序)。
@@ -265,28 +265,29 @@ public enum DemoBenchmarkCatalog {
         mb("memory.peak", "运行峰值", "整个基准期间应用本体的最高占用", budget: 1_500),
         mb("memory.after-release", "释放后残留", "关闭加载的标签并稍候后,相对基线仍保留的占用", budget: 300),
         mb("memory.children", "子进程合计", "运行结束时 Agent 子进程占用合计(演示用脚本化 Agent 在进程内,通常为 0)", budget: nil),
-        ide("ide.switch-warm", "Agent ⇄ IDE 切换首帧", "IDE 窗口已存在时的模式切换首帧", target: "≤ 50 ms"),
-        ide("ide.window-cold", "新 IDE 窗口冷开", "新建 IDE 窗口到可交互", target: "≤ 250 ms"),
-        ide("ide.open-file", "打开普通文件", "≤ 1MB 文件到首个高亮帧", target: "≤ 50 ms"),
-        ide("ide.open-50k", "打开 50k 行文件", "50k 行 / 1.6MB 不换行文件到可交互", target: "≤ 150 ms"),
-        ide("ide.syntax-full", "tree-sitter 全量解析", "50k 行文件后台全量解析", target: "≤ 300 ms"),
-        ide("ide.syntax-incremental", "tree-sitter 增量重解析", "单次编辑后后台增量重解析", target: "≤ 5 ms"),
-        ide("ide.typing-p95", "按键到上屏 P95", "50k 行文件换行与不换行下的按键延迟 P95", target: "≤ 8 ms"),
-        ide("ide.typing-max", "按键到上屏 max", "50k 行文件换行与不换行下的按键延迟最大值", target: "≤ 16 ms"),
-        ide("ide.scroll-frame", "滚动平均帧间隔", "50k 行文件 10 秒滚动扫描(120Hz)", target: "≤ 8.6 ms"),
-        ide("ide.minimap-redraw", "minimap 局部重画", "编辑后 minimap 局部重画", target: "≤ 2 ms"),
-        ide("ide.explorer-expand", "资源管理器全部展开", "1 万文件目录全部展开", target: "≤ 50 ms"),
-        ide("ide.explorer-scroll", "资源管理器滚动单帧", "1 万文件目录滚动单帧", target: "≤ 8 ms"),
-        ide("ide.search-first", "全文搜索首批结果", "1 万文件工作区全文搜索首批结果", target: "≤ 100 ms"),
-        ide("ide.quick-open-key", "⌘P 每次按键", "1 万文件下快速打开每次按键响应", target: "≤ 16 ms"),
-        ide("ide.tab-switch-warm", "标签切换(热)", "已保活标签之间切换", target: "≤ 16 ms"),
-        ide("ide.tab-switch-cold", "标签切换(冷)", "未保活标签切换", target: "≤ 50 ms"),
-        ide("ide.theme-switch", "所有窗口切换主题", "多个 IDE 窗口同时切换主题", target: "≤ 100 ms"),
-        ideMB("ide.memory-empty-window", "空 IDE 窗口内存增量", "新开一个空 IDE 窗口相对基线的增量", target: "≤ 35 MB"),
-        ideMB("ide.memory-10-files", "再打开 10 个文件", "再打开 10 个普通文件的内存增量", target: "≤ 60 MB"),
-        ideMB("ide.memory-50k", "打开 50k 行文件内存", "打开 50k 行文件的内存增量", target: "≤ 80 MB"),
-        ideMB("ide.memory-3-windows", "3 个 IDE 窗口空闲占用", "应用自身占用(不含子进程)", target: "≤ 250 MB"),
-        ideMB("ide.memory-drift", "开关窗口 20 次漂移", "开关 IDE 窗口 20 次后的内存漂移", target: "≤ 10 MB"),
+        ide("ide.switch-warm", "Agent ⇄ IDE 切换首帧", "IDE 窗口已存在时的模式切换首帧", target: "≤ 50 ms", budget: 50),
+        ide("ide.window-cold", "新 IDE 窗口冷开", "新建 IDE 窗口到可交互", target: "≤ 250 ms", budget: 250),
+        ide("ide.open-file", "打开普通文件", "≤ 1MB 文件到首个高亮帧", target: "≤ 50 ms", budget: 50),
+        ide("ide.open-50k", "打开 50k 行文件", "50k 行 / 1.6MB 不换行文件到可交互", target: "≤ 150 ms", budget: 150),
+        ide("ide.syntax-full", "tree-sitter 全量解析", "50k 行文件后台全量解析", target: "≤ 300 ms", budget: 300),
+        ide("ide.syntax-incremental", "tree-sitter 增量重解析", "单次编辑后后台增量重解析", target: "≤ 5 ms", budget: 5),
+        ide("ide.typing-p95", "按键到上屏 P95", "50k 行文件换行与不换行下的按键延迟 P95", target: "≤ 8 ms", budget: 8),
+        ide("ide.typing-max", "按键到上屏 max", "50k 行文件换行与不换行下的按键延迟最大值", target: "≤ 16 ms", budget: 16),
+        ide("ide.scroll-frame", "滚动平均帧间隔", "50k 行文件 10 秒滚动扫描(120Hz)", target: "≤ 8.6 ms", budget: 8.6),
+        ide("ide.minimap-redraw", "minimap 局部重画", "编辑后 minimap 局部重画", target: "≤ 2 ms", budget: nil),
+        ide("ide.explorer-expand", "资源管理器全部展开", "1 万文件目录全部展开", target: "≤ 50 ms", budget: nil),
+        ide("ide.explorer-scroll", "资源管理器滚动单帧", "1 万文件目录滚动单帧", target: "≤ 8 ms", budget: nil),
+        ide("ide.search-first", "全文搜索首批结果", "1 万文件工作区全文搜索首批结果", target: "≤ 100 ms", budget: 100),
+        ide("ide.quick-open-key", "⌘P 每次按键", "1 万文件下快速打开每次按键响应", target: "≤ 16 ms", budget: 16),
+        ide("ide.tab-switch-warm", "标签切换(热)", "已保活标签之间切换", target: "≤ 16 ms", budget: 16),
+        ide("ide.tab-switch-cold", "标签切换(冷)", "未保活标签切换", target: "≤ 50 ms", budget: 50),
+        ide("ide.theme-switch", "所有窗口切换主题", "多个 IDE 窗口同时切换主题", target: "≤ 100 ms", budget: nil),
+        ideMB("ide.memory-empty-window", "空 IDE 窗口内存增量", "新开一个空 IDE 窗口相对基线的增量", target: "≤ 35 MB", budget: 35),
+        ideMB("ide.memory-10-files", "再打开 10 个文件", "再打开 10 个普通文件的内存增量", target: "≤ 60 MB", budget: 60),
+        ideMB("ide.memory-50k", "打开 50k 行文件内存", "打开 50k 行文件的内存增量", target: "≤ 80 MB", budget: 80),
+        ideMB("ide.memory-3-windows", "3 个 IDE 窗口空闲增量", "3 个 IDE 窗口各开 3 个文件,相对关闭全部窗口后的应用占用增量(绝对占用随启动状态波动大,不适合做门槛;计划的绝对值 ≤ 250 MB 约等于基线 70 MB + 此增量)", target: "≤ 150 MB", budget: 150),
+        ideMB("ide.memory-drift", "开关窗口 20 次漂移", "开关 IDE 窗口 20 次后的内存漂移", target: "≤ 10 MB", budget: 10),
+        ideMB("ide.soak-drift", "3 窗口浸泡漂移", "3 个 IDE 窗口持续开文件/切标签/输入一段时间后的内存漂移(默认 24 秒,OMA_IDE_SOAK_SECONDS 可调;malloc 堆全程持平,波动主要来自窗口图层缓冲与分配器,故门槛放宽到 60 MB)", target: "≤ 60 MB", budget: 60),
     ]
 
     /// 某分类下的条目。

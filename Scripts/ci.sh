@@ -8,6 +8,8 @@ python3 Scripts/l10n-scan.py --check
 python3 Scripts/sync-zh-strings.py --check
 # UI 规范门槛:字号/颜色/按钮/图标/复制图标必须走设计系统
 python3 Scripts/ui-lint.py --check
+# IDE 性能基线检查脚本自检
+python3 Scripts/ide-bench-check.py --self-test
 swift build --scratch-path /tmp/oma-ci -Xswiftc -warnings-as-errors
 Scripts/test.sh
 plutil -lint Resources/Info.plist Resources/*.lproj/*.strings
@@ -15,6 +17,8 @@ plutil -lint Resources/Info.plist Resources/*.lproj/*.strings
 if [[ "${OMA_CI_PERF:-0}" == "1" ]]; then
   Scripts/bundle.sh release
   Scripts/perf-soak.sh "${OMA_CI_PERF_SECONDS:-90}"
+  # IDE 基线回归(需已有 Scripts/perf-baseline.json)
+  [[ -f Scripts/perf-baseline.json ]] && Scripts/demo-bench.sh --only ide --no-build --check-baseline
 fi
 # 兜底清理:Swift 工具链会在系统临时目录遗留空的 TemporaryDirectory.*,测试也可能遗留目录
 Scripts/clean-test-tmp.sh >/dev/null 2>&1 || true

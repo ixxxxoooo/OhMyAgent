@@ -73,12 +73,18 @@ struct DemoMetricsTests {
         #expect(DemoBenchmarkCatalog.item(id: "memory.after-release") != nil)
     }
 
-    @Test("IDE 分类:先登记为展示项(无预算),目标值写在说明里;覆盖开关窗口与按键延迟等关键指标")
+    @Test("IDE 分类:可自动测量的项都挂了预算,目标值写在说明里;仅需真实交互的 4 项保持展示;覆盖开关窗口、按键延迟、浸泡等关键指标")
     func ideCategoryRegistered() {
         let items = DemoBenchmarkCatalog.items(in: .ide)
         #expect(items.count >= 20)
-        #expect(items.allSatisfy { $0.budget == nil && $0.purpose.contains("目标") })
-        for id in ["ide.switch-warm", "ide.window-cold", "ide.typing-p95", "ide.open-50k", "ide.memory-drift"] {
+        #expect(items.allSatisfy { $0.purpose.contains("目标") })
+        let displayOnly: Set<String> = ["ide.minimap-redraw", "ide.explorer-expand", "ide.explorer-scroll", "ide.theme-switch"]
+        #expect(Set(items.filter { $0.budget == nil }.map(\.id)) == displayOnly)
+        // 预算取自开发计划第 4 节
+        #expect(DemoBenchmarkCatalog.item(id: "ide.typing-p95")?.budget == 8)
+        #expect(DemoBenchmarkCatalog.item(id: "ide.window-cold")?.budget == 250)
+        #expect(DemoBenchmarkCatalog.item(id: "ide.memory-3-windows")?.budget == 150)
+        for id in ["ide.switch-warm", "ide.window-cold", "ide.typing-p95", "ide.open-50k", "ide.memory-drift", "ide.soak-drift"] {
             #expect(DemoBenchmarkCatalog.item(id: id) != nil, "缺少 \(id)")
         }
         #expect(DemoBenchmarkCatalog.categories(from: "ide") == [.ide])
