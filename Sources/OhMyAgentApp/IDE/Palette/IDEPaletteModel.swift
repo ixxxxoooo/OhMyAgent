@@ -109,6 +109,7 @@ final class IDEPaletteModel {
         present(custom: items, placeholder: String(localized: "选择颜色主题(↑↓ 预览,↩ 应用,Esc 取消)"))
         themeRevertID = current
         highlighted = items.firstIndex { $0.themeID == current } ?? 0
+        themeKeys.install { [weak self] command in self?.handleThemeKey(command) ?? false }
     }
 
     /// 预览高亮的主题行(非主题行或不在主题选择器里时忽略)。
@@ -132,6 +133,7 @@ final class IDEPaletteModel {
             themeRevertID = nil
             AppearanceModel.shared.themeID = id
         }
+        themeKeys.remove()
         isPresented = false
     }
 
@@ -156,17 +158,7 @@ final class IDEPaletteModel {
     ///   - context: 命令上下文
     ///   - recents: 已打开文件的相对路径(最近在前)
     func items(context: IDECommandContext, recents: [String]) -> [IDEPaletteItem] {
-        if let customItems {
-            let trimmed = text.trimmingCharacters(in: .whitespaces)
-            if trimmed.isEmpty { return customItems.prefix(200).map(IDEPaletteItem.location) }
-            return customItems
-                .compactMap { item -> (IDEPaletteLocation, Int)? in
-                    FuzzyMatcher.match(query: trimmed, path: item.title + " " + item.detail).map { (item, $0.score) }
-                }
-                .sorted { $0.1 > $1.1 }
-                .prefix(200)
-                .map { IDEPaletteItem.location($0.0) }
-        }
+        if customItems != nil { return filteredCustom.map(IDEPaletteItem.location) }
         switch query {
         case .files(let text):
             return IDEQuickOpen.rank(query: text, files: files, recents: recents).map(IDEPaletteItem.file)
@@ -175,6 +167,42 @@ final class IDEPaletteModel {
         case .line(let line, let column):
             return [.line(line, column)]
         }
+    }
+
+    /// 自定义列表按输入框文本过滤后的结果。
+    private var filteredCustom: [IDEPaletteLocation] {
+        guard let customItems else { return [] }
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        if trimmed.isEmpty { return Array(customItems.prefix(200)) }
+        return customItems
+            .compactMap { item -> (IDEPaletteLocation, Int)? in
+                FuzzyMatcher.match(query: trimmed, path: item.title + " " + item.detail).map { (item, $0.score) }
+            }
+            .sorted { $0.1 > $1.1 }
+            .prefix(200)
+            .map(\.0)
+    }
+
+    /// 主题选择器的键盘监视器:预览换主题会让窗口重绘、输入框丢焦点,
+    /// 所以 ↑↓/↩/Esc 不能依赖视图焦点(与中央搜索窗一致,走应用级监视器)。
+    @ObservationIgnored private let themeKeys = HubKeyMonitor()
+
+    private func handleThemeKey(_ command: HubKeyCommand) -> Bool {
+        guard isPresented, themeRevertID != nil else { return false }
+        let list = filteredCustom
+        let current = list.indices.contains(highlighted) ? list[highlighted] : nil
+        switch command {
+        case .move(let step):
+            move(step, count: list.count)
+            previewTheme(list.indices.contains(highlighted) ? .location(list[highlighted]) : nil)
+        case .submit:
+            if let id = current?.themeID { commitTheme(id); dismiss() }
+        case .dismiss:
+            dismiss()
+        case .switchSegment:
+            return false
+        }
+        return true
     }
 
     /// 记录命令使用。
