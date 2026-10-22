@@ -6,7 +6,7 @@ import Foundation
 
 /// 支持的语言服务器。
 public enum LSPServerKind: String, Sendable, CaseIterable, Hashable {
-    case swift, typescript, python
+    case swift, typescript, python, go
 
     /// 展示名称。
     public var displayName: String {
@@ -14,6 +14,7 @@ public enum LSPServerKind: String, Sendable, CaseIterable, Hashable {
         case .swift: return "sourcekit-lsp"
         case .typescript: return "typescript-language-server"
         case .python: return "pyright"
+        case .go: return "gopls"
         }
     }
 
@@ -23,6 +24,7 @@ public enum LSPServerKind: String, Sendable, CaseIterable, Hashable {
         case .swift: return String(localized: "需要安装 Xcode 或 Swift 工具链(自带 sourcekit-lsp)")
         case .typescript: return "npm i -g typescript-language-server typescript"
         case .python: return String(localized: "npm i -g pyright(或 pip install basedpyright)")
+        case .go: return "go install golang.org/x/tools/gopls@latest"
         }
     }
 
@@ -32,12 +34,13 @@ public enum LSPServerKind: String, Sendable, CaseIterable, Hashable {
         case .swift: return ["sourcekit-lsp"]
         case .typescript: return ["typescript-language-server"]
         case .python: return ["pyright-langserver", "basedpyright-langserver"]
+        case .go: return ["gopls"]
         }
     }
 
     var arguments: [String] {
         switch self {
-        case .swift: return []
+        case .swift, .go: return []
         case .typescript, .python: return ["--stdio"]
         }
     }
@@ -48,6 +51,7 @@ public enum LSPServerKind: String, Sendable, CaseIterable, Hashable {
         case .swift: return ["Package.swift"]
         case .typescript: return ["tsconfig.json", "jsconfig.json", "package.json"]
         case .python: return ["pyrightconfig.json", "pyproject.toml", "setup.py", "setup.cfg", "requirements.txt"]
+        case .go: return ["go.work", "go.mod"]
         }
     }
 
@@ -60,6 +64,7 @@ public enum LSPServerKind: String, Sendable, CaseIterable, Hashable {
         case "swift": return .swift
         case "typescript", "typescriptreact", "javascript", "javascriptreact": return .typescript
         case "python": return .python
+        case "go": return .go
         default: return nil
         }
     }
@@ -74,6 +79,7 @@ public enum LSPServerKind: String, Sendable, CaseIterable, Hashable {
         case "js", "mjs", "cjs": return "javascript"
         case "jsx": return "javascriptreact"
         case "py", "pyi": return "python"
+        case "go": return "go"
         default: return nil
         }
     }
@@ -92,6 +98,7 @@ public enum LSPServerLocator {
         dirs += [
             "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin",
             home + "/.local/bin", home + "/.npm-global/bin", home + "/.bun/bin", home + "/.volta/bin",
+            home + "/go/bin", "/usr/local/go/bin",
             "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin",
             "/Library/Developer/CommandLineTools/usr/bin",
         ]

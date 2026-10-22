@@ -135,7 +135,18 @@ struct LSPServersTests {
         #expect(LSPServerKind.languageID(forPath: "/a/b.tsx") == "typescriptreact")
         #expect(LSPServerKind.kind(forPath: "/a/b.JS") == .typescript)
         #expect(LSPServerKind.kind(forPath: "/a/b.py") == .python)
+        #expect(LSPServerKind.kind(forPath: "/a/b.go") == .go)
+        #expect(LSPServerKind.languageID(forPath: "/a/b.go") == "go")
         #expect(LSPServerKind.kind(forPath: "/a/b.rs") == nil)
+    }
+
+    @Test("Go:定位 ~/go/bin 下的 gopls,工作区根取 go.mod 所在目录")
+    func goServer() {
+        let launch = LSPServerLocator.locate(.go, projectRoot: "/p", workspaceRoot: "/p", environment: ["PATH": "/usr/bin"], home: "/h", isExecutable: { $0 == "/h/go/bin/gopls" })
+        #expect(launch?.executable == "/h/go/bin/gopls")
+        #expect(launch?.arguments == [])
+        let exists: (String) -> Bool = { $0 == "/p/svc/go.mod" }
+        #expect(LSPServerLocator.workspaceRoot(for: "/p/svc/a/b.go", kind: .go, projectRoot: "/p", fileExists: exists) == "/p/svc")
     }
 
     @Test("工作区根:向上查找标记且不越过项目根")
