@@ -16,6 +16,8 @@ struct SubagentTabView: View {
     let workbench: WorkbenchModel
     let projectID: String
     let toolCallID: String
+    /// 指定承载会话(IDE 窗口的 Agent 面板可能不是项目的「当前会话」);为空取项目当前会话
+    var session: SessionModel?
     @AppStorage(ClientPrefs.Key.chatWidth) private var chatWidth = ChatWidth.standard.rawValue
     @AppStorage(ClientPrefs.Key.chatWidthCustom) private var chatWidthCustom = ChatWidth.customDefault
     @AppStorage(ClientPrefs.Key.toolDensity) private var toolDensityRaw = ToolDensity.standard.rawValue
@@ -25,7 +27,7 @@ struct SubagentTabView: View {
     private static let pageItems = 120
 
     var body: some View {
-        if let model = workbench.sessions[projectID],
+        if let model = session ?? workbench.sessions[projectID],
            let entry = model.timeline.toolEntry(id: toolCallID), let tool = entry.tool {
             VStack(spacing: 0) {
                 header(tool: tool, entry: entry)

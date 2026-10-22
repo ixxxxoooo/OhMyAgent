@@ -81,6 +81,21 @@ public extension IDEWindowModel {
         return id
     }
 
+    /// 打开子 Agent 的只读完整会话标签(已打开则聚焦)。
+    /// - Parameters:
+    ///   - project: 项目 ID
+    ///   - toolCallID: 派生子 Agent 的工具调用 ID
+    ///   - title: 标签标题
+    /// - Returns: 标签标识;入参为空返回 nil
+    @discardableResult
+    func openSubagent(project: String, toolCallID: String, title: String) -> UUID? {
+        guard !project.isEmpty, !toolCallID.isEmpty else { return nil }
+        var layout = editor
+        let id = layout.open(.subagent(projectID: project, toolCallID: toolCallID), title: title, preview: false)
+        editor = layout
+        return id
+    }
+
     /// 关闭某标签。
     /// - Parameter tabID: 标签标识
     func closeTab(_ tabID: UUID) {

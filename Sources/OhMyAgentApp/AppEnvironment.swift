@@ -66,6 +66,11 @@ final class AppEnvironment {
             model.openFile(path, line: line, preview: preview)
             return true
         }
+        workbench.subagentOpenRedirect = { projectID, toolCallID, title in
+            guard let model = WindowContext.shared.ideModel else { return false }
+            model.openSubagent(project: projectID, toolCallID: toolCallID, title: title)
+            return true
+        }
         workbench.onProjectRemoved = { root in TerminalStore.shared.remove(WorkbenchModel.residentTerminalID(root: root)) }
     }
 

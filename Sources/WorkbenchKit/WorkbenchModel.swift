@@ -86,6 +86,8 @@ public final class WorkbenchModel {
     @ObservationIgnored public var onFileOpened: (@MainActor (String) -> Void)?
     /// 文件打开重定向(应用层注入):返回 true 表示已由别处(如键盘窗口是 IDE 窗口时的 IDE 编辑器)接管,不再在本模型的停靠区打开。
     @ObservationIgnored public var fileOpenRedirect: (@MainActor (_ path: String, _ line: Int?, _ preview: Bool) -> Bool)?
+    /// 子 Agent 标签打开重定向(应用层注入):键盘窗口是 IDE 窗口时,在该 IDE 编辑器里打开;返回 true 表示已接管。
+    @ObservationIgnored public var subagentOpenRedirect: (@MainActor (_ projectID: String, _ toolCallID: String, _ title: String) -> Bool)?
     /// 项目被移除后回调(应用层据此结束该项目的常驻终端进程)。
     @ObservationIgnored public var onProjectRemoved: (@MainActor (String) -> Void)?
     @ObservationIgnored public var makeAgentSession: (@MainActor (URL, String) -> SessionModel?)?
@@ -423,7 +425,8 @@ public final class WorkbenchModel {
     ///   - title: 标签标题
     @discardableResult
     public func openSubagent(project projectID: String, toolCallID: String, title: String) -> UUID {
-        openTab(.subagent(projectID: projectID, toolCallID: toolCallID), title: title)
+        if subagentOpenRedirect?(projectID, toolCallID, title) == true { return UUID() }
+        return openTab(.subagent(projectID: projectID, toolCallID: toolCallID), title: title)
     }
 
     /// 以新标签页打开 Agent 终端的只读输出(任务坞点击行时使用,与普通标签一致进入聚焦组)。
