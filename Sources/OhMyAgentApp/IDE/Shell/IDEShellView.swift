@@ -85,13 +85,27 @@ struct IDEResizer: View {
     let area: CGSize
     @State private var base: Double?
 
-    private var current: Double {
+    /// 当前存储值(可能大于窗口实际放得下的宽度)。
+    private var stored: Double {
         switch kind {
         case .sidebar: model.sidebarWidth
         case .panel: model.panelHeight
         case .agent: model.agentPaneWidth
         }
     }
+
+    /// 窗口当前允许的上限(与 `apply` 的钳制一致)。
+    private var upperBound: Double {
+        switch kind {
+        case .sidebar: IDEMetrics.sidebarMax(window: Double(area.width), agentWidth: model.agentPaneVisible ? model.agentPaneWidth : 0)
+        case .agent: IDEMetrics.agentMax(window: Double(area.width), sidebarWidth: model.sidebarVisible ? model.sidebarWidth : 0)
+        case .panel: IDEMetrics.panelMax(window: Double(area.height) + IDEMetrics.titleBarHeight + IDEMetrics.statusBarHeight)
+        }
+    }
+
+    /// 拖动起点:实际显示的宽度/高度。存储值超出上限时(窗口缩小后)显示值被压低,
+    /// 若以存储值为起点,拖动要先「空拖」一段才有反应。
+    private var current: Double { min(stored, upperBound) }
 
     var body: some View {
         OMSplitHandle(
