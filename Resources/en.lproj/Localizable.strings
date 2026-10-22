@@ -2911,3 +2911,5 @@
 "选择颜色主题(↑↓ 预览,↩ 应用,Esc 取消)" = "Select a color theme (↑↓ preview, ↩ apply, Esc cancel)";
 "安装" = "Install";
 "在终端运行:%@\n安装完成后重新打开文件即可生效" = "Runs in a terminal: %@\nReopen the file after installing.";
+"未找到语言服务器" = "Language server not found";
+"语言服务器不可用" = "Language server unavailable";
