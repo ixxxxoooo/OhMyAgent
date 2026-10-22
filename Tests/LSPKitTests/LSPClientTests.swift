@@ -52,7 +52,7 @@ final class ScriptedLSPServer: ACPRequestHandler, @unchecked Sendable {
         record(method)
         switch method {
         case "initialize":
-            return ["capabilities": ["hoverProvider": true], "serverInfo": ["name": "scripted"]]
+            return ["capabilities": ["hoverProvider": true, "textDocumentSync": ["openClose": true, "change": 2]], "serverInfo": ["name": "scripted"]]
         case "shutdown":
             shutdownSeen.withLock { $0 = true }
             return .null
@@ -76,6 +76,15 @@ final class ScriptedLSPServer: ACPRequestHandler, @unchecked Sendable {
             return ["changes": ["file:///a.swift": [["range": ["start": ["line": 0, "character": 4], "end": ["line": 0, "character": 7]], "newText": .string(name)]]]]
         case "textDocument/formatting":
             return [["range": ["start": ["line": 0, "character": 0], "end": ["line": 0, "character": 2]], "newText": "  "]]
+        case "textDocument/codeAction":
+            return [
+                ["title": "添加缺失的 import", "kind": "quickfix", "isPreferred": true,
+                 "edit": ["changes": ["file:///a.swift": [["range": ["start": ["line": 0, "character": 0], "end": ["line": 0, "character": 0]], "newText": "import Foundation\n"]]]]],
+                ["title": "提取为函数", "kind": "refactor.extract", "data": ["id": 7]],
+                ["title": "仅命令", "command": ["title": "x", "command": "do.it"]],
+            ]
+        case "codeAction/resolve":
+            return ["title": "提取为函数", "edit": ["changes": ["file:///a.swift": [["range": ["start": ["line": 0, "character": 0], "end": ["line": 0, "character": 1]], "newText": "F"]]]]]
         case "textDocument/signatureHelp":
             return ["signatures": [["label": "f(a: Int, b: String)", "parameters": [["label": "a: Int"], ["label": "b: String"]]]], "activeSignature": 0, "activeParameter": 1]
         default:
@@ -413,5 +422,58 @@ struct LSPFeatureTests {
         let info: JSONValue = [["name": "g", "kind": 12, "location": ["uri": "file:///x", "range": ["start": ["line": 4, "character": 0], "end": ["line": 6, "character": 1]]]]]
         let symbols = LSPDecode.symbols(info)
         #expect(symbols.count == 1 && symbols[0].line == 4 && symbols[0].endLine == 6 && symbols[0].kind == .function)
+    }
+}
+
+
+@Suite("LSP 增量同步与代码操作")
+struct LSPIncrementalTests {
+    /// 用变更还原新文本,验证 diff 的正确性。
+    private func roundTrip(_ old: String, _ new: String) throws -> LSPContentChange? {
+        guard let change = LSPTextDiff.change(from: old, to: new) else { return nil }
+        let range = try #require(change.range)
+        #expect(LSPTextEdits.apply([LSPTextEdit(range: range, newText: change.text)], to: old) == new)
+        return change
+    }
+
+    @Test("增量 diff:插入、删除、替换、相同文本")
+    func diff() throws {
+        #expect(try roundTrip("abc\n", "abc\n") == nil)
+        let insert = try #require(try roundTrip("hello\nworld\n", "hello\nbig world\n"))
+        #expect(insert.range?.start == LSPPosition(line: 1, character: 0) && insert.range?.end == LSPPosition(line: 1, character: 0) && insert.text == "big ")
+        let delete = try #require(try roundTrip("a\nb\nc\n", "a\nc\n"))
+        #expect(delete.text == "" && delete.range?.start.line == 1)
+        _ = try roundTrip("let x = 1", "let y = 12")
+        _ = try roundTrip("", "新文本")
+        _ = try roundTrip("旧文本", "")
+    }
+
+    @Test("增量 diff 不会切开代理对(emoji)")
+    func surrogatePairs() throws {
+        for (old, new) in [("a😀b", "a😁b"), ("😀", "😁"), ("x😀😀y", "x😀y"), ("😀a", "😁a")] {
+            let change = try #require(try roundTrip(old, new))
+            let range = try #require(change.range)
+            let oldUnits = Array(old.utf16)
+            let start = LSPTextEdits.offset(of: range.start, lineStarts: LSPTextEdits.lineStarts(of: old), length: oldUnits.count)
+            #expect(start == 0 || !UTF16.isLeadSurrogate(oldUnits[start - 1]))
+        }
+    }
+
+    @Test("服务器声明增量同步时发 range 变更;代码操作解码与 resolve")
+    func codeActionsAndSync() async throws {
+        let (client, server) = try await makeScripted()
+        try await client.start()
+        #expect(await client.supportsIncrementalSync)
+        await client.didOpen(uri: "file:///a.swift", languageID: "swift", text: "a\n")
+        let change = try #require(LSPTextDiff.change(from: "a\n", to: "ab\n"))
+        #expect(await client.didChange(uri: "file:///a.swift", change: change, fullText: "ab\n") == 2)
+        for _ in 0..<50 where !server.methods.contains("textDocument/didChange") { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(server.methods.contains("textDocument/didChange"))
+
+        let actions = try await client.codeActions(uri: "file:///a.swift", range: LSPRange(start: LSPPosition(line: 0, character: 0), end: LSPPosition(line: 0, character: 0)), diagnostics: [])
+        #expect(actions.map(\.title) == ["添加缺失的 import", "提取为函数"])  // 纯命令被丢弃
+        #expect(actions[0].isPreferred && actions[0].edit?.editCount == 1 && actions[1].edit == nil)
+        let resolved = try await client.resolve(actions[1])
+        #expect(resolved.edit?.editCount == 1)
     }
 }

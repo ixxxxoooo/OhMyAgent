@@ -297,6 +297,8 @@ struct WorkbenchCommands: Commands {
                 .keyboardShortcut(functionKeyEquivalent(NSF12FunctionKey), modifiers: .shift)
             Button("重命名符号") { IDEWindowManager.shared.route(.renameSymbol) }
                 .keyboardShortcut(functionKeyEquivalent(NSF2FunctionKey), modifiers: [])
+            Button("快速修复…") { IDEWindowManager.shared.route(.quickFix) }
+                .keyboardShortcut(".", modifiers: .command)
             Button("格式化文档") { IDEWindowManager.shared.route(.formatDocument) }
                 .keyboardShortcut("f", modifiers: [.option, .shift])
             Button("折叠") { IDEWindowManager.shared.route(.foldCode) }

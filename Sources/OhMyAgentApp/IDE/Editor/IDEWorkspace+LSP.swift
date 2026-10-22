@@ -110,6 +110,36 @@ extension IDEWorkspace {
         }
     }
 
+    /// 快速修复(⌘.):向语言服务器请求光标/选区处的代码操作,以列表形式让用户选择并应用其编辑。
+    func showCodeActions() {
+        guard let path = model.activeFilePath, let controller = activeLSP else { reportUnavailable(); return }
+        let start = caretOffset(in: controller, path: path)
+        let range = NSRange(location: start, length: carets[path]?.selectedLength ?? 0)
+        Task { [weak self] in
+            guard let self else { return }
+            let actions = await controller.codeActions(in: range)
+            guard !actions.isEmpty else {
+                OMDialog.alert(title: String(localized: "没有可用的快速修复"), message: "", isError: false)
+                return
+            }
+            paletteActions = [:]
+            let sorted = actions.sorted { $0.isPreferred && !$1.isPreferred }
+            let items = sorted.enumerated().map { index, action -> IDEPaletteLocation in
+                let id = "codeAction:\(index)"
+                paletteActions[id] = { [weak self] in
+                    let resolved = await controller.resolve(action)
+                    guard let edit = resolved.edit, edit.editCount > 0, let self else { return }
+                    let files = await self.applyWorkspaceEdit(edit)
+                    Log.lsp.info("IDE 快速修复", ["title": action.title, "files": "\(files)", "edits": "\(edit.editCount)"])
+                }
+                var item = IDEPaletteLocation(id: id, title: action.title, detail: action.kind ?? "", icon: "wrench", path: path, line: 0)
+                item.actionID = id
+                return item
+            }
+            palette.present(custom: items, placeholder: String(localized: "快速修复"))
+        }
+    }
+
     /// 格式化当前文档(⇧⌥F):应用服务器给出的整篇编辑到缓冲区(标记为未保存)。
     func formatDocument() {
         guard let path = model.activeFilePath, let controller = activeLSP else { reportUnavailable(); return }

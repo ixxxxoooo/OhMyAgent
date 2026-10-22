@@ -2878,3 +2878,6 @@
 "IDE 窗口的编辑器顶部固定显示当前所在的外层代码块标题(最多 3 行),点击跳转。" = "Pin the headers of the enclosing code blocks (up to 3 lines) at the top of the editor in IDE windows; click to jump.";
 "折叠" = "Fold";
 "全部展开" = "Unfold All";
+"快速修复…" = "Quick Fix…";
+"快速修复" = "Quick Fix";
+"没有可用的快速修复" = "No quick fixes available";

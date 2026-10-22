@@ -191,8 +191,14 @@ final class EditorLSPController {
     /// 立刻把未同步的文本发给服务器(查询前调用,保证位置一致)。
     private func flush() async {
         guard let handle, currentText != syncedText else { return }
+        let previous = syncedText
         syncedText = currentText
-        await handle.client.didChange(uri: handle.uri, text: currentText)
+        // 服务器支持增量同步时只发一段变更;否则(或算不出差异)整篇同步
+        if let change = LSPTextDiff.change(from: previous, to: currentText) {
+            await handle.client.didChange(uri: handle.uri, change: change, fullText: currentText)
+        } else {
+            await handle.client.didChange(uri: handle.uri, text: currentText)
+        }
     }
 
     /// 保存后通知服务器。
@@ -210,7 +216,8 @@ final class EditorLSPController {
         return EditorLanguageFeatures(
             hover: { [weak self] offset in await self?.hover(at: offset) },
             definition: { [weak self] offset in self?.jumpToDefinition(at: offset) },
-            completion: { [weak self] offset in await self?.completion(at: offset) ?? [] }
+            completion: { [weak self] offset in await self?.completion(at: offset) ?? [] },
+            signatureHelp: { [weak self] offset in await self?.signatureHelp(at: offset) }
         )
     }
 
@@ -269,6 +276,49 @@ final class EditorLSPController {
             Log.lsp.warning("格式化失败", ["error": error.localizedDescription])
             return []
         }
+    }
+
+    /// 光标处的签名帮助。
+    /// - Parameter offset: UTF-16 偏移
+    func signatureHelp(at offset: Int) async -> EditorSignature? {
+        guard let handle else { return nil }
+        await flush()
+        let position = LSPTextMapping.position(offset: offset, in: LineIndex(text: currentText))
+        do {
+            guard let help = try await handle.client.signatureHelp(uri: handle.uri, at: position) else { return nil }
+            return EditorSignature(label: help.label, activeParameter: help.activeParameter)
+        } catch {
+            Log.lsp.debug("签名帮助失败", ["error": error.localizedDescription])
+            return nil
+        }
+    }
+
+    /// 某范围的代码操作(快速修复/重构);带上与范围相交的诊断。
+    /// - Parameter range: UTF-16 范围(光标处为空范围)
+    func codeActions(in range: NSRange) async -> [LSPCodeAction] {
+        guard let handle else { return [] }
+        await flush()
+        let index = LineIndex(text: currentText)
+        let lspRange = LSPRange(start: LSPTextMapping.position(offset: range.location, in: index),
+                                end: LSPTextMapping.position(offset: NSMaxRange(range), in: index))
+        do {
+            let all = await handle.client.diagnostics(for: handle.uri)
+            let overlapping = all.filter { diagnostic in
+                let start = LSPTextMapping.offset(of: diagnostic.range.start, in: index)
+                let end = max(LSPTextMapping.offset(of: diagnostic.range.end, in: index), start)
+                return start <= NSMaxRange(range) && end >= range.location
+            }
+            return try await handle.client.codeActions(uri: handle.uri, range: lspRange, diagnostics: overlapping)
+        } catch {
+            Log.lsp.warning("代码操作请求失败", ["error": error.localizedDescription])
+            return []
+        }
+    }
+
+    /// 补全缺少编辑的代码操作。
+    func resolve(_ action: LSPCodeAction) async -> LSPCodeAction {
+        guard let handle else { return action }
+        return (try? await handle.client.resolve(action)) ?? action
     }
 
     private func hover(at offset: Int) async -> String? {

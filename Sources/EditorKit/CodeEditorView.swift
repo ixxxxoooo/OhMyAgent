@@ -89,6 +89,9 @@ public final class CodeEditorView: NSView {
     private var hoverPopover: NSPopover?
     private var hoverGeneration = 0
     private var autoCompleteTask: Task<Void, Never>?
+    /// 签名帮助浮窗与其请求的世代号(过期结果丢弃)
+    var signaturePopover: NSPopover?
+    var signatureGeneration = 0
 
     /// 行标记,变更后刷新标尺。
     public var lineMarkers: [Int: LineMarker] = [:] {
@@ -623,6 +626,7 @@ public final class CodeEditorView: NSView {
     /// 输入 `.` 后稍作停顿自动弹出补全。
     private func scheduleAutoCompletion() {
         autoCompleteTask?.cancel()
+        updateSignatureHelp()
         guard features.completion != nil else { return }
         let ns = textView.string as NSString
         let caret = textView.selectedRange().location

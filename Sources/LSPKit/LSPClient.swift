@@ -163,6 +163,12 @@ public actor LSPClient {
                     "hover": ["contentFormat": ["plaintext", "markdown"]],
                     "definition": ["linkSupport": true],
                     "completion": ["completionItem": ["snippetSupport": false]],
+                    "signatureHelp": ["signatureInformation": ["parameterInformation": ["labelOffsetSupport": true]]],
+                    "codeAction": [
+                        "codeActionLiteralSupport": ["codeActionKind": ["valueSet": ["quickfix", "refactor", "source"]]],
+                        "isPreferredSupport": true,
+                        "resolveSupport": ["properties": ["edit"]],
+                    ],
                 ],
             ],
         ]
@@ -193,6 +199,35 @@ public actor LSPClient {
         await connection.notify("textDocument/didChange", params: [
             "textDocument": ["uri": .string(uri), "version": .int(version)],
             "contentChanges": [["text": .string(text)]],
+        ])
+        return version
+    }
+
+    /// 服务器是否声明支持增量同步(`textDocumentSync` 为 2 或其 `change` 为 2)。
+    public var supportsIncrementalSync: Bool {
+        let sync = capabilities["textDocumentSync"]
+        return sync?.intValue == 2 || sync?["change"]?.intValue == 2
+    }
+
+    /// 按范围的增量内容变更;服务器不支持增量时自动退化为整篇同步。
+    /// - Parameters:
+    ///   - uri: 文档
+    ///   - change: 一处增量变更(`range` 为旧文本里的范围)
+    ///   - fullText: 变更后的完整文本(退化时使用)
+    /// - Returns: 变更后的文档版本;文档未打开返回 0
+    @discardableResult
+    public func didChange(uri: String, change: LSPContentChange, fullText: String) async -> Int {
+        guard supportsIncrementalSync, let range = change.range else { return await didChange(uri: uri, text: fullText) }
+        guard let current = documents[uri] else { return 0 }
+        let version = current + 1
+        documents[uri] = version
+        await connection.notify("textDocument/didChange", params: [
+            "textDocument": ["uri": .string(uri), "version": .int(version)],
+            "contentChanges": [[
+                "range": ["start": ["line": .int(range.start.line), "character": .int(range.start.character)],
+                          "end": ["line": .int(range.end.line), "character": .int(range.end.character)]],
+                "text": .string(change.text),
+            ]],
         ])
         return version
     }

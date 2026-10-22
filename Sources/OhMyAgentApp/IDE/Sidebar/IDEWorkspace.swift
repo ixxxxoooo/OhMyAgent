@@ -37,6 +37,8 @@ final class IDEWorkspace {
     @ObservationIgnored var closedStack: [TabKind] = []
     /// 各文件的语言服务器会话(`FileTabView` 登记)
     @ObservationIgnored var lspControllers: [String: EditorLSPController] = [:]
+    /// 命令面板里「动作行」(快速修复)选中后执行的闭包,按行 id 登记;面板关闭后清空
+    @ObservationIgnored var paletteActions: [String: @MainActor () async -> Void] = [:]
     /// 活动文件的大纲与其所属路径
     var outline: [LSPSymbol] = []
     var outlinePath: String?

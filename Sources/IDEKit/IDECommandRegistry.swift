@@ -161,6 +161,7 @@ public struct IDECommandRegistry: Sendable {
             IDECommand(id: "lsp.symbols", title: String(localized: "转到符号…"), category: go, shortcut: "⇧⌘O", when: .hasActiveFile),
             IDECommand(id: "lsp.references", title: String(localized: "查找引用"), category: go, shortcut: "⇧F12", when: .hasActiveFile),
             IDECommand(id: "lsp.rename", title: String(localized: "重命名符号"), category: edit, shortcut: "F2", when: .hasActiveFile),
+            IDECommand(id: "lsp.codeAction", title: String(localized: "快速修复…"), category: edit, shortcut: "⌘.", when: .hasActiveFile),
             IDECommand(id: "lsp.format", title: String(localized: "格式化文档"), category: edit, shortcut: "⇧⌥F", when: .hasActiveFile),
             IDECommand(id: "edit.toggleComment", title: String(localized: "切换行注释"), category: edit, shortcut: "⌘/", when: .hasActiveFile),
             IDECommand(id: "edit.moveLineUp", title: String(localized: "向上移动行"), category: edit, shortcut: "⌥↑", when: .hasActiveFile),

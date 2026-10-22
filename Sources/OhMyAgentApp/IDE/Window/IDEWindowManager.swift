@@ -124,7 +124,7 @@ final class IDEWindowManager {
         case save, saveAll, closeTab, reopenTab, nextTab, previousTab
         case newTerminal, showProblems
         case quickOpen, commandPalette, goToLine, showSearch
-        case showSymbols, showReferences, renameSymbol, formatDocument
+        case showSymbols, showReferences, renameSymbol, formatDocument, quickFix
         case foldCode, unfoldCode
     }
 
@@ -155,6 +155,7 @@ final class IDEWindowManager {
         case .showReferences: controllers[model.id]?.workspace.showReferences()
         case .renameSymbol: controllers[model.id]?.workspace.renameSymbol()
         case .formatDocument: controllers[model.id]?.workspace.formatDocument()
+        case .quickFix: controllers[model.id]?.workspace.showCodeActions()
         case .foldCode: controllers[model.id]?.workspace.perform("edit.fold")
         case .unfoldCode: controllers[model.id]?.workspace.perform("edit.unfold")
         case .reopenTab: controllers[model.id]?.workspace.reopenClosed()

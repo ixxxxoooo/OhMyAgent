@@ -37,6 +37,19 @@ public struct EditorCompletion: Sendable, Equatable {
     }
 }
 
+/// 签名帮助:函数签名文本与当前参数的范围。
+public struct EditorSignature: Sendable, Equatable {
+    /// 完整签名,如 `f(a: Int, b: String)`
+    public var label: String
+    /// 当前参数在 `label` 里的 UTF-16 范围
+    public var activeParameter: NSRange?
+
+    public init(label: String, activeParameter: NSRange? = nil) {
+        self.label = label
+        self.activeParameter = activeParameter
+    }
+}
+
 /// 语言智能回调集合。所有回调都在主线程调用,偏移为 UTF-16 偏移。
 public struct EditorLanguageFeatures {
     /// 悬停:返回要展示的文本,无信息返回 nil。
@@ -45,15 +58,19 @@ public struct EditorLanguageFeatures {
     public var definition: (@MainActor (_ offset: Int) -> Void)?
     /// 补全候选(⌃Space / Esc,或输入 `.` 后自动触发)。
     public var completion: (@MainActor (_ offset: Int) async -> [EditorCompletion])?
+    /// 签名帮助(输入 `(` 或 `,` 后自动触发):返回当前调用的签名,没有返回 nil。
+    public var signatureHelp: (@MainActor (_ offset: Int) async -> EditorSignature?)?
 
     public init(
         hover: (@MainActor (_ offset: Int) async -> String?)? = nil,
         definition: (@MainActor (_ offset: Int) -> Void)? = nil,
-        completion: (@MainActor (_ offset: Int) async -> [EditorCompletion])? = nil
+        completion: (@MainActor (_ offset: Int) async -> [EditorCompletion])? = nil,
+        signatureHelp: (@MainActor (_ offset: Int) async -> EditorSignature?)? = nil
     ) {
         self.hover = hover
         self.definition = definition
         self.completion = completion
+        self.signatureHelp = signatureHelp
     }
 }
 

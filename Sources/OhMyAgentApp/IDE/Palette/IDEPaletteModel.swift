@@ -25,6 +25,8 @@ struct IDEPaletteLocation: Identifiable, Equatable {
     let line: Int
     /// 缩进层级(符号层级)
     var depth = 0
+    /// 非空时选中即执行 `IDEWorkspace.paletteActions` 里登记的动作(快速修复),而不是跳转文件
+    var actionID: String?
 }
 
 enum IDEPaletteItem: Identifiable {
@@ -185,6 +187,12 @@ extension IDEWorkspace {
             palette.recordUse(match.command.id)
             perform(match.command.id)
         case .location(let location):
+            if let actionID = location.actionID {
+                let action = paletteActions.removeValue(forKey: actionID)
+                paletteActions = [:]
+                if let action { Task { await action() } }
+                return
+            }
             model.openFile(location.path, line: location.line, preview: false)
         case .line(let line, let column):
             guard let line else { return }
@@ -218,6 +226,7 @@ extension IDEWorkspace {
         case "lsp.symbols": showSymbols()
         case "lsp.references": showReferences()
         case "lsp.rename": renameSymbol()
+        case "lsp.codeAction": showCodeActions()
         case "lsp.format": formatDocument()
         case "edit.toggleComment": CodeEditorView.activeEditor()?.perform(.toggleComment)
         case "edit.moveLineUp": CodeEditorView.activeEditor()?.perform(.moveLineUp)
