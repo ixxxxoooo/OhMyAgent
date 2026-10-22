@@ -390,6 +390,8 @@ public final class SessionModel {
     private var supervisor: AgentSupervisor?
     /// Agent 进程号(attach 时缓存,供同步的休眠判断检查进程树)
     private var agentPID: Int32?
+    /// 存档回显时被折叠的更早轮数(只对对应会话有效,见 `archiveHiddenTurns`)
+    var archiveHidden: (sessionId: String, turns: Int)?
     private(set) var client: ACPClient?
     /// 正在接回引擎的存档会话 ID:期间屏蔽回放内容进时间线、发送进入排队
     @ObservationIgnored var archiveSyncing: String?

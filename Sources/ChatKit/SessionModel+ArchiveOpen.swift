@@ -19,30 +19,44 @@ enum ArchiveRenderResult: Sendable {
 extension SessionModel {
     /// 每批喂给时间线的更新数:批与批之间让出主线程,长会话回显时界面不冻结
     private static let archiveBatchSize = 200
+    /// 每批最多占用主线程的时间
+    private static let archiveBatchBudget: Duration = .milliseconds(8)
 
     /// 把存档内容渲染进时间线(调用方保证时间线已清空、`sessionId` 已指向该会话)。
-    /// - Parameter sessionId: 协议会话 ID
+    /// - Parameters:
+    ///   - sessionId: 协议会话 ID
+    ///   - keepTurns: 只回显最近的轮数(更早的折叠,点「显示更早」再完整回显);nil 表示完整回显
     /// - Returns: 渲染结果
-    func renderArchive(_ sessionId: String) async -> ArchiveRenderResult {
+    func renderArchive(_ sessionId: String, keepTurns: Int? = TimelineWindow.defaultTurns) async -> ArchiveRenderResult {
         guard let archive = Self.archive else { return .unavailable }
         let started = ContinuousClock.now
         let transcriptTurns = startTranscriptParse()
+        archiveHidden = nil
         guard let archived = await archive.load(archiveKey(sessionId)) else { return .unavailable }
+        let cut = ArchiveWindow.cut(archived.updates, keepTurns: keepTurns)
+        // 只解码窗口内的更新(后台),被折叠的更早轮次不解码、不应用、不渲染
         let events = await Task.detached(priority: .userInitiated) {
-            archived.updates.map { ClientEvent.sessionUpdate(sessionId: sessionId, update: SessionUpdate(json: $0)) }
+            archived.updates[cut.start...].map { ClientEvent.sessionUpdate(sessionId: sessionId, update: SessionUpdate(json: $0)) }
         }.value
         let turns = await transcriptTurns?.value
         guard self.sessionId == sessionId else { return .superseded }
         timeline.beginReplay()
         timeline.replayResolveModel = { [weak self] raw in self?.resolveReplayModel(raw) ?? (raw, nil) }
         if let turns {
-            timeline.replayTurns = turns
+            // 折叠了更早的轮次时,记录里的回合只取与窗口对应的最近几个(按末尾对齐)
+            timeline.replayTurns = cut.hiddenTurns > 0 ? Array(turns.suffix(cut.keptTurns)) : turns
             seedUsage(from: turns)
         }
+        archiveHidden = cut.hiddenTurns > 0 ? (sessionId, cut.hiddenTurns) : nil
         var offset = 0
         while offset < events.count {
-            let end = min(offset + Self.archiveBatchSize, events.count)
-            handle(Array(events[offset..<end]))
+            // 按时间预算而不是固定条数切批:每批最多占用主线程约 8ms,批间让出,长会话回显时界面不冻结
+            let batchStart = ContinuousClock.now
+            var end = offset
+            while end < events.count, end - offset < Self.archiveBatchSize, ContinuousClock.now - batchStart < Self.archiveBatchBudget {
+                handle([events[end]])
+                end += 1
+            }
             offset = end
             if offset < events.count {
                 await Task.yield()
@@ -56,9 +70,35 @@ extension SessionModel {
         timeline.endReplay()
         attachReplayedSummaries(turns: turns)
         isReplaying = false
-        log.info("会话存档已回显", ["target": String(sessionId.prefix(8)), "updates": "\(events.count)", "entries": "\(timeline.entries.count)",
+        log.info("会话存档已回显", ["target": String(sessionId.prefix(8)), "updates": "\(events.count)", "hiddenTurns": "\(cut.hiddenTurns)", "entries": "\(timeline.entries.count)",
                                "ms": "\(OMLogger.milliseconds(since: started))"])
         return .rendered(archived.meta)
+    }
+
+    /// 被折叠(未回显)的更早轮数;没有折叠为 0。只对当前会话有效。
+    public var archiveHiddenTurns: Int {
+        guard let hidden = archiveHidden, hidden.sessionId == sessionId else { return 0 }
+        return hidden.turns
+    }
+
+    /// 是否可以完整回显被折叠的更早轮次(有折叠、空闲、存档可用)。运行中不允许:重新回显会替换时间线。
+    public var canLoadEarlierArchive: Bool { archiveHiddenTurns > 0 && !isRunning && !isReplaying }
+
+    /// 完整回显被折叠的更早轮次(重新从存档渲染全部)。
+    /// - Returns: 重渲染后「原窗口第一条」对应的条目 ID(用于保持滚动位置);无法完成时为 nil
+    @discardableResult
+    public func loadEarlierArchive() async -> UUID? {
+        guard canLoadEarlierArchive, let id = sessionId else { return nil }
+        let oldCount = timeline.entries.count
+        let span = log.span("展开存档更早轮次", warnMs: 500, ["hidden": "\(archiveHiddenTurns)"])
+        timeline.reset()
+        isReplaying = true
+        let result = await renderArchive(id, keepTurns: nil)
+        isReplaying = false
+        span.end()
+        guard case .rendered = result, self.sessionId == id else { return nil }
+        let index = timeline.entries.count - oldCount
+        return timeline.entries.indices.contains(index) ? timeline.entries[index].id : nil
     }
 
     /// 打开会话(已重置状态):先回显存档,再接回引擎;存档不可用时退回引擎回放。

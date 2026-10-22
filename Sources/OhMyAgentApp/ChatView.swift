@@ -156,6 +156,17 @@ struct ChatView: View {
         }
     }
 
+    /// 完整回显存档里被折叠的更早轮次,并把视口保持在原来的第一条上。
+    private func loadEarlierFromArchive() {
+        Task { @MainActor in
+            let anchor = await model.loadEarlierArchive()
+            visibleTurns += TimelineWindow.pageTurns
+            guard let anchor else { return }
+            await Task.yield()
+            position.scrollTo(id: anchor, anchor: .top)
+        }
+    }
+
     private var timeline: some View {
         let slice = itemsCache.windowed(for: model.timeline, density: toolDensity, visibleTurns: visibleTurns)
         let items = slice.items
@@ -163,7 +174,11 @@ struct ChatView: View {
         return ScrollView {
             LazyVStack(alignment: .leading, spacing: AppearanceModel.shared.isCompact ? 7 : 14) {
                 if slice.hiddenTurns > 0 {
-                    EarlierTurnsRow(hiddenTurns: slice.hiddenTurns) { showEarlierTurns(anchor: items.first?.id) }
+                    EarlierTurnsRow(hiddenTurns: slice.hiddenTurns + model.archiveHiddenTurns) { showEarlierTurns(anchor: items.first?.id) }
+                } else if model.archiveHiddenTurns > 0 {
+                    // 打开长会话时只回显了最近几轮:点击后从本地存档完整回显(运行中不可用)
+                    EarlierTurnsRow(hiddenTurns: model.archiveHiddenTurns) { loadEarlierFromArchive() }
+                        .disabled(!model.canLoadEarlierArchive)
                 }
                 ForEach(items) { item in
                     // Equatable:结构不变时不因父视图重新求值而重建行(行内容由条目自身的可观察状态驱动)
