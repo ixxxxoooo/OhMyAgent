@@ -56,6 +56,31 @@ public extension IDEWindowModel {
         return id
     }
 
+    /// 打开某文件(或整个仓库)的 Git 历史标签。
+    /// - Parameters:
+    ///   - project: 项目根目录
+    ///   - path: 仅看该文件的历史;nil 为整个仓库
+    @discardableResult
+    func openHistory(project: String, path: String?) -> UUID? {
+        guard !project.isEmpty else { return nil }
+        var layout = editor
+        let title = path.map { String(localized: "历史") + " · " + ($0 as NSString).lastPathComponent } ?? String(localized: "Git 历史")
+        let id = layout.open(.history(projectID: project, path: path), title: title, preview: true)
+        editor = layout
+        return id
+    }
+
+    /// 打开某文件的逐行追溯(blame)标签。
+    /// - Parameter path: 文件绝对路径
+    @discardableResult
+    func openBlame(_ path: String) -> UUID? {
+        guard !path.isEmpty else { return nil }
+        var layout = editor
+        let id = layout.open(.blame(path: path), title: "Blame · " + (path as NSString).lastPathComponent, preview: true)
+        editor = layout
+        return id
+    }
+
     /// 关闭某标签。
     /// - Parameter tabID: 标签标识
     func closeTab(_ tabID: UUID) {

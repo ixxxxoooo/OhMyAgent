@@ -5,6 +5,7 @@
 import AppKit
 import ChatKit
 import EditorKit
+import GitKit
 import IDEKit
 import LSPKit
 import Observation
@@ -43,6 +44,10 @@ final class IDEWorkspace {
     var outline: [LSPSymbol] = []
     var outlinePath: String?
     @ObservationIgnored var outlineTask: Task<Void, Never>?
+    /// 活动文件的提交时间线(TIMELINE)与其所属路径
+    var timeline: [GitCommit] = []
+    var timelinePath: String?
+    @ObservationIgnored var timelineTask: Task<Void, Never>?
     /// 延迟自动保存的计时任务
     @ObservationIgnored var autoSaveTask: Task<Void, Never>?
 

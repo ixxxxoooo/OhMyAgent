@@ -30,6 +30,7 @@ struct IDEExplorerPane: View {
                 )
                 .omContextMenu { menu(root: root) }
                 IDEOutlineSection(workspace: workspace)
+                IDETimelineSection(workspace: workspace)
             }
             .task(id: root) { workspace.configureTree() }
             // 编辑器切换文件时,文件树自动展开并定位到它
