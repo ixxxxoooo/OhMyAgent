@@ -27,6 +27,9 @@ public final class WorkbenchModel {
     public var layout: WorkbenchLayout { didSet { if layout != oldValue { scheduleSave() } } }
     /// 全部会话:每个会话标签对应一个独立的 SessionModel(按需创建,标签关闭时回收)
     public private(set) var conversations: [ConversationKey: SessionModel] = [:]
+    /// 被工作台之外的持有者(IDE 窗口的 Agent 面板)占用的会话:持有者标识 → 会话键。
+    /// 这类会话没有 dock 标签,`reapConversations` 靠它判断「仍有人在用」,持有者关闭时再回收。
+    @ObservationIgnored var externalHolds: [String: ConversationKey] = [:]
     /// 每个项目最近一次激活的会话槽位(决定「项目当前会话」)
     public private(set) var lastSlot: [String: String?] = [:]
     /// 主窗口当前显示的内容:工作台或设置整页(不持久化,启动时总是工作台)。
@@ -194,7 +197,7 @@ public final class WorkbenchModel {
         let alive = Set(allDockTabs.compactMap { tab -> ConversationKey? in
             if case .chat(let projectID, let slot) = tab.kind { return ConversationKey(projectID: projectID, slot: slot) }
             return nil
-        })
+        }).union(externalHolds.values)
         for key in conversations.keys where !alive.contains(key) {
             conversations[key]?.shutdown()
             conversations[key] = nil

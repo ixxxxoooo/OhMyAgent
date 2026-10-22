@@ -46,6 +46,44 @@ struct ConversationTabTests {
         model.shutdownAll()
     }
 
+    @Test("外部持有的专属槽位会话不会被回收;释放后才结束")
+    func externalHoldKeepsConversation() throws {
+        let env = try makeEnvironment()
+        defer { try? FileManager.default.removeItem(at: env.root) }
+        let model = env.model
+        let slot = "ide-test0001"
+        _ = try #require(model.ensureSession(project: env.project, slot: slot))
+        // 未登记持有:任何一次回收都会把没有标签的会话清掉(这正是修复前 IDE 面板会话被误杀/泄漏的原因)
+        model.holdConversation(owner: "window-1", project: env.project, slot: slot)
+        model.reapConversations()
+        #expect(model.conversations[ConversationKey(projectID: env.project, slot: slot)] != nil)
+        #expect(model.externalHoldCount == 1)
+        model.releaseConversation(owner: "window-1")
+        #expect(model.conversations[ConversationKey(projectID: env.project, slot: slot)] == nil)
+        #expect(model.externalHoldCount == 0)
+        // 重复释放无副作用
+        model.releaseConversation(owner: "window-1")
+        model.shutdownAll()
+    }
+
+    @Test("同一持有者换槽位:旧会话被回收,新会话保留")
+    func externalHoldReplacement() throws {
+        let env = try makeEnvironment()
+        defer { try? FileManager.default.removeItem(at: env.root) }
+        let model = env.model
+        _ = try #require(model.ensureSession(project: env.project, slot: "ide-a"))
+        model.holdConversation(owner: "w", project: env.project, slot: "ide-a")
+        _ = try #require(model.ensureSession(project: env.project, slot: "ide-b"))
+        model.holdConversation(owner: "w", project: env.project, slot: "ide-b")
+        #expect(model.conversations[ConversationKey(projectID: env.project, slot: "ide-a")] == nil)
+        #expect(model.conversations[ConversationKey(projectID: env.project, slot: "ide-b")] != nil)
+        // 空持有者标识被忽略
+        model.holdConversation(owner: "", project: env.project, slot: "ide-b")
+        #expect(model.externalHoldCount == 1)
+        model.releaseConversation(owner: "w")
+        model.shutdownAll()
+    }
+
     @Test("关闭会话标签回收对应会话,激活标签后项目当前会话随之切换")
     func closeReapsConversation() throws {
         let env = try makeEnvironment()

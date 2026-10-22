@@ -224,6 +224,8 @@ extension IDEWorkspace {
             workbench.ensureSession(for: projectID)
         } else {
             workbench.ensureSession(project: projectID, slot: agentSlot)
+            // 专属槽位没有 dock 标签:登记持有关系,避免被回收;窗口关闭时释放
+            workbench.holdConversation(owner: model.id.uuidString, project: projectID, slot: agentSlot)
         }
         Log.ui.info("IDE Agent 面板会话就绪", ["project": (projectID as NSString).lastPathComponent, "slot": agentSlot ?? "-", "fusion": "\(FusionMode.shared.isEnabled)", "ms": "\(Int((ContinuousClock.now - started).seconds * 1000))"])
     }

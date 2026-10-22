@@ -233,7 +233,11 @@ final class IDEWindowManager {
         // 控制器在回调栈上,延后到下一轮再释放,避免窗口代理在自己的回调里被销毁
         let controller = controllers.removeValue(forKey: id)
         // 关闭窗口(非退出)时结束它名下的终端:否则 shell 进程与终端视图会一直留在 TerminalStore 里(浸泡基准发现的泄漏)
-        if !isTerminating { controller?.workspace.closeAllTerminals() }
+        if !isTerminating {
+            controller?.workspace.closeAllTerminals()
+            // 释放本窗口 Agent 面板的专属会话(结束其 Agent 进程),否则每开一个 IDE 窗口就泄漏一个进程
+            AppEnvironment.shared.workbench.releaseConversation(owner: id.uuidString)
+        }
         if !isTerminating { registry.remove(id) }
         Task { @MainActor in withExtendedLifetime(controller) {} }
         Log.app.info("IDE 窗口已关闭", ["id": id.uuidString, "terminating": "\(isTerminating)"])
