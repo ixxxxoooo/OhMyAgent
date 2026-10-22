@@ -380,4 +380,26 @@ public enum EditorEditing {
         }
         return out
     }
+
+    /// 把多个互不重叠的编辑合成一次应用的结果(多光标键入用)。
+    /// 每个编辑的 `selection` 以「只应用它自己」时的新文本坐标给出,这里按其之前所有编辑的长度变化平移。
+    /// - Parameters:
+    ///   - edits: 编辑列表(任意顺序;范围互不重叠)
+    ///   - text: 原文本
+    /// - Returns: 编辑后的全文与每个编辑对应的新选区(与 `edits` 升序排列后一一对应)
+    public static func compose(_ edits: [TextEdit], in text: String) -> (text: String, selections: [NSRange]) {
+        let ordered = edits.sorted { $0.range.location < $1.range.location }
+        var result = text as NSString
+        var delta = 0
+        var selections: [NSRange] = []
+        var applied: [(range: NSRange, replacement: String)] = []
+        for edit in ordered {
+            let shifted = NSRange(location: edit.selection.location + delta, length: edit.selection.length)
+            selections.append(shifted)
+            applied.append((NSRange(location: edit.range.location + delta, length: edit.range.length), edit.replacement))
+            delta += (edit.replacement as NSString).length - edit.range.length
+        }
+        for item in applied { result = result.replacingCharacters(in: item.range, with: item.replacement) as NSString }
+        return (result as String, selections)
+    }
 }

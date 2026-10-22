@@ -71,6 +71,14 @@ public final class EditorTextView: NSTextView {
     /// 「在对话中引用选区」:传入非空选区的 UTF-16 范围
     var onReferenceSelection: ((NSRange) -> Void)?
 
+    /// 额外的空光标(UTF-16 偏移):AppKit 的 `selectedRanges` 会把多个空光标塌缩成一个,
+    /// 因此除主选区外的空光标由我们自己保存与绘制;普通选区变化/外部编辑会清空它。
+    var secondaryCarets: [Int] = [] {
+        didSet { if oldValue != secondaryCarets { needsDisplay = true } }
+    }
+    /// 正在应用多光标编辑(此时选区/文本变化不应清空额外光标)
+    var isApplyingMultiEdit = false
+
     /// 当前语言(决定行注释前缀、缩进单位与自动缩进规则)
     var language: SyntaxLanguage = .plain
     /// 是否启用代码编辑增强(自动缩进、自动闭合、行操作快捷键);只读或 Markdown 就地渲染时由宿主关闭
@@ -116,7 +124,7 @@ public final class EditorTextView: NSTextView {
 
     /// 是否可以走单光标的代码编辑增强(可编辑、开启、无输入法组合、只有一个选区)。
     private var canEnhance: Bool {
-        isEditable && codeEditingEnabled && !hasMarkedText() && selectedRanges.count == 1
+        isEditable && codeEditingEnabled && !hasMarkedText() && selectionCount == 1
     }
 
     /// 一级缩进:Tab 字符缩进的文件用制表符,否则按语言取 2 或 4 个空格。
@@ -127,6 +135,10 @@ public final class EditorTextView: NSTextView {
 
     /// 列表项末尾回车:续出下一项,空项回车结束列表;代码文件沿用/增加缩进。
     public override func insertNewline(_ sender: Any?) {
+        if isMultiCursor, language != .markdown {
+            multiNewline(unit: indentUnit)
+            return
+        }
         if isEditable, markdownInteractive, !hasMarkedText(),
            let edit = MarkdownEditCommands.continueList(in: string, selection: selectedRange()) {
             apply(edit)
@@ -144,6 +156,10 @@ public final class EditorTextView: NSTextView {
 
     /// 输入字符:括号/引号自动闭合、闭合符跨越、选区包裹。
     public override func insertText(_ insertString: Any, replacementRange: NSRange) {
+        if isMultiCursor, replacementRange.location == NSNotFound {
+            if let text = insertString as? String { multiInsert(text); return }
+            if let attributed = insertString as? NSAttributedString { multiInsert(attributed.string); return }
+        }
         if canEnhance, language != .markdown, language != .plain, replacementRange.location == NSNotFound,
            let text = insertString as? String, text.count == 1, let char = text.first,
            EditorBehaviorPrefs.autoClose,
@@ -160,6 +176,10 @@ public final class EditorTextView: NSTextView {
 
     /// 退格:夹在空括号对之间时一并删除。
     public override func deleteBackward(_ sender: Any?) {
+        if isMultiCursor {
+            multiDeleteBackward()
+            return
+        }
         if canEnhance, language != .markdown, language != .plain, EditorBehaviorPrefs.autoClose,
            let edit = EditorEditing.backspacePair(text: string, selection: selectedRange()) {
             applyEdit(edit)
@@ -170,6 +190,10 @@ public final class EditorTextView: NSTextView {
 
     /// Tab:多行选区整体缩进。
     public override func insertTab(_ sender: Any?) {
+        if isMultiCursor {
+            multiInsert(indentUnit)
+            return
+        }
         if canEnhance, spansMultipleLines, let edit = EditorEditing.indent(text: string, selection: selectedRange(), outdent: false, unit: indentUnit) {
             applyEdit(edit)
             return
@@ -200,7 +224,7 @@ public final class EditorTextView: NSTextView {
         super.drawBackground(in: rect)
         guard let manager = textLayoutManager, let storage = textContentStorage else { return }
         let origin = textContainerOrigin
-        if let color = currentLineColor, isEditable, EditorBehaviorPrefs.currentLine, selectedRanges.count == 1, selectedRange().length == 0,
+        if let color = currentLineColor, isEditable, EditorBehaviorPrefs.currentLine, selectionCount == 1, selectedRange().length == 0,
            window?.firstResponder === self,
            let location = storage.location(storage.documentRange.location, offsetBy: selectedRange().location),
            let fragment = manager.textLayoutFragment(for: location) {
@@ -232,7 +256,7 @@ public final class EditorTextView: NSTextView {
 
     /// 执行一个行操作快捷键;返回是否已处理。
     private func handleEditingShortcut(_ event: NSEvent, isKeyEquivalent: Bool) -> Bool {
-        guard canEnhance || (isEditable && codeEditingEnabled && selectedRanges.count > 1 && event.keyCode == 2) else { return false }
+        guard canEnhance || (isEditable && codeEditingEnabled && selectionCount > 1 && event.keyCode == 2) else { return false }
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.numericPad, .function])
         switch (event.keyCode, flags) {
         case (44, [.command]): perform(.toggleComment)
@@ -257,18 +281,18 @@ public final class EditorTextView: NSTextView {
         let selection = selectedRange()
         switch action {
         case .toggleComment:
-            guard selectedRanges.count == 1, let prefix = EditorEditing.commentPrefix(for: language),
+            guard selectionCount == 1, let prefix = EditorEditing.commentPrefix(for: language),
                   let edit = EditorEditing.toggleLineComment(text: string, selection: selection, prefix: prefix) else { return }
             applyEdit(edit)
         case .deleteLine:
-            guard selectedRanges.count == 1 else { return }
+            guard selectionCount == 1 else { return }
             applyEdit(EditorEditing.deleteLines(text: string, selection: selection))
         case .moveLineUp, .moveLineDown:
-            guard selectedRanges.count == 1,
+            guard selectionCount == 1,
                   let edit = EditorEditing.moveLines(text: string, selection: selection, up: action == .moveLineUp) else { return }
             applyEdit(edit)
         case .duplicateLineUp, .duplicateLineDown:
-            guard selectedRanges.count == 1 else { return }
+            guard selectionCount == 1 else { return }
             applyEdit(EditorEditing.duplicateLines(text: string, selection: selection, down: action == .duplicateLineDown))
         case .addNextOccurrence:
             addNextOccurrence()
@@ -302,6 +326,56 @@ public final class EditorTextView: NSTextView {
         }
     }
 
+
+    public override func setSelectedRanges(_ ranges: [NSValue], affinity: NSSelectionAffinity, stillSelecting: Bool) {
+        if !isApplyingMultiEdit, !secondaryCarets.isEmpty { secondaryCarets = [] }
+        super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelecting)
+    }
+
+    public override func didChangeText() {
+        if !isApplyingMultiEdit, !secondaryCarets.isEmpty { secondaryCarets = [] }
+        super.didChangeText()
+    }
+
+    public override func moveLeft(_ sender: Any?) {
+        if isMultiCursor { multiMove(by: -1); return }
+        super.moveLeft(sender)
+    }
+
+    public override func moveRight(_ sender: Any?) {
+        if isMultiCursor { multiMove(by: 1); return }
+        super.moveRight(sender)
+    }
+
+    public override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        drawSecondaryCarets(in: dirtyRect)
+    }
+
+    public override func deleteForward(_ sender: Any?) {
+        if isMultiCursor {
+            multiDeleteForward()
+            return
+        }
+        super.deleteForward(sender)
+    }
+
+    public override func paste(_ sender: Any?) {
+        if isMultiCursor {
+            multiPaste()
+            return
+        }
+        super.paste(sender)
+    }
+
+    /// Esc:多光标时收回成单光标,否则交给默认处理(补全等)。
+    public override func cancelOperation(_ sender: Any?) {
+        if selectionCount > 1 {
+            collapseMultiCursor()
+            return
+        }
+        super.cancelOperation(sender)
+    }
 
     public override func becomeFirstResponder() -> Bool {
         let accepted = super.becomeFirstResponder()
@@ -396,10 +470,7 @@ public final class EditorTextView: NSTextView {
         // ⌥ 点击:在点击处增加一个光标
         if isEditable, codeEditingEnabled, event.modifierFlags.contains(.option), !event.modifierFlags.contains(.command),
            let (offset, _) = characterUnder(convert(event.locationInWindow, from: nil)) {
-            var ranges = selectedRanges
-            let caret = NSRange(location: offset, length: 0)
-            if !ranges.contains(where: { $0.rangeValue == caret }) { ranges.append(NSValue(range: caret)) }
-            setSelectedRanges(ranges, affinity: .downstream, stillSelecting: false)
+            addCaret(at: offset)
             return
         }
         if markdownInteractive, handleMarkdownClick(event) { return }

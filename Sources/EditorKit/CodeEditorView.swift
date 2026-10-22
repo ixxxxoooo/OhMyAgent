@@ -840,7 +840,7 @@ extension CodeEditorView: NSTextViewDelegate {
     /// 光标紧邻括号时,高亮它与配对括号。
     private func updateBracketMatch() {
         let selection = textView.selectedRange()
-        guard selection.length == 0, language != .markdown, language != .plain, textView.selectedRanges.count == 1,
+        guard selection.length == 0, language != .markdown, language != .plain, textView.selectionCount == 1,
               let pair = EditorEditing.matchingBracket(in: textView.string, at: selection.location) else {
             textView.bracketPair = []
             return
