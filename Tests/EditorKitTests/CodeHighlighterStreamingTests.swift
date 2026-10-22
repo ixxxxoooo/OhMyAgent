@@ -91,4 +91,48 @@ struct CodeHighlighterStreamingTests {
             #expect(CodeHighlighter.attributed(second, language: .swift) == CodeHighlighter.build(second, language: .swift))
         }
     }
+
+    @Test("增长中的文本不写缓存;结束后精确命中并晋升进缓存")
+    func growingTextSkipsCacheThenPromotes() {
+        CodeHighlighter.clearCache()
+        CodeHighlighter.resetStreaming()
+        let lines = (0..<30).map { "let value\($0) = \($0) // 注释" }
+        var text = ""
+        for line in lines {
+            text += line + "\n"
+            _ = CodeHighlighter.attributed(text, language: .swift)
+        }
+        let before = CodeHighlighter.cacheStats
+        // 结束后再次取同一文本:来自流式状态(记为命中),且与全量一致
+        let again = CodeHighlighter.attributed(text, language: .swift)
+        #expect(again == CodeHighlighter.build(text, language: .swift))
+        #expect(CodeHighlighter.cacheStats.hits == before.hits + 1)
+        // 晋升之后走缓存命中
+        _ = CodeHighlighter.attributed(text, language: .swift)
+        #expect(CodeHighlighter.cacheStats.hits == before.hits + 2)
+    }
+
+    @Test("追加段:上一次稳定边界之后的着色与全量结果的对应部分一致")
+    func streamingSegmentMatchesFullSuffix() {
+        CodeHighlighter.clearCache()
+        CodeHighlighter.resetStreaming()
+        var text = ""
+        var stable = 0
+        for step in 0..<40 {
+            text += "func f\(step)() { return \"s\(step)\" } // 尾注释\n"
+            let full = CodeHighlighter.attributed(text, language: .swift)
+            if step > 0, let segment = CodeHighlighter.streamingSegment(text, language: .swift, from: stable) {
+                var head = AttributedString()
+                let units = Array(text.utf16)
+                // 用全量结果的前 stable 个 UTF-16 单元 + 追加段重组,应与全量完全相等
+                let prefix = String(decoding: units[..<stable], as: UTF16.self)
+                let index = full.characters.index(full.startIndex, offsetBy: prefix.count)
+                head = AttributedString(full[full.startIndex..<index])
+                head.append(segment.text)
+                #expect(head == full, "第 \(step) 步重组结果与全量不一致")
+            }
+            stable = CodeHighlighter.stableUnits(text, language: .swift)
+        }
+        #expect(stable > 0)
+    }
 }

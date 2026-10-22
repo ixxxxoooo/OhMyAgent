@@ -4,6 +4,7 @@
 import AppKit
 import DesignSystem
 import ChatKit
+import EditorKit
 import DiffKit
 import Foundation
 import Testing
@@ -263,6 +264,46 @@ struct OMTableMeasureTests {
         #expect(narrow.width < 400, "宽度 \(narrow.width)")
         let tight = coordinator.measuredSize(host, config: config, proposedWidth: 100)
         #expect(tight.width == 100)
+    }
+
+    @Test("代码块流式:增量更新的结果与整段构建逐属性一致,且只走尾部替换")
+    func codeStreamMatchesFullBuild() {
+        CodeHighlighter.clearCache()
+        CodeHighlighter.resetStreaming()
+        let host = OMLeafHostView(wrap: true)
+        let coordinator = OMTextLeafCoordinator()
+        var text = String(repeating: "let value = compute(1) // 注释\n", count: 120)
+        for step in 0..<12 {
+            text += "func f\(step)() { return \"s\" }\n"
+            let source = text
+            let stream = OMLeafStream(source: source, style: 7) { previous in
+                OMLeafContent.codeStreaming(source, fence: "swift", previousStable: previous)
+            }
+            coordinator.apply(to: host.textView, signature: step + 1, stream: stream)
+            guard let storage = host.textView.textStorage else { Issue.record("没有文本存储"); return }
+            let full = OMLeafContent.code(source, fence: "swift")
+            #expect(storage.isEqual(to: NSTextStorage(attributedString: full)), "第 \(step) 步与整段构建不一致")
+        }
+        #expect(coordinator.incrementalUpdates >= 8)
+        #expect(coordinator.fullRebuilds <= 2)
+    }
+
+    @Test("代码块流式:样式签名变化或正文被改写时整体重建")
+    func codeStreamFallsBackOnStyleChange() {
+        CodeHighlighter.clearCache()
+        CodeHighlighter.resetStreaming()
+        let host = OMLeafHostView(wrap: true)
+        let coordinator = OMTextLeafCoordinator()
+        let base = String(repeating: "let a = 1\n", count: 400)
+        func make(_ source: String, style: Int) -> OMLeafStream {
+            OMLeafStream(source: source, style: style) { OMLeafContent.codeStreaming(source, fence: "swift", previousStable: $0) }
+        }
+        coordinator.apply(to: host.textView, signature: 1, stream: make(base, style: 1))
+        coordinator.apply(to: host.textView, signature: 2, stream: make(base + "let b = 2\n", style: 2))
+        #expect(coordinator.fullRebuilds == 2, "样式签名变化要整体重建")
+        coordinator.apply(to: host.textView, signature: 3, stream: make("X" + base.dropFirst() + "tail", style: 2))
+        #expect(coordinator.fullRebuilds == 3, "正文被改写要整体重建")
+        #expect(host.textView.string == "X" + base.dropFirst() + "tail")
     }
 }
 

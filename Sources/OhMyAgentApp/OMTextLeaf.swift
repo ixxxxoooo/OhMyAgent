@@ -97,6 +97,17 @@ final class OMLeafScrollView: NSScrollView {
     }
 }
 
+/// 流式追加型叶子的内容描述(代码块):正文只会在末尾增长时,文本视图只替换稳定边界之后的部分。
+struct OMLeafStream {
+    /// 完整正文
+    let source: String
+    /// 不含正文的样式签名(语言、字号、主题等);变化时整体重建
+    let style: Int
+    /// 构建富文本。`previousStable >= 0` 表示调用方希望只要「该边界之后」的部分;
+    /// 返回 `isTail` 说明是否真的只含尾部(取不到增量时返回整段,`isTail` 为假)。
+    let build: @MainActor (_ previousStable: Int) -> (text: NSAttributedString, stable: Int, isTail: Bool)
+}
+
 /// 叶子文本的渲染与测量状态(每个叶子一个,作为 `NSViewRepresentable` 的协调器)。
 /// 抽出来是为了让「更新文本存储」的策略可以脱离 SwiftUI 单独测试。
 @MainActor
@@ -133,6 +144,39 @@ final class OMTextLeafCoordinator {
         if !replaceTail(storage, with: fresh) { storage.setAttributedString(fresh); fullRebuilds += 1 }
         storage.endEditing()
         edits += 1
+        SelectionHub.shared.leafContentDidChange(view)
+    }
+
+    /// 上次流式渲染的描述(正文、样式签名、文本存储长度、稳定边界)
+    private var renderedStream: (source: String, style: Int, length: Int, stable: Int)?
+
+    /// 流式追加型内容的应用:正文是上次的延伸、样式未变时,只构建并替换稳定边界之后的部分,
+    /// 不再每批重建整段富文本也不再整段比对。
+    /// - Parameters:
+    ///   - view: 文本视图
+    ///   - signature: 内容与样式签名
+    ///   - stream: 流式内容描述
+    func apply(to view: OMReadOnlyTextView, signature: Int, stream: OMLeafStream) {
+        guard signature != renderedSignature, let storage = view.textStorage else { return }
+        renderedSignature = signature
+        var from = -1
+        if let prev = renderedStream, prev.style == stream.style, storage.length >= Self.incrementalThreshold,
+           storage.length == prev.length, stream.source.utf16.count >= prev.length,
+           prev.stable <= storage.length, stream.source.utf8.starts(with: prev.source.utf8) {
+            from = prev.stable
+        }
+        let built = stream.build(from)
+        storage.beginEditing()
+        if built.isTail, from >= 0 {
+            storage.replaceCharacters(in: NSRange(location: from, length: storage.length - from), with: built.text)
+            incrementalUpdates += 1
+        } else {
+            storage.setAttributedString(built.text)
+            fullRebuilds += 1
+        }
+        storage.endEditing()
+        edits += 1
+        renderedStream = (stream.source, stream.style, storage.length, built.stable)
         SelectionHub.shared.leafContentDidChange(view)
     }
 
@@ -207,6 +251,8 @@ struct OMTextLeaf: NSViewRepresentable {
     var copyTransform: ((String) -> String)?
     /// 无选区的单击回调
     var onPlainClick: (() -> Void)?
+    /// 流式追加型内容(代码块);提供时优先走增量路径,`build` 仍作兜底
+    var stream: OMLeafStream?
     /// 构建富文本(仅签名变化时调用)
     let build: @MainActor () -> NSAttributedString
 
@@ -226,7 +272,11 @@ struct OMTextLeaf: NSViewRepresentable {
         host.scrollView?.persistentScroller = config.persistentScroller
         if view.textContainerInset != config.inset { view.textContainerInset = config.inset }
         context.coordinator.applySelection(selectionColor, to: view)
-        context.coordinator.apply(to: view, signature: signature, build: build)
+        if let stream {
+            context.coordinator.apply(to: view, signature: signature, stream: stream)
+        } else {
+            context.coordinator.apply(to: view, signature: signature, build: build)
+        }
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView host: OMLeafHostView, context: Context) -> CGSize? {

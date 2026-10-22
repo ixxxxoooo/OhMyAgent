@@ -19,9 +19,18 @@ struct CodeTextLeaf: View {
         hasher.combine(code)
         hasher.combine(language)
         hasher.combine(OMLeafStyle.current)
+        var styleHasher = Hasher()
+        styleHasher.combine(language)
+        styleHasher.combine(OMLeafStyle.current)
+        let fence = language
+        let source = code
+        let stream = OMLeafStream(source: source, style: styleHasher.finalize()) { previousStable in
+            OMLeafContent.codeStreaming(source, fence: fence, previousStable: previousStable)
+        }
         return OMTextLeaf(
             signature: hasher.finalize(),
-            config: OMTextLeafConfig(wrap: wrap, inset: NSSize(width: 12, height: 12))
+            config: OMTextLeafConfig(wrap: wrap, inset: NSSize(width: 12, height: 12)),
+            stream: stream
         ) { OMLeafContent.code(code, fence: language) }
         .id(wrap)
         .accessibilityLabel(String(localized: "代码"))

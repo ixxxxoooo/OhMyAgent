@@ -41,17 +41,61 @@ public enum CodeHighlighter {
         // 缓存键含主题 id 与明暗:切换主题后同一段代码立即以新配色重新生成
         _ = ThemeRuntime.palette
         let themeKey = currentThemeKey()
-        let key = "\(themeKey)#\(language.rawValue)#\(code.hashValue)#\(code.utf16.count)" as NSString
+        let key = cacheKey(code, language: language, themeKey: themeKey)
         if let hit = cache.object(forKey: key) {
             counters.withLock { $0.hits += 1 }
             return hit.value
         }
+        // 流式状态里正好是这段文本(流式结束后再次渲染):直接取用并晋升进缓存
+        if let state = streamStates.last(where: { $0.language == language && $0.themeKey == themeKey && $0.code == code }) {
+            counters.withLock { $0.hits += 1 }
+            cache.setObject(Box(state.full), forKey: key, cost: code.utf16.count * 4)
+            return state.full
+        }
         counters.withLock { $0.misses += 1 }
-        let result = streamable(language)
-            ? buildStreaming(code, language: language, themeKey: themeKey)
-            : build(code, language: language)
-        cache.setObject(Box(result), forKey: key, cost: code.utf16.count * 4)
-        return result
+        guard streamable(language) else {
+            let result = build(code, language: language)
+            cache.setObject(Box(result), forKey: key, cost: code.utf16.count * 4)
+            return result
+        }
+        let built = buildStreaming(code, language: language, themeKey: themeKey)
+        // 文本在持续增长(新文本完整延伸了上一次的文本)时不写缓存:每一批都写会让大量中间版本挤掉有用条目;
+        // 这些中间结果由流式状态持有,结束后精确命中时再晋升(见上),被淘汰的状态也会落进缓存
+        if !built.growing { cache.setObject(Box(built.result), forKey: key, cost: code.utf16.count * 4) }
+        return built.result
+    }
+
+    /// 缓存键:主题、语言与内容哈希/长度。
+    private static func cacheKey(_ code: String, language: SyntaxLanguage, themeKey: String) -> NSString {
+        "\(themeKey)#\(language.rawValue)#\(code.hashValue)#\(code.utf16.count)" as NSString
+    }
+
+    /// 流式追加段:相对上一次稳定边界之后的着色文本,供文本视图只替换尾部。
+    public struct StreamSegment {
+        /// 从 `from` 起到文本末尾的着色文本
+        public let text: AttributedString
+        /// 本次的稳定边界(UTF-16 偏移):边界之前的着色已是最终结果
+        public let stableUnits: Int
+    }
+
+    /// 取「上一次稳定边界之后」的着色段。仅当最近一次高亮的正是 `code`、且那次构建的起点恰为 `previousStable` 时可用,
+    /// 否则返回 nil(调用方退回整段构建)。
+    /// - Parameters:
+    ///   - code: 当前完整源码(须先调用过 `attributed`)
+    ///   - language: 语言
+    ///   - previousStable: 调用方上一次拿到的稳定边界
+    /// - Returns: 追加段;不可用时 nil
+    public static func streamingSegment(_ code: String, language: SyntaxLanguage, from previousStable: Int) -> StreamSegment? {
+        let themeKey = currentThemeKey()
+        guard let state = streamStates.last(where: { $0.language == language && $0.themeKey == themeKey && $0.code == code }),
+              state.base == previousStable else { return nil }
+        return StreamSegment(text: state.segment, stableUnits: state.stableUnits)
+    }
+
+    /// 当前文本对应的稳定边界(没有流式状态时为 0)。
+    public static func stableUnits(_ code: String, language: SyntaxLanguage) -> Int {
+        let themeKey = currentThemeKey()
+        return streamStates.last(where: { $0.language == language && $0.themeKey == themeKey && $0.code == code })?.stableUnits ?? 0
     }
 
     /// 按围栏标签生成(`ts`、`sh` 等别名)。
@@ -119,6 +163,19 @@ public enum CodeHighlighter {
         var language: SyntaxLanguage
         var stable: AttributedString
         var stableUnits: Int
+        /// 完整着色结果(= stable + 未稳定尾部)
+        var full: AttributedString
+        /// 本次构建的起点(上一次的稳定边界)
+        var base: Int
+        /// 起点之后的着色文本(新稳定的部分 + 未稳定尾部)
+        var segment: AttributedString
+    }
+
+    /// 流式构建的结果。
+    private struct StreamBuild {
+        let result: AttributedString
+        /// 新文本是否完整延伸了某个流式状态的旧文本(真正的「增长」)
+        let growing: Bool
     }
 
     /// 最近的流式状态(同时流式输出的代码块不会超过几个,超出按先进先出淘汰)。
@@ -133,17 +190,19 @@ public enum CodeHighlighter {
     }
 
     /// 带续扫的构建:新文本是某个已有状态的扩展时,只重扫稳定边界之后的部分。
-    private static func buildStreaming(_ code: String, language: SyntaxLanguage, themeKey: String) -> AttributedString {
+    private static func buildStreaming(_ code: String, language: SyntaxLanguage, themeKey: String) -> StreamBuild {
         let units = Array(code.utf16)
         var base = 0
         var stable = AttributedString()
         var slot: Int?
+        var growing = false
         for (index, state) in streamStates.enumerated().reversed()
         where state.language == language && state.themeKey == themeKey && state.stableUnits <= units.count
             && code.utf16.prefix(state.stableUnits).elementsEqual(state.code.utf16.prefix(state.stableUnits)) {
             base = state.stableUnits
             stable = state.stable
             slot = index
+            growing = code.utf16.count > state.code.utf16.count && code.utf8.starts(with: state.code.utf8)
             break
         }
         if slot != nil { incrementalBuilds += 1 }
@@ -153,16 +212,39 @@ public enum CodeHighlighter {
             SyntaxSpan(location: $0.location + base, length: $0.length, kind: $0.kind)
         }
         let boundary = stableBoundary(units: units, spans: spans, from: base)
+        // 起点之后分两段构建:新稳定的部分(并入 head)与未稳定尾部
+        var middle = AttributedString()
+        append(&middle, units: units, spans: spans, from: base, to: boundary)
+        var tail = AttributedString()
+        append(&tail, units: units, spans: spans, from: boundary, to: units.count)
         var head = stable
-        append(&head, units: units, spans: spans, from: base, to: boundary)
+        head.append(middle)
         var result = head
-        append(&result, units: units, spans: spans, from: boundary, to: units.count)
-        let state = StreamState(code: code, themeKey: themeKey, language: language, stable: head, stableUnits: boundary)
-        if let slot { streamStates[slot] = state } else {
+        result.append(tail)
+        var segment = middle
+        segment.append(tail)
+        let state = StreamState(code: code, themeKey: themeKey, language: language, stable: head, stableUnits: boundary,
+                                full: result, base: base, segment: segment)
+        if let slot {
+            // 槽位被另一段不相干的文本接管(只共享了前缀):旧文本的最终结果落进缓存
+            if !growing {
+                let old = streamStates[slot]
+                cache.setObject(Box(old.full), forKey: cacheKey(old.code, language: old.language, themeKey: old.themeKey),
+                                cost: old.code.utf16.count * 4)
+            }
+            streamStates[slot] = state
+        } else {
             streamStates.append(state)
-            if streamStates.count > maxStreamStates { streamStates.removeFirst(streamStates.count - maxStreamStates) }
+            if streamStates.count > maxStreamStates {
+                // 被淘汰的状态落进缓存:它可能是一段已经结束的流式输出,之后还会被渲染
+                for evicted in streamStates.prefix(streamStates.count - maxStreamStates) {
+                    cache.setObject(Box(evicted.full), forKey: cacheKey(evicted.code, language: evicted.language, themeKey: evicted.themeKey),
+                                    cost: evicted.code.utf16.count * 4)
+                }
+                streamStates.removeFirst(streamStates.count - maxStreamStates)
+            }
         }
-        return result
+        return StreamBuild(result: result, growing: growing)
     }
 
     /// 找新的稳定边界:最后一个行首(`\n` 之后),且没有片段跨过它;找不到则保持 `from`。

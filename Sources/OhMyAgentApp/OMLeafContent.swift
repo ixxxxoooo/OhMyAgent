@@ -43,11 +43,30 @@ enum OMLeafContent {
     ///   - fence: 围栏语言标签
     /// - Returns: 富文本
     static func code(_ code: String, fence: String?) -> NSAttributedString {
+        styledCode(CodeHighlighter.attributed(code, fence: fence))
+    }
+
+    /// 代码块的流式构建:只要「上一次稳定边界之后」的着色段(取不到增量时给整段)。
+    /// - Parameters:
+    ///   - code: 完整源码
+    ///   - fence: 围栏语言标签
+    ///   - previousStable: 上一次拿到的稳定边界;负数表示要整段
+    /// - Returns: 富文本、新的稳定边界、是否只含尾部
+    static func codeStreaming(_ code: String, fence: String?, previousStable: Int) -> (text: NSAttributedString, stable: Int, isTail: Bool) {
+        let language = SyntaxLanguage.fromFence(fence)
+        let full = CodeHighlighter.attributed(code, language: language)
+        if previousStable >= 0, let segment = CodeHighlighter.streamingSegment(code, language: language, from: previousStable) {
+            return (styledCode(segment.text), segment.stableUnits, true)
+        }
+        return (styledCode(full), CodeHighlighter.stableUnits(code, language: language), false)
+    }
+
+    /// 把高亮结果转成带时间线代码字号与行距的富文本。
+    private static func styledCode(_ highlighted: AttributedString) -> NSAttributedString {
         let font = monoFont(12, timeline: true)
         let style = NSMutableParagraphStyle()
         style.lineSpacing = OMFonts.readingMonoLineSpacing
         let base = NSColor(OMColors.primaryText)
-        let highlighted = CodeHighlighter.attributed(code, fence: fence)
         let result = NSMutableAttributedString()
         var colors: [Color: NSColor] = [:]
         for run in highlighted.runs {
