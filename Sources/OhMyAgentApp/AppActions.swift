@@ -292,15 +292,20 @@ final class AppActions {
     }
 
     /// 前置主窗口;窗口已被关闭时重新打开。
-    /// - Parameter frame: 融合模式下沿用的来源窗口外框(nil 保持主窗口原外框)
+    /// - Parameters:
+    ///   - frame: 融合模式下沿用的来源窗口外框(nil 保持主窗口原外框)
+    ///   - source: 融合模式下被替换的来源窗口:主窗口淡入完成后再隐藏它
     /// - Returns: 是否已前置(或已请求打开)主窗口;false 表示当前没有任何办法显示它(调用方不应据此隐藏其他窗口)
     @discardableResult
-    func showMainWindow(adopting frame: NSRect? = nil) -> Bool {
+    func showMainWindow(adopting frame: NSRect? = nil, replacing source: NSWindow? = nil) -> Bool {
         NSApp.activate()
         if let window = mainWindow ?? Self.sceneMainWindow() {
             if let frame { window.adoptFusionFrame(frame) }
+            let reveal = source.flatMap { $0 !== window ? $0 : nil }
+            if reveal != nil { window.beginFusionReveal() }
             if window.isMiniaturized { window.deminiaturize(nil) }
             window.makeKeyAndOrderFront(nil)
+            if let reveal { window.finishFusionReveal(replacing: reveal) }
             return true
         }
         guard let openWindowAction else {
@@ -308,6 +313,13 @@ final class AppActions {
             return false
         }
         openWindowAction(id: "main")
+        // 新建的主窗口没有渐变过程:稍后(窗口出现后)再隐藏来源窗口
+        if let source {
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(250))
+                source.orderOut(nil)
+            }
+        }
         return true
     }
 

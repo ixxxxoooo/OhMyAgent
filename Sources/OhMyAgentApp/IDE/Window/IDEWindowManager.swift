@@ -52,9 +52,9 @@ final class IDEWindowManager {
     /// - Returns: 窗口模型
     ///   - adoptFrame: 融合模式下沿用的来源窗口外框
     @discardableResult
-    func open(root: String?, forceNew: Bool = false, adoptFrame: NSRect? = nil) -> IDEWindowModel {
+    func open(root: String?, forceNew: Bool = false, adoptFrame: NSRect? = nil, replacing source: NSWindow? = nil) -> IDEWindowModel {
         let (model, _) = registry.open(root: root, forceNew: forceNew)
-        show(model, reason: "open", adoptFrame: adoptFrame)
+        show(model, reason: "open", adoptFrame: adoptFrame, replacing: source)
         return model
     }
 
@@ -64,8 +64,8 @@ final class IDEWindowManager {
     func switchToIDE(forceNew: Bool = false) {
         let root = AppEnvironment.shared.workbench.selectedProject?.id
         let source = Self.fusionSource(AppActions.shared.mainWindow)
-        open(root: root, forceNew: forceNew, adoptFrame: source?.frame)
-        source?.orderOut(nil)  // IDE 窗口一定会被创建并显示,来源窗口可放心隐藏
+        // IDE 窗口一定会被创建并显示:它叠在来源窗口正上方淡入,淡入完成后来源窗口才隐藏(无闪烁、无跳动)
+        open(root: root, forceNew: forceNew, adoptFrame: source?.frame, replacing: source)
         if FusionMode.shared.isEnabled { UserDefaults.standard.set(true, forKey: Self.fusionLastIDEKey) }
     }
 
@@ -87,9 +87,8 @@ final class IDEWindowManager {
             }
         }
         // 只有 Agent 窗口确实显示出来才隐藏 IDE 窗口,避免两个窗口都不可见
-        let shown = AppActions.shared.showMainWindow(adopting: source?.frame)
+        let shown = AppActions.shared.showMainWindow(adopting: source?.frame, replacing: source)
         if shown {
-            source?.orderOut(nil)
             if FusionMode.shared.isEnabled { UserDefaults.standard.set(false, forKey: Self.fusionLastIDEKey) }
         }
         span.end()
@@ -244,7 +243,7 @@ final class IDEWindowManager {
     // MARK: 显示
 
     /// 显示窗口(必要时创建控制器),并记录冷开/热切换耗时。
-    private func show(_ model: IDEWindowModel, reason: String, activate: Bool = true, adoptFrame: NSRect? = nil) {
+    private func show(_ model: IDEWindowModel, reason: String, activate: Bool = true, adoptFrame: NSRect? = nil, replacing source: NSWindow? = nil) {
         let cold = controllers[model.id] == nil
         let span = Log.perf.span(cold ? "IDE 窗口冷开" : "IDE 窗口切换", warnMs: cold ? 250 : 50, quiet: true, ["reason": reason])
         let controller: IDEWindowController
@@ -258,8 +257,10 @@ final class IDEWindowManager {
         NSApp.activate()
         if let window = controller.window {
             if let adoptFrame { window.adoptFusionFrame(adoptFrame) }
+            if let source, source !== window { window.beginFusionReveal() }
             if window.isMiniaturized { window.deminiaturize(nil) }
             if activate { window.makeKeyAndOrderFront(nil) } else { window.orderFront(nil) }
+            if let source, source !== window { window.finishFusionReveal(replacing: source) }
         }
         span.end(["windows": "\(controllers.count)"])
     }
@@ -272,5 +273,39 @@ extension NSWindow {
         guard !styleMask.contains(.fullScreen),
               let target = FusionFrame.adopted(frame, minSize: minSize, screens: NSScreen.screens.map(\.visibleFrame)) else { return }
         setFrame(target, display: false)
+    }
+}
+
+extension NSWindow {
+    /// 融合模式切换:目标窗口先完全透明地叠在来源窗口上(在 `makeKeyAndOrderFront` 之前调用),
+    /// 避免它首帧未渲染完时闪出空白或错位的内容。必须与 `finishFusionReveal(replacing:)` 成对使用。
+    func beginFusionReveal() {
+        alphaValue = 0
+    }
+
+    /// 融合模式切换:等目标窗口完成首帧渲染后淡入,淡入完成再隐藏来源窗口,整个过程来源窗口一直垫在下面,
+    /// 视觉上是同一个窗口里的内容原地换成了另一种模式。「减弱动态效果」下无渐变,直接替换。
+    /// - Parameter source: 被替换的来源窗口
+    func finishFusionReveal(replacing source: NSWindow) {
+        contentView?.layoutSubtreeIfNeeded()
+        displayIfNeeded()
+        let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        Task { @MainActor [weak self, weak source] in
+            // 给 SwiftUI 一个运行循环完成首次布局与绘制(热窗口几乎立即完成)
+            try? await Task.sleep(for: .milliseconds(40))
+            guard let self else { source?.orderOut(nil); return }
+            self.contentView?.layoutSubtreeIfNeeded()
+            self.displayIfNeeded()
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = reduceMotion ? 0 : 0.14
+                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                self.animator().alphaValue = 1
+            }, completionHandler: {
+                MainActor.assumeIsolated {
+                    self.alphaValue = 1
+                    source?.orderOut(nil)
+                }
+            })
+        }
     }
 }
