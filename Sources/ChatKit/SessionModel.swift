@@ -580,6 +580,7 @@ public final class SessionModel {
         self.supervisor = supervisor
         self.client = client
         agentPID = nil
+        shellActivityProbe = nil
         Task { [weak self] in
             let pid = await supervisor.processIdentifier
             self?.agentPID = pid
@@ -2341,14 +2342,31 @@ public final class SessionModel {
     /// 运行中、待处理的权限/提问、排队消息、仍在跑的终端或工具(含后台子代理)、回放中一律不休眠。
     public var canHibernate: Bool {
         guard phase == .ready, !isHibernated, !isRunning, !isReplaying, !isShuttingDown else { return false }
-        guard activeDescriptor.kind == .claudeACP, connectTask == nil else { return false }
+        // 非 Claude ACP 的会话只有「空白」时才允许休眠(空白会话直接丢弃进程,唤醒时新建);有内容的会话 resume 语义因引擎而异
+        guard activeDescriptor.kind == .claudeACP || timeline.entries.isEmpty, connectTask == nil else { return false }
         guard pendingPermissions.isEmpty, pendingElicitations.isEmpty, queuedPrompt == nil, followUps.isEmpty else { return false }
         if terminals.values.contains(where: \.isRunning) { return false }
         // 终端状态可能漏判(命令被转入后台等):Agent 进程下只要还挂着 shell 命令,就不能结束进程
-        if let pid = agentPID, ProcessTree.hasShellDescendant(of: pid) { return false }
+        // 进程树探测(libproc 遍历)放在后台刷新缓存,这里只读缓存;缓存缺失或过期按「不确定」处理,不休眠
+        if agentPID != nil {
+            guard let probe = shellActivityProbe, Date().timeIntervalSince(probe.at) < Self.shellProbeTTL, !probe.hasShell else { return false }
+        }
         if timeline.entries.contains(where: { $0.kind == .tool && ($0.tool?.status == .pending || $0.tool?.status == .inProgress) }) { return false }
         // 有对话内容时必须能用 session/resume 接回;空白会话直接丢弃进程,唤醒时新建
         return timeline.entries.isEmpty || capabilities.canResume
+    }
+
+    /// Agent 进程下是否挂着 shell 命令的探测缓存(后台刷新,见 `refreshShellActivity`)。
+    @ObservationIgnored private var shellActivityProbe: (hasShell: Bool, at: Date)?
+    /// 探测缓存有效期(秒);驻留检查间隔 30s,留出一倍余量
+    private static let shellProbeTTL: TimeInterval = 90
+
+    /// 在后台线程探测 Agent 进程树里是否还有 shell 命令,并刷新缓存(休眠判定前调用;不阻塞主线程)。
+    public func refreshShellActivity() async {
+        guard let pid = agentPID else { shellActivityProbe = nil; return }
+        let hasShell = await Task.detached(priority: .utility) { ProcessTree.hasShellDescendant(of: pid) }.value
+        // 探测期间进程可能已被替换:只在 pid 未变时写入
+        if agentPID == pid { shellActivityProbe = (hasShell, Date()) }
     }
 
     /// 标记会话刚被使用(切到前台等),让它排在休眠顺序的后面。

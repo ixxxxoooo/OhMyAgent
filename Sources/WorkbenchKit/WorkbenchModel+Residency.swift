@@ -22,6 +22,11 @@ extension WorkbenchModel {
         return keys
     }
 
+    /// 并发刷新所有会话的进程树探测缓存(libproc 遍历在后台线程,避免休眠判定卡住主线程)。
+    func refreshShellActivities() async {
+        for session in Array(conversations.values) { await session.refreshShellActivity() }
+    }
+
     /// 按驻留策略休眠闲置会话,并刷新可见会话的最近使用时间。
     /// - Parameter now: 当前时间(测试可注入)
     /// - Returns: 本次休眠的会话数
@@ -72,6 +77,7 @@ extension WorkbenchModel {
         residencyTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: Self.residencyInterval)
+                await self?.refreshShellActivities()
                 self?.enforceResidency()
             }
         }
@@ -82,7 +88,12 @@ extension WorkbenchModel {
                 let event = source.data
                 self.underMemoryPressure = event.contains(.warning) || event.contains(.critical)
                 self.log.info("系统内存压力变化", ["pressure": self.underMemoryPressure ? "high" : "normal"])
-                if self.underMemoryPressure { self.enforceResidency() }
+                if self.underMemoryPressure {
+                    Task { @MainActor [weak self] in
+                        await self?.refreshShellActivities()
+                        self?.enforceResidency()
+                    }
+                }
             }
         }
         source.resume()
