@@ -131,7 +131,7 @@ struct IDEAgentPane: View {
             OMEmptyState { Label("Agent 面板", om: "sparkles") } description: { Text("打开文件夹后即可在这里与 Agent 对话") }
         } else if let session = workspace.agentSession {
             ChatView(model: session)
-                .id(appearance.renderKey)
+                .id("\(appearance.renderKey)-\(session.uid)")
                 .environment(session)
         } else {
             OMSpinner(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
