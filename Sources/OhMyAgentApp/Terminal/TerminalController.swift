@@ -167,6 +167,17 @@ final class TerminalController: Identifiable {
         observers.forEach { NotificationCenter.default.removeObserver($0) }
         observers = []
         terminate()
+        Self.releaseBuffers(of: view)
+    }
+
+    /// 释放终端缓冲占用的内存。
+    /// SwiftTerm 的 `Terminal` 与 `Buffer` 互相强引用(`leaks` 实测每个终端都会整体泄漏),对象本身回收不了;
+    /// 弃用前先把回滚行数设为 0 并重置缓冲,让占内存最大的旧缓冲(回滚行)能被释放,残留的只是一个空壳。
+    /// - Parameter view: 即将弃用的终端视图
+    static func releaseBuffers(of view: TerminalView) {
+        let terminal = view.getTerminal()
+        terminal.options.scrollback = 0
+        terminal.resetToInitialState()
     }
 
     /// 终止进程(关闭标签时调用)。交互式 shell 会忽略 SIGTERM,所以先发 SIGHUP(与关闭终端窗口一致),

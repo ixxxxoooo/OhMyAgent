@@ -25,6 +25,16 @@ struct TerminalControllerTests {
         #expect(!controller.isRunning)
     }
 
+    @Test("弃用控制器会清空缓冲并把回滚设为 0(SwiftTerm 的 Terminal↔Buffer 循环引用让对象本身回收不了)")
+    func disposeReleasesBuffers() async {
+        let controller = TerminalController(id: "t-dispose", directory: NSTemporaryDirectory(), executable: "/bin/sh", arguments: ["-c", "echo oma-dispose-ok; exit 0"])
+        await wait { !controller.isRunning && controller.screenText.contains("oma-dispose-ok") }
+        #expect(controller.screenText.contains("oma-dispose-ok"))
+        controller.dispose()
+        #expect(controller.view.getTerminal().options.scrollback == 0)
+        #expect(!controller.screenText.contains("oma-dispose-ok"))
+    }
+
     @Test("在指定目录启动;不存在的目录退回主目录")
     func workingDirectory() async {
         let dir = NSTemporaryDirectory()

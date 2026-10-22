@@ -53,6 +53,11 @@ extension IDEWorkspace {
         TerminalStore.shared.remove(id)
     }
 
+    /// 结束本窗口的全部终端(窗口关闭时调用)。
+    func closeAllTerminals() {
+        for id in model.terminalIDs { closeTerminal(id) }
+    }
+
     // MARK: 保存
 
     /// 「延迟保存」模式下,最后一次修改后停顿一秒保存全部;每次修改重置计时。
