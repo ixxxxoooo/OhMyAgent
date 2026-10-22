@@ -122,8 +122,8 @@ public final class MainThreadHitchMonitor: @unchecked Sendable {
     /// 最近一次探针的投递时刻(用于判断停滞已持续多久)
     private let postedAt = Mutex<ContinuousClock.Instant?>(nil)
     private var timer: DispatchSourceTimer?
-    /// 是否在停滞期间抓取调用栈(开发版/演示模式默认开启,见 `HitchStackSampler.isEnabled`)
-    private let sampleStacks = HitchStackSampler.isEnabled()
+    /// 是否在停滞期间抓取调用栈(正式版也开启,≥1s 才采、≥2s 才落盘;`OMA_HITCH_SAMPLE=0` 关闭)
+    private let sampleStacks = HitchStackSampler.isSamplingAllowed()
     private let sampler = HitchStackSampler.shared
 
     /// 自启动以来的卡顿累计:次数与单次最大毫秒。
@@ -134,6 +134,7 @@ public final class MainThreadHitchMonitor: @unchecked Sendable {
     public func start(thresholdMs: Int = 100) {
         queue.async { [self] in
             guard timer == nil else { return }
+            if sampleStacks { DispatchQueue.main.async { HitchStackSampler.shared.attachMainThread() } }
             let source = DispatchSource.makeTimerSource(queue: queue)
             source.schedule(deadline: .now() + .milliseconds(500), repeating: .milliseconds(50))
             source.setEventHandler { [self] in
@@ -145,7 +146,7 @@ public final class MainThreadHitchMonitor: @unchecked Sendable {
                 guard !alreadyPending else {
                     // 探针迟迟没被主线程执行:停滞仍在进行中,必要时抓栈(此刻主线程恰好卡在问题现场)
                     if sampleStacks, let since = postedAt.withLock({ $0 }) {
-                        sampler.stallDetected(stalledMs: OMLogger.milliseconds(since: since))
+                        sampler.stallDetected(stalledMs: OMLogger.milliseconds(since: since), postedAt: since)
                     }
                     return
                 }
@@ -154,6 +155,7 @@ public final class MainThreadHitchMonitor: @unchecked Sendable {
                 DispatchQueue.main.async { [self] in
                     pending.withLock { $0 = false }
                     let ms = OMLogger.milliseconds(since: posted)
+                    if sampleStacks { sampler.stallEnded(totalMs: ms) }
                     guard ms >= thresholdMs else { return }
                     let total = counters.withLock { value -> Int in
                         value.count += 1
