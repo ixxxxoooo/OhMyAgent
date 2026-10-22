@@ -5,12 +5,15 @@ import EditorKit
 import Foundation
 import SwiftUI
 import Testing
+@testable import OhMyAgentApp
 
 @MainActor
 @Suite("代码高亮")
 struct CodeHighlighterTests {
     @Test("扩展名与文件名识别")
     func detectLanguages() {
+        #expect(SyntaxLanguage.detect(path: "/a/.cursor/rules/swift.mdc") == .markdown)
+        #expect(FilePreviewKind.of(path: "/a/.cursor/rules/swift.mdc") == .markdown)
         #expect(SyntaxLanguage.detect(path: "/a/index.html") == .html)
         #expect(SyntaxLanguage.detect(path: "/a/icon.svg") == .html)
         #expect(SyntaxLanguage.detect(path: "/a/site.scss") == .css)

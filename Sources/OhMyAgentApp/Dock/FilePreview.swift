@@ -17,7 +17,7 @@ enum FilePreviewKind: Equatable {
     /// 按扩展名识别;不支持预览返回 nil。
     static func of(path: String) -> FilePreviewKind? {
         switch (path as NSString).pathExtension.lowercased() {
-        case "md", "markdown", "mdx": return .markdown
+        case "md", "markdown", "mdx", "mdc", "mdown", "mkd", "mkdn": return .markdown
         case "mmd", "mermaid": return .mermaid
         case "svg": return .svg
         case "png", "jpg", "jpeg", "gif", "webp", "heic", "tif", "tiff", "bmp", "ico", "icns": return .image

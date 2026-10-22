@@ -22,7 +22,7 @@ public enum SyntaxLanguage: String, Sendable, CaseIterable {
         case "ts", "tsx", "mts", "cts": return .typescript
         case "py", "pyi": return .python
         case "json", "jsonc", "json5": return .json
-        case "md", "markdown", "mdx": return .markdown
+        case "md", "markdown", "mdx", "mdc", "mdown", "mkd", "mkdn": return .markdown
         case "sh", "zsh", "bash": return .shell
         case "rs": return .rust
         case "go": return .go
