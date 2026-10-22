@@ -65,7 +65,8 @@ struct WorkbenchView: View {
         }
         // 共享终端表变化(IDE 窗口新建/关闭终端)→ 右栏终端标签同步增减
         .onChange(of: ProjectTerminals.shared.entries) { old, new in syncTerminalTabs(old: old, new: new) }
-        .onAppear { syncTerminalTabs(old: [], new: ProjectTerminals.shared.entries) }
+        .onAppear { reconcileTerminalTabs() }
+        .onChange(of: workbench.selectedProjectID) { _, _ in reconcileTerminalTabs() }
         .onChange(of: workbench.selectedProject?.id, initial: true) { _, id in WorkspaceWatchCenter.shared.watch(root: id, extras: workbench.selectedProject?.extraFolders ?? []) }
         .onChange(of: workbench.selectedProject?.extraFolders ?? []) { _, extras in WorkspaceWatchCenter.shared.watch(root: workbench.selectedProject?.id, extras: extras) }
         .onChange(of: workbench.activeSession?.uid) { _, _ in updateFocus() }
@@ -108,11 +109,24 @@ struct WorkbenchView: View {
         .onChange(of: navigationSignature) { _, _ in workbench.recordNavigation() }
     }
 
-    /// 把共享终端表的增减同步到右栏终端标签:新增的补开标签,被移除的关闭标签(其余标签不动)。
+    /// 让共享终端表成为 Agent 窗口与 IDE 窗口的唯一来源:
+    /// 先把 Agent 窗口里已有、但表里没有的终端标签登记进去(如重启后随工作台状态恢复的标签),
+    /// 再给当前项目表里有、却还没有标签的终端补开标签。这样两个窗口看到的终端个数一致。
+    private func reconcileTerminalTabs() {
+        let project = workbench.selectedProjectID
+        for tab in workbench.terminalTabs {
+            guard case .terminal(let id) = tab.kind, !ProjectTerminals.shared.ids.contains(id) else { continue }
+            ProjectTerminals.shared.add(id: id, title: tab.title, project: WorkbenchModel.residentTerminalRoot(id) ?? project)
+        }
+        syncTerminalTabs(old: [], new: ProjectTerminals.shared.entries)
+    }
+
+    /// 把共享终端表的增减同步到右栏终端标签:当前项目新增的补开标签,被移除的关闭标签(其余标签不动)。
     private func syncTerminalTabs(old: [ProjectTerminals.Entry], new: [ProjectTerminals.Entry]) {
         let oldIDs = Set(old.map(\.id))
         let newIDs = Set(new.map(\.id))
-        for entry in new where !oldIDs.contains(entry.id) && workbench.existingTab(for: .terminal(id: entry.id)) == nil {
+        let project = ProjectTerminals.key(workbench.selectedProjectID)
+        for entry in new where !oldIDs.contains(entry.id) && entry.project == project && workbench.existingTab(for: .terminal(id: entry.id)) == nil {
             workbench.openTerminal(id: entry.id, title: entry.title)
         }
         for id in oldIDs.subtracting(newIDs) {
