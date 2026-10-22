@@ -91,7 +91,7 @@ struct ControlReader {
                 if response["subtype"]?.stringValue == "success" { return response["response"] ?? .object([:]) }
                 Log.agent.warning("套餐用量控制请求失败", ["request": id, "error": LogRedactor.truncate(response["error"]?.stringValue ?? "-", limit: 200)])
                 return nil
-            case .stderr:
+            case .stderr, .message:
                 continue
             case .closed:
                 return nil

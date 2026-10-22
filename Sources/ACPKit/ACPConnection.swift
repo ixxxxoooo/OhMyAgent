@@ -73,6 +73,7 @@ public actor ACPConnection {
     /// 启动传输并开始读循环。
     public func start() throws {
         let events = try transport.start()
+        transport.enableDirectMessages()
         readTask = Task { [weak self] in
             for await event in events {
                 guard let self else { return }
@@ -151,9 +152,15 @@ public actor ACPConnection {
     }
 
     private func send(_ message: JSONRPCMessage) throws {
-        let data = try message.serialized()
-        log.traffic("→", Self.summary(message), payload: String(decoding: data, as: UTF8.self))
-        transport.send(data)
+        // 流量日志关闭时不会求值载荷,因此进程内直连路径完全不需要序列化
+        log.traffic("→", Self.summary(message), payload: Self.text(of: message))
+        try transport.send(message: message)
+    }
+
+    /// 消息的 JSON 文本(仅流量日志开启时求值)。
+    private static func text(of message: JSONRPCMessage) -> String {
+        guard let data = try? message.serialized() else { return "" }
+        return String(decoding: data, as: UTF8.self)
     }
 
     /// 协议流量日志的摘要:类型、方法名与 id。
@@ -193,6 +200,9 @@ public actor ACPConnection {
                 log.warning("收到无法解析的行", ["error": "\(error)", "bytes": "\(data.count)", "head": String(decoding: data.prefix(200), as: UTF8.self)])
                 inboundContinuation.yield(.malformed(String(decoding: data.prefix(512), as: UTF8.self)))
             }
+        case .message(let message):
+            log.traffic("←", Self.summary(message), payload: Self.text(of: message))
+            dispatch(message)
         case .stderr(let text):
             inboundContinuation.yield(.stderr(text))
         case .closed(let code):

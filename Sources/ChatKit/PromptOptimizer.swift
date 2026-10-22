@@ -193,7 +193,7 @@ public enum PromptOptimizer {
                 let cleaned = result.isError ? nil : clean(result.text)
                 Log.session.info("优化提示词完成", ["channel": "claude", "ms": "\(OMLogger.milliseconds(since: started))", "ok": "\(cleaned != nil)"])
                 return cleaned
-            case .stderr:
+            case .stderr, .message:
                 continue
             case .closed:
                 Log.session.warning("优化提示词的 claude 进程提前退出", ["ms": "\(OMLogger.milliseconds(since: started))"])

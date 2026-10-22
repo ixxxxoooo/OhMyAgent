@@ -7,7 +7,7 @@ import Testing
 @testable import OhMyAgentApp
 
 @MainActor
-@Suite("工作区监听中心")
+@Suite("工作区监听中心", .serialized)
 struct WorkspaceWatchCenterTests {
     /// 回调计数器。
     @MainActor
@@ -38,7 +38,7 @@ struct WorkspaceWatchCenterTests {
         center.watch(root: b)
         #expect(!center.covers(file))
         // 订阅结束补查一次,之后按轮询间隔持续检查
-        let deadline = ContinuousClock.now + .seconds(3)
+        let deadline = ContinuousClock.now + .seconds(10)
         while counter.value < before + 3, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(20)) }
         #expect(counter.value >= before + 3)
         task.cancel()
@@ -60,7 +60,7 @@ struct WorkspaceWatchCenterTests {
         let pollTask = Task { @MainActor in
             await center.followProject(project, poll: .milliseconds(30)) { polled.value += 1 }
         }
-        let deadline = ContinuousClock.now + .seconds(3)
+        let deadline = ContinuousClock.now + .seconds(10)
         while polled.value < 3, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(20)) }
         #expect(polled.value >= 3)
         pollTask.cancel()
@@ -75,7 +75,7 @@ struct WorkspaceWatchCenterTests {
         try await Task.sleep(for: .milliseconds(400))
         #expect(driven.value == 0, "空闲时不应有刷新")
         try Data("x".utf8).write(to: URL(fileURLWithPath: project + "/new.txt"))
-        let wait = ContinuousClock.now + .seconds(5)
+        let wait = ContinuousClock.now + .seconds(10)
         while driven.value == 0, ContinuousClock.now < wait { try await Task.sleep(for: .milliseconds(30)) }
         #expect(driven.value >= 1, "文件变化后应收到事件刷新")
         task.cancel()

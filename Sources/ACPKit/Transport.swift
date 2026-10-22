@@ -11,6 +11,8 @@ public enum TransportEvent: Sendable {
     case line(Data)
     /// 标准错误输出(日志)
     case stderr(String)
+    /// 已解析的消息(仅进程内直连传输产生:跳过序列化与再解析;其余传输永远不会发出)
+    case message(JSONRPCMessage)
     /// 传输关闭,附带退出码(若有)
     case closed(exitCode: Int32?)
 }
@@ -23,6 +25,15 @@ public protocol ACPTransport: Sendable {
     func send(_ data: Data)
     /// 停止传输。
     func stop()
+    /// 发送一条尚未序列化的消息。进程内直连传输可直接投递给对端而省去序列化与解析;默认实现序列化后走 `send(_:)`。
+    func send(message: JSONRPCMessage) throws
+    /// 声明本端能直接接收 `.message` 事件(`ACPConnection` 启动时调用);默认空实现。
+    func enableDirectMessages()
+}
+
+public extension ACPTransport {
+    func send(message: JSONRPCMessage) throws { send(try message.serialized()) }
+    func enableDirectMessages() {}
 }
 
 /// 子进程启动配置。
@@ -161,8 +172,22 @@ public final class StdioTransport: ACPTransport, @unchecked Sendable {
 public final class LoopbackTransport: ACPTransport, @unchecked Sendable {
     private let continuation = Mutex<AsyncStream<TransportEvent>.Continuation?>(nil)
     private let peer = Mutex<LoopbackTransport?>(nil)
+    /// 本端是否接受直连消息(由 `ACPConnection` 启动时开启)。
+    private let acceptsMessages = Mutex<Bool>(false)
 
     public init() {}
+
+    public func enableDirectMessages() { acceptsMessages.withLock { $0 = true } }
+
+    /// 对端接受直连消息时原样投递(不序列化),否则退回行协议。
+    public func send(message: JSONRPCMessage) throws {
+        let other = peer.withLock { $0 }
+        if let other, other.acceptsMessages.withLock({ $0 }) {
+            other.continuation.withLock { $0 }?.yield(.message(message))
+        } else {
+            send(try message.serialized())
+        }
+    }
 
     /// 创建一对互相连接的传输。
     public static func makePair() -> (LoopbackTransport, LoopbackTransport) {

@@ -45,7 +45,7 @@ extension JSONValue {
     /// - Parameter data: UTF-8 数据
     /// - Returns: 解析结果;失败返回 nil
     static func parse(_ data: Data) -> JSONValue? {
-        try? JSONDecoder().decode(JSONValue.self, from: data)
+        try? JSONValue.parsing(data)
     }
 
     /// 解析一段 JSON 文本。

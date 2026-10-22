@@ -156,6 +156,8 @@ public actor ClaudeQuery {
                 return
             }
             dispatch(value)
+        case .message:
+            break   // 仅进程内 ACP 直连传输会产生,CLI 管道不会
         case .stderr(let text):
             stderrTail = String((stderrTail + text).suffix(4000))
         case .closed(let code):

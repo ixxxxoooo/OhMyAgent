@@ -35,6 +35,44 @@ public enum RequestID: Sendable, Hashable, Codable, CustomStringConvertible {
     }
 }
 
+extension RequestID {
+    /// 从 JSON 值构造(整数、可无损转整数的浮点数、字符串)。
+    /// - Parameter json: 原始 id 值
+    /// - Throws: 类型不合法时抛出 `DecodingError`
+    init(json: JSONValue) throws {
+        switch json {
+        case .int(let value): self = .int(value)
+        case .string(let value): self = .string(value)
+        case .double(let value) where value == value.rounded() && abs(value) < 9e15: self = .int(Int(value))
+        default:
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: [], debugDescription: "请求 id 必须为整数或字符串"))
+        }
+    }
+
+    /// 对应的 JSON 值。
+    var json: JSONValue {
+        switch self {
+        case .int(let value): return .int(value)
+        case .string(let value): return .string(value)
+        }
+    }
+}
+
+extension JSONRPCError {
+    /// 从 JSON 值构造;缺少 `code`/`message` 时返回 nil。
+    init?(json: JSONValue) {
+        guard let code = json["code"]?.intValue, let message = json["message"]?.stringValue else { return nil }
+        self.init(code: code, message: message, data: json["data"].flatMap { $0.isNull ? nil : $0 })
+    }
+
+    /// 对应的 JSON 值(`data` 为空时省略)。
+    var json: JSONValue {
+        var object: [String: JSONValue] = ["code": .int(code), "message": .string(message)]
+        if let data { object["data"] = data }
+        return .object(object)
+    }
+}
+
 /// JSON-RPC 错误对象。
 public struct JSONRPCError: Error, LocalizedError, Sendable, Codable, Hashable {
     /// 面向用户的错误描述:直接使用 Agent 返回的 `message`
@@ -86,15 +124,15 @@ public enum JSONRPCMessage: Sendable, Hashable {
     public static func parse(_ data: Data) throws -> JSONRPCMessage {
         let value: JSONValue
         do {
-            value = try JSONDecoder().decode(JSONValue.self, from: data)
+            value = try JSONValue.parsing(data)
         } catch {
-            throw JSONRPCError(code: JSONRPCError.parseError, message: "JSON 解析失败: \(error.localizedDescription)")
+            throw JSONRPCError(code: JSONRPCError.parseError, message: "JSON 解析失败: \(error)")
         }
         guard case .object(let object) = value else {
             throw JSONRPCError(code: JSONRPCError.invalidRequest, message: "消息必须是 JSON 对象")
         }
         let id: RequestID? = try object["id"].flatMap { raw in
-            raw.isNull ? nil : try raw.decode(RequestID.self)
+            raw.isNull ? nil : try RequestID(json: raw)
         }
         if let method = object["method"]?.stringValue {
             let params = object["params"]
@@ -104,7 +142,7 @@ public enum JSONRPCMessage: Sendable, Hashable {
             return .notification(method: method, params: params)
         }
         if let errorValue = object["error"], !errorValue.isNull {
-            let error = (try? errorValue.decode(JSONRPCError.self))
+            let error = JSONRPCError(json: errorValue)
                 ?? JSONRPCError(code: JSONRPCError.internalError, message: "未知错误")
             return .errorResponse(id: id, error: error)
         }
@@ -124,18 +162,18 @@ public enum JSONRPCMessage: Sendable, Hashable {
         var object: [String: JSONValue] = ["jsonrpc": "2.0"]
         switch self {
         case .request(let id, let method, let params):
-            object["id"] = try JSONValue.from(id)
+            object["id"] = id.json
             object["method"] = .string(method)
             if let params { object["params"] = params }
         case .notification(let method, let params):
             object["method"] = .string(method)
             if let params { object["params"] = params }
         case .response(let id, let result):
-            object["id"] = try JSONValue.from(id)
+            object["id"] = id.json
             object["result"] = result
         case .errorResponse(let id, let error):
-            object["id"] = try id.map { try JSONValue.from($0) } ?? .null
-            object["error"] = try JSONValue.from(error)
+            object["id"] = id?.json ?? .null
+            object["error"] = error.json
         }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.withoutEscapingSlashes]
