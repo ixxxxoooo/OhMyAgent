@@ -121,9 +121,37 @@ final class HubModel {
         recompute()
     }
 
+    /// 候选超过该数量且有查询时,排序放到后台(输入期间先沿用上一次结果,不阻塞主线程)
+    static let asyncRankThreshold = 3_000
+    /// 排序代数:后台结果只在代数仍是最新时落地
+    @ObservationIgnored private var recomputeGeneration = 0
+    @ObservationIgnored private var recomputeTask: Task<Void, Never>?
+
     /// 重新排序。
     private func recompute() {
+        recomputeTask?.cancel()
+        recomputeGeneration &+= 1
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if candidates.count > Self.asyncRankThreshold, !trimmed.isEmpty {
+            let generation = recomputeGeneration
+            let snapshot = candidates
+            let segment = segment
+            recomputeTask = Task { [weak self] in
+                let result = await Task.detached(priority: .userInitiated) {
+                    HubSearchEngine.sections(query: trimmed, segment: segment, candidates: snapshot)
+                }.value
+                guard !Task.isCancelled, let self, self.recomputeGeneration == generation else { return }
+                self.sections = result
+                self.sectionsDidChange()
+            }
+            return
+        }
         sections = HubSearchEngine.sections(query: query, segment: segment, candidates: candidates)
+        sectionsDidChange()
+    }
+
+    /// 结果更新后修正选中项与实时预览。
+    private func sectionsDidChange() {
         if segment == .themes && query.isEmpty {
             if let cur = flatItems.firstIndex(where: { $0.candidate.action == .theme(id: committedThemeID) }) {
                 selection = cur

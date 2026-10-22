@@ -45,6 +45,35 @@ public struct IndexIgnore: Sendable, Equatable {
         IndexIgnore(text: defaults.string(forKey: preferenceKey) ?? "")
     }
 
+    /// 偏好键:索引是否读取工作区根目录的 `.gitignore`(默认开启)。
+    public static let gitignorePreferenceKey = "codeIntel.useGitignore"
+
+    /// 读取工作区根目录的 `.gitignore`(只读根目录那一份,最大 256KB)。
+    /// 取消忽略的 `!` 规则不支持,会被跳过(被它豁免的路径仍按忽略处理)。
+    /// - Parameter root: 工作区根目录
+    /// - Returns: 解析出的规则;没有文件或读取失败为空规则
+    public static func gitignore(root: String) -> IndexIgnore {
+        guard !root.isEmpty, let handle = FileHandle(forReadingAtPath: root + "/.gitignore") else { return .none }
+        defer { try? handle.close() }
+        guard let data = try? handle.read(upToCount: 256 * 1024), let text = String(data: data, encoding: .utf8) else { return .none }
+        let lines = text.split(whereSeparator: \.isNewline).filter { !$0.hasPrefix("!") }
+        return IndexIgnore(text: lines.joined(separator: "\n"))
+    }
+
+    /// 合并两份规则。
+    /// - Parameter other: 另一份规则
+    public func merged(with other: IndexIgnore) -> IndexIgnore { IndexIgnore(rules: rules + other.rules) }
+
+    /// 某工作区的有效规则:用户规则,加上(偏好开启时)该工作区的 `.gitignore`。
+    /// - Parameters:
+    ///   - root: 工作区根目录
+    ///   - defaults: 偏好存储
+    public static func current(root: String, _ defaults: UserDefaults = .standard) -> IndexIgnore {
+        let user = current(defaults)
+        guard defaults.object(forKey: gitignorePreferenceKey) as? Bool ?? true else { return user }
+        return user.merged(with: gitignore(root: root))
+    }
+
     /// 是否没有任何规则。
     public var isEmpty: Bool { rules.isEmpty }
 

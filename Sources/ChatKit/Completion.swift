@@ -444,7 +444,7 @@ public actor FileIndex {
         var files: [String] = []
         var dirs: [String] = []
         let rootPath = root.standardizedFileURL.path
-        let userIgnore = IndexIgnore.current()
+        let userIgnore = IndexIgnore.current(root: rootPath)
         for case let url as URL in enumerator {
             if Task.isCancelled { break }
             let name = url.lastPathComponent

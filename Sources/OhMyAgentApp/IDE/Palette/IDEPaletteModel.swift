@@ -163,6 +163,12 @@ final class IDEPaletteModel {
         if indexRoot != root { files = [] }
         indexRoot = root
         indexTask?.cancel()
+        // 与 Agent 窗口同一个工作区时直接复用共享索引(由文件系统事件增量维护),不再重复扫盘
+        let shared = WorkspaceIndexModel.shared
+        if shared.root == root, !shared.isLoading, !shared.files.isEmpty {
+            files = shared.files
+            return
+        }
         indexTask = Task { [weak self] in
             let started = ContinuousClock.now
             let list = await Task.detached(priority: .userInitiated) { WorkspaceFiles.index(root: root) }.value

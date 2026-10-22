@@ -2917,3 +2917,5 @@
 "找不到可用于执行计划的模式,请手动切换到 build 后发送「按计划执行」。" = "No mode available to run the plan. Switch to build manually and send \"run the plan\".";
 "请按上面的计划开始执行。" = "Please carry out the plan above.";
 "否" = "No";
+"索引时跳过 .gitignore 列出的文件" = "Skip files listed in .gitignore when indexing";
+"读取项目根目录的 .gitignore(不支持 ! 取反规则与子目录里的 .gitignore)。关闭后 ⌘K / ⌘P 文件搜索会包含这些文件;新打开的项目或重新索引后生效。" = "Reads the .gitignore at the project root (negated ! rules and nested .gitignore files are not supported). When off, ⌘K / ⌘P file search includes those files; takes effect for newly opened projects or after re-indexing.";

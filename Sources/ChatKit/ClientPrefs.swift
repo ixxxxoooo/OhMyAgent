@@ -113,6 +113,8 @@ public enum ClientPrefs {
         public static let worktreeMaxCount = "worktree.maxCount"
         /// 索引忽略 glob(多行文本)
         public static let indexIgnoreGlobs = IndexIgnore.preferenceKey
+        /// 索引读取工作区 `.gitignore`(默认开启)
+        public static let indexUseGitignore = IndexIgnore.gitignorePreferenceKey
     }
 
     /// 托盘图标是否启用:菜单栏开关打开,或 Dock 图标被隐藏(此时必须有托盘才能打开窗口)。默认开启。

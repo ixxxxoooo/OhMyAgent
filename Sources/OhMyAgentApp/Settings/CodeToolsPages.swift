@@ -41,6 +41,7 @@ struct CodeIntelligencePage: View {
     @AppStorage(ClientPrefs.Key.editorLSP) private var lspEnabled = true
     @AppStorage(ClientPrefs.Key.lspMaxWorkspaces) private var maxWorkspaces = 4
     @AppStorage(ClientPrefs.Key.indexIgnoreGlobs) private var ignoreGlobs = ""
+    @AppStorage(ClientPrefs.Key.indexUseGitignore) private var useGitignore = true
 
     /// 上限档位 1…8。
     private var limit: Int { min(max(maxWorkspaces == 0 ? 4 : maxWorkspaces, 1), 8) }
@@ -59,6 +60,8 @@ struct CodeIntelligencePage: View {
                 Note("Swift 使用 Xcode 自带的 sourcekit-lsp;TypeScript/JavaScript 需要 typescript-language-server,Python 需要 pyright(npm i -g typescript-language-server typescript pyright)。悬停停留查看类型,⌘ 点击或 F12 跳转定义,⌃Space 补全,输入 . 自动补全。").footnote()
             }
             SettingsCard("忽略文件") {
+                SettingsToggleRow("索引时跳过 .gitignore 列出的文件", isOn: $useGitignore)
+                Note("读取项目根目录的 .gitignore(不支持 ! 取反规则与子目录里的 .gitignore)。关闭后 ⌘K / ⌘P 文件搜索会包含这些文件;新打开的项目或重新索引后生效。").footnote()
                 VStack(alignment: .leading, spacing: 6) {
                     Text("索引忽略规则").font(OMFonts.body)
                     TextEditor(text: $ignoreGlobs)

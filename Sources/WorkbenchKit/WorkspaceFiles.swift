@@ -48,25 +48,103 @@ public enum WorkspaceFiles {
     /// - Parameters:
     ///   - root: 工作区根目录
     ///   - limit: 最多返回的文件数
-    ///   - ignore: 用户自定义忽略规则(默认读取设置)
+    ///   - ignore: 忽略规则(默认:用户规则 + 工作区 `.gitignore`)
     /// - Returns: 相对路径数组(已排序)
-    public static func index(root: String, limit: Int = 100_000, ignore: IndexIgnore = .current()) -> [String] {
-        guard !root.isEmpty, let enumerator = FileManager.default.enumerator(atPath: root) else { return [] }
+    public static func index(root: String, limit: Int = 100_000, ignore: IndexIgnore? = nil) -> [String] {
+        scan(base: root, relativePrefix: "", limit: limit, ignore: ignore ?? .current(root: root)).sorted()
+    }
+
+    /// 枚举 `base` 目录下的文件;规则按「相对工作区根」的路径判断(`relativePrefix` 是 `base` 相对工作区根的路径)。
+    private static func scan(base: String, relativePrefix: String, limit: Int, ignore: IndexIgnore) -> [String] {
+        guard !base.isEmpty, let enumerator = FileManager.default.enumerator(atPath: base) else { return [] }
         var result: [String] = []
         // 使用路径式枚举器直接得到相对路径,避免 /private 等符号链接前缀差异
         while let rel = enumerator.nextObject() as? String {
             if Task.isCancelled { break }
+            let full = relativePrefix.isEmpty ? rel : relativePrefix + "/" + rel
             let name = (rel as NSString).lastPathComponent
             let type = enumerator.fileAttributes?[.type] as? FileAttributeType
             if type == .typeDirectory || type == .typeSymbolicLink {
                 if type == .typeSymbolicLink || WorkspaceIgnore.skippedDirectories.contains(name)
-                    || ignore.ignores(relativePath: rel, isDirectory: true) { enumerator.skipDescendants() }
+                    || ignore.ignores(relativePath: full, isDirectory: true) { enumerator.skipDescendants() }
                 continue
             }
-            guard type == .typeRegular, name != ".DS_Store", !ignore.ignores(relativePath: rel, isDirectory: false) else { continue }
-            result.append(rel)
+            guard type == .typeRegular, name != ".DS_Store", !ignore.ignores(relativePath: full, isDirectory: false) else { continue }
+            result.append(full)
             if result.count >= limit { break }
         }
+        return result
+    }
+
+    /// 单批最多做增量更新的目录数,超过则退回整树重建。
+    public static let maxIncrementalDirectories = 64
+
+    /// 按文件系统事件报告的变化目录增量更新索引(替代每次变化都整树重扫)。
+    /// 每个变化目录:重新列举它的直接子项,替换该目录下的直接文件,删除已不存在的子目录条目,新出现的子目录整体扫描。
+    /// - Parameters:
+    ///   - files: 当前索引(相对路径)
+    ///   - root: 工作区根目录
+    ///   - directories: 变化的目录(绝对路径)
+    ///   - ignore: 忽略规则
+    ///   - limit: 索引上限
+    /// - Returns: 更新后的索引(已排序);目录过多或有目录不在工作区内时返回 nil,调用方应整树重建
+    public static func applyingChanges(to files: [String], root: String, directories: Set<String>, ignore: IndexIgnore? = nil,
+                                       limit: Int = 100_000) -> [String]? {
+        guard !root.isEmpty, directories.count <= maxIncrementalDirectories else { return nil }
+        let rules = ignore ?? .current(root: root)
+        var relatives: [String] = []
+        for directory in directories {
+            if directory == root { relatives.append(""); continue }
+            guard directory.hasPrefix(root + "/") else { return nil }
+            relatives.append(String(directory.dropFirst(root.count + 1)))
+        }
+        // 先父后子:路径短的先处理
+        var result = files
+        let fileManager = FileManager.default
+        for relative in relatives.sorted(by: { $0.count < $1.count }) {
+            let absolute = relative.isEmpty ? root : root + "/" + relative
+            let prefix = relative.isEmpty ? "" : relative + "/"
+            if !relative.isEmpty {
+                let components = relative.split(separator: "/").map(String.init)
+                if components.contains(where: { WorkspaceIgnore.skippedDirectories.contains($0) })
+                    || rules.ignores(relativePath: relative, isDirectory: true) { continue }
+            }
+            var isDirectory: ObjCBool = false
+            guard fileManager.fileExists(atPath: absolute, isDirectory: &isDirectory), isDirectory.boolValue,
+                  let names = try? fileManager.contentsOfDirectory(atPath: absolute) else {
+                // 目录已被删除:移除它下面的全部条目
+                if !prefix.isEmpty { result.removeAll { $0.hasPrefix(prefix) } }
+                continue
+            }
+            var currentFiles: [String] = []
+            var currentDirectories: Set<String> = []
+            for name in names where name != ".DS_Store" {
+                let path = absolute + "/" + name
+                let full = prefix + name
+                guard let attributes = try? fileManager.attributesOfItem(atPath: path), let type = attributes[.type] as? FileAttributeType else { continue }
+                if type == .typeRegular {
+                    if !rules.ignores(relativePath: full, isDirectory: false) { currentFiles.append(full) }
+                } else if type == .typeDirectory {
+                    if !WorkspaceIgnore.skippedDirectories.contains(name), !rules.ignores(relativePath: full, isDirectory: true) { currentDirectories.insert(name) }
+                }
+            }
+            // 保留仍存在的子目录里的条目;直接子文件整体重建
+            var knownSubdirectories: Set<String> = []
+            result = result.filter { entry in
+                guard entry.hasPrefix(prefix) else { return true }
+                let remainder = entry.dropFirst(prefix.count)
+                guard let slash = remainder.firstIndex(of: "/") else { return false }
+                let sub = String(remainder[remainder.startIndex..<slash])
+                guard currentDirectories.contains(sub) else { return false }
+                knownSubdirectories.insert(sub)
+                return true
+            }
+            result.append(contentsOf: currentFiles)
+            for sub in currentDirectories.subtracting(knownSubdirectories) {
+                result.append(contentsOf: scan(base: absolute + "/" + sub, relativePrefix: prefix + sub, limit: limit, ignore: rules))
+            }
+        }
+        if result.count > limit { result = Array(result.prefix(limit)) }
         return result.sorted()
     }
 }

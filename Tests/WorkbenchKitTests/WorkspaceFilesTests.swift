@@ -1,6 +1,7 @@
 // @author ixxxxoooo
 // 工作区文件能力测试:列举、索引忽略、模糊匹配、全局搜索。
 
+import ChatKit
 import Foundation
 import Testing
 @testable import WorkbenchKit
@@ -141,5 +142,65 @@ struct FuzzyPrefilterTests {
         }
         #expect(FuzzyMatcher.preparedQuery("设计") == nil)
         #expect(FuzzyMatcher.preparedQuery("  ") == nil)
+    }
+}
+
+@Suite("文件索引增量更新与 .gitignore")
+struct IncrementalIndexTests {
+    /// 造一个临时工作区。
+    private func makeRoot(_ files: [String]) throws -> String {
+        let root = NSTemporaryDirectory() + "oma-incr-\(UUID().uuidString)"
+        for file in files {
+            let path = root + "/" + file
+            try FileManager.default.createDirectory(atPath: (path as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
+            FileManager.default.createFile(atPath: path, contents: Data("x".utf8))
+        }
+        return root
+    }
+
+    @Test("增量更新:新增、删除、重命名、新子目录、删除目录都与整树重建一致")
+    func incrementalMatchesFullIndex() throws {
+        let root = try makeRoot(["a.txt", "src/main.swift", "src/util/helper.swift", "docs/readme.md", "node_modules/pkg/x.js"])
+        defer { try? FileManager.default.removeItem(atPath: root) }
+        var index = WorkspaceFiles.index(root: root, ignore: IndexIgnore.none)
+        let fm = FileManager.default
+        // 一批改动:根目录新增文件、src 内重命名、新建深层目录、删除整个 docs
+        fm.createFile(atPath: root + "/b.txt", contents: Data())
+        try fm.moveItem(atPath: root + "/src/main.swift", toPath: root + "/src/app.swift")
+        try fm.createDirectory(atPath: root + "/new/deep/er", withIntermediateDirectories: true)
+        fm.createFile(atPath: root + "/new/deep/er/f.txt", contents: Data())
+        try fm.removeItem(atPath: root + "/docs")
+        fm.createFile(atPath: root + "/node_modules/pkg/y.js", contents: Data())
+        let changed: Set<String> = [root, root + "/src", root + "/new", root + "/docs", root + "/node_modules/pkg"]
+        guard let updated = WorkspaceFiles.applyingChanges(to: index, root: root, directories: changed, ignore: IndexIgnore.none) else {
+            Issue.record("应能增量更新"); return
+        }
+        index = updated
+        #expect(index == WorkspaceFiles.index(root: root, ignore: IndexIgnore.none))
+        #expect(index.contains("new/deep/er/f.txt") && index.contains("src/app.swift") && index.contains("b.txt"))
+        #expect(!index.contains { $0.hasPrefix("docs/") } && !index.contains { $0.hasPrefix("node_modules/") })
+    }
+
+    @Test("目录过多或不在工作区内时返回 nil,由调用方整树重建")
+    func fallsBackWhenNotApplicable() throws {
+        let root = try makeRoot(["a.txt"])
+        defer { try? FileManager.default.removeItem(atPath: root) }
+        let many = Set((0...WorkspaceFiles.maxIncrementalDirectories).map { root + "/d\($0)" })
+        #expect(WorkspaceFiles.applyingChanges(to: [], root: root, directories: many, ignore: IndexIgnore.none) == nil)
+        #expect(WorkspaceFiles.applyingChanges(to: [], root: root, directories: ["/elsewhere/x"], ignore: IndexIgnore.none) == nil)
+    }
+
+    @Test(".gitignore:忽略规则生效,取反规则跳过,偏好关闭后不读取")
+    func gitignoreRules() throws {
+        let root = try makeRoot(["keep.swift", "debug.log", "out/gen.swift", "src/a.log", "src/b.swift"])
+        defer { try? FileManager.default.removeItem(atPath: root) }
+        try "# 注释\n*.log\n/out/\n!important.log\n".write(toFile: root + "/.gitignore", atomically: true, encoding: .utf8)
+        let defaults = UserDefaults(suiteName: "oma-gitignore-\(UUID().uuidString)") ?? .standard
+        let on = WorkspaceFiles.index(root: root, ignore: IndexIgnore.current(root: root, defaults))
+        #expect(!on.contains("debug.log") && !on.contains("src/a.log") && !on.contains("out/gen.swift"))
+        #expect(on.contains("keep.swift") && on.contains("src/b.swift") && on.contains(".gitignore"))
+        defaults.set(false, forKey: IndexIgnore.gitignorePreferenceKey)
+        let off = WorkspaceFiles.index(root: root, ignore: IndexIgnore.current(root: root, defaults))
+        #expect(off.contains("debug.log") && off.contains("out/gen.swift"))
     }
 }

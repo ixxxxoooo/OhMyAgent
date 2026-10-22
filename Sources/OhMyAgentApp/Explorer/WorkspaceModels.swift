@@ -27,11 +27,41 @@ final class WorkspaceIndexModel {
     /// 查询某项目的附加文件夹(由应用层接到工作台模型);默认没有。
     @ObservationIgnored var extraRootsProvider: @MainActor (String) -> [String] = { _ in [] }
     @ObservationIgnored private var task: Task<Void, Never>?
+    /// 整树刷新的代数:增量更新只在代数没变时落地(期间发生了整树刷新则丢弃,以整树结果为准)
+    @ObservationIgnored private var generation = 0
+    @ObservationIgnored private var incrementalTask: Task<Void, Never>?
+
+    /// 按文件系统事件增量更新主目录的索引(后台线程);不适用时(目录过多、索引尚未建好)改为整树刷新。
+    /// - Parameters:
+    ///   - directories: 变化的目录(绝对路径)
+    ///   - watched: 项目根目录
+    func applyChanges(directories: Set<String>, root watched: String) {
+        guard root == watched, !isLoading, !files.isEmpty, directories.count <= WorkspaceFiles.maxIncrementalDirectories else {
+            refresh(root: watched)
+            return
+        }
+        let snapshot = files
+        let expected = generation
+        incrementalTask?.cancel()
+        incrementalTask = Task { [weak self] in
+            let started = ContinuousClock.now
+            let updated = await Task.detached(priority: .utility) {
+                WorkspaceFiles.applyingChanges(to: snapshot, root: watched, directories: directories)
+            }.value
+            guard !Task.isCancelled, let self, self.root == watched, self.generation == expected else { return }
+            guard let updated else { self.refresh(root: watched); return }
+            if updated != self.files { self.files = updated }
+            Log.editor.debug("文件索引增量更新", ["dirs": "\(directories.count)", "files": "\(updated.count)",
+                                              "ms": "\(Int((ContinuousClock.now - started).seconds * 1000))"])
+        }
+    }
 
     /// 刷新索引(后台线程扫描主目录与全部附加文件夹)。
     /// - Parameter root: 项目根目录;nil 清空
     func refresh(root newRoot: String?) {
         task?.cancel()
+        incrementalTask?.cancel()
+        generation &+= 1
         root = newRoot
         guard let newRoot else { files = []; extraFiles = []; return }
         let extras = extraRootsProvider(newRoot)
@@ -126,6 +156,9 @@ final class WorkspaceWatchCenter {
     static let shared = WorkspaceWatchCenter()
     private var watchers: [WorkspaceWatcher] = []
     private var indexTask: Task<Void, Never>?
+    /// 节流期间累积的变化:目录集合与是否必须整树重建
+    private var pendingIndexDirectories: Set<String> = []
+    private var pendingIndexFull = false
     /// 变化订阅者(打开的文件、Diff 视图):文件内容或 Git 状态变化时收到信号,取代按固定间隔轮询磁盘/`git diff`
     private var subscribers: [UUID: AsyncStream<Void>.Continuation] = [:]
     private(set) var root: String?
@@ -143,6 +176,8 @@ final class WorkspaceWatchCenter {
         subscribers.values.forEach { $0.finish() }
         subscribers = [:]
         indexTask?.cancel()
+        pendingIndexDirectories = []
+        pendingIndexFull = false
         root = newRoot
         extraRoots = newRoot == nil ? [] : extras
         guard let newRoot else { return }
@@ -212,16 +247,22 @@ final class WorkspaceWatchCenter {
             ExplorerModel.shared.markDirty(batch.directories)
         }
         Log.editor.debug("工作区文件变化", ["dirs": "\(batch.directories.count)", "full": "\(batch.needsFullRefresh)"])
+        // 附加文件夹的变化、无法精确到目录的变化与过多目录:整树重建;否则只增量更新这些目录
+        if watched != primary || batch.needsFullRefresh { pendingIndexFull = true } else { pendingIndexDirectories.formUnion(batch.directories) }
         scheduleIndexRefresh(root: primary)
     }
 
-    /// 节流重建文件索引:1.5 秒内的多次变化合并为一次。
+    /// 节流更新文件索引:1.5 秒内的多次变化合并为一次(能精确到目录时增量更新,否则整树重建)。
     private func scheduleIndexRefresh(root watched: String) {
         indexTask?.cancel()
         indexTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(1500))
             guard !Task.isCancelled, let self, self.root == watched else { return }
-            WorkspaceIndexModel.shared.refresh(root: watched)
+            let directories = self.pendingIndexDirectories
+            let full = self.pendingIndexFull || directories.count > WorkspaceFiles.maxIncrementalDirectories
+            self.pendingIndexDirectories = []
+            self.pendingIndexFull = false
+            if full { WorkspaceIndexModel.shared.refresh(root: watched) } else { WorkspaceIndexModel.shared.applyChanges(directories: directories, root: watched) }
         }
     }
 }
