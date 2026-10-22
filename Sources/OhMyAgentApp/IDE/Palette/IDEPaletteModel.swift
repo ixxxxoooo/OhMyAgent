@@ -3,6 +3,7 @@
 // 文件索引按窗口根目录独立(IDE 窗口可以打开不同于 Agent 窗口的目录)。
 
 import AppKit
+import DesignSystem
 import EditorKit
 import IDEKit
 import Observation
@@ -27,6 +28,8 @@ struct IDEPaletteLocation: Identifiable, Equatable {
     var depth = 0
     /// 非空时选中即执行 `IDEWorkspace.paletteActions` 里登记的动作(快速修复),而不是跳转文件
     var actionID: String?
+    /// 非空时这一行是颜色主题:键盘移动高亮即实时预览,回车提交
+    var themeID: String?
 }
 
 enum IDEPaletteItem: Identifiable {
@@ -93,8 +96,44 @@ final class IDEPaletteModel {
         refreshIndex(root: root)
     }
 
-    /// 关闭面板。
-    func dismiss() { isPresented = false }
+    /// 颜色主题选择器打开时的原主题:非 nil 表示正在预览,取消(Esc/点遮罩)时还原
+    @ObservationIgnored private var themeRevertID: String?
+
+    /// 以主题列表打开面板(参考 VS Code「颜色主题」):↑↓ 实时预览,↩ 应用,Esc 还原。
+    func presentThemes() {
+        let current = AppearanceModel.shared.themeID
+        let items = ThemePackage.all.map { package in
+            IDEPaletteLocation(id: "theme:" + package.id, title: package.name, detail: package.tone.displayName,
+                               icon: package.id == current ? "check" : "paintbrush", path: "", line: 0, themeID: package.id)
+        }
+        present(custom: items, placeholder: String(localized: "选择颜色主题(↑↓ 预览,↩ 应用,Esc 取消)"))
+        themeRevertID = current
+        highlighted = items.firstIndex { $0.themeID == current } ?? 0
+    }
+
+    /// 预览高亮的主题行(非主题行或不在主题选择器里时忽略)。
+    /// - Parameter item: 当前高亮的结果行
+    func previewTheme(_ item: IDEPaletteItem?) {
+        guard themeRevertID != nil, case .location(let location)? = item, let id = location.themeID,
+              AppearanceModel.shared.themeID != id else { return }
+        AppearanceModel.shared.themeID = id
+    }
+
+    /// 提交主题:之后关闭面板不再还原。
+    /// - Parameter id: 主题 id
+    func commitTheme(_ id: String) {
+        themeRevertID = nil
+        AppearanceModel.shared.themeID = id
+    }
+
+    /// 关闭面板(主题预览中则还原原主题)。
+    func dismiss() {
+        if let id = themeRevertID {
+            themeRevertID = nil
+            AppearanceModel.shared.themeID = id
+        }
+        isPresented = false
+    }
 
     /// 重建文件索引(根目录变化或每次打开时,后台扫描;旧结果先用着)。
     private func refreshIndex(root: String?) {
@@ -178,6 +217,7 @@ extension IDEWorkspace {
     /// 选中面板里的一行并执行。
     /// - Parameter item: 结果行
     func choose(_ item: IDEPaletteItem) {
+        if case .location(let location) = item, let themeID = location.themeID { palette.commitTheme(themeID) }
         palette.dismiss()
         switch item {
         case .file(let match):
@@ -187,6 +227,7 @@ extension IDEWorkspace {
             palette.recordUse(match.command.id)
             perform(match.command.id)
         case .location(let location):
+            if location.themeID != nil { return }
             if let actionID = location.actionID {
                 let action = paletteActions.removeValue(forKey: actionID)
                 paletteActions = [:]
@@ -241,6 +282,7 @@ extension IDEWorkspace {
         case "view.toggleAgentPane": model.toggleAgentPane()
         case "view.maximizeAgentPane": model.toggleAgentMaximized()
         case "view.perfHUD": model.perfHUDVisible.toggle()
+        case "view.colorTheme": palette.presentThemes()
         case "view.explorer": model.sidebarVisible = true; model.selectSidebar(.explorer)
         case "view.search": model.sidebarVisible = true; model.selectSidebar(.search); search.requestFocus()
         case "view.scm": model.sidebarVisible = true; model.selectSidebar(.scm)

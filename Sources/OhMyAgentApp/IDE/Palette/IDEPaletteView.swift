@@ -54,9 +54,16 @@ private struct IDEPaletteCard: View {
         .omGlassCard(cornerRadius: OMRadius.modal)
         .omFloatingShadow()
         .onAppear { focused = true }
-        .onKeyPress(.upArrow) { palette.move(-1, count: items.count); return .handled }
-        .onKeyPress(.downArrow) { palette.move(1, count: items.count); return .handled }
+        .onKeyPress(.upArrow) { moveHighlight(-1, items) }
+        .onKeyPress(.downArrow) { moveHighlight(1, items) }
         .onKeyPress(.escape) { palette.dismiss(); return .handled }
+    }
+
+    /// 键盘移动高亮;在主题选择器里同时实时预览(鼠标悬停不预览)。
+    private func moveHighlight(_ delta: Int, _ items: [IDEPaletteItem]) -> KeyPress.Result {
+        palette.move(delta, count: items.count)
+        palette.previewTheme(items.indices.contains(palette.highlighted) ? items[palette.highlighted] : nil)
+        return .handled
     }
 
     private var icon: String {
