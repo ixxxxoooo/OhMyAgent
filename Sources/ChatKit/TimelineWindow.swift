@@ -19,7 +19,7 @@ public enum TimelineWindow {
         public let items: [TimelineItem]
         /// 被折在窗口之外的轮数
         public let hiddenTurns: Int
-        /// 被折在窗口之外的展示单元数
+        /// 被折在窗口之外的展示单元数(经 `TimelineItemsCache.windowed` 得到的切片里是被折叠的**条目**数,不再先全量分组)
         public let hiddenItems: Int
 
         public init(items: [TimelineItem], hiddenTurns: Int, hiddenItems: Int) {

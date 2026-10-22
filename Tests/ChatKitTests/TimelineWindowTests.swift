@@ -73,4 +73,26 @@ struct TimelineWindowTests {
         timeline.apply(.userMessageChunk(messageId: "u50", content: .text("提问 50")))
         #expect(cache.windowed(for: timeline, visibleTurns: 45).hiddenTurns == 6)
     }
+
+    @Test("只对窗口内分组:结果与先全量分组再切片一致,且被折叠的条目数正确")
+    func windowFirstEqualsFullThenSlice() {
+        for density in [ToolDensity.standard, .compact] {
+            let timeline = store(turns: 55)
+            let cached = TimelineItemsCache().windowed(for: timeline, density: density, visibleTurns: 40)
+            let reference = TimelineWindow.slice(TimelineGrouping.group(timeline.entries, density: density), visibleTurns: 40)
+            #expect(cached.items.map(\.id) == reference.items.map(\.id))
+            #expect(cached.hiddenTurns == reference.hiddenTurns)
+            // 被折叠的条目恰好是窗口起点之前的全部条目
+            let firstVisible = cached.items.first?.id
+            #expect(timeline.entries[cached.hiddenItems].id == firstVisible)
+        }
+    }
+
+    @Test("轮数不超过窗口时不折叠,条目全部分组")
+    func shortTimelineUnfolded() {
+        let timeline = store(turns: 5)
+        let slice = TimelineItemsCache().windowed(for: timeline, visibleTurns: 40)
+        #expect(slice.hiddenTurns == 0 && slice.hiddenItems == 0)
+        #expect(slice.items.map(\.id) == TimelineGrouping.group(timeline.entries).map(\.id))
+    }
 }

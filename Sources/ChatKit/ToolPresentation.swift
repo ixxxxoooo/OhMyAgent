@@ -366,25 +366,42 @@ public final class TimelineItemsCache {
     private var count = -1
     private var density: ToolDensity = .standard
     private var items: [TimelineItem] = []
-    /// 分组结果的代数:每次重新分组加一,用于判断窗口切片缓存是否仍有效
-    private var generation = 0
-    private var sliceKey: (generation: Int, turns: Int)?
-    private var slice: TimelineWindow.Slice?
 
     public init() {}
 
-    /// 取窗口切片(只含最近 `visibleTurns` 轮);分组结果与窗口大小都没变时复用上次切片。
+    /// 窗口切片缓存的键:时间线身份、结构修订号、条目数、详细程度与窗口大小都没变时复用上次结果。
+    private struct WindowKey: Equatable {
+        let owner: ObjectIdentifier
+        let revision: Int
+        let count: Int
+        let density: ToolDensity
+        let turns: Int
+    }
+    private var windowKey: WindowKey?
+    private var windowSlice: TimelineWindow.Slice?
+
+    /// 取窗口切片(只含最近 `visibleTurns` 轮)。
+    /// 先在条目层面找到窗口起点,**只对窗口内的条目分组**:分组成本与窗口大小相关,不再随会话总长度线性增长
+    /// (分组本来就按用户消息分段,窗口起点正好是段边界,结果与「先全量分组再切片」一致)。
     /// - Parameters:
     ///   - store: 时间线
     ///   - density: 工具调用详细程度
     ///   - visibleTurns: 窗口大小(轮数)
-    /// - Returns: 窗口切片
+    /// - Returns: 窗口切片;`hiddenItems` 为被折在窗口之外的**条目**数
     public func windowed(for store: TimelineStore, density: ToolDensity = .standard, visibleTurns: Int) -> TimelineWindow.Slice {
-        let all = items(for: store, density: density)
-        if let key = sliceKey, key.generation == generation, key.turns == visibleTurns, let slice { return slice }
-        let result = TimelineWindow.slice(all, visibleTurns: visibleTurns)
-        slice = result
-        sliceKey = (generation, visibleTurns)
+        let key = WindowKey(owner: ObjectIdentifier(store), revision: store.structureRevision, count: store.entries.count, density: density, turns: visibleTurns)
+        if windowKey == key, let windowSlice { return windowSlice }
+        let entries = store.entries
+        let limit = max(visibleTurns, 1)
+        let starts = entries.indices.filter { entries[$0].kind == .user && !entries[$0].isSteered }
+        let hiddenTurns = max(starts.count - limit, 0)
+        let cut = hiddenTurns > 0 ? starts[hiddenTurns] : 0
+        let span = Log.perf.span("时间线分组", warnMs: 8, quiet: true, ["entries": "\(entries.count - cut)", "total": "\(entries.count)"])
+        let items = TimelineGrouping.group(cut > 0 ? Array(entries[cut...]) : entries, density: density)
+        span.end()
+        let result = TimelineWindow.Slice(items: items, hiddenTurns: hiddenTurns, hiddenItems: cut)
+        windowKey = key
+        windowSlice = result
         return result
     }
 
@@ -397,7 +414,6 @@ public final class TimelineItemsCache {
         if owner == ObjectIdentifier(store), store.structureRevision == revision, store.entries.count == count, self.density == density { return items }
         let span = Log.perf.span("时间线分组", warnMs: 8, quiet: true, ["entries": "\(store.entries.count)"])
         items = TimelineGrouping.group(store.entries, density: density)
-        generation += 1
         span.end()
         self.density = density
         owner = ObjectIdentifier(store)
