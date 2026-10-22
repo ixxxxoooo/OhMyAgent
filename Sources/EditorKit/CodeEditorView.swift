@@ -35,7 +35,8 @@ public final class CodeEditorView: NSView {
     let ruler: LineNumberRulerView
     /// 被折叠(隐藏)的字符范围,升序且互不重叠(见 `CodeEditorView+Folding.swift`)
     var foldedRanges: [NSRange] = []
-    private let engine = HighlightEngine()
+    /// 高亮引擎(测试可读取同步状态)
+    let engine = HighlightEngine()
     var theme: EditorTheme
     /// 上次应用的字体族与字号偏好,用来判断偏好是否真的变了
     private var appliedFamily = EditorFontPrefs.preferredFamily
@@ -77,6 +78,10 @@ public final class CodeEditorView: NSView {
 
     /// 当前是否处于大文件模式。
     public private(set) var isLargeFileMode = false
+    /// 尚未同步给高亮引擎的编辑
+    private var pendingEngineEdits: [TextUnitEdit] = []
+    /// 编辑记录溢出(整块替换/积压过多):下次同步改为整体重建
+    private var engineEditsOverflow = false
 
     /// 用户编辑后回调(传出完整文本)。程序化 `setText` 不触发。
     public var onTextChange: ((String) -> Void)?
@@ -290,6 +295,8 @@ public final class CodeEditorView: NSView {
     @objc private func storageDidProcessEditing(_ notification: Notification) {
         guard let storage = notification.object as? NSTextStorage, storage.editedMask.contains(.editedCharacters) else { return }
         adjustFolds(edited: storage.editedRange, delta: storage.changeInLength)
+        recordEngineEdit(storage)
+        minimap?.contentDidChange()
         guard lineIndexIsLive else { return }
         if lineIndex.applyEdit(editedRange: storage.editedRange, changeInLength: storage.changeInLength, text: storage.mutableString) {
             ruler.lineIndex = lineIndex
@@ -298,6 +305,38 @@ public final class CodeEditorView: NSView {
             lineIndexIsLive = false
             Log.editor.warning("行索引增量更新失败,退回整体重建", ["editedRange": "\(storage.editedRange)", "delta": "\(storage.changeInLength)"])
         }
+    }
+
+    /// 单次编辑记录的最大长度(UTF-16):更大的整块替换直接整体重建,不值得逐个记录
+    private static let engineEditLimit = 20_000
+    /// 防抖窗口内最多累积的编辑条数
+    private static let engineEditCount = 256
+
+    /// 把一次字符编辑记入「待同步给高亮引擎」的队列。
+    /// 编辑范围与长度变化直接来自文本存储(`editedRange`/`changeInLength`),新内容按范围取出;
+    /// 装载整篇文本、整块替换或积压过多时标记溢出,引擎退回整体重建。
+    private func recordEngineEdit(_ storage: NSTextStorage) {
+        guard !engineEditsOverflow else { return }
+        let range = storage.editedRange
+        let oldLength = range.length - storage.changeInLength
+        guard range.location >= 0, oldLength >= 0, range.length <= Self.engineEditLimit,
+              pendingEngineEdits.count < Self.engineEditCount, NSMaxRange(range) <= storage.length else {
+            engineEditsOverflow = true
+            pendingEngineEdits.removeAll()
+            return
+        }
+        var units = [unichar](repeating: 0, count: range.length)
+        if range.length > 0 { storage.mutableString.getCharacters(&units, range: range) }
+        pendingEngineEdits.append(TextUnitEdit(location: range.location, oldLength: oldLength, replacement: units))
+    }
+
+    /// 取走待同步的编辑。
+    /// - Returns: 编辑序列与编辑前长度;没有记录或已溢出时为 nil(同时清空状态)
+    private func takeEngineEdits() -> (edits: [TextUnitEdit], oldLength: Int)? {
+        defer { pendingEngineEdits.removeAll(); engineEditsOverflow = false }
+        guard !engineEditsOverflow, !pendingEngineEdits.isEmpty, let storage = textView.textStorage else { return nil }
+        let delta = pendingEngineEdits.reduce(0) { $0 + $1.replacement.count - $1.oldLength }
+        return (pendingEngineEdits, storage.length - delta)
     }
 
     /// 主题变化后重新应用编辑器配色并清空高亮缓存。
@@ -334,6 +373,9 @@ public final class CodeEditorView: NSView {
         ruler.diagnosticLines = [:]
         closeHover()
         textView.string = text
+        // 整篇装载:之前记录的编辑作废,引擎随后整体重建
+        pendingEngineEdits.removeAll()
+        engineEditsOverflow = false
         // 替换文本时新字符会继承旧字符的属性,显式去掉旧诊断的下划线
         if let storage = textView.textStorage, storage.length > 0 {
             let all = NSRange(location: 0, length: storage.length)
@@ -437,12 +479,23 @@ public final class CodeEditorView: NSView {
         }
         updateNoWrapGeometry()
         let rebuildIndex = needsIndexRebuild
+        // 大文件降级:语法树同步的防抖拉长,连续输入期间不反复解析
+        let debounce = isLargeFileMode ? 320 : 180
         rebuildTask?.cancel()
         rebuildTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(180))
+            try? await Task.sleep(for: .milliseconds(debounce))
             guard !Task.isCancelled else { return }
             let index: LineIndex? = rebuildIndex ? await Task.detached(priority: .userInitiated) { LineIndex(text: text) }.value : nil
-            _ = await engine.rebuild(text: text, language: language)
+            // 优先用文本存储记下的编辑增量同步语法树;对不上(整块替换、溢出、引擎尚未建立)时才整体重建
+            var synced = false
+            let pending = self?.takeEngineEdits()
+            if let self, let pending, let length = self.textView.textStorage?.length {
+                synced = await engine.applyEdits(pending.edits, oldLength: pending.oldLength, newLength: length, language: language)
+            }
+            if !synced {
+                let latest = self?.textView.string ?? text
+                _ = await engine.rebuild(text: latest, language: language)
+            }
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 guard let self, self.generation == current else { return }
@@ -714,8 +767,8 @@ public final class CodeEditorView: NSView {
 
     // MARK: - 大文件模式
 
-    /// 记录大文件模式。大文件不再强制换行(不换行的宽度由估算得到,见 `updateNoWrapGeometry`),
-    /// 该标志目前只用于装载日志与外部判断。
+    /// 记录大文件模式。大文件不再强制换行(不换行的宽度由估算得到,见 `updateNoWrapGeometry`);
+    /// 该标志用于装载日志,并让输入期间的语法树同步防抖更长(见 `handleEdit`)。
     private func applyLargeFileMode(_ large: Bool) {
         isLargeFileMode = large
     }

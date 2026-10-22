@@ -175,3 +175,55 @@ struct TreeSitterPerformanceTests {
         #expect(ms(query) < 50)
     }
 }
+
+@Suite("tree-sitter 显式编辑同步")
+struct TreeSitterEditSyncTests {
+    /// 在 UTF-16 数组上应用编辑,得到新文本。
+    private func apply(_ edit: TextUnitEdit, to units: inout [UInt16]) {
+        units.replaceSubrange(edit.location..<(edit.location + edit.oldLength), with: edit.replacement)
+    }
+
+    @Test("随机编辑序列:显式编辑同步后的高亮与整体重建完全一致")
+    func randomEditsMatchFullRebuild() async {
+        let base = (0..<60).map { "let v\($0) = \($0) // 注释😀\n" }.joined()
+        var units = Array(base.utf16)
+        let engine = HighlightEngine()
+        await engine.rebuild(text: base, language: .swift)
+        var generator = SystemRandomNumberGenerator()
+        let snippets = ["x", "\n", "let q = \"s\"\n", "/* a\nb */", "}", "你好", "😀", ""]
+        for round in 0..<40 {
+            var edits: [TextUnitEdit] = []
+            let before = units.count
+            for _ in 0..<Int.random(in: 1...3, using: &generator) {
+                let location = Int.random(in: 0...units.count, using: &generator)
+                let oldLength = Int.random(in: 0...min(6, units.count - location), using: &generator)
+                let snippet = Array((snippets.randomElement(using: &generator) ?? "x").utf16)
+                let edit = TextUnitEdit(location: location, oldLength: oldLength, replacement: snippet)
+                apply(edit, to: &units)
+                edits.append(edit)
+            }
+            let synced = await engine.applyEdits(edits, oldLength: before, newLength: units.count, language: .swift)
+            #expect(synced, "第 \(round) 轮应能增量同步")
+            let text = String(decoding: units, as: UTF16.self)
+            let reference = HighlightEngine()
+            await reference.rebuild(text: text, language: .swift)
+            let range = NSRange(location: 0, length: units.count)
+            #expect(await engine.spans(in: range) == reference.spans(in: range), "第 \(round) 轮高亮与整体重建不一致")
+            #expect(await engine.lastParseWasIncremental)
+        }
+    }
+
+    @Test("长度对不上、语言不同或没有树时返回 false,由调用方整体重建")
+    func mismatchFallsBack() async {
+        let engine = HighlightEngine()
+        let edit = TextUnitEdit(location: 0, oldLength: 0, replacement: Array("x".utf16))
+        #expect(!(await engine.applyEdits([edit], oldLength: 0, newLength: 1, language: .swift)), "没有树")
+        await engine.rebuild(text: "let a = 1\n", language: .swift)
+        #expect(!(await engine.applyEdits([edit], oldLength: 3, newLength: 11, language: .swift)), "编辑前长度不一致")
+        #expect(!(await engine.applyEdits([edit], oldLength: 10, newLength: 99, language: .swift)), "编辑后长度不一致")
+        #expect(!(await engine.applyEdits([edit], oldLength: 10, newLength: 11, language: .python)), "语言不同")
+        let outOfRange = TextUnitEdit(location: 50, oldLength: 0, replacement: [0x78])
+        await engine.rebuild(text: "let a = 1\n", language: .swift)
+        #expect(!(await engine.applyEdits([outOfRange], oldLength: 10, newLength: 11, language: .swift)), "越界")
+    }
+}

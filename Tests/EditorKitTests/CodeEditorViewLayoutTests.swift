@@ -118,4 +118,26 @@ struct CodeEditorViewLayoutTests {
         #expect(!editor.isWrapping)
         #expect(editor.textView.textContainer?.widthTracksTextView == false)
     }
+
+    @Test("键入、回车、撤销后高亮引擎走显式编辑增量,结果与整体重建一致")
+    func engineFollowsEditsIncrementally() async throws {
+        let (editor, window) = makeEditor(wrap: true)
+        defer { window.close() }
+        editor.setText(sampleText(lines: 200), language: .swift)
+        // 等装载阶段的后台重建完成(引擎建立 tree-sitter 状态)
+        try await Task.sleep(for: .milliseconds(500))
+        let view = editor.textView
+        view.setSelectedRange(NSRange(location: 10, length: 0))
+        view.insertText("a", replacementRange: view.selectedRange())
+        view.insertText("\n    let z = \"你好😀\"\n", replacementRange: view.selectedRange())
+        view.setSelectedRange(NSRange(location: 3, length: 5))
+        view.delete(nil)
+        try await Task.sleep(for: .milliseconds(700))
+        #expect(await editor.engine.lastParseWasIncremental)
+        let text = view.string
+        let reference = HighlightEngine()
+        await reference.rebuild(text: text, language: .swift)
+        let range = NSRange(location: 0, length: (text as NSString).length)
+        #expect(await editor.engine.spans(in: range) == reference.spans(in: range))
+    }
 }

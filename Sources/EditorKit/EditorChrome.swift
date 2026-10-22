@@ -57,8 +57,61 @@ final class EditorMinimapView: NSView {
         return lines <= rows ? CGFloat(lines) * Self.rowHeight : bounds.height
     }
 
+    /// 条形图缓存的键:尺寸、缩放、文本修订与前景色任一变化都要重画条形。
+    private struct BarsKey {
+        let size: NSSize
+        let scale: CGFloat
+        let revision: Int
+        let lineCount: Int
+        let foreground: NSColor
+
+        func matches(_ other: BarsKey) -> Bool {
+            size == other.size && scale == other.scale && revision == other.revision
+                && lineCount == other.lineCount && foreground.isEqual(other.foreground)
+        }
+    }
+
+    /// 已渲染的条形位图与它对应的键(滚动、滑块移动不改变条形,直接复用)
+    private var barsCache: (key: BarsKey, image: NSBitmapImageRep)?
+    /// 文本修订号:文本存储每次字符编辑加一,条形缓存据此失效
+    private(set) var contentRevision = 0
+
+    /// 文本内容变化:条形缓存失效并重画。
+    func contentDidChange() {
+        contentRevision &+= 1
+        needsDisplay = true
+    }
+
     override func draw(_ dirtyRect: NSRect) {
         guard editor.lineIndexIsLive else { return }
+        let theme = editor.theme
+        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        let key = BarsKey(size: bounds.size, scale: scale, revision: contentRevision,
+                          lineCount: editor.lineIndex.lineCount, foreground: theme.foreground)
+        if barsCache == nil || !(barsCache?.key.matches(key) ?? false) {
+            barsCache = renderBars(key).map { (key, $0) }
+        }
+        barsCache?.image.draw(in: bounds, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+        // 视口滑块
+        let slider = sliderRect()
+        theme.foreground.withAlphaComponent(0.10).setFill()
+        slider.fill(using: .sourceOver)
+        theme.foreground.withAlphaComponent(0.22).setStroke()
+        NSBezierPath(rect: slider.insetBy(dx: 0.5, dy: 0.5)).stroke()
+    }
+
+    /// 把整张条形图渲染进位图(每行一条与缩进、长度成比例的细条)。
+    /// - Parameter key: 本次渲染对应的键(尺寸与缩放)
+    /// - Returns: 位图;尺寸为空或创建失败时 nil
+    private func renderBars(_ key: BarsKey) -> NSBitmapImageRep? {
+        let pixelsWide = Int((key.size.width * key.scale).rounded(.up))
+        let pixelsHigh = Int((key.size.height * key.scale).rounded(.up))
+        guard pixelsWide > 0, pixelsHigh > 0,
+              let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: pixelsWide, pixelsHigh: pixelsHigh, bitsPerSample: 8,
+                                         samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+                                         bytesPerRow: 0, bitsPerPixel: 0),
+              let context = NSGraphicsContext(bitmapImageRep: rep) else { return nil }
+        rep.size = key.size
         let theme = editor.theme
         let index = editor.lineIndex
         let ns = editor.textView.string as NSString
@@ -67,9 +120,17 @@ final class EditorMinimapView: NSView {
         let scale = (Self.width - 10) / 120
         let bar = theme.foreground.withAlphaComponent(0.30)
         let dim = theme.foreground.withAlphaComponent(0.14)
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+        NSGraphicsContext.current = context
+        // 位图坐标系 y 向上:翻转成与视图一致的 y 向下
+        let flip = NSAffineTransform()
+        flip.translateX(by: 0, yBy: key.size.height)
+        flip.scaleX(by: 1, yBy: -1)
+        flip.concat()
         for (row, line) in lines.enumerated() {
             let y = CGFloat(row) * Self.rowHeight
-            guard y + Self.rowHeight >= dirtyRect.minY, y <= dirtyRect.maxY, let range = index.range(ofLine: line), range.length > 0, NSMaxRange(range) <= ns.length else { continue }
+            guard let range = index.range(ofLine: line), range.length > 0, NSMaxRange(range) <= ns.length else { continue }
             // 缩进与可见长度(只扫描前 140 个字符)
             let limit = min(range.length, 140)
             var indent = 0
@@ -89,12 +150,7 @@ final class EditorMinimapView: NSView {
             let width = max(CGFloat(min(contentLength, 120)) * scale, 2)
             NSRect(x: x, y: y, width: width, height: Self.rowHeight - 0.5).fill(using: .sourceOver)
         }
-        // 视口滑块
-        let slider = sliderRect()
-        theme.foreground.withAlphaComponent(0.10).setFill()
-        slider.fill(using: .sourceOver)
-        theme.foreground.withAlphaComponent(0.22).setStroke()
-        NSBezierPath(rect: slider.insetBy(dx: 0.5, dy: 0.5)).stroke()
+        return rep
     }
 
     /// 视口滑块在缩略图里的位置。

@@ -134,26 +134,27 @@ extension DemoBenchmarkRunner {
         let fullMs = (ContinuousClock.now - full).seconds * 1000
         let usesTree = await engine.usesTreeSitter
         setValue("ide.syntax-full", fullMs, usesTree ? "tree-sitter 全量" : "退回词法(未使用 tree-sitter)")
-        // 增量:在中部各插入一个字符,量重解析耗时,取中位数(字符串提前构造,不计入耗时)
-        var text = bigText as NSString
-        let midpoint = text.length / 2
-        var variants: [String] = []
-        for index in 0..<20 {
-            text = text.replacingCharacters(in: NSRange(location: midpoint + index, length: 0), with: "x") as NSString
-            variants.append(String(text))
-        }
+        // 增量:在中部逐个插入字符,走编辑器同款的显式编辑同步(`applyEdits`),量重解析耗时,取中位数
+        let language = SyntaxLanguage.swift
+        var length = bigText.utf16.count
+        let midpoint = length / 2
         var samples: [Double] = []
         var parseOnly: [Double] = []
-        for variant in variants {
+        var incremental = true
+        for index in 0..<20 {
+            let edit = TextUnitEdit(location: midpoint + index, oldLength: 0, replacement: [0x78])
             let t0 = ContinuousClock.now
-            await engine.rebuild(text: variant, language: .swift)
+            let synced = await engine.applyEdits([edit], oldLength: length, newLength: length + 1, language: language)
             samples.append((ContinuousClock.now - t0).seconds * 1000)
+            incremental = incremental && synced
+            length += 1
             parseOnly.append(await engine.lastParseMs)
         }
         let parseMedian = parseOnly.sorted()[parseOnly.count / 2]
-        let incremental = await engine.lastParseWasIncremental
+        let lastIncremental = await engine.lastParseWasIncremental
+        incremental = incremental && lastIncremental
         let median = samples.sorted()[samples.count / 2]
-        setValue("ide.syntax-incremental", median, incremental ? "20 次中位数(增量;其中纯解析 \(String(format: "%.1f", parseMedian)) ms,其余为 UTF-16 拷贝与差分)" : "20 次中位数(未走增量)")
+        setValue("ide.syntax-incremental", median, incremental ? "20 次中位数(显式编辑增量;其中纯解析 \(String(format: "%.1f", parseMedian)) ms,其余为编辑应用与行表维护)" : "20 次中位数(未走增量)")
     }
 
     // MARK: 快速打开与搜索

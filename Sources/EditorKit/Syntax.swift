@@ -448,6 +448,21 @@ public actor HighlightEngine {
         return spans.count
     }
 
+    /// 用显式编辑序列同步 tree-sitter 语法树:不拷贝、不比对整篇文本,只做 O(改动) 的增量解析。
+    /// 仅在已有 tree-sitter 状态、语言一致且长度对得上时生效;否则返回 false,调用方应退回 `rebuild(text:language:)`。
+    /// - Parameters:
+    ///   - edits: 编辑序列(每个编辑的坐标基于前面的编辑都已应用)
+    ///   - oldLength: 编辑前的文本长度(UTF-16),用于确认引擎与编辑器同步
+    ///   - newLength: 编辑后的文本长度(UTF-16),应用后用于二次确认
+    ///   - language: 当前语言
+    /// - Returns: 是否已增量同步
+    public func applyEdits(_ edits: [TextUnitEdit], oldLength: Int, newLength: Int, language: SyntaxLanguage) -> Bool {
+        guard let highlighter = treeSitter, treeLanguage == language, highlighter.units.count == oldLength,
+              !edits.isEmpty, highlighter.apply(edits: edits), highlighter.units.count == newLength else { return false }
+        spans = []
+        return true
+    }
+
     /// 取与范围相交的片段。tree-sitter 模式按文档顺序返回,重叠时后者应覆盖前者;词法模式互不重叠。
     /// - Parameter range: UTF-16 范围
     /// - Returns: 片段数组

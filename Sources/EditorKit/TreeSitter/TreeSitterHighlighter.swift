@@ -8,6 +8,23 @@ import CTreeSitter
 import Foundation
 import OMLog
 
+/// 一次文本编辑(UTF-16 坐标):把 `[location, location + oldLength)` 替换为 `replacement`。
+public struct TextUnitEdit: Sendable, Equatable {
+    public var location: Int
+    public var oldLength: Int
+    public var replacement: [UInt16]
+
+    /// - Parameters:
+    ///   - location: 起点
+    ///   - oldLength: 被替换的长度
+    ///   - replacement: 新内容
+    public init(location: Int, oldLength: Int, replacement: [UInt16]) {
+        self.location = location
+        self.oldLength = oldLength
+        self.replacement = replacement
+    }
+}
+
 /// 单个文档的 tree-sitter 状态(非线程安全,只在所属 actor 内使用)。
 final class TreeSitterHighlighter {
     private let resources: TreeSitterLanguage
@@ -18,6 +35,8 @@ final class TreeSitterHighlighter {
     /// 最近一次解析耗时(毫秒)与是否为增量
     private(set) var lastParseMs: Double = 0
     private(set) var lastWasIncremental = false
+    /// 每行起点的 UTF-16 偏移(升序,首项恒为 0);由全量同步建立,编辑时增量维护,用来 O(log n) 求行号
+    private var lineStarts: [Int] = [0]
 
     /// 创建某语言的高亮器。
     /// - Parameter language: 编辑器语言
@@ -51,7 +70,46 @@ final class TreeSitterHighlighter {
             ts_tree_edit(existing, &edit)
             incremental = true
         }
-        let parsed = new.withUnsafeBufferPointer { buffer -> OpaquePointer? in
+        let previous = units
+        units = new
+        guard reparse(incremental: incremental, started: started) else {
+            units = previous
+            return false
+        }
+        lineStarts = Self.lineStarts(of: new)
+        return true
+    }
+
+    /// 用显式的编辑序列同步(编辑器从文本存储的 `editedRange` 直接得到),不再拷贝整篇文本、整篇比对与前后缀扫描。
+    /// 每个编辑的坐标是「前面的编辑都已应用之后」的文档坐标。
+    /// - Parameter edits: 编辑序列
+    /// - Returns: 是否已增量同步;无树、编辑越界或解析失败时返回 false,调用方应退回 `update(text:)`
+    func apply(edits: [TextUnitEdit]) -> Bool {
+        guard let existing = tree, !units.isEmpty, !edits.isEmpty else { return false }
+        let started = ContinuousClock.now
+        for edit in edits {
+            let end = edit.location + edit.oldLength
+            guard edit.location >= 0, edit.oldLength >= 0, end <= units.count else { return false }
+            let startPoint = point(at: edit.location)
+            let oldEndPoint = Self.advance(startPoint, from: edit.location, to: end, in: units)
+            let newEndPoint = Self.advance(startPoint, over: edit.replacement)
+            var input = TSInputEdit(
+                start_byte: UInt32(edit.location * 2), old_end_byte: UInt32(end * 2),
+                new_end_byte: UInt32((edit.location + edit.replacement.count) * 2),
+                start_point: startPoint, old_end_point: oldEndPoint, new_end_point: newEndPoint
+            )
+            updateLineStarts(edit)
+            units.replaceSubrange(edit.location..<end, with: edit.replacement)
+            ts_tree_edit(existing, &input)
+        }
+        guard reparse(incremental: true, started: started) else { return false }
+        return true
+    }
+
+    /// 以当前 `units` 重新解析(`incremental` 时复用旧树),成功则替换树并记录耗时。
+    /// - Returns: 是否解析成功
+    private func reparse(incremental: Bool, started: ContinuousClock.Instant) -> Bool {
+        let parsed = units.withUnsafeBufferPointer { buffer -> OpaquePointer? in
             guard let base = buffer.baseAddress else {
                 // 空文本:给解析器一个有效指针
                 var zero: UInt16 = 0
@@ -69,11 +127,63 @@ final class TreeSitterHighlighter {
         }
         if let old = tree { ts_tree_delete(old) }
         tree = parsed
-        units = new
         let elapsed = ContinuousClock.now - started
         lastParseMs = Double(elapsed.components.seconds) * 1000 + Double(elapsed.components.attoseconds) / 1e15
         lastWasIncremental = incremental
         return true
+    }
+
+    // MARK: 行起点表
+
+    /// 某 UTF-16 偏移处的点(行从 0 起,列以字节计)。
+    private func point(at offset: Int) -> TSPoint {
+        var low = 0
+        var high = lineStarts.count
+        while low < high {
+            let mid = (low + high) / 2
+            if lineStarts[mid] <= offset { low = mid + 1 } else { high = mid }
+        }
+        let row = max(low - 1, 0)
+        return TSPoint(row: UInt32(row), column: UInt32((offset - lineStarts[row]) * 2))
+    }
+
+    /// 应用一次编辑后维护行起点表:被替换区间内的行起点移除,新内容里的换行加入,其后的行起点整体平移。
+    private func updateLineStarts(_ edit: TextUnitEdit) {
+        let oldEnd = edit.location + edit.oldLength
+        let delta = edit.replacement.count - edit.oldLength
+        // 行起点 s 对应 s-1 处是换行:被替换区间内的换行产生的起点落在 (location, oldEnd]
+        var lower = 0
+        var high = lineStarts.count
+        while lower < high {
+            let mid = (lower + high) / 2
+            if lineStarts[mid] <= edit.location { lower = mid + 1 } else { high = mid }
+        }
+        var upper = lower
+        while upper < lineStarts.count, lineStarts[upper] <= oldEnd { upper += 1 }
+        var inserted: [Int] = []
+        for (index, unit) in edit.replacement.enumerated() where unit == 0x0A { inserted.append(edit.location + index + 1) }
+        lineStarts.replaceSubrange(lower..<upper, with: inserted)
+        if delta != 0 {
+            var index = lower + inserted.count
+            while index < lineStarts.count { lineStarts[index] += delta; index += 1 }
+        }
+    }
+
+    /// 整篇文本的行起点表。
+    private static func lineStarts(of units: [UInt16]) -> [Int] {
+        var starts = [0]
+        for (index, unit) in units.enumerated() where unit == 0x0A { starts.append(index + 1) }
+        return starts
+    }
+
+    /// 从 `origin` 出发扫过一段替换内容后的点。
+    private static func advance(_ origin: TSPoint, over replacement: [UInt16]) -> TSPoint {
+        var row = origin.row
+        var column = Int(origin.column) / 2
+        for unit in replacement {
+            if unit == 0x0A { row += 1; column = 0 } else { column += 1 }
+        }
+        return TSPoint(row: row, column: UInt32(column * 2))
     }
 
     /// 根节点的子节点数(诊断与测试用)。
