@@ -124,6 +124,7 @@ struct IDEEditorSplitView: View {
                 liveRatios = nil
             }
         )
+        .zIndex(2)
         .accessibilityHidden(true)
     }
 }

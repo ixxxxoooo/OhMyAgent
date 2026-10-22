@@ -105,6 +105,8 @@ struct IDEResizer: View {
             onEnded: { base = nil },
             onDoubleClick: { reset() }
         )
+        // 命中区比 1pt 可见线宽:必须盖在相邻的编辑区/Agent 面板(含 AppKit 文本视图)之上,否则一侧的拖动被吞掉
+        .zIndex(2)
         .accessibilityLabel(label)
         .accessibilityAdjustableAction { direction in
             let step: Double = 20
