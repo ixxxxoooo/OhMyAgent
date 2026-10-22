@@ -176,8 +176,8 @@ final class UpdateModel {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(60))
                 ticks += 1
-                // 长时间不退出的用户:每 6 小时重新检查一次
-                if ticks % 360 == 0, let self, UserDefaults.standard.object(forKey: ClientPrefs.Key.autoUpdate) as? Bool ?? true { self.checkNow() }
+                // 长时间不退出的用户:每小时重新检查一次
+                if ticks % 60 == 0, let self, UserDefaults.standard.object(forKey: ClientPrefs.Key.autoUpdate) as? Bool ?? true { self.checkNow() }
                 guard let self, self.mode == .auto, self.canSelfInstall, case .ready = self.phase else { continue }
                 guard let anyInput = CGEventType(rawValue: ~0) else { continue }
                 let idle = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: anyInput)

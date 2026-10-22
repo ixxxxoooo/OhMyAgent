@@ -770,12 +770,12 @@ struct UpdateCheckerTests {
         if case .failed = bad {} else { Issue.record("应失败") }
     }
 
-    @Test("自动检查 24 小时节流")
+    @Test("自动检查 1 小时节流")
     func throttle() {
         let now = Date()
         #expect(UpdateChecker.shouldAutoCheck(last: nil, now: now))
-        #expect(!UpdateChecker.shouldAutoCheck(last: now.addingTimeInterval(-3600), now: now))
-        #expect(UpdateChecker.shouldAutoCheck(last: now.addingTimeInterval(-25 * 3600), now: now))
+        #expect(!UpdateChecker.shouldAutoCheck(last: now.addingTimeInterval(-30 * 60), now: now))
+        #expect(UpdateChecker.shouldAutoCheck(last: now.addingTimeInterval(-3600), now: now))
     }
 }
 

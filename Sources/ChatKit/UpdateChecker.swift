@@ -133,13 +133,13 @@ public enum UpdateChecker {
         return url.isFileURL || url.host == "localhost" || url.host == "127.0.0.1"
     }
 
-    /// 自动检查的节流:距上次检查不足 24 小时则跳过。
+    /// 自动检查的节流:距上次检查不足 1 小时则跳过。
     /// - Parameters:
     ///   - last: 上次检查时间
     ///   - now: 当前时间
     /// - Returns: 是否应该检查
     public static func shouldAutoCheck(last: Date?, now: Date = Date()) -> Bool {
         guard let last else { return true }
-        return now.timeIntervalSince(last) >= 24 * 3600
+        return now.timeIntervalSince(last) >= 3600
     }
 }
