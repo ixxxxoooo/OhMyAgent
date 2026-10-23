@@ -256,6 +256,8 @@ public final class CodeEditorView: NSView {
             minimap = nil
         }
         scrollTrailing?.constant = minimap == nil ? 0 : -EditorMinimapView.width
+        // 缩略图自带滑块与拖动,开启时隐藏竖向滚动条
+        scrollView.hasVerticalScroller = minimap == nil
         let wantsSticky = chrome.contains(.stickyScroll) && EditorBehaviorPrefs.stickyScroll
         if wantsSticky, sticky == nil {
             let view = EditorStickyView(editor: self)

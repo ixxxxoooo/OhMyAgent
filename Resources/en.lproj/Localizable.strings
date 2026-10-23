@@ -1843,6 +1843,7 @@
 "重新启动 OhMyAgent" = "Restart OhMyAgent";
 "等待动画(Spinner Verbs)" = "Spinner Verbs";
 "滚动条" = "Scrollbars";
+"编辑器缩略图" = "Editor minimap";
 "显示方式" = "Display";
 "自动隐藏" = "Auto-hide";
 "始终显示" = "Always show";
@@ -2871,7 +2872,7 @@
 "没有打开的文件" = "No open file";
 "没有可显示的符号" = "No symbols to show";
 "显示缩略图" = "Show minimap";
-"IDE 窗口的编辑器右侧显示代码缩略图,点击或拖动可快速滚动。" = "Show a code minimap on the right of the editor in IDE windows; click or drag to scroll quickly.";
+"IDE 窗口的编辑器右侧显示按语法着色的代码缩略图,点击或拖动可快速滚动;开启时隐藏竖向滚动条。" = "Show a syntax-colored minimap on the right of the editor in the IDE window; click or drag to scroll. The vertical scrollbar is hidden while it is on.";
 "粘性滚动" = "Sticky scroll";
 "IDE 窗口的编辑器顶部固定显示当前所在的外层代码块标题(最多 3 行),点击跳转。" = "Pin the headers of the enclosing code blocks (up to 3 lines) at the top of the editor in IDE windows; click to jump.";
 "折叠" = "Fold";
