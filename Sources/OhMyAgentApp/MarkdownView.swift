@@ -244,6 +244,14 @@ struct TableBlockView: View {
     @State private var availableWidth: CGFloat?
     /// 鼠标是否悬停在表格上(决定是否显示放大按钮)
     @State private var hovering = false
+    /// 单行排版下的自然宽度(用于判断表格是否放得下);未算出时为 nil
+    @State private var naturalWidth: CGFloat?
+
+    /// 表格在当前宽度下是否被压缩/需要滚动(放不下才提供放大入口)
+    private var overflows: Bool {
+        guard let naturalWidth, let availableWidth else { return false }
+        return naturalWidth > availableWidth + 1
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -257,7 +265,7 @@ struct TableBlockView: View {
                 .clipShape(RoundedRectangle(cornerRadius: OMMetrics.cardRadius, style: .continuous))
                 .omSolidCard()
                 .overlay(alignment: .topTrailing) {
-                    if hovering {
+                    if hovering, overflows {
                         Button { let (h, r, a) = (header, rows, aligns); Task { @MainActor in TableExpander.present(header: h, rows: r, aligns: a) } } label: {
                             Image.om("maximize-2", size: 12).frame(width: 24, height: 24)
                         }
@@ -270,6 +278,9 @@ struct TableBlockView: View {
                     }
                 }
                 .onHover { hovering = $0 }
+                .task(id: header + rows.flatMap { $0 }) {
+                    naturalWidth = TableExpander.naturalWidth(header: header, rows: rows, aligns: aligns)
+                }
         }
     }
 }

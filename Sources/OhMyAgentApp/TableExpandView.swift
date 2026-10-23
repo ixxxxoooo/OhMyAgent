@@ -36,7 +36,7 @@ enum TableExpander {
     }
 
     /// 单行排版下整张表格的自然宽度。
-    private static func naturalWidth(header: [String], rows: [[String]], aligns: [MarkdownTableAlign]) -> CGFloat {
+    static func naturalWidth(header: [String], rows: [[String]], aligns: [MarkdownTableAlign]) -> CGFloat {
         let text = OMLeafContent.table(header: header, rows: rows, aligns: aligns, roomy: true, maxWidth: nil)
         guard text.length > 0, let width = text.attribute(omIntrinsicWidthKey, at: 0, effectiveRange: nil) as? CGFloat else { return 0 }
         return width
