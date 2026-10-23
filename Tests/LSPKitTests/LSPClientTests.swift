@@ -234,6 +234,35 @@ struct LSPTransportTests {
         #expect(echoed == body)
     }
 
+    @Test("向已关闭传输的 send 不得崩溃:stop 后再发送被优雅丢弃")
+    func sendAfterStopIsSafe() async throws {
+        let transport = LSPStdioTransport(launch: ProcessLaunch(executable: "/bin/cat"))
+        let events = try transport.start()
+        let body = Data("hello, lsp".utf8)
+        transport.send(body)
+        // 收到 cat 回显
+        for await event in events {
+            if case .line(let echoed) = event, echoed == body { break }
+        }
+        transport.stop()
+        // 关闭后再发送两次:必须不抛 Objective-C 异常,不导致 abort。
+        transport.send(body)
+        transport.send(Data("第二次发送".utf8))
+        try await Task.sleep(for: .milliseconds(200))
+    }
+
+    @Test("子进程退出后再 send 不得崩溃:EPIPE 被优雅处理")
+    func sendAfterProcessExitIsSafe() async throws {
+        let transport = LSPStdioTransport(launch: ProcessLaunch(executable: "/bin/sh", arguments: ["-c", "exit 0"]))
+        let events = try transport.start()
+        // 等待进程退出与 .closed 事件
+        for await event in events {
+            if case .closed = event { break }
+        }
+        transport.send(Data("进程已退出".utf8)) // 写入已无读端的管道,EPIPE 被优雅处理
+        try await Task.sleep(for: .milliseconds(200))
+    }
+
     @Test("环境净化:剔除 OMA_*/ANTHROPIC_*/密钥类变量,保留 PATH")
     func sanitizedEnvironment() {
         let env = LSPStdioTransport.sanitizedEnvironment(extra: ["FOO": "bar"])

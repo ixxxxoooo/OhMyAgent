@@ -1,6 +1,7 @@
 // @author ixxxxoooo
 // 传输抽象与 Stdio 实现。
 
+import Darwin
 import Foundation
 import OMLog
 import Synchronization
@@ -72,12 +73,19 @@ public final class StdioTransport: ACPTransport, @unchecked Sendable {
     private let stderrPipe = Pipe()
     /// 串行写队列,保证消息顺序且不阻塞调用方。
     private let writeQueue = DispatchQueue(label: "OhMyAgent.StdioTransport.write")
-    /// stdin 是否已关闭;仅在 `writeQueue` 上读写(关闭与写入同队列串行,避免对已关闭句柄写入触发 ObjC 异常)。
+    /// stdin 的原始文件描述符,在 `init` 中捕获。所有写入均用 POSIX `write()`:
+    /// 失败只返回 -1 并设置 errno,绝不抛出 Objective-C 异常,因此不会把异常抛过
+    /// dispatch 队列边界导致进程 abort。
+    private let stdinFileDescriptor: Int32
+    /// stdin 是否已关闭;仅在 `writeQueue` 上读写(关闭与写入同队列串行,无锁竞争)。
     nonisolated(unsafe) private var stdinClosed = false
     private let framer = FramerBox()
 
     public init(launch: ProcessLaunch) {
         self.launch = launch
+        // Pipe 创建后即持有有效的写端 fd;在此捕获原始 fd,此后无论 `FileHandle` 是否被 close,
+        // fd 值本身仍可用于 POSIX write(失败会得到 EBADF/EPIPE 并被优雅处理,不会抛异常)。
+        self.stdinFileDescriptor = stdinPipe.fileHandleForWriting.fileDescriptor
     }
 
     /// 子进程的 pid,启动后可用。
@@ -147,20 +155,33 @@ public final class StdioTransport: ACPTransport, @unchecked Sendable {
         var framed = data
         framed.append(0x0A)
         let payload = framed
-        let handle = stdinPipe.fileHandleForWriting
         writeQueue.async { [self] in
             guard !stdinClosed else { return }
-            try? handle.write(contentsOf: payload)
+            var offset = 0
+            while offset < payload.count {
+                let written = payload.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) -> Int in
+                    guard let base = buffer.baseAddress else { return 0 }
+                    return Darwin.write(stdinFileDescriptor, base.advanced(by: offset), payload.count - offset)
+                }
+                if written < 0 {
+                    let err = errno
+                    if err == EINTR { continue }
+                    Log.agent.warning("写入子进程 stdin 失败,传输已关闭", ["fd": "\(stdinFileDescriptor)", "errno": "\(err)", "error": String(cString: strerror(err))])
+                    // 不抛异常:Objective-C 异常穿过 dispatch 队列会导致 abort。
+                    stdinClosed = true
+                    break
+                }
+                offset += written
+            }
         }
     }
 
     /// 停止传输:在写队列上关闭 stdin(排在已入队的写入之后),随后终止子进程;关闭后的 `send` 会被丢弃。
     public func stop() {
-        let handle = stdinPipe.fileHandleForWriting
         writeQueue.async { [self] in
             guard !stdinClosed else { return }
             stdinClosed = true
-            try? handle.close()
+            if stdinFileDescriptor >= 0 { close(stdinFileDescriptor) }
         }
         if process.isRunning {
             process.terminate()
@@ -249,7 +270,21 @@ public final class StdioServerTransport: ACPTransport, @unchecked Sendable {
         var payload = data
         payload.append(0x0A)
         let framed = payload
-        writeQueue.async { FileHandle.standardOutput.write(framed) }
+        writeQueue.async {
+            var offset = 0
+            while offset < framed.count {
+                let written = framed.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) -> Int in
+                    guard let base = buffer.baseAddress else { return 0 }
+                    return Darwin.write(STDOUT_FILENO, base.advanced(by: offset), framed.count - offset)
+                }
+                if written < 0 {
+                    if errno == EINTR { continue }
+                    Log.agent.warning("写入标准输出失败", ["errno": "\(errno)", "error": String(cString: strerror(errno))])
+                    break
+                }
+                offset += written
+            }
+        }
     }
 
     public func stop() {}
