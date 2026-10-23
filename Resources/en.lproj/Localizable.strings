@@ -2964,3 +2964,16 @@
 "当前 Agent 不支持运行中引导:先中断本轮,再发送这条消息" = "This agent can't be steered mid-turn: stop the current turn, then send this message";
 "代码缩略图" = "Code minimap";
 "代码编辑器" = "Code editor";
+"生成 ⏎" = "Generate ⏎";
+"取消 Esc" = "Cancel Esc";
+"描述要如何修改选中的代码…" = "Describe how to change the selected code…";
+"行内编辑指令" = "Inline edit instruction";
+"正在生成…" = "Generating…";
+"接受 ⌘⏎" = "Accept ⌘⏎";
+"拒绝 Esc" = "Reject Esc";
+"AI 行内编辑" = "AI inline edit";
+"保留" = "Keep";
+"Agent 更改" = "Agent changes";
+"请输入修改指令" = "Enter an edit instruction";
+"没有可用的模型通道,请先在设置里配置模型" = "No model channel is available. Configure a model in Settings first.";
+"模型没有返回有效的修改,请重试" = "The model returned no valid edit. Please try again.";

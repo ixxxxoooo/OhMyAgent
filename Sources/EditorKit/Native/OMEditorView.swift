@@ -93,6 +93,12 @@ public final class OMEditorView: NSView {
     static weak var lastFocused: OMEditorView?
     /// 语言智能控制器(补全、悬停、签名、灯泡、内嵌提示、语义着色)。
     public private(set) lazy var languageController = NativeLanguageController(view: self)
+    /// Agent 改动 / 行内编辑的行内 Diff 审阅(zone + 行底色)。
+    public private(set) lazy var inlineReview = NativeInlineReview(view: self)
+    /// ⌘K 行内编辑控制器。
+    public private(set) lazy var inlineEdit = NativeInlineEdit(view: self)
+    /// ⌘L / ⌘⇧L:把选区引用到对话(参数为 UTF-16 选区;空选区表示只切到对话输入框)。
+    public var onReferenceSelection: ((NSRange) -> Void)?
     /// 窗口大小变化时的防抖任务。
     var wrapTask: Task<Void, Never>?
     /// 主题监听。
@@ -257,7 +263,7 @@ public final class OMEditorView: NSView {
         needsDisplay = true
         if findHost != nil, !change.edits.isEmpty { scheduleFindRefresh() }
         onTextChange?(change)
-        if !change.edits.isEmpty { languageController.documentChanged() }
+        if !change.edits.isEmpty { languageController.documentChanged(); inlineEdit.documentDidChange() }
         if !change.edits.isEmpty { NSAccessibility.post(element: self, notification: .valueChanged) }
     }
 

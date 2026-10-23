@@ -4,8 +4,47 @@
 
 import AppKit
 import DesignSystem
+import DiffKit
 import EditorCore
 import SwiftUI
+
+/// 待审阅的 Agent 改动(行内 Diff)。
+public struct NativeAgentReview {
+    /// 变化键:相同则不重新布局(调用方用「路径 + 内容哈希 + 待审阅块」拼接)。
+    public var key: String
+    /// 旧(Agent 写入前)→ 新(当前文件内容)的差异。
+    public var diff: FileDiff
+    /// 仍待审阅的块 id。
+    public var pending: Set<Int>
+    /// 块级操作(保留 / 还原),参数为块 id。
+    public var actions: [NativeDiffAction]
+    /// 块头条标题。
+    public var title: String
+    /// 需要滚动到的块 id(变化时才滚动;nil 不滚动)。
+    public var focusHunk: Int?
+
+    public init(key: String, diff: FileDiff, pending: Set<Int>, actions: [NativeDiffAction], title: String, focusHunk: Int? = nil) {
+        self.key = key
+        self.diff = diff
+        self.pending = pending
+        self.actions = actions
+        self.title = title
+        self.focusHunk = focusHunk
+    }
+}
+
+/// Agent 相关的编辑器钩子(行内审阅、⌘K 行内编辑、⌘L 引用选区)。
+public struct NativeAgentHooks {
+    public var review: NativeAgentReview?
+    public var inlineEdit: NativeInlineEditGenerator?
+    public var onReferenceSelection: ((NSRange) -> Void)?
+
+    public init(review: NativeAgentReview? = nil, inlineEdit: NativeInlineEditGenerator? = nil, onReferenceSelection: ((NSRange) -> Void)? = nil) {
+        self.review = review
+        self.inlineEdit = inlineEdit
+        self.onReferenceSelection = onReferenceSelection
+    }
+}
 
 /// SwiftUI 版原生代码编辑器。
 public struct NativeCodeEditor: NSViewRepresentable {
@@ -27,6 +66,16 @@ public struct NativeCodeEditor: NSViewRepresentable {
     public var onCaretChange: ((EditorCaret) -> Void)?
     /// 文档变化(用户编辑或外部写入)回调,宿主据此防抖同步字符串镜像与脏标记。
     public var onEdited: ((DocumentChange) -> Void)?
+    /// Agent 钩子(行内审阅、⌘K、⌘L)。
+    public var agent = NativeAgentHooks()
+
+    /// 返回带 Agent 钩子的副本。
+    /// - Parameter hooks: 钩子
+    public func agentHooks(_ hooks: NativeAgentHooks) -> NativeCodeEditor {
+        var copy = self
+        copy.agent = hooks
+        return copy
+    }
 
     /// 创建编辑器。
     /// - Parameters:
@@ -110,6 +159,9 @@ public struct NativeCodeEditor: NSViewRepresentable {
             view.languageController.services = services
         }
         view.lineMarkers = markers
+        view.inlineEdit.generate = agent.inlineEdit
+        view.onReferenceSelection = agent.onReferenceSelection
+        syncReview(view, coordinator)
         if coordinator.diagnostics != diagnostics {
             coordinator.diagnostics = diagnostics
             view.setDiagnostics(diagnostics)
@@ -128,9 +180,32 @@ public struct NativeCodeEditor: NSViewRepresentable {
         }
     }
 
+    /// 同步 Agent 行内审阅:键变化才重建;被清空时移除 zone 与底色。
+    private func syncReview(_ view: OMEditorView, _ coordinator: Coordinator) {
+        guard let review = agent.review else {
+            if coordinator.reviewKey != nil {
+                coordinator.reviewKey = nil
+                coordinator.reviewFocus = nil
+                view.inlineReview.clear()
+            }
+            return
+        }
+        if coordinator.reviewKey != review.key {
+            coordinator.reviewKey = review.key
+            view.inlineReview.show(diff: review.diff, pending: review.pending, title: { _ in review.title }, actions: review.actions)
+        }
+        if let focus = review.focusHunk, coordinator.reviewFocus != focus {
+            let isFirst = coordinator.reviewFocus == nil
+            coordinator.reviewFocus = focus
+            if !isFirst, let line = view.inlineReview.hunkLines[focus] { view.scrollToLine(max(line - 1, 0), centered: false) }
+        }
+    }
+
     /// 记录已应用状态,避免重复处理。
     @MainActor
     public final class Coordinator {
+        var reviewKey: String?
+        var reviewFocus: Int?
         var language: SyntaxLanguage?
         var revealedLine: Int?
         var servicesKey = 0

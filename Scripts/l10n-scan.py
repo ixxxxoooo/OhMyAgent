@@ -135,6 +135,7 @@ ALLOWLIST = (
     *(("Sources/ProviderProxyKit/UpstreamHints.swift", w) for w in ("额度不足", "余额不足", "额度已用尽", "配额已用尽")),   # 上游错误正文的匹配特征,非界面文案   # 相对时间后缀裁剪(去掉「前」只做字符串比较,非界面文案)
     ("Sources/OhMyAgentApp/Demo/DemoBenchmarkRunner.swift", None),   # 演示基准的明细文本(仅演示模式,面向开发者)
     ("Sources/OhMyAgentApp/Demo/DemoBenchmarkRunner+IDE.swift", None),   # IDE 基准的明细文本(仅演示模式,面向开发者)
+    ("Sources/ChatKit/InlineEdit.swift", None),           # ⌘K 行内编辑发给模型的提示词(非界面文案);界面错误文案已在 en 里翻译
     ("Sources/ACPKit/ACPClient.swift", None),            # JSON-RPC 错误文本(给 Agent 看)
     ("Sources/ACPKit/JSONRPC.swift", None),
     ("Sources/ACPKit/JSONValue.swift", None),

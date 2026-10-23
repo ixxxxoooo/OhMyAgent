@@ -9,6 +9,7 @@ extension OMEditorView: NSUserInterfaceValidations {
     public override func keyDown(with event: NSEvent) {
         model.document.breakUndoCoalescing()
         // 编辑器快捷键(行操作、多光标等)优先于系统键位表(⌥↑ 等在系统表里是段落移动)。
+        if composition == nil, inlineEdit.keyDown(event) { return }
         if composition == nil, languageController.keyDown(event) { return }
         if composition == nil, handleShortcut(event) { return }
         // 先交给输入法/键位表;ESC 单独处理(折叠多光标)。
@@ -18,6 +19,7 @@ extension OMEditorView: NSUserInterfaceValidations {
     /// ⌘ 组合键先于菜单到达时在这里处理。
     public override func performKeyEquivalent(with event: NSEvent) -> Bool {
         guard window?.firstResponder === self, composition == nil else { return super.performKeyEquivalent(with: event) }
+        if inlineEdit.keyDown(event) { return true }
         if languageController.keyDown(event) { return true }
         if handleShortcut(event) { return true }
         return super.performKeyEquivalent(with: event)
@@ -31,6 +33,12 @@ extension OMEditorView: NSUserInterfaceValidations {
         let editable = model.isEditable
         switch (event.keyCode, flags) {
         // 行操作(需可编辑)
+        case (40, [cmd]) where editable && inlineEdit.isAvailable: inlineEdit.begin(); return true
+        case (37, [cmd]), (37, [cmd, shift]):
+            guard let handler = onReferenceSelection else { return false }
+            let range = model.selections.primary.range
+            handler(NSRange(location: range.location, length: range.length))
+            return true
         case (44, [cmd]) where editable: model.toggleLineComment()
         case (0, [opt, shift]) where editable: model.toggleBlockComment()
         case (40, [cmd, shift]) where editable: model.deleteLines()

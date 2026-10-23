@@ -19,6 +19,16 @@ extension IDEWorkspace {
                 if dirty { self?.scheduleAutoSave() }
             },
             reference: { [weak self] token in self?.addReferenceToChat(token) },
+            session: { [weak self] in
+                guard let self else { return nil }
+                if self.agentSession == nil { self.prepareAgentSession() }
+                return self.agentSession
+            },
+            focusAgent: { [weak self] in
+                guard let self else { return }
+                self.model.agentPaneVisible = true
+                if self.agentSession == nil { self.prepareAgentSession() }
+            },
             report: { [weak self] path, diagnostics, text in
                 let problems = diagnostics.map { item -> IDEProblem in
                     let position = IDELineMap.lineColumn(utf16Offset: item.range.location, in: text)

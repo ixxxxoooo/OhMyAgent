@@ -263,6 +263,7 @@ struct FileTabView: View {
                              chrome: ideHost == nil ? [] : [.minimap, .stickyScroll, .folding, .overviewRuler], filePath: path,
                              services: nativeServices, servicesKey: nativeServicesKey,
                              onCaretChange: ideHost.map { host in { host.caret(path, $0) } })
+                .agentHooks(agentHooks(doc, editorDocument: editorDocument))
                 .id(ObjectIdentifier(editorDocument))
         } else {
             CodeEditor(text: text, language: SyntaxLanguage.detect(path: path), isEditable: !doc.isReadOnly, revealLine: tab.line, markers: markers,
@@ -328,7 +329,12 @@ struct FileTabView: View {
     }
 
     /// 把选区引用(`@文件:行范围`)追加到所属项目的输入框并切到对话标签。
-    private func referenceSelection(_ range: NSRange, text: String) {
+    func referenceSelection(_ range: NSRange, text: String) {
+        // 空选区(⌘L):只切到并聚焦对话输入框
+        if range.length == 0 {
+            if let ideHost { ideHost.focusAgent() } else { workbench.select(project: projectRoot()) }
+            return
+        }
         if let ideHost {
             // IDE 窗口:引用追加到本窗口 Agent 面板的输入框
             ideHost.reference(EditorReference.token(path: path, projectRoot: projectRoot(), text: text, range: range))
@@ -359,7 +365,7 @@ struct FileTabView: View {
     }
 
     /// 文件所属项目的根目录(取最长匹配);不在任何项目内则用文件所在目录。
-    private func projectRoot() -> String {
+    func projectRoot() -> String {
         if let root = ideHost?.root, path.hasPrefix(root + "/") { return root }
         let match = workbench.projects.map(\.id)
             .filter { path == $0 || path.hasPrefix($0 + "/") }

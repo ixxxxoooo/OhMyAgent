@@ -1,6 +1,7 @@
 // @author ixxxxoooo
 // IDE 窗口的文件宿主:复用 Agent 窗口的 `FileTabView` 时,通过环境值把脏标记、跳转与项目根改接到 IDE 窗口。
 
+import ChatKit
 import EditorKit
 import SwiftUI
 
@@ -14,6 +15,10 @@ struct IDEFileHost {
     var setDirty: @MainActor (Bool, String) -> Void
     /// 把引用标记(`@路径:行`)加入 Agent 面板输入框
     var reference: @MainActor (String) -> Void
+    /// 本窗口 Agent 面板的会话(⌘K 行内编辑借用它的辅助模型通道);没有时为 nil
+    var session: @MainActor () -> SessionModel?
+    /// 显示并聚焦 Agent 面板(⌘L)
+    var focusAgent: @MainActor () -> Void
     /// 上报某文件当前的诊断(参数:路径、诊断、对应文本;空数组表示清除)
     var report: @MainActor (String, [EditorDiagnostic], String) -> Void
     /// 上报某文件的光标状态(路径,光标)

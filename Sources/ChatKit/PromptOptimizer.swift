@@ -69,12 +69,12 @@ public enum PromptOptimizer {
     ///   - model: 网关模型别名
     ///   - text: 草稿
     /// - Returns: JSON 数据
-    public static func requestBody(model: String, text: String) -> Data? {
+    public static func requestBody(model: String, text: String, system: String = systemPrompt, maxTokens: Int = 2000) -> Data? {
         let body: [String: Any] = [
             "model": model,
-            "max_tokens": 2000,
+            "max_tokens": maxTokens,
             "stream": false,
-            "system": systemPrompt,
+            "system": system,
             "messages": [["role": "user", "content": text]],
         ]
         return try? JSONSerialization.data(withJSONObject: body)
@@ -88,8 +88,9 @@ public enum PromptOptimizer {
     ///   - timeout: 超时
     ///   - session: URLSession(测试可注入)
     /// - Returns: 清洗后的提示词;失败返回 nil
-    public static func viaGateway(gateway: URL, model: String, text: String, timeout: TimeInterval = 60, session: URLSession = .shared) async -> String? {
-        guard let body = requestBody(model: model, text: text) else { return nil }
+    public static func viaGateway(gateway: URL, model: String, text: String, timeout: TimeInterval = 60, session: URLSession = .shared,
+                                  system: String = systemPrompt, maxTokens: Int = 2000, cleaner: (String) -> String? = clean) async -> String? {
+        guard let body = requestBody(model: model, text: text, system: system, maxTokens: maxTokens) else { return nil }
         var request = URLRequest(url: gateway.appendingPathComponent("v1/messages"), timeoutInterval: timeout)
         request.httpMethod = "POST"
         request.httpBody = body
@@ -103,7 +104,7 @@ public enum PromptOptimizer {
                 Log.session.warning("优化提示词失败", ["channel": "gateway", "status": "\((response as? HTTPURLResponse)?.statusCode ?? -1)"])
                 return nil
             }
-            let result = TitleGenerator.responseText(from: data).flatMap(clean)
+            let result = TitleGenerator.responseText(from: data).flatMap(cleaner)
             Log.session.info("优化提示词完成", ["channel": "gateway", "ms": "\(OMLogger.milliseconds(since: started))", "ok": "\(result != nil)"])
             return result
         } catch {
@@ -117,13 +118,13 @@ public enum PromptOptimizer {
     /// `claude -p` 的启动参数:流式 JSON 收发、无工具、无 MCP、无技能、不落盘;自带 BASE_URL 的第三方网关环境下不指定模型别名。
     /// - Parameter environment: claude 运行时的环境变量
     /// - Returns: 参数列表
-    static func claudeArguments(environment: [String: String]) -> [String] {
+    static func claudeArguments(environment: [String: String], system: String = systemPrompt) -> [String] {
         var arguments = ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--no-session-persistence",
                          "--tools", "", "--strict-mcp-config", "--disable-slash-commands",
                          // 不读 user/project/local 设置(hooks、插件、技能、权限规则),实测首轮输入约 13K → 0.6K token
                          "--setting-sources", ""]
         if (environment["ANTHROPIC_BASE_URL"] ?? "").isEmpty { arguments += ["--model", "haiku"] }
-        arguments += ["--system-prompt", systemPrompt]
+        arguments += ["--system-prompt", system]
         return arguments
     }
 
@@ -165,10 +166,11 @@ public enum PromptOptimizer {
     ///   - text: 草稿
     ///   - timeout: 整体超时
     /// - Returns: 清洗后的提示词;失败返回 nil
-    public static func viaClaude(claude: String, environment: [String: String], cwd: String, text: String, timeout: Duration = .seconds(90)) async -> String? {
+    public static func viaClaude(claude: String, environment: [String: String], cwd: String, text: String, timeout: Duration = .seconds(90),
+                                 system: String = systemPrompt, cleaner: (String) -> String? = clean) async -> String? {
         guard !claude.isEmpty, let payload = userMessage(text) else { return nil }
         let environment = minimalEnvironment(base: environment, settingsEnv: ModelGateway.loadSettingsEnv())
-        let transport = StdioTransport(launch: ProcessLaunch(executable: claude, arguments: claudeArguments(environment: environment), environment: environment, workingDirectory: cwd))
+        let transport = StdioTransport(launch: ProcessLaunch(executable: claude, arguments: claudeArguments(environment: environment, system: system), environment: environment, workingDirectory: cwd))
         let events: AsyncStream<TransportEvent>
         do { events = try transport.start() } catch {
             Log.session.error("优化提示词启动 claude 失败", error: error)
@@ -190,7 +192,7 @@ public enum PromptOptimizer {
             case .line(let data):
                 StdioTransport.backlog.consumed()
                 guard let result = parseResult(data) else { continue }
-                let cleaned = result.isError ? nil : clean(result.text)
+                let cleaned = result.isError ? nil : cleaner(result.text)
                 Log.session.info("优化提示词完成", ["channel": "claude", "ms": "\(OMLogger.milliseconds(since: started))", "ok": "\(cleaned != nil)"])
                 return cleaned
             case .stderr, .message:

@@ -7,12 +7,14 @@
 // - `OMA_IDE_PANEL=terminal|problems|output`:启动后显示底部面板并切到该标签页;
 // - `OMA_IDE_PALETTE=<输入>`:启动后打开命令面板并预填输入(如 `>保存`、`:12`、`main`);
 // - `OMA_IDE_OPEN_DIFF=路径`:打开后在编辑器里打开该文件的 Diff 标签;
-// - `OMA_IDE_EDITOR_ACTIONS=动作1;动作2`:打开文件后依次执行编辑器动作(`goto:行`、`foldline:行`、`fold`、`unfold`、`foldAll`、`unfoldAll`、`nextOcc`、`type:文本`、`complete`、`hover:行:列`、`sig`、`actions`、`format`、`refs`、`wait:毫秒`);
+// - `OMA_IDE_EDITOR_ACTIONS=动作1;动作2`:打开文件后依次执行编辑器动作(`goto:行`、`selectlines:起-止`、`inline:指令`(⌘K 行内编辑)、`review:旧文本路径`(行内 Diff 审阅预览)、`inlineAccept`/`inlineReject`、`foldline:行`、`fold`、`unfold`、`foldAll`、`unfoldAll`、`nextOcc`、`type:文本`、`complete`、`hover:行:列`、`sig`、`actions`、`format`、`refs`、`wait:毫秒`);
 // - `OMA_IDE_SWEEP=N`:开关/切换基准,重复 N 轮「冷开 → 切回 Agent → 热切到 IDE → 关闭」,
 //   perf 日志「IDE 窗口基准」记录每轮耗时与内存漂移(计划预算:热切换 ≤ 50ms、冷开 ≤ 250ms、20 轮漂移 ≤ 10MB)。
 
 import AppKit
 import Foundation
+import DiffKit
+import EditorCore
 import EditorKit
 import IDEKit
 import OMLog
@@ -108,6 +110,24 @@ enum IDEDebugHooks {
             if let native = firstNativeEditor() ?? OMEditorView.activeEditor() {
                 switch parts.first ?? "" {
                 case "goto": native.goToLine(line: Int(argument) ?? 1, column: 1)
+                case "selectlines":
+                    // selectlines:起-止(1 起,含):选中这些行,供 ⌘K 行内编辑
+                    let range = argument.split(separator: "-").compactMap { Int($0) }
+                    if let first = range.first {
+                        let rope = native.model.document.snapshot
+                        let low = min(max(first - 1, 0), rope.lineCount - 1), high = min(max((range.last ?? first) - 1, low), rope.lineCount - 1)
+                        native.model.setSelections(SelectionSet([Selection(anchor: rope.lineStart(low), head: rope.lineStart(high) + rope.lineLength(high))]))
+                    }
+                case "inline": native.inlineEdit.debugRun(argument)
+                case "review":
+                    // review:旧文本文件路径:以它为「Agent 改动前」,在当前编辑器里展示行内 Diff 审阅
+                    if let old = try? String(contentsOfFile: argument, encoding: .utf8) {
+                        let diff = LineDiff.diff(old: old, new: native.model.document.text())
+                        let actions = [NativeDiffAction(title: "Keep") { _ in }, NativeDiffAction(title: "Revert") { _ in }]
+                        native.inlineReview.show(diff: diff, title: { _ in "Agent changes" }, actions: actions)
+                    }
+                case "inlineAccept": native.inlineEdit.accept()
+                case "inlineReject": native.inlineEdit.reject()
                 case "foldline": native.model.fold(line: max((Int(argument) ?? 1) - 1, 0))
                 case "fold": native.perform(.fold)
                 case "unfold": native.perform(.unfold)

@@ -100,9 +100,12 @@ extension FileTabView {
                     .buttonStyle(OMButtonStyle(.icon))
                     .omTooltip(String(localized: "下一处更改")).accessibilityLabel(String(localized: "下一处更改"))
                 Spacer()
-                Button("还原此块") { target.model.revert(target.change, hunks: [hunk.id]) }.buttonStyle(.omSecondary)
-                Button("保留此块") { acceptedHunks.insert(AgentHunkKey.key(hunk)); reviewIndex = min(index, max(target.hunks.count - 2, 0)) }
-                    .buttonStyle(.omSecondary)
+                // 原生引擎里逐块「保留 / 还原」在行内块头条上,这里只保留导航与整体操作
+                if EditorEngine.current != .native2 {
+                    Button("还原此块") { target.model.revert(target.change, hunks: [hunk.id]) }.buttonStyle(.omSecondary)
+                    Button("保留此块") { acceptedHunks.insert(AgentHunkKey.key(hunk)); reviewIndex = min(index, max(target.hunks.count - 2, 0)) }
+                        .buttonStyle(.omSecondary)
+                }
                 Button("全部还原") { target.model.revert(target.change) }.buttonStyle(.omDestructive)
                 Button("全部保留") { target.hunks.forEach { acceptedHunks.insert(AgentHunkKey.key($0)) } }.buttonStyle(.omPrimary)
             }
