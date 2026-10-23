@@ -246,7 +246,13 @@ struct ChatView: View {
             if showsAnchorRail { ConversationAnchorRail(model: model, sticky: sticky, jump: anchorJump) }
         }
         .onChange(of: tabActive) { _, active in
-            if active { scheduleBlankCheck(after: .milliseconds(300)) } else { blankGuard.cancel() }
+            if active {
+                scheduleBlankCheck(after: .milliseconds(300))
+            } else {
+                blankGuard.cancel()
+                // 保活标签切走后视图仍挂载:不收起的话,回到该标签时编辑框会凭空弹出(且隐藏时它的点击监听还会吞掉别处的点击)
+                if sticky.editing != nil { sticky.finishEditing() }
+            }
         }
         .onAppear {
             scheduleBlankCheck(after: .milliseconds(600))
