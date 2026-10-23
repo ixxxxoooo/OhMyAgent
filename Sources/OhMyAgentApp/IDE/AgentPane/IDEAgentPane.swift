@@ -138,7 +138,9 @@ struct IDEAgentPane: View {
     }
 
     private func iconButton(_ icon: String, _ title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) { Image.om(icon, size: 14) }
+        // 动作推迟到本次点击事件处理完之后:最大化/关闭会在松开鼠标时整体替换面板视图,
+        // 若同步执行,这一下点击会落到新建的吸顶卡上,误触发「放大编辑」
+        Button { Task { @MainActor in action() } } label: { Image.om(icon, size: 14) }
             .buttonStyle(.omIcon)
             .omTooltip(title)
             .accessibilityLabel(title)
