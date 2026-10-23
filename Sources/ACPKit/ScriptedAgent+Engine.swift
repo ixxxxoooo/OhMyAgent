@@ -133,6 +133,7 @@ extension ScriptedAgent {
         case .builtin(let builtin):
             switch builtin {
             case .edit: try await runEdit(sessionId: sessionId)
+            case .editFile(let name): try await runEdit(sessionId: sessionId, fileName: name)
             case .ask: try await runAsk(sessionId: sessionId)
             case .terminal: try await runTerminal(sessionId: sessionId)
             case .longRunning: try await runHold(sessionId: sessionId)

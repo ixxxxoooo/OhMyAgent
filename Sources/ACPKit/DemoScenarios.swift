@@ -171,7 +171,7 @@ public enum DemoScenarios {
     static var catalog: [DemoScenario] { orderedCatalog }
 
     /// 分组的展示顺序(命令面板与斜杠补全按此排列;组内保持注册顺序)。
-    static let groupOrder = ["全景", "工具卡", "交互", "会话流样式", "子 Agent", "状态与错误", "输入区与模式", "性能实验室", "回归"]
+    static let groupOrder = ["全景", "工具卡", "交互", "会话流样式", "子 Agent", "状态与错误", "输入区与模式", "IDE 模式", "性能实验室", "回归"]
 
     /// 按分组顺序稳定排序后的目录;未登记的分组排在最后。
     private static let orderedCatalog: [DemoScenario] = {

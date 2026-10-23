@@ -166,6 +166,8 @@ public struct ScenarioPlanItem: Sendable {
 public enum ScenarioBuiltin: Sendable {
     /// 真实修改工作区 `oma-demo.txt` 并请求权限
     case edit
+    /// 真实修改工作区内指定文件名的文件(与 `edit` 同一套权限与改动流程;多文件审阅场景用)
+    case editFile(String)
     /// 发起 AskUserQuestion 表单
     case ask
     /// 通过客户端终端执行命令

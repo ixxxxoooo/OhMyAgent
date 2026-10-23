@@ -263,19 +263,21 @@ public actor ScriptedAgent: ACPRequestHandler {
     // MARK: 扩展场景(真实写文件、提问、终端、子 Agent)
 
     /// 真实修改工作区内的 `oma-demo.txt`,用于验证检查点与改动汇总。
-    func runEdit(sessionId: String) async throws {
+    func runEdit(sessionId: String, fileName: String = "oma-demo.txt") async throws {
+        // 只允许工作区根下的纯文件名,避免场景参数越出沙盒
+        let name = (fileName as NSString).lastPathComponent.isEmpty ? "oma-demo.txt" : (fileName as NSString).lastPathComponent
         let cwd = sessions[sessionId] ?? NSTemporaryDirectory()
-        let path = (cwd as NSString).appendingPathComponent("oma-demo.txt")
+        let path = (cwd as NSString).appendingPathComponent(name)
         editCounter += 1
         let id = "edit_\(editCounter)"
         await update(sessionId, [
-            "sessionUpdate": "tool_call", "toolCallId": .string(id), "title": "修改 oma-demo.txt", "kind": "edit", "status": "pending",
+            "sessionUpdate": "tool_call", "toolCallId": .string(id), "title": .string("修改 \(name)"), "kind": "edit", "status": "pending",
             "locations": [["path": .string(path)]],
         ])
         let permission = try await connection.request("session/request_permission", params: [
             "sessionId": .string(sessionId),
             "toolCall": [
-                "toolCallId": .string(id), "title": "修改 oma-demo.txt", "kind": "edit",
+                "toolCallId": .string(id), "title": .string("修改 \(name)"), "kind": "edit",
                 "content": [["type": "diff", "path": .string(path), "oldText": "line 3", "newText": "edited"]],
             ],
             "options": [
