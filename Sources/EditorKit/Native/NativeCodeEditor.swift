@@ -38,8 +38,11 @@ public struct NativeAgentHooks {
     public var review: NativeAgentReview?
     public var inlineEdit: NativeInlineEditGenerator?
     public var onReferenceSelection: ((NSRange) -> Void)?
+    public var inlineSuggestion: NativeInlineSuggestionProvider?
 
-    public init(review: NativeAgentReview? = nil, inlineEdit: NativeInlineEditGenerator? = nil, onReferenceSelection: ((NSRange) -> Void)? = nil) {
+    public init(review: NativeAgentReview? = nil, inlineEdit: NativeInlineEditGenerator? = nil, onReferenceSelection: ((NSRange) -> Void)? = nil,
+                inlineSuggestion: NativeInlineSuggestionProvider? = nil) {
+        self.inlineSuggestion = inlineSuggestion
         self.review = review
         self.inlineEdit = inlineEdit
         self.onReferenceSelection = onReferenceSelection
@@ -160,6 +163,7 @@ public struct NativeCodeEditor: NSViewRepresentable {
         }
         view.lineMarkers = markers
         view.inlineEdit.generate = agent.inlineEdit
+        view.inlineSuggestion.provider = agent.inlineSuggestion
         view.onReferenceSelection = agent.onReferenceSelection
         syncReview(view, coordinator)
         if coordinator.diagnostics != diagnostics {

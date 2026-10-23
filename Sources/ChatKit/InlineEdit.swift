@@ -109,3 +109,60 @@ extension SessionModel {
         return result
     }
 }
+
+/// Tab 幽灵补全的提示词与结果清洗。
+public enum InlineSuggest {
+    /// 系统提示词。
+    public static let systemPrompt = """
+    你是代码补全引擎。用户给出光标前后的代码(以 <cursor/> 标记光标位置),请直接续写光标处应当出现的代码。
+    - 只输出要插入的文本本身,不要重复光标前已有的内容,不要解释,不要 Markdown 代码围栏。
+    - 通常补全当前语句或接下来的几行,最多 8 行;不确定时输出空内容。
+    """
+
+    /// 建议的最大行数与字符数。
+    public static let maxLines = 8
+    public static let maxLength = 800
+
+    /// 构造发给模型的用户消息。
+    /// - Parameters:
+    ///   - path: 文件路径(取文件名)
+    ///   - prefix: 光标前的上下文
+    ///   - suffix: 光标后的上下文
+    /// - Returns: 消息文本
+    public static func userMessage(path: String, prefix: String, suffix: String) -> String {
+        "文件:\((path as NSString).lastPathComponent)\n\n\(prefix)<cursor/>\(suffix)"
+    }
+
+    /// 清洗模型输出:去掉围栏与误带的光标标记,限制行数与长度,保留首部缩进/空格。
+    /// - Parameter raw: 模型原始输出
+    /// - Returns: 可直接插入的文本;空内容返回 nil
+    public static func clean(_ raw: String) -> String? {
+        var text = raw.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "<cursor/>", with: "")
+        var lines = text.components(separatedBy: "\n")
+        if let first = lines.first, first.trimmingCharacters(in: .whitespaces).hasPrefix("```") { lines.removeFirst() }
+        if let last = lines.last, last.trimmingCharacters(in: .whitespaces) == "```" { lines.removeLast() }
+        text = lines.prefix(maxLines).joined(separator: "\n")
+        if text.count > maxLength { text = String(text.prefix(maxLength)) }
+        return text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : text
+    }
+
+    /// 演示模式的确定性建议:在行尾补一段注释。
+    public static let demoText = " // 幽灵补全建议"
+}
+
+extension SessionModel {
+    /// 请求光标处的续写建议。只走网关小模型(不为每次停顿拉起 `claude` 进程);无通道返回 nil。
+    /// - Parameters:
+    ///   - path: 文件路径
+    ///   - prefix: 光标前上下文
+    ///   - suffix: 光标后上下文
+    /// - Returns: 要插入的文本
+    public func inlineSuggest(path: String, prefix: String, suffix: String) async -> String? {
+        guard !prefix.isEmpty else { return nil }
+        if Toolchain.isDemoMode || ProcessInfo.processInfo.environment["OMA_AGENT"] == "fake" { return InlineSuggest.demoText }
+        guard let gateway = await UtilityModels.endpoint(for: UtilityModels.choice(for: .optimize), fallback: utilityGateway) else { return nil }
+        return await PromptOptimizer.viaGateway(gateway: gateway.url, model: gateway.alias,
+                                                text: InlineSuggest.userMessage(path: path, prefix: prefix, suffix: suffix), timeout: 20,
+                                                system: InlineSuggest.systemPrompt, maxTokens: 300, cleaner: InlineSuggest.clean)
+    }
+}

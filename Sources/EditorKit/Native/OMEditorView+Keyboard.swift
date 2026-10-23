@@ -11,6 +11,7 @@ extension OMEditorView: NSUserInterfaceValidations {
         // 编辑器快捷键(行操作、多光标等)优先于系统键位表(⌥↑ 等在系统表里是段落移动)。
         if composition == nil, inlineEdit.keyDown(event) { return }
         if composition == nil, languageController.keyDown(event) { return }
+        if composition == nil, inlineSuggestion.keyDown(event) { return }
         if composition == nil, handleShortcut(event) { return }
         // 先交给输入法/键位表;ESC 单独处理(折叠多光标)。
         interpretKeyEvents([event])
@@ -21,6 +22,7 @@ extension OMEditorView: NSUserInterfaceValidations {
         guard window?.firstResponder === self, composition == nil else { return super.performKeyEquivalent(with: event) }
         if inlineEdit.keyDown(event) { return true }
         if languageController.keyDown(event) { return true }
+        if inlineSuggestion.keyDown(event) { return true }
         if handleShortcut(event) { return true }
         return super.performKeyEquivalent(with: event)
     }

@@ -31,3 +31,15 @@ struct InlineEditTests {
         #expect(result == "    a\n    // 已按指令修改:加注释\n    b")
     }
 }
+
+@Suite("InlineSuggest")
+struct InlineSuggestTests {
+    @Test("清洗:去围栏、去光标标记、限制行数,保留首部空格")
+    func clean() {
+        #expect(InlineSuggest.clean("```swift\n = 2\n```") == " = 2")
+        #expect(InlineSuggest.clean("a<cursor/>b") == "ab")
+        #expect(InlineSuggest.clean("  \n ") == nil)
+        let many = (1...20).map(String.init).joined(separator: "\n")
+        #expect(InlineSuggest.clean(many)?.components(separatedBy: "\n").count == InlineSuggest.maxLines)
+    }
+}

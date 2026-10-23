@@ -97,6 +97,8 @@ public final class OMEditorView: NSView {
     public private(set) lazy var inlineReview = NativeInlineReview(view: self)
     /// ⌘K 行内编辑控制器。
     public private(set) lazy var inlineEdit = NativeInlineEdit(view: self)
+    /// Tab 幽灵补全。
+    public private(set) lazy var inlineSuggestion = NativeInlineSuggestion(view: self)
     /// ⌘L / ⌘⇧L:把选区引用到对话(参数为 UTF-16 选区;空选区表示只切到对话输入框)。
     public var onReferenceSelection: ((NSRange) -> Void)?
     /// 窗口大小变化时的防抖任务。
@@ -263,7 +265,7 @@ public final class OMEditorView: NSView {
         needsDisplay = true
         if findHost != nil, !change.edits.isEmpty { scheduleFindRefresh() }
         onTextChange?(change)
-        if !change.edits.isEmpty { languageController.documentChanged(); inlineEdit.documentDidChange() }
+        if !change.edits.isEmpty { languageController.documentChanged(); inlineEdit.documentDidChange(); inlineSuggestion.documentDidChange() }
         if !change.edits.isEmpty { NSAccessibility.post(element: self, notification: .valueChanged) }
     }
 
@@ -285,6 +287,7 @@ public final class OMEditorView: NSView {
         needsDisplay = true
         onSelectionChange?()
         languageController.selectionChanged()
+        inlineSuggestion.selectionDidChange()
         NSAccessibility.post(element: self, notification: .selectedTextChanged)
     }
 

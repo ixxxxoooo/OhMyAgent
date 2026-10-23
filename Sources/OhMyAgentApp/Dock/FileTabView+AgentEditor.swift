@@ -28,7 +28,8 @@ extension FileTabView {
             review: nativeReview(doc),
             // ⌘K 只在 IDE 窗口接管(Agent 窗口里 ⌘K 仍是全局搜索)
             inlineEdit: doc.isReadOnly || ideHost == nil ? nil : inlineEditGenerator(),
-            onReferenceSelection: { range in referenceSelection(range, text: editorDocument.text()) }
+            onReferenceSelection: { range in referenceSelection(range, text: editorDocument.text()) },
+            inlineSuggestion: doc.isReadOnly || ideHost == nil ? nil : inlineSuggestionProvider()
         )
     }
 
@@ -38,6 +39,15 @@ extension FileTabView {
         return { instruction, selected, before, after in
             guard let session = inlineEditSession() else { throw InlineEditError.unavailable }
             return try await session.inlineEdit(instruction: instruction, path: path, selected: selected, before: before, after: after)
+        }
+    }
+
+    /// 幽灵补全的提供者:借会话的辅助模型通道请求光标处续写。
+    private func inlineSuggestionProvider() -> NativeInlineSuggestionProvider {
+        let path = path
+        return { prefix, suffix in
+            guard let session = inlineEditSession() else { return nil }
+            return await session.inlineSuggest(path: path, prefix: prefix, suffix: suffix)
         }
     }
 

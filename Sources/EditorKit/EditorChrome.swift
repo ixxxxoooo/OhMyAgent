@@ -25,6 +25,10 @@ public extension EditorBehaviorPrefs {
     static let minimapKey = "editor.minimap"
     /// 粘性滚动开关的键
     static let stickyScrollKey = "editor.stickyScroll"
+    /// 幽灵补全(Tab 接受 AI 续写)开关的键
+    static let ghostCompletionKey = "editor.ghostCompletion"
+    /// 是否启用幽灵补全(默认关:每次停顿都会向模型发请求)。
+    static var ghostCompletion: Bool { UserDefaults.standard.object(forKey: ghostCompletionKey) as? Bool ?? false }
     /// 是否显示缩略图(默认开)。
     static var minimap: Bool { UserDefaults.standard.object(forKey: minimapKey) as? Bool ?? true }
     /// 是否显示粘性滚动(默认开)。

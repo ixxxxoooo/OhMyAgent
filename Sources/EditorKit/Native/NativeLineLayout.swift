@@ -331,11 +331,14 @@ final class NativeLayoutCache {
         guard model.hasInlays else { return [] }
         let absolute = TextSpan(location: lineStartOffset + rowStart, length: rowEnd - rowStart)
         var result: [(local: Int, label: String)] = []
-        for item in model.decorations.intersecting(absolute) where item.kind == .inlay {
+        for item in model.decorations.intersecting(absolute) where item.kind == .inlay || item.kind == .ghostText {
             let local = item.range.location - lineStartOffset - rowStart
-            guard local >= 0, local <= rowEnd - rowStart, local < rowEnd - rowStart || isLastRow, let label = item.payload else { continue }
+            guard local >= 0, local <= rowEnd - rowStart, local < rowEnd - rowStart || isLastRow, var label = item.payload else { continue }
+            // 幽灵补全只在光标行内联显示第一行;多行建议在末尾加省略号提示还有后续
+            if item.kind == .ghostText, let newline = label.firstIndex(of: "\n") { label = String(label[..<newline]) + " …" }
             result.append((local, label))
         }
+        result.sort { $0.local < $1.local }
         return result
     }
 
