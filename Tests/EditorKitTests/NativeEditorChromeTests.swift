@@ -120,3 +120,32 @@ struct NativeEditorChromeTests {
         #expect(view.indentUnitColumns == 2)
     }
 }
+
+@MainActor
+@Suite("原生编辑视图外围绘制内容")
+struct NativeEditorChromeDrawTests {
+    @Test("带全部外围视图并滚动后,文本区仍有文字像素")
+    func textStillDrawnWithChrome() throws {
+        let source = (0..<900).map { "    let value\($0) = compute(\($0)) // 注释" }.joined(separator: "\n")
+        let model = NativeEditorModel(document: EditorDocument(text: source), language: .swift)
+        let view = OMEditorView(model: model, theme: EditorTheme.default, font: EditorFontPrefs.preferredFont)
+        view.chrome = [.minimap, .stickyScroll, .folding, .overviewRuler]
+        view.setFrameSize(CGSize(width: 900, height: 600))
+        view.model.setSelections(SelectionSet(caret: 330 * 40))
+        view.scrollToLine(330)
+        guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { Issue.record("无位图"); return }
+        view.cacheDisplay(in: view.bounds, to: rep)
+        var distinct = Set<UInt32>()
+        let area = view.textArea
+        for x in stride(from: Int(area.minX) + 10, to: Int(area.maxX) - 10, by: 3) {
+            for y in stride(from: 10, to: Int(view.bounds.height) - 10, by: 2) {
+                if let color = rep.colorAt(x: x * rep.pixelsWide / Int(view.bounds.width), y: y * rep.pixelsHigh / Int(view.bounds.height))?.usingColorSpace(.sRGB) {
+                    distinct.insert(UInt32(color.redComponent * 255) << 16 | UInt32(color.greenComponent * 255) << 8 | UInt32(color.blueComponent * 255))
+                }
+            }
+        }
+        #expect(view.scrollY > 0)
+        #expect(!view.visibleDrawRows().isEmpty, "scrollY=\(view.scrollY) max=\(view.maxScrollY) rows=\(view.model.lineMap.totalRows)")
+        #expect(distinct.count > 3, "文本区只有 \(distinct.count) 种颜色")
+    }
+}

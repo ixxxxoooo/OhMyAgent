@@ -33,6 +33,7 @@ final class NativeMinimapView: NSView {
         super.init(frame: .zero)
         wantsLayer = true
         layerContentsRedrawPolicy = .onSetNeedsDisplay
+        clipsToBounds = true
         setAccessibilityElement(true)
         setAccessibilityRole(.scrollArea)
         setAccessibilityLabel(String(localized: "代码缩略图"))
@@ -86,7 +87,8 @@ final class NativeMinimapView: NSView {
         guard let context = NSGraphicsContext.current?.cgContext else { return }
         let theme = editor.theme
         theme.background.setFill()
-        dirtyRect.fill()
+        // macOS 14+ 子视图默认不裁剪到自身边界:填充必须自己限制在 bounds 内,否则会盖住兄弟内容。
+        dirtyRect.intersection(bounds).fill()
         let total = lineCount
         guard total > 0 else { return }
         let scroll = miniScroll
