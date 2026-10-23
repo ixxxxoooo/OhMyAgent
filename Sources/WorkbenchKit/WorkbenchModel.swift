@@ -23,7 +23,9 @@ public struct ConversationKey: Hashable, Sendable {
 @Observable
 public final class WorkbenchModel {
     public internal(set) var projects: [ProjectEntry]
-    public private(set) var selectedProjectID: String?
+    public private(set) var selectedProjectID: String? {
+        didSet { if selectedProjectID != oldValue { syncLeftPaneToSelection() } }
+    }
     /// 侧栏各模式离开时的工作区位置(见 `switchLeftPane`);只在本次运行内记忆
     var paneMemory: [LeftPane: PaneMemory] = [:]
     public var layout: WorkbenchLayout { didSet { if layout != oldValue { scheduleSave() } } }

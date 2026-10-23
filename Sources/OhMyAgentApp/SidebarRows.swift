@@ -130,6 +130,32 @@ extension WorkbenchModel {
 }
 
 /// 侧栏展平后的一行(分区标题、会话、提示、「显示更多」、项目分组标题)。
+/// 侧栏行的范围:对应侧栏的两个模式。
+enum SidebarScope: Equatable {
+    /// 全部(旧行为,测试与基准使用)
+    case all
+    /// 会话模式:只含不绑定项目的通用会话
+    case chat
+    /// 代码模式:只含工作区(项目及其会话)
+    case code
+
+    /// 由侧栏模式得到范围。
+    /// - Parameter pane: 侧栏模式
+    init(pane: LeftPane) {
+        self = pane == .workspaces ? .code : .chat
+    }
+
+    /// 该范围是否包含某一类条目。
+    /// - Parameter chatArea: 条目是否属于会话区(通用会话)
+    func includes(chatArea: Bool) -> Bool {
+        switch self {
+        case .all: return true
+        case .chat: return chatArea
+        case .code: return !chatArea
+        }
+    }
+}
+
 struct SidebarRow: Identifiable {
     /// 分区标题种类。
     enum TitleKind { case pinned, general, workspace }
@@ -168,12 +194,13 @@ extension WorkbenchModel {
     /// - Parameters:
     ///   - showArchived: 是否包含已归档会话
     ///   - expandedMore: 已点开「显示更多」的列表键(`general` 或项目 ID)
+    ///   - scope: 行范围(会话模式 / 代码模式 / 全部)
     /// - Returns: 从上到下的行
     @MainActor
-    func sidebarRows(showArchived: Bool, expandedMore: Set<String>) -> [SidebarRow] {
+    func sidebarRows(showArchived: Bool, expandedMore: Set<String>, scope: SidebarScope = .all) -> [SidebarRow] {
         var rows: [SidebarRow] = []
-        // 置顶:只有登记了置顶会话的项目才需要构造会话行
-        let pinned = projects.filter { !$0.pinnedSessions.isEmpty }.flatMap {
+        // 置顶:只有登记了置顶会话的项目才需要构造会话行;会话模式只含通用会话,代码模式只含工作区会话
+        let pinned = projects.filter { !$0.pinnedSessions.isEmpty && scope.includes(chatArea: $0.isChatArea) }.flatMap {
             sidebarSessionList(for: $0, filter: .pinnedOnly).items
         }
         if !pinned.isEmpty {
@@ -182,20 +209,24 @@ extension WorkbenchModel {
                 rows.append(SidebarRow(id: "pin:\(item.id)", kind: .session(item, mode: .pinned, siblings: [], index: 0)))
             }
         }
-        rows.append(SidebarRow(id: "title:general", kind: .title(.general)))
-        if let entry = projects.first(where: \.isChatArea) {
-            appendSessions(of: entry, mode: .general, key: "general", indent: 8, showArchived: showArchived,
-                           expandedMore: expandedMore, emptyHint: .noGeneral, collapsed: false, into: &rows)
-        } else {
-            rows.append(SidebarRow(id: "hint:general", kind: .hint(.noGeneral, indent: 8)))
+        if scope.includes(chatArea: true) {
+            rows.append(SidebarRow(id: "title:general", kind: .title(.general)))
+            if let entry = projects.first(where: \.isChatArea) {
+                appendSessions(of: entry, mode: .general, key: "general", indent: 8, showArchived: showArchived,
+                               expandedMore: expandedMore, emptyHint: .noGeneral, collapsed: false, into: &rows)
+            } else {
+                rows.append(SidebarRow(id: "hint:general", kind: .hint(.noGeneral, indent: 8)))
+            }
         }
-        rows.append(SidebarRow(id: "title:workspace", kind: .title(.workspace)))
-        if workspaceProjects.isEmpty {
-            rows.append(SidebarRow(id: "hint:workspace", kind: .hint(.noWorkspace, indent: 8)))
-        }
-        for project in orderedProjects {
-            appendSessions(of: project, mode: .tree, key: project.id, indent: 16, showArchived: showArchived,
-                           expandedMore: expandedMore, emptyHint: .noSessions, collapsed: project.collapsed, into: &rows)
+        if scope.includes(chatArea: false) {
+            rows.append(SidebarRow(id: "title:workspace", kind: .title(.workspace)))
+            if workspaceProjects.isEmpty {
+                rows.append(SidebarRow(id: "hint:workspace", kind: .hint(.noWorkspace, indent: 8)))
+            }
+            for project in orderedProjects {
+                appendSessions(of: project, mode: .tree, key: project.id, indent: 16, showArchived: showArchived,
+                               expandedMore: expandedMore, emptyHint: .noSessions, collapsed: project.collapsed, into: &rows)
+            }
         }
         return rows
     }

@@ -1,5 +1,5 @@
 // @author ixxxxoooo
-// 侧栏顶部的模式切换:两个纯图标按钮并排,「会话模式」(会话/工作区列表)与「代码模式」(当前项目的文件树)。
+// 侧栏顶部的模式切换:两个纯图标按钮并排,「会话模式」(不绑定项目的通用会话)与「代码模式」(工作区:项目及其会话)。
 // 位置在 35pt 顶部区域、红绿灯与左上浮层按钮的右侧;侧栏过窄放不下时自动退到顶部区域下方单独一行。
 
 import DesignSystem
@@ -33,7 +33,7 @@ struct SidebarModeSwitch: View {
     var body: some View {
         HStack(spacing: TitlebarMetrics.buttonSpacing) {
             modeButton(.sessions, icon: "messages-square", label: String(localized: "会话模式"))
-            modeButton(.files, icon: "code", label: String(localized: "代码模式"))
+            modeButton(.workspaces, icon: "code", label: String(localized: "代码模式"))
         }
     }
 

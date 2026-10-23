@@ -15,10 +15,12 @@ public enum WorkbenchMode: Equatable, Sendable {
 /// 左栏视图。
 public enum LeftPane: String, Codable, CaseIterable, Sendable {
     case sessions, files, git, search
+    /// 侧栏「代码模式」:显示工作区(项目及其会话);`.sessions` 是「会话模式」(不绑定项目的通用会话)。
+    case workspaces
 
     /// 已实现的视图(随里程碑逐步开放)。
-    /// `.sessions` 是侧栏的「会话模式」,`.files` 是「代码模式」(当前项目的文件树)。
-    public static var available: [LeftPane] { [.sessions, .files] }
+    /// 侧栏的两个模式:`.sessions` 会话模式、`.workspaces` 代码模式。
+    public static var available: [LeftPane] { [.sessions, .workspaces] }
 }
 
 /// 右栏视图(文件 / 搜索 / Git)。它们是右栏停靠区里的工具面板标签(`oma-tools:<rawValue>`)。

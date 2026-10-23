@@ -109,4 +109,25 @@ struct SidebarRowsTests {
         #expect(ids.count == 8)
         #expect(index == 0)
     }
+
+    @Test("按模式过滤:会话模式只含通用会话,代码模式只含工作区")
+    func scopeFiltersSections() {
+        let model = makeModel()
+        var chat = project("chat", sessions: sessions("c", count: 2))
+        chat.isChatArea = true
+        let work = project("w", sessions: sessions("w", count: 2))
+        model.projects = [chat, work]
+        let titles: (SidebarScope) -> [String] = { scope in
+            model.sidebarRows(showArchived: false, expandedMore: [], scope: scope).compactMap { row in
+                if case .title(let kind) = row.kind { return "\(kind)" } else { return nil }
+            }
+        }
+        #expect(titles(.chat) == ["general"])
+        #expect(titles(.code) == ["workspace"])
+        #expect(titles(.all) == ["general", "workspace"])
+        let codeRows = model.sidebarRows(showArchived: false, expandedMore: [], scope: .code)
+        #expect(sessionIDs(codeRows, key: work.id) == ["w1", "w0"])
+        #expect(sessionIDs(codeRows, key: "general").isEmpty)
+        #expect(SidebarScope(pane: .sessions) == .chat && SidebarScope(pane: .workspaces) == .code)
+    }
 }

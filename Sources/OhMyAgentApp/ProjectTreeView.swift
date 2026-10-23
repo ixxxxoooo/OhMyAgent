@@ -18,32 +18,17 @@ struct ProjectTreeView: View {
     @State private var showArchived = false
     /// 已点开「显示更多」的列表键
     @State private var expandedMore: Set<String> = []
-    /// 代码模式是否进入过:进入后文件树常驻,切回会话模式也不销毁
-    @State private var codeVisited = false
 
     var body: some View {
         let _ = PanelToggleProbe.count("tree")
         VStack(spacing: 0) {
             // 顶部 35pt:红绿灯与侧栏开关浮层所在区域(可拖动窗口),右侧是「会话 / 代码」模式切换
             SidebarTopStrip(workbench: workbench)
-            // 两个模式的内容常驻、只切换显隐:文件树的展开与滚动位置、会话列表的滚动位置切回来都还在
-            let inCode = workbench.layout.leftPane == .files
-            ZStack {
-                VStack(spacing: 0) { sessionsContent }
-                    .opacity(inCode ? 0 : 1)
-                    .allowsHitTesting(!inCode)
-                    .accessibilityHidden(inCode)
-                if codeVisited || inCode {
-                    ExplorerView(workbench: workbench)
-                        .opacity(inCode ? 1 : 0)
-                        .allowsHitTesting(inCode)
-                        .accessibilityHidden(!inCode)
-                }
-            }
-            .frame(maxHeight: .infinity)
-            .onChange(of: inCode, initial: true) { _, now in if now { codeVisited = true } }
+            // 会话模式只显示通用会话,代码模式只显示工作区(项目及其会话)
+            sessionsContent
             footer
         }
+        .onAppear { workbench.syncLeftPaneToSelection() }
         .dropDestination(for: URL.self) { urls, _ in
             var added = false
             for url in urls where (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true {
@@ -53,9 +38,9 @@ struct ProjectTreeView: View {
         }
     }
 
-    /// 会话模式:主操作 + 置顶/会话/工作区列表。行数据(快照)在这里一次性生成;滚动只改窗口,不会重算。
+    /// 主操作 + 当前模式的列表(会话模式:置顶/会话;代码模式:置顶/工作区)。行数据(快照)在这里一次性生成;滚动只改窗口,不会重算。
     @ViewBuilder private var sessionsContent: some View {
-        let rows = workbench.sidebarRows(showArchived: showArchived, expandedMore: expandedMore)
+        let rows = workbench.sidebarRows(showArchived: showArchived, expandedMore: expandedMore, scope: SidebarScope(pane: workbench.layout.leftPane))
         navigation
         SidebarWindowedList(rows: rows) { row in rowView(row) }
     }
