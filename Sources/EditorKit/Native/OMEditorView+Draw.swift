@@ -159,11 +159,19 @@ extension OMEditorView {
         for decoration in model.decorations.intersecting(visible) {
             guard let color = Self.backgroundColor(for: decoration.kind) else { continue }
             color.setFill()
-            for rect in segments(for: decoration.range, rows: rows) {
-                switch decoration.kind {
-                case .agentAdded, .agentRemoved, .agentModified, .gitAdded, .gitModified, .gitRemoved:
-                    NSRect(x: gutterWidth, y: rect.minY, width: textArea.width, height: rect.height).fill()
-                default:
+            switch decoration.kind {
+            case .agentAdded, .agentRemoved, .agentModified, .gitAdded, .gitModified, .gitRemoved:
+                // 整行底色:按行填充,空行与折行的后续行也要覆盖。
+                let range = decoration.range
+                for item in rows {
+                    let start = item.absoluteStart, end = item.absoluteEnd
+                    let hits = range.isEmpty
+                        ? (range.location >= start && range.location <= end)
+                        : (range.location < max(end, start + 1) && range.upperBound > start)
+                    if hits { NSRect(x: gutterWidth, y: item.y, width: textArea.width, height: lineHeight).fill() }
+                }
+            default:
+                for rect in segments(for: decoration.range, rows: rows) {
                     NSBezierPath(roundedRect: rect.insetBy(dx: -1, dy: 1), xRadius: 2, yRadius: 2).fill()
                 }
             }
@@ -209,6 +217,10 @@ extension OMEditorView {
         path.stroke()
     }
 
+    /// 字符级 Diff 装饰的自定义码(新增 / 删除)。
+    static let diffCharAddedCode = 0x2000
+    static let diffCharRemovedCode = 0x2001
+
     static func backgroundColor(for kind: DecorationKind) -> NSColor? {
         switch kind {
         case .findMatch: return NSColor(OMColors.warning).withAlphaComponent(0.28)
@@ -219,6 +231,8 @@ extension OMEditorView {
         case .agentAdded, .gitAdded: return NSColor(OMColors.diffAdded).withAlphaComponent(0.16)
         case .agentRemoved, .gitRemoved: return NSColor(OMColors.diffRemoved).withAlphaComponent(0.16)
         case .agentModified, .gitModified: return NSColor(OMColors.warning).withAlphaComponent(0.14)
+        case .custom(Self.diffCharAddedCode): return NSColor(OMColors.diffAdded).withAlphaComponent(0.38)
+        case .custom(Self.diffCharRemovedCode): return NSColor(OMColors.diffRemoved).withAlphaComponent(0.38)
         case .snippetStop: return NSColor(OMColors.accent).withAlphaComponent(0.12)
         case .snippetStopActive: return NSColor(OMColors.accent).withAlphaComponent(0.26)
         default: return nil

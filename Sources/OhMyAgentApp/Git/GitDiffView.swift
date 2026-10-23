@@ -3,6 +3,7 @@
 
 import DesignSystem
 import DiffKit
+import EditorKit
 import GitKit
 import IconKit
 import SwiftUI
@@ -16,7 +17,15 @@ struct GitFileDiffView: View {
     var embedded = false
     @AppStorage("diff.sideBySide") private var sideBySide = true
     @Environment(\.tabIsActive) private var isActive
-    @State private var scope: GitDiffScope = .workingTree
+    /// 初始范围;调试钩子 `OMA_DIFF_SCOPE=unstaged|staged|main` 可预置。
+    @State private var scope: GitDiffScope = {
+        switch ProcessInfo.processInfo.environment["OMA_DIFF_SCOPE"] {
+        case "unstaged": return .unstaged
+        case "staged": return .staged
+        case "main": return .mainBranch
+        default: return .workingTree
+        }
+    }()
     @State private var result: Loaded = .loading
     /// 当前定位的差异块下标(上一处/下一处导航)
     @State private var currentHunk = 0
@@ -170,6 +179,9 @@ struct GitFileDiffView: View {
                         Text(actionError).font(OMFonts.small).foregroundStyle(OMColors.danger)
                             .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 14).padding(.vertical, 6)
                     }
+                    if EditorEngine.current == .native2 {
+                        nativeDiff(diff)
+                    } else {
                     ScrollViewReader { proxy in
                         ScrollView {
                             Group {
@@ -183,9 +195,25 @@ struct GitFileDiffView: View {
                             withAnimation(.easeInOut(duration: 0.2)) { proxy.scrollTo(diff.hunks[index].id, anchor: .top) }
                         }
                     }
+                    }
                 }
             }
         }
+    }
+
+    /// 原生 Diff 编辑器(native2 引擎):并排/内联、字符级高亮、折叠未改动区、块头条操作。
+    private func nativeDiff(_ diff: FileDiff) -> some View {
+        let hunkID = diff.hunks.indices.contains(currentHunk) ? diff.hunks[currentHunk].id : nil
+        return NativeDiffEditor(
+            old: diff.oldLines.joined(separator: "\n") + (diff.oldTrailingNewline ? "\n" : ""),
+            new: diff.newLines.joined(separator: "\n") + (diff.newTrailingNewline ? "\n" : ""),
+            diff: diff,
+            layoutMode: sideBySide ? .sideBySide : .inline,
+            language: SyntaxLanguage.detect(path: path),
+            fileName: path,
+            actions: hunkActions(for: diff).map { action in NativeDiffAction(title: action.title, perform: action.perform) },
+            targetHunk: hunkID
+        )
     }
 
     /// 加载差异。仓库定位只做一次(轮询时复用);结果与当前展示相同时不重新赋值,避免每 2 秒重建整页差异视图。

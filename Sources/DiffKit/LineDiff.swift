@@ -42,7 +42,7 @@ public struct DiffHunk: Sendable, Hashable, Identifiable {
     public var added: Int
     public var removed: Int
     /// 覆盖的操作区间(含上下文),回退时使用
-    var opRange: Range<Int>
+    public internal(set) var opRange: Range<Int>
 
     /// 形如 `@@ -a,b +c,d @@` 的头部。
     public var header: String { "@@ -\(oldStart),\(oldCount) +\(newStart),\(newCount) @@" }

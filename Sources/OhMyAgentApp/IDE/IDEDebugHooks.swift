@@ -6,6 +6,7 @@
 // - `OMA_IDE_SIDEBAR=explorer|search|scm`:启动后切到该侧栏视图;`OMA_IDE_QUERY=词` 预填搜索词(配合 search);
 // - `OMA_IDE_PANEL=terminal|problems|output`:启动后显示底部面板并切到该标签页;
 // - `OMA_IDE_PALETTE=<输入>`:启动后打开命令面板并预填输入(如 `>保存`、`:12`、`main`);
+// - `OMA_IDE_OPEN_DIFF=路径`:打开后在编辑器里打开该文件的 Diff 标签;
 // - `OMA_IDE_EDITOR_ACTIONS=动作1;动作2`:打开文件后依次执行编辑器动作(`goto:行`、`foldline:行`、`fold`、`unfold`、`foldAll`、`unfoldAll`、`nextOcc`、`type:文本`、`complete`、`hover:行:列`、`sig`、`actions`、`format`、`refs`、`wait:毫秒`);
 // - `OMA_IDE_SWEEP=N`:开关/切换基准,重复 N 轮「冷开 → 切回 Agent → 热切到 IDE → 关闭」,
 //   perf 日志「IDE 窗口基准」记录每轮耗时与内存漂移(计划预算:热切换 ≤ 50ms、冷开 ≤ 250ms、20 轮漂移 ≤ 10MB)。
@@ -62,6 +63,7 @@ enum IDEDebugHooks {
             if let colon = raw.lastIndex(of: ":"), let number = Int(raw[raw.index(after: colon)...]) { path = String(raw[..<colon]); line = number }
             workspace.model.openFile(absolute(path), line: line, preview: false)
         }
+        if let raw = env["OMA_IDE_OPEN_DIFF"], !raw.isEmpty { workspace.model.openDiff(absolute(raw)) }
         if let raw = env["OMA_IDE_EDITOR_ACTIONS"], !raw.isEmpty { await runEditorActions(raw) }
     }
 
