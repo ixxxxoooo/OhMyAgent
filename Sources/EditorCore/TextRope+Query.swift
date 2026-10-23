@@ -26,7 +26,7 @@ extension TextRope {
     // MARK: 区间读取
 
     /// 按顺序遍历 `range` 覆盖的文本块(零拷贝);`body` 收到的缓冲区只在回调内有效。
-    public func forEachChunk(in range: TextRange, _ body: (UnsafeBufferPointer<UInt16>) -> Void) {
+    public func forEachChunk(in range: TextSpan, _ body: (UnsafeBufferPointer<UInt16>) -> Void) {
         let lower = min(range.location, length)
         let upper = min(range.upperBound, length)
         guard upper > lower else { return }
@@ -52,7 +52,7 @@ extension TextRope {
     }
 
     /// 取区间文本为 UTF-16 数组(越界夹取)。
-    public func slice(_ range: TextRange) -> ContiguousArray<UInt16> {
+    public func slice(_ range: TextSpan) -> ContiguousArray<UInt16> {
         var result = ContiguousArray<UInt16>()
         result.reserveCapacity(min(range.length, length))
         forEachChunk(in: range) { result.append(contentsOf: $0) }
@@ -60,12 +60,12 @@ extension TextRope {
     }
 
     /// 取区间文本为字符串(越界夹取)。
-    public func string(in range: TextRange) -> String {
+    public func string(in range: TextSpan) -> String {
         String(decoding: slice(range), as: UTF16.self)
     }
 
     /// 全文字符串。
-    public func string() -> String { string(in: TextRange(location: 0, length: length)) }
+    public func string() -> String { string(in: TextSpan(location: 0, length: length)) }
 
     // MARK: 行与偏移
 
@@ -95,11 +95,11 @@ extension TextRope {
     }
 
     /// 第 `line` 行的内容区间(不含换行符);行号越界返回 nil。
-    public func lineRange(_ line: Int) -> TextRange? {
+    public func lineRange(_ line: Int) -> TextSpan? {
         guard line >= 0, line < lineCount else { return nil }
         let start = lineStart(line)
         let end = line + 1 < lineCount ? lineStart(line + 1) - 1 : length
-        return TextRange(lower: start, upper: end)
+        return TextSpan(lower: start, upper: end)
     }
 
     /// 偏移所在行号(0 起);偏移超界夹取到文末。

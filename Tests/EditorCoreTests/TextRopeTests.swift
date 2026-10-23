@@ -59,8 +59,8 @@ struct TextRopeTests {
         #expect(rope.lineStart(2) == 7)
         #expect(rope.lineStart(3) == 8)
         #expect(rope.lineStart(4) == 9)
-        #expect(rope.lineRange(1) == TextRange(location: 3, length: 3))
-        #expect(rope.lineRange(2) == TextRange(location: 7, length: 0))
+        #expect(rope.lineRange(1) == TextSpan(location: 3, length: 3))
+        #expect(rope.lineRange(2) == TextSpan(location: 7, length: 0))
         #expect(rope.lineRange(4) == nil)
         #expect(rope.line(containing: 3) == 1)
         #expect(rope.line(containing: 2) == 0)
@@ -69,7 +69,7 @@ struct TextRopeTests {
         #expect(rope.offset(of: TextPosition(line: 1, column: 99)) == 6)
         #expect(rope.lineText(1) == "cde")
         let empty = TextRope()
-        #expect(empty.length == 0 && empty.lineCount == 1 && empty.lineRange(0) == TextRange(location: 0, length: 0))
+        #expect(empty.length == 0 && empty.lineCount == 1 && empty.lineRange(0) == TextSpan(location: 0, length: 0))
     }
 
     @Test("随机增删与朴素模型逐项一致(内容、行数、行起点、行号)")
@@ -88,13 +88,13 @@ struct TextRopeTests {
             } else {
                 let at = Int(rng.next() >> 33) % model.units.count
                 let size = 1 + Int(rng.next() >> 33) % (roll == 9 ? 5000 : 30)
-                let range = TextRange(location: at, length: min(size, model.units.count - at))
+                let range = TextSpan(location: at, length: min(size, model.units.count - at))
                 rope = rope.deleting(range)
                 model.units.removeSubrange(range.location..<range.upperBound)
             }
             #expect(rope.length == model.units.count)
             if step % 100 == 0 {
-                #expect(Array(rope.slice(TextRange(location: 0, length: rope.length))) == model.units)
+                #expect(Array(rope.slice(TextSpan(location: 0, length: rope.length))) == model.units)
                 #expect(rope.lineCount == model.lineCount)
                 for line in stride(from: 0, to: model.lineCount + 1, by: max(1, model.lineCount / 17)) {
                     #expect(rope.lineStart(line) == model.lineStart(line))
@@ -106,7 +106,7 @@ struct TextRopeTests {
                 }
             }
         }
-        #expect(Array(rope.slice(TextRange(location: 0, length: rope.length))) == model.units)
+        #expect(Array(rope.slice(TextSpan(location: 0, length: rope.length))) == model.units)
     }
 
     @Test("随机区间切片与分块遍历一致")
@@ -117,7 +117,7 @@ struct TextRopeTests {
         for _ in 0..<200 {
             let location = Int(rng.next() >> 33) % (text.count + 1)
             let length = Int(rng.next() >> 33) % 5000
-            let range = TextRange(location: location, length: length)
+            let range = TextSpan(location: location, length: length)
             let upper = min(range.upperBound, text.count)
             #expect(Array(rope.slice(range)) == Array(text[location..<max(location, upper)]))
         }
@@ -126,10 +126,10 @@ struct TextRopeTests {
     @Test("快照不可变:后续编辑不影响旧快照")
     func snapshotsAreImmutable() {
         let first = TextRope("hello\nworld")
-        let second = first.replacing(TextRange(location: 0, length: 5), with: ContiguousArray("HELLO!!".utf16))
+        let second = first.replacing(TextSpan(location: 0, length: 5), with: ContiguousArray("HELLO!!".utf16))
         #expect(first.string() == "hello\nworld")
         #expect(second.string() == "HELLO!!\nworld")
-        let third = second.deleting(TextRange(location: 0, length: 8))
+        let third = second.deleting(TextSpan(location: 0, length: 8))
         #expect(second.string() == "HELLO!!\nworld")
         #expect(third.string() == "world")
     }
@@ -138,8 +138,8 @@ struct TextRopeTests {
     func clampsOutOfBounds() {
         let rope = TextRope("abc")
         #expect(rope.inserting(ContiguousArray("X".utf16), at: 99).string() == "abcX")
-        #expect(rope.deleting(TextRange(location: 2, length: 99)).string() == "ab")
-        #expect(rope.deleting(TextRange(location: 50, length: 3)).string() == "abc")
+        #expect(rope.deleting(TextSpan(location: 2, length: 99)).string() == "ab")
+        #expect(rope.deleting(TextSpan(location: 50, length: 3)).string() == "abc")
         #expect(rope.unit(at: -1) == nil && rope.unit(at: 3) == nil)
     }
 
@@ -152,7 +152,7 @@ struct TextRopeTests {
         let units = line.utf16.count
         #expect(rope.lineStart(100_000) == 100_000 * units)
         #expect(rope.line(containing: 123_456 * units + 3) == 123_456)
-        let replaced = rope.replacing(TextRange(location: 0, length: rope.length), with: ContiguousArray("x\ny".utf16))
+        let replaced = rope.replacing(TextSpan(location: 0, length: rope.length), with: ContiguousArray("x\ny".utf16))
         #expect(replaced.string() == "x\ny" && replaced.lineCount == 2)
         #expect(rope.lineCount == 200_001)
     }

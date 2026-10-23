@@ -4,7 +4,7 @@
 import Foundation
 
 /// 文本区间:UTF-16 偏移的半开区间 `[location, location + length)`。
-public struct TextRange: Sendable, Hashable {
+public struct TextSpan: Sendable, Hashable {
     /// 起点偏移(UTF-16)。
     public var location: Int
     /// 长度(UTF-16)。
@@ -31,7 +31,7 @@ public struct TextRange: Sendable, Hashable {
     public func contains(_ offset: Int) -> Bool { offset >= location && offset < upperBound }
 
     /// 与另一区间是否相交(空区间贴边不算相交)。
-    public func intersects(_ other: TextRange) -> Bool {
+    public func intersects(_ other: TextSpan) -> Bool {
         location < other.upperBound && other.location < upperBound
     }
 

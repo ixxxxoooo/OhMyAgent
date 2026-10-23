@@ -143,7 +143,7 @@ public struct TextRope: Sendable {
     }
 
     /// 删除区间(超界夹取)。
-    public func deleting(_ range: TextRange) -> TextRope {
+    public func deleting(_ range: TextSpan) -> TextRope {
         let lower = min(range.location, length)
         let upper = min(range.upperBound, length)
         if upper <= lower { return self }
@@ -151,10 +151,10 @@ public struct TextRope: Sendable {
     }
 
     /// 用 `text` 替换区间(超界夹取)。
-    public func replacing(_ range: TextRange, with text: ContiguousArray<UInt16>) -> TextRope {
+    public func replacing(_ range: TextSpan, with text: ContiguousArray<UInt16>) -> TextRope {
         let lower = min(range.location, length)
         let upper = min(range.upperBound, length)
-        return deleting(TextRange(lower: lower, upper: upper)).inserting(text, at: lower)
+        return deleting(TextSpan(lower: lower, upper: upper)).inserting(text, at: lower)
     }
 
     /// 递归插入:返回替代 `node` 的同高度节点序列(叶子过大或内部节点过满时会分裂成多个)。

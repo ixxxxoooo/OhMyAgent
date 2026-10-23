@@ -35,17 +35,17 @@ public struct DocumentChange: Sendable {
 /// 文档层错误。
 public enum EditorDocumentError: Error, Equatable {
     /// 编辑区间超出文本范围。
-    case rangeOutOfBounds(TextRange)
+    case rangeOutOfBounds(TextSpan)
     /// 同一批编辑存在重叠区间。
     case overlappingEdits
 }
 
 /// 一条待应用的编辑(坐标相对应用前的文本)。
 public struct DocumentEdit: Sendable, Equatable {
-    public var range: TextRange
+    public var range: TextSpan
     public var text: String
 
-    public init(range: TextRange, text: String) {
+    public init(range: TextSpan, text: String) {
         self.range = range
         self.text = text
     }
@@ -164,7 +164,7 @@ public final class EditorDocument {
 
     /// 便捷:单条替换。
     @discardableResult
-    public func replace(_ range: TextRange, with text: String, selectionsBefore: [Selection] = [],
+    public func replace(_ range: TextSpan, with text: String, selectionsBefore: [Selection] = [],
                         selectionsAfter: [Selection] = [], coalesceKey: String? = nil) throws -> DocumentChange? {
         try apply([DocumentEdit(range: range, text: text)], selectionsBefore: selectionsBefore,
                   selectionsAfter: selectionsAfter, coalesceKey: coalesceKey)
@@ -179,13 +179,13 @@ public final class EditorDocument {
         let incoming = normalized.units
         let old = snapshot
         // 求公共前缀与后缀,只替换中间的差异区间。
-        let oldUnits = old.slice(TextRange(location: 0, length: old.length))
+        let oldUnits = old.slice(TextSpan(location: 0, length: old.length))
         let limit = min(oldUnits.count, incoming.count)
         var prefix = 0
         while prefix < limit, oldUnits[prefix] == incoming[prefix] { prefix += 1 }
         var suffix = 0
         while suffix < limit - prefix, oldUnits[oldUnits.count - 1 - suffix] == incoming[incoming.count - 1 - suffix] { suffix += 1 }
-        let oldRange = TextRange(lower: prefix, upper: oldUnits.count - suffix)
+        let oldRange = TextSpan(lower: prefix, upper: oldUnits.count - suffix)
         let inserted = ContiguousArray(incoming[prefix..<(incoming.count - suffix)])
         if oldRange.isEmpty && inserted.isEmpty {
             savedMarker = undoStack.topID

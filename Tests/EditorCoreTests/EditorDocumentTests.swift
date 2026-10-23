@@ -18,9 +18,9 @@ struct EditorDocumentTests {
     func batchEdit() throws {
         let document = EditorDocument(text: "one two three")
         try document.apply([
-            DocumentEdit(range: TextRange(location: 8, length: 5), text: "3"),
-            DocumentEdit(range: TextRange(location: 0, length: 3), text: "1"),
-            DocumentEdit(range: TextRange(location: 4, length: 3), text: "2"),
+            DocumentEdit(range: TextSpan(location: 8, length: 5), text: "3"),
+            DocumentEdit(range: TextSpan(location: 0, length: 3), text: "1"),
+            DocumentEdit(range: TextSpan(location: 4, length: 3), text: "2"),
         ])
         #expect(document.text() == "1 2 3")
         #expect(document.version == 1)
@@ -29,13 +29,13 @@ struct EditorDocumentTests {
     @Test("越界与重叠的编辑被拒绝且文档不变")
     func rejectsInvalid() {
         let document = EditorDocument(text: "abc")
-        #expect(throws: EditorDocumentError.rangeOutOfBounds(TextRange(location: 2, length: 5))) {
-            try document.replace(TextRange(location: 2, length: 5), with: "x")
+        #expect(throws: EditorDocumentError.rangeOutOfBounds(TextSpan(location: 2, length: 5))) {
+            try document.replace(TextSpan(location: 2, length: 5), with: "x")
         }
         #expect(throws: EditorDocumentError.overlappingEdits) {
             try document.apply([
-                DocumentEdit(range: TextRange(location: 0, length: 2), text: "x"),
-                DocumentEdit(range: TextRange(location: 1, length: 2), text: "y"),
+                DocumentEdit(range: TextSpan(location: 0, length: 2), text: "x"),
+                DocumentEdit(range: TextSpan(location: 1, length: 2), text: "y"),
             ])
         }
         #expect(document.text() == "abc" && document.version == 0 && !document.isDirty)
@@ -44,9 +44,9 @@ struct EditorDocumentTests {
     @Test("撤销与重做还原文本与选区")
     func undoRedo() throws {
         let document = EditorDocument(text: "hello")
-        try document.replace(TextRange(location: 5, length: 0), with: " world",
+        try document.replace(TextSpan(location: 5, length: 0), with: " world",
                              selectionsBefore: [Selection(caret: 5)], selectionsAfter: [Selection(caret: 11)])
-        try document.replace(TextRange(location: 0, length: 5), with: "HELLO",
+        try document.replace(TextSpan(location: 0, length: 5), with: "HELLO",
                              selectionsBefore: [Selection(anchor: 0, head: 5)], selectionsAfter: [Selection(caret: 5)])
         #expect(document.text() == "HELLO world")
         #expect(document.undo() == [Selection(anchor: 0, head: 5)])
@@ -63,10 +63,10 @@ struct EditorDocumentTests {
     @Test("新编辑清空重做栈")
     func editClearsRedo() throws {
         let document = EditorDocument(text: "a")
-        try document.replace(TextRange(location: 1, length: 0), with: "b")
+        try document.replace(TextSpan(location: 1, length: 0), with: "b")
         document.undo()
         #expect(document.canRedo)
-        try document.replace(TextRange(location: 1, length: 0), with: "c")
+        try document.replace(TextSpan(location: 1, length: 0), with: "c")
         #expect(!document.canRedo)
         #expect(document.text() == "ac")
     }
@@ -77,15 +77,15 @@ struct EditorDocumentTests {
         let document = EditorDocument(text: "", clock: { clock.now })
         for (index, character) in "abc".enumerated() {
             clock.now += 0.1
-            try document.replace(TextRange(location: index, length: 0), with: String(character), coalesceKey: "typing")
+            try document.replace(TextSpan(location: index, length: 0), with: String(character), coalesceKey: "typing")
         }
         #expect(document.text() == "abc")
         document.undo()
         #expect(document.text() == "" && !document.canUndo)
         document.redo()
         clock.now += 5
-        try document.replace(TextRange(location: 3, length: 0), with: "d", coalesceKey: "typing")
-        try document.replace(TextRange(location: 4, length: 0), with: "e", coalesceKey: "other")
+        try document.replace(TextSpan(location: 3, length: 0), with: "d", coalesceKey: "typing")
+        try document.replace(TextSpan(location: 4, length: 0), with: "e", coalesceKey: "other")
         document.undo()
         #expect(document.text() == "abcd")
         document.undo()
@@ -96,7 +96,7 @@ struct EditorDocumentTests {
     func dirtyTracking() throws {
         let document = EditorDocument(text: "x")
         #expect(!document.isDirty)
-        try document.replace(TextRange(location: 1, length: 0), with: "y")
+        try document.replace(TextSpan(location: 1, length: 0), with: "y")
         #expect(document.isDirty)
         document.markSaved()
         #expect(!document.isDirty)
@@ -112,12 +112,12 @@ struct EditorDocumentTests {
         var received: [DocumentChange] = []
         let token = document.addObserver { received.append($0) }
         try document.apply([
-            DocumentEdit(range: TextRange(location: 0, length: 1), text: "XX"),
-            DocumentEdit(range: TextRange(location: 4, length: 2), text: ""),
+            DocumentEdit(range: TextSpan(location: 0, length: 1), text: "XX"),
+            DocumentEdit(range: TextSpan(location: 4, length: 2), text: ""),
         ])
         document.undo()
         document.removeObserver(token)
-        try document.replace(TextRange(location: 0, length: 0), with: "z")
+        try document.replace(TextSpan(location: 0, length: 0), with: "z")
         #expect(received.count == 2)
         #expect(received[0].edits == [AppliedEdit(location: 4, oldLength: 2, newLength: 0),
                                       AppliedEdit(location: 0, oldLength: 1, newLength: 2)])
@@ -132,7 +132,7 @@ struct EditorDocumentTests {
     func lineEndingRoundTrip() throws {
         let document = EditorDocument(text: "a\r\nb\r\n")
         #expect(document.text() == "a\nb\n" && document.lineEnding == .crlf)
-        try document.replace(TextRange(location: 0, length: 0), with: "x\r\ny")
+        try document.replace(TextSpan(location: 0, length: 0), with: "x\r\ny")
         #expect(document.text() == "x\nya\nb\n")
         #expect(document.textForSaving() == "x\r\nya\r\nb\r\n")
     }

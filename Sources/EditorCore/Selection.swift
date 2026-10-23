@@ -20,7 +20,7 @@ public struct Selection: Sendable, Hashable {
     public init(caret: Int) { self.init(anchor: caret, head: caret) }
 
     /// 对应的文本区间。
-    public var range: TextRange { TextRange(lower: min(anchor, head), upper: max(anchor, head)) }
+    public var range: TextSpan { TextSpan(lower: min(anchor, head), upper: max(anchor, head)) }
     /// 是否为空选区(纯光标)。
     public var isEmpty: Bool { anchor == head }
     /// 是否反向(活动端在起点之前)。
