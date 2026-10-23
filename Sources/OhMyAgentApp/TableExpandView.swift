@@ -24,22 +24,14 @@ enum TableExpander {
         guard !header.isEmpty || !rows.isEmpty else { return }
         let parent = NSApp.keyWindow ?? NSApp.mainWindow
         let container = parent?.frame.size ?? CGSize(width: 1200, height: 800)
-        let natural = naturalWidth(header: header, rows: rows, aligns: aligns)
         let maxWidth = max(container.width - 2 * shadowInset - 48, 480)
-        let width = min(max(natural + 2 * contentPadding + 2, 480), maxWidth)
+        let width = maxWidth
         let lineHeight = ceil(11.5 * OMScale.ui * 1.3) + 16 + 1
         let maxHeight = max(container.height * 0.8 - 60, 200)
         let height = min(CGFloat(rows.count + 1) * lineHeight + 4, maxHeight)
         OMModal.run(width: width) { handle in
-            TableExpandCard(header: header, rows: rows, aligns: aligns, height: height) { handle.finish(-1) }
+            TableExpandCard(header: header, rows: rows, aligns: aligns, height: height, width: width) { handle.finish(-1) }
         }
-    }
-
-    /// 单行排版下整张表格的自然宽度。
-    private static func naturalWidth(header: [String], rows: [[String]], aligns: [MarkdownTableAlign]) -> CGFloat {
-        let text = OMLeafContent.table(header: header, rows: rows, aligns: aligns, roomy: true, maxWidth: nil)
-        guard text.length > 0, let width = text.attribute(omIntrinsicWidthKey, at: 0, effectiveRange: nil) as? CGFloat else { return 0 }
-        return width
     }
 }
 
@@ -49,6 +41,7 @@ private struct TableExpandCard: View {
     let rows: [[String]]
     let aligns: [MarkdownTableAlign]
     let height: CGFloat
+    let width: CGFloat
     let close: () -> Void
 
     var body: some View {
@@ -56,14 +49,14 @@ private struct TableExpandCard: View {
             HStack {
                 Text("表格").font(OMFonts.title).foregroundStyle(OMColors.primaryText)
                 Spacer()
-                Button(action: close) { Image.om("x", size: 14) }
+                Button(action: close) { Image.om("x", size: 14).frame(width: 28, height: 28).contentShape(Rectangle()) }
                     .buttonStyle(.plain)
                     .foregroundStyle(OMColors.secondaryText)
                     .omTooltip("关闭")
                     .accessibilityLabel(String(localized: "关闭"))
             }
             ScrollView([.horizontal, .vertical]) {
-                TableTextLeaf(header: header, rows: rows, aligns: aligns, roomy: true, availableWidth: nil)
+                TableTextLeaf(header: header, rows: rows, aligns: aligns, roomy: true, availableWidth: width - 2 * 16 - 2)
                     .clipShape(RoundedRectangle(cornerRadius: OMMetrics.cardRadius, style: .continuous))
                     .omSolidCard()
             }

@@ -258,7 +258,7 @@ struct TableBlockView: View {
                 .omSolidCard()
                 .overlay(alignment: .topTrailing) {
                     if hovering {
-                        Button { TableExpander.present(header: header, rows: rows, aligns: aligns) } label: {
+                        Button { let (h, r, a) = (header, rows, aligns); Task { @MainActor in TableExpander.present(header: h, rows: r, aligns: a) } } label: {
                             Image.om("maximize-2", size: 12).frame(width: 24, height: 24)
                         }
                         .buttonStyle(.plain)
