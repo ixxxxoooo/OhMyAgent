@@ -2984,3 +2984,4 @@
 "审阅 Agent 改动" = "Review agent changes";
 "幽灵补全(Tab 接受)" = "Ghost completion (Tab to accept)";
 "IDE 窗口里停止输入片刻后,用辅助模型在行尾给出灰色续写建议,Tab 接受、Esc 丢弃。会产生模型请求,默认关闭。" = "In IDE windows, after a short pause the helper model shows a gray continuation at the end of the line. Tab accepts, Esc dismisses. Sends model requests; off by default.";
+"放大查看" = "Expand";

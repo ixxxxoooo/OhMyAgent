@@ -242,6 +242,8 @@ struct TableBlockView: View {
     @Environment(\.markdownDocument) private var document
     /// 可用宽度(8pt 量化,避免拖动窗口时逐像素重建表格);首帧未知时为 nil
     @State private var availableWidth: CGFloat?
+    /// 鼠标是否悬停在表格上(决定是否显示放大按钮)
+    @State private var hovering = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -254,6 +256,20 @@ struct TableBlockView: View {
                 // 表头底色是矩形,按卡片圆角裁切,避免顶部两角溢出
                 .clipShape(RoundedRectangle(cornerRadius: OMMetrics.cardRadius, style: .continuous))
                 .omSolidCard()
+                .overlay(alignment: .topTrailing) {
+                    if hovering {
+                        Button { TableExpander.present(header: header, rows: rows, aligns: aligns) } label: {
+                            Image.om("maximize-2", size: 12).frame(width: 24, height: 24)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(OMColors.secondaryText)
+                        .background(OMColors.card, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
+                        .padding(6)
+                        .omTooltip("放大查看")
+                        .accessibilityLabel(String(localized: "放大查看"))
+                    }
+                }
+                .onHover { hovering = $0 }
         }
     }
 }
