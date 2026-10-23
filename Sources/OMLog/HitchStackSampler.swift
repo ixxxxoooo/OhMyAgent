@@ -1,7 +1,8 @@
 // @author ixxxxoooo
 // 卡顿栈采样:主线程停滞超过阈值后,由进程内看门狗线程每 10~20ms 挂起主线程读一次调用栈(`MainThreadStackProbe`),
 // 直到这次卡顿结束;结束时按真实时长聚合、符号化并落盘(`hitch-<pid>-<序号>-<毫秒>ms.txt`),日志 WARN「卡顿栈」。
-// 开发版 / 演示模式 ≥250ms 即采;正式版 ≥1s 开始采、总时长 ≥2s 才落盘(`OMA_HITCH_SAMPLE=0` 可关闭);只记录符号,不含任何载荷与密钥。
+// 开发版 / 演示模式 ≥120ms 即采;正式版 ≥150ms 开始采并落盘(`OMA_HITCH_SAMPLE=0` 可关闭);只记录符号,不含任何载荷与密钥。
+// 主线程停在模态循环(`runModal`、`NSAlert` 等)里不算卡顿:识别后整次跳过,直到该次停滞结束。
 
 import Foundation
 import Synchronization
@@ -18,22 +19,22 @@ public struct HitchSamplePolicy: Sendable, Equatable {
     public var persistThresholdMs: Int
 
     /// - Parameters:
-    ///   - stallThresholdMs: 开始采样的停滞阈值,默认 250
+    ///   - stallThresholdMs: 开始采样的停滞阈值,默认 120
     ///   - minGapMs: 两次会话的最小间隔,默认 500
     ///   - maxSamples: 最大会话数,默认 60
     ///   - persistThresholdMs: 落盘的最短总时长,默认等于 `stallThresholdMs`
-    public init(stallThresholdMs: Int = 250, minGapMs: Int = 500, maxSamples: Int = 60, persistThresholdMs: Int? = nil) {
+    public init(stallThresholdMs: Int = 120, minGapMs: Int = 500, maxSamples: Int = 60, persistThresholdMs: Int? = nil) {
         self.stallThresholdMs = max(stallThresholdMs, 50)
         self.minGapMs = max(minGapMs, 0)
         self.maxSamples = max(maxSamples, 0)
         self.persistThresholdMs = max(persistThresholdMs ?? self.stallThresholdMs, 0)
     }
 
-    /// 按构建环境选择策略:开发版/演示 250ms 即采并全部落盘;正式版 1s 开始采、≥2s 才落盘。
+    /// 按构建环境选择策略:开发版/演示 120ms 即采并全部落盘;正式版 150ms 开始采并落盘(落盘文件另有保留数量上限)。
     /// - Parameter environment: 环境变量(测试可注入)
     public static func forEnvironment(_ environment: [String: String] = ProcessInfo.processInfo.environment) -> HitchSamplePolicy {
         let verbose = AppEnv.isDev(environment: environment) || environment["OMA_DEMO"] == "1" || environment["OMA_HITCH_SAMPLE"] == "1"
-        return verbose ? HitchSamplePolicy() : HitchSamplePolicy(stallThresholdMs: 1000, persistThresholdMs: 2000)
+        return verbose ? HitchSamplePolicy() : HitchSamplePolicy(stallThresholdMs: 150)
     }
 
     /// 是否应当采样。
@@ -46,6 +47,19 @@ public struct HitchSamplePolicy: Sendable, Equatable {
         guard taken < maxSamples, stalledMs >= stallThresholdMs else { return false }
         if let sinceLastMs, sinceLastMs < minGapMs { return false }
         return true
+    }
+}
+
+/// 模态循环识别(纯逻辑,便于测试):主线程停在 `runModal` / 模态事件循环里是在等人操作,不是卡顿。
+public enum HitchModalFilter {
+    /// 出现即视为模态等待的符号片段
+    private static let markers = ["runModalForWindow", "_doModalLoop", "runModalSession", "_NSTryRunModal", "NSAlert runModal"]
+
+    /// 一条栈的帧描述里是否含模态循环。
+    /// - Parameter descriptions: 帧描述(符号文本)
+    /// - Returns: 含模态循环标记时为 true
+    public static func isModal(_ descriptions: [String]) -> Bool {
+        descriptions.contains { text in markers.contains { text.contains($0) } }
     }
 }
 
@@ -208,6 +222,8 @@ public final class HitchStackSampler: @unchecked Sendable {
         var endedMs: Int?
         /// 最近一次卡顿结束的时刻(用来丢弃「探针已被执行、监视器才来报告」的过期通知)
         var lastStallEndAt: ContinuousClock.Instant?
+        /// 当前这次停滞被判定为模态等待:跳过,直到停滞结束
+        var suppressedModal = false
     }
 
     private let state = Mutex(State())
@@ -256,7 +272,7 @@ public final class HitchStackSampler: @unchecked Sendable {
         let sequence: Int? = state.withLock { value in
             if let ended = value.lastStallEndAt, ended >= postedAt { return nil }
             let since = value.lastEndAt.map { Int(OMLogger.milliseconds(since: $0)) }
-            guard !value.running, policy.shouldSample(stalledMs: stalledMs, sinceLastMs: since, taken: value.taken) else { return nil }
+            guard !value.suppressedModal, !value.running, policy.shouldSample(stalledMs: stalledMs, sinceLastMs: since, taken: value.taken) else { return nil }
             value.running = true
             value.endedMs = nil
             value.taken += 1
@@ -272,6 +288,7 @@ public final class HitchStackSampler: @unchecked Sendable {
     public func stallEnded(totalMs: Int) {
         state.withLock { value in
             value.lastStallEndAt = .now
+            value.suppressedModal = false
             if value.running { value.endedMs = totalMs }
         }
     }
@@ -287,9 +304,25 @@ public final class HitchStackSampler: @unchecked Sendable {
         defer { buffer.deallocate() }
         var aggregator = HitchStackAggregator()
         var totalMs = 0
+        var checkedModal = false
         while true {
             let count = activeProbe.capture(into: buffer, capacity: capacity)
-            if count > 0 { aggregator.add(Array(UnsafeBufferPointer(start: buffer, count: count))) }
+            if count > 0 {
+                let frames = Array(UnsafeBufferPointer(start: buffer, count: count))
+                // 第一份栈判一次:停在模态循环里就放弃本次,并压制到这次停滞结束,避免每 0.5s 重复采样
+                if !checkedModal {
+                    checkedModal = true
+                    if HitchModalFilter.isModal(frames.map(StackSymbolizer.describe)) {
+                        state.withLock { value in
+                            value.running = false
+                            value.suppressedModal = true
+                            value.taken -= 1
+                        }
+                        return
+                    }
+                }
+                aggregator.add(frames)
+            }
             usleep(UInt32(intervalMs * 1000))
             let ended = state.withLock { $0.endedMs }
             let elapsed = Int(OMLogger.milliseconds(since: startedAt))

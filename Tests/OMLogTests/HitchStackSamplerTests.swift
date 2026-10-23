@@ -34,16 +34,24 @@ struct HitchStackSamplerTests {
         #expect(!HitchStackSampler.isEnabled(environment: ["OMA_DEMO": "1", "OMA_HITCH_SAMPLE": "0"]))
     }
 
-    @Test("策略:正式版 1s 开始采、2s 才落盘;开发版 250ms 全落盘")
+    @Test("策略:正式版 150ms 开始采并落盘;开发版 120ms 全落盘")
     func environmentPolicy() {
         let release = HitchSamplePolicy.forEnvironment([:])
-        #expect(release.stallThresholdMs == 1000)
-        #expect(release.persistThresholdMs == 2000)
+        #expect(release.stallThresholdMs == 150)
+        #expect(release.persistThresholdMs == 150)
         let dev = HitchSamplePolicy.forEnvironment(["OMA_DEV": "1"])
-        #expect(dev.stallThresholdMs == 250)
-        #expect(dev.persistThresholdMs == 250)
+        #expect(dev.stallThresholdMs == 120)
+        #expect(dev.persistThresholdMs == 120)
         #expect(HitchStackSampler.isSamplingAllowed(environment: [:]))
         #expect(!HitchStackSampler.isSamplingAllowed(environment: ["OMA_HITCH_SAMPLE": "0"]))
+    }
+
+    @Test("模态循环:runModal / _doModalLoop 视为等待用户,普通栈不是")
+    func modalFilter() {
+        #expect(HitchModalFilter.isModal(["main (in OhMyAgent)", "-[NSApplication runModalForWindow:] (in AppKit)"]))
+        #expect(HitchModalFilter.isModal(["-[NSApplication _doModalLoop:peek:] (in AppKit)"]))
+        #expect(!HitchModalFilter.isModal(["main (in OhMyAgent)", "CA::Transaction::commit (in QuartzCore)"]))
+        #expect(!HitchModalFilter.isModal([]))
     }
 
     @Test("聚合:同栈计数、空栈忽略、按次数排序")
