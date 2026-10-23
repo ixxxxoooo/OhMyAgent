@@ -203,7 +203,7 @@ struct TabItemView: View {
 
     /// 标签当前的状态填充(无填充为 nil);背景与标题渐隐覆盖层共用,保证两者颜色一致。
     private var tabFill: Color? {
-        isActive ? (hovering ? OMColors.subtleFill : nil) : (hovering ? OMColors.pressedFill : OMColors.hoverFill)
+        isActive ? (hovering ? OMColors.pressedFill : OMColors.hoverFill) : (hovering ? OMColors.subtleFill : nil)
     }
 
     var body: some View {
@@ -231,7 +231,7 @@ struct TabItemView: View {
         // 关闭按钮/状态点叠在标签右端,不单独占位
         .overlay(alignment: .trailing) { trailing.padding(.trailing, 6) }
         .frame(height: TabMetrics.height)
-        .foregroundStyle(isActive ? OMColors.secondaryText : OMColors.primaryText)
+        .foregroundStyle(isActive ? OMColors.primaryText : OMColors.secondaryText)
         .background(
             RoundedRectangle(cornerRadius: TabMetrics.radius, style: .continuous)
                 .fill(tabFill ?? Color.clear)
@@ -267,10 +267,10 @@ struct TabItemView: View {
     private var icon: some View {
         if case .file(let path) = tab.kind {
             OMFileIcon(name: (path as NSString).lastPathComponent, size: 14)
-                .opacity(isActive ? 0.75 : 1)
+                .opacity(isActive ? 1 : 0.75)
         } else {
             Image.om(tabIcon(tab.kind), size: 12)
-                .foregroundStyle(isActive ? OMColors.tertiaryText : OMColors.primaryText)
+                .foregroundStyle(isActive ? OMColors.primaryText : OMColors.tertiaryText)
         }
     }
 
