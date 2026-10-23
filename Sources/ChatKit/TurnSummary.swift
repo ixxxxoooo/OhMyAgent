@@ -67,19 +67,38 @@ public struct TurnSummary: Sendable, Equatable {
         return usage.inputTokens + usage.cachedReadTokens + usage.cachedWriteTokens
     }
 
+    /// 本轮新处理的输入:未缓存输入 + 缓存写入(缓存读取是复用的前缀,不算新增)。
+    public var freshInput: Int {
+        guard let usage else { return 0 }
+        return usage.inputTokens + usage.cachedWriteTokens
+    }
+
+    /// 按 Claude 价格倍率折合成全价输入 token(缓存读 0.1×、缓存写 1.25×、输出 5×),只作对比参考。
+    public var billedEquivalent: Int {
+        guard let usage else { return 0 }
+        let value = Double(usage.inputTokens) + 1.25 * Double(usage.cachedWriteTokens) + 0.1 * Double(usage.cachedReadTokens) + 5 * Double(usage.outputTokens)
+        return Int(value.rounded())
+    }
+
     /// 提示缓存命中率(缓存读取 ÷ 输入侧总量);没有缓存读写(模型或提供商不支持缓存)或没有输入时为 nil。
     public var cacheHitRate: Double? {
         guard let usage, usage.cachedReadTokens + usage.cachedWriteTokens > 0, inputTotal > 0 else { return nil }
         return Double(usage.cachedReadTokens) / Double(inputTotal)
     }
 
-    /// 展示用的各个片段(模型、耗时、输入/输出/总计 token、缓存命中率、tps),已本地化。
+    /// 展示用的各个片段(模型、耗时、新增/缓存读/输出 token、缓存命中率、tps),已本地化。
     public var parts: [String] {
         var result: [String] = []
         if !model.isEmpty { result.append(model) }
         result.append(durationText)
         if let usage, usage.totalTokens > 0 {
-            result.append(String(localized: "输入 \(inputTotal.formatted()) · 输出 \(usage.outputTokens.formatted()) · 共 \(usage.totalTokens.formatted()) token"))
+            // 有缓存时按口径分开:新增(全价/1.25×)与缓存读(0.1×)不加总,避免把便宜的缓存读当成消耗;
+            // 终端 Claude Code 转圈处的「↓ N tokens」只统计输出,两边对照时看「输出」
+            if usage.cachedReadTokens + usage.cachedWriteTokens > 0 {
+                result.append(String(localized: "新增 \(freshInput.formatted()) · 缓存读 \(usage.cachedReadTokens.formatted()) · 输出 \(usage.outputTokens.formatted()) token"))
+            } else {
+                result.append(String(localized: "输入 \(inputTotal.formatted()) · 输出 \(usage.outputTokens.formatted()) token"))
+            }
             if let rate = cacheHitRate { result.append(String(localized: "缓存命中 \(Int((rate * 100).rounded()))%")) }
         }
         if let tps = tokensPerSecond { result.append(String(format: String(localized: "%.1f tps"), tps)) }
@@ -87,7 +106,7 @@ public struct TurnSummary: Sendable, Equatable {
         return result
     }
 
-    /// token 明细(多行,悬停提示用):未缓存输入、缓存读取、缓存写入、输出、总计与命中率;没有用量时为 nil。
+    /// token 明细(多行,悬停提示用):未缓存输入、缓存读取、缓存写入、输出、总计、计费折合与命中率;没有用量时为 nil。
     public var tokenDetail: String? {
         guard let usage, usage.totalTokens > 0 else { return nil }
         var lines = [
@@ -96,6 +115,7 @@ public struct TurnSummary: Sendable, Equatable {
             String(localized: "缓存写入 \(usage.cachedWriteTokens.formatted())(约 1.25 倍计费)"),
             String(localized: "输出 \(usage.outputTokens.formatted())"),
             String(localized: "总计 \(usage.totalTokens.formatted())"),
+            String(localized: "折合全价输入约 \(billedEquivalent.formatted())(按 Claude 价格倍率)"),
         ]
         if let rate = cacheHitRate { lines.append(String(localized: "缓存命中率 \(Int((rate * 100).rounded()))%")) }
         return lines.joined(separator: "\n")

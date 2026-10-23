@@ -26,20 +26,25 @@ struct TurnSummaryTests {
         #expect(TurnSummary(model: "m", durationSeconds: 2, usage: TurnUsage(inputTokens: 5)).tokensPerSecond == nil)
     }
 
-    @Test("token 明细:输入含缓存、总计、命中率与悬停明细;无缓存时不显示命中率")
+    @Test("token 明细:新增与缓存读分开、不加总;悬停明细含总计、计费折合与命中率;无缓存时不显示命中率")
     func tokenDetail() throws {
         let usage = TurnUsage(inputTokens: 100, outputTokens: 50, cachedReadTokens: 800, cachedWriteTokens: 100)
         let summary = TurnSummary(model: "m", durationSeconds: 5, usage: usage)
         #expect(summary.inputTotal == 1000)
         #expect(summary.cacheHitRate == 0.8)
-        #expect(summary.parts.contains { $0.contains("1,000") && $0.contains("1,050") })
+        #expect(summary.freshInput == 200)
+        // 100 + 1.25×100 + 0.1×800 + 5×50 = 555
+        #expect(summary.billedEquivalent == 555)
+        #expect(summary.parts.contains { $0.contains("新增 200") && $0.contains("缓存读 800") && $0.contains("输出 50") })
+        #expect(!summary.parts.contains { $0.contains("1,050") })
         #expect(summary.parts.contains { $0.contains("80%") })
         let detail = try #require(summary.tokenDetail)
-        #expect(detail.contains("800") && detail.contains("1,050") && detail.contains("80%"))
+        #expect(detail.contains("800") && detail.contains("1,050") && detail.contains("555") && detail.contains("80%"))
         #expect(summary.copyText.contains(detail))
         let plain = TurnSummary(model: "m", durationSeconds: 5, usage: TurnUsage(inputTokens: 100, outputTokens: 50))
         #expect(plain.cacheHitRate == nil)
         #expect(!plain.parts.contains { $0.contains("缓存") })
+        #expect(plain.parts.contains { $0.contains("输入 100") && $0.contains("输出 50") })
         #expect(TurnSummary(model: "m", durationSeconds: 5).tokenDetail == nil)
     }
 
