@@ -50,6 +50,7 @@ extension OMEditorView {
         lastMouseLocation = point
         model.document.breakUndoCoalescing()
         if beginScrollbarDrag(at: point) { return }
+        if stickyClick(at: point) { return }
         if point.x < gutterWidth { gutterClick(at: point, event: event); return }
 
         let offset = offset(at: point)
@@ -171,7 +172,7 @@ extension OMEditorView {
     func startAutoscrollIfNeeded() {
         guard dragMode != .none else { return }
         let outside = lastMouseLocation.y < 0 || lastMouseLocation.y > bounds.height
-            || lastMouseLocation.x < gutterWidth || lastMouseLocation.x > bounds.width
+            || lastMouseLocation.x < gutterWidth || lastMouseLocation.x > textArea.maxX
         guard outside else {
             autoscrollTimer?.invalidate()
             autoscrollTimer = nil
@@ -183,7 +184,7 @@ extension OMEditorView {
                 guard let self, self.dragMode != .none else { return }
                 let p = self.lastMouseLocation
                 let dy: CGFloat = p.y < 0 ? p.y : (p.y > self.bounds.height ? p.y - self.bounds.height : 0)
-                let dx: CGFloat = p.x < self.gutterWidth ? p.x - self.gutterWidth : (p.x > self.bounds.width ? p.x - self.bounds.width : 0)
+                let dx: CGFloat = p.x < self.gutterWidth ? p.x - self.gutterWidth : (p.x > self.textArea.maxX ? p.x - self.textArea.maxX : 0)
                 self.scrollBy(dx: dx * 0.5, dy: dy * 0.5)
                 self.updateDragSelection(at: p)
             }

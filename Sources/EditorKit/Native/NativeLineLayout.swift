@@ -4,6 +4,7 @@
 
 import AppKit
 import CoreText
+import DesignSystem
 import EditorCore
 
 /// 一个视图行的排版结果。
@@ -63,7 +64,15 @@ final class NativeRowLayout {
 @MainActor
 final class NativeLineLayout {
     let rows: [NativeRowLayout]
-    init(rows: [NativeRowLayout]) { self.rows = rows }
+    /// 行首空白的视觉列数(制表符展开)。
+    let leadingColumns: Int
+    /// 整行是否只有空白(缩进参考线需要向邻行借用缩进)。
+    let isBlank: Bool
+    init(rows: [NativeRowLayout], leadingColumns: Int = 0, isBlank: Bool = true) {
+        self.rows = rows
+        self.leadingColumns = leadingColumns
+        self.isBlank = isBlank
+    }
 }
 
 /// 行排版构建器与缓存。
@@ -76,6 +85,13 @@ final class NativeLayoutCache {
     /// 已按当前外观解析成具体色的前景与语法色(动态色在创建 `CTLine` 时即被固化,必须先解析)。
     private var foreground: NSColor
     private var syntaxColors: [SyntaxKind: NSColor] = [:]
+    /// 彩色括号的循环色与未配对括号色。
+    private var rainbow: [NSColor] = []
+    private var unmatchedColor = NSColor.red
+    /// 括号索引(nil 或未启用则不着色)。
+    weak var brackets: NativeBracketStore?
+    /// 是否启用彩色括号。
+    var rainbowEnabled = true
     private var entries: [Int: NativeLineLayout] = [:]
     /// 缓存上限(行)。
     static let capacity = 2_400
@@ -104,6 +120,14 @@ final class NativeLayoutCache {
         }
         foreground = resolvedForeground
         syntaxColors = resolved
+        var rainbowColors: [NSColor] = []
+        var unmatched = NSColor.red
+        appearance.performAsCurrentDrawingAppearance {
+            rainbowColors = [SyntaxKind.type, .function, .keyword, .number].compactMap { resolved[$0] }
+            unmatched = (NSColor(OMColors.danger).usingColorSpace(.sRGB)) ?? NSColor.red
+        }
+        rainbow = rainbowColors.isEmpty ? [resolvedForeground] : rainbowColors
+        unmatchedColor = unmatched
     }
 
     static func measureColumnWidth(_ font: NSFont) -> CGFloat {
@@ -186,7 +210,14 @@ final class NativeLayoutCache {
             start = end
         }
         if rows.isEmpty { rows.append(makeRow(units: units, start: 0, end: units.count, line: line, lineStartOffset: range.location)) }
-        return NativeLineLayout(rows: rows)
+        // 行首缩进列数与是否空白行(给缩进参考线用)。
+        var columns = 0
+        var blank = true
+        let tab = max(model.metrics.tabSize, 1)
+        for unit in units {
+            if unit == 0x20 { columns += 1 } else if unit == 0x09 { columns += tab - columns % tab } else { blank = false; break }
+        }
+        return NativeLineLayout(rows: rows, leadingColumns: columns, isBlank: blank)
     }
 
     /// 构建一个视图行:展开制表符、替换控制字符、套语法色。
@@ -237,6 +268,8 @@ final class NativeLayoutCache {
                                                    attributes: [.font: font, .foregroundColor: foreground])
         applySyntax(to: attributed, rowStart: start, rowEnd: end, lineStartOffset: lineStartOffset,
                     modelToDisplay: needsMap || display.count != end - start ? modelToDisplay : nil)
+        applyBrackets(to: attributed, rowStart: start, rowEnd: end, lineStartOffset: lineStartOffset,
+                      modelToDisplay: needsMap || display.count != end - start ? modelToDisplay : nil)
         let ctLine = CTLineCreateWithAttributedString(attributed)
         let width = CGFloat(CTLineGetTypographicBounds(ctLine, nil, nil, nil))
         let identity = !needsMap && display.count == end - start
@@ -260,6 +293,23 @@ final class NativeLayoutCache {
             let displayUpper = modelToDisplay.map { Int($0[upper]) } ?? upper
             guard displayUpper > displayLower, displayUpper <= displayLength else { continue }
             text.addAttribute(.foregroundColor, value: color, range: NSRange(location: displayLower, length: displayUpper - displayLower))
+        }
+    }
+
+    /// 彩色括号:括号字符按嵌套深度循环取色,未配对的括号用危险色。
+    private func applyBrackets(to text: NSMutableAttributedString, rowStart: Int, rowEnd: Int, lineStartOffset: Int, modelToDisplay: [Int32]?) {
+        guard rainbowEnabled, rowEnd > rowStart, let store = brackets, store.enabled else { return }
+        let absolute = TextSpan(location: lineStartOffset + rowStart, length: rowEnd - rowStart)
+        let items = store.brackets.intersecting(absolute)
+        guard !items.isEmpty else { return }
+        for item in items {
+            guard case .custom(let code) = item.kind else { continue }
+            let local = item.range.location - absolute.location
+            guard local >= 0, local < rowEnd - rowStart else { continue }
+            let display = modelToDisplay.map { Int($0[local]) } ?? local
+            guard display < text.length else { continue }
+            let color = code == BracketCode.unmatched ? unmatchedColor : rainbow[BracketCode.depth(code) % rainbow.count]
+            text.addAttribute(.foregroundColor, value: color, range: NSRange(location: display, length: 1))
         }
     }
 }

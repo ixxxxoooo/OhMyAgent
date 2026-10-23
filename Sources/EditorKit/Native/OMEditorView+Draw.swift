@@ -86,6 +86,7 @@ extension OMEditorView {
         context.saveGState()
         context.clip(to: textArea)
         drawCurrentLine(rows: rows, in: context)
+        drawIndentGuides(rows: rows)
         drawSelections(rows: rows)
         drawDecorationBackgrounds(rows: rows)
         drawText(rows: rows, in: context)
@@ -95,6 +96,8 @@ extension OMEditorView {
         context.restoreGState()
 
         drawGutter(rows: rows)
+        drawSticky()
+        drawOverviewRuler(rows: rows)
         drawScrollbars()
     }
 
@@ -106,7 +109,7 @@ extension OMEditorView {
         for item in rows where item.line == caretLine && item.rowInLine == 0 {
             // 软换行行整体高亮。
             let rowCount = model.lineMap.wrapRows(ofLine: item.line)
-            NSRect(x: gutterWidth, y: item.y, width: bounds.width - gutterWidth, height: lineHeight * CGFloat(rowCount)).fill()
+            NSRect(x: gutterWidth, y: item.y, width: textArea.width, height: lineHeight * CGFloat(rowCount)).fill()
         }
     }
 
@@ -156,7 +159,7 @@ extension OMEditorView {
             for rect in segments(for: decoration.range, rows: rows) {
                 switch decoration.kind {
                 case .agentAdded, .agentRemoved, .agentModified, .gitAdded, .gitModified, .gitRemoved:
-                    NSRect(x: gutterWidth, y: rect.minY, width: bounds.width - gutterWidth, height: rect.height).fill()
+                    NSRect(x: gutterWidth, y: rect.minY, width: textArea.width, height: rect.height).fill()
                 default:
                     NSBezierPath(roundedRect: rect.insetBy(dx: -1, dy: 1), xRadius: 2, yRadius: 2).fill()
                 }

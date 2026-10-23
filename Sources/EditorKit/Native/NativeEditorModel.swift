@@ -23,7 +23,9 @@ public final class NativeEditorModel {
     /// 全部 View Zone(锚点以模型行计)。
     public private(set) var zones: [ViewZone] = []
     /// 装饰集合(诊断、查找命中、Agent 改动……)。
-    public var decorations = DecorationSet()
+    public var decorations = DecorationSet() { didSet { decorationsRevision &+= 1 } }
+    /// 装饰集合的修订号(概览尺等派生缓存据此失效)。
+    public private(set) var decorationsRevision = 0
     /// 列宽规则(制表符宽度、全角宽度)。
     public private(set) var metrics = ColumnMetrics()
     /// 软换行列数;`nil` 表示不换行。
@@ -65,7 +67,12 @@ public final class NativeEditorModel {
     }
 
     deinit {
-        // 观察者随文档释放;文档为共享对象,主线程外无法安全移除,弱引用已避免循环。
+        // 观察者回调只弱引用本模型;视图销毁时应显式调用 `detach()` 移除。
+    }
+
+    /// 从共享文档上摘掉观察者(视图销毁时调用,避免文档长期持有无效回调)。
+    public func detach() {
+        if let token = observerToken { document.removeObserver(token); observerToken = nil }
     }
 
     // MARK: 尺寸与配置

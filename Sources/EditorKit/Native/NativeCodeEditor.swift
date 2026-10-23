@@ -16,6 +16,8 @@ public struct NativeCodeEditor: NSViewRepresentable {
     public var markers: [Int: LineMarker]
     public var diagnostics: [EditorDiagnostic]
     public var wrapsLines: Bool
+    /// IDE 外围视图(缩略图、粘性滚动、折叠、概览尺)。
+    public var chrome: EditorChrome
     /// 光标/选区变化回调(状态栏「行 列」)。
     public var onCaretChange: ((EditorCaret) -> Void)?
     /// 文档变化(用户编辑或外部写入)回调,宿主据此防抖同步字符串镜像与脏标记。
@@ -30,10 +32,11 @@ public struct NativeCodeEditor: NSViewRepresentable {
     ///   - markers: 行号栏标记(0 起始行号)
     ///   - diagnostics: 语言服务器诊断
     ///   - wrapsLines: 是否软换行
+    ///   - chrome: 外围视图
     ///   - onCaretChange: 光标变化回调
     ///   - onEdited: 文档变化回调
     public init(document: EditorDocument, language: SyntaxLanguage, isEditable: Bool = true, revealLine: Int? = nil,
-                markers: [Int: LineMarker] = [:], diagnostics: [EditorDiagnostic] = [], wrapsLines: Bool = false,
+                markers: [Int: LineMarker] = [:], diagnostics: [EditorDiagnostic] = [], wrapsLines: Bool = false, chrome: EditorChrome = [],
                 onCaretChange: ((EditorCaret) -> Void)? = nil, onEdited: ((DocumentChange) -> Void)? = nil) {
         self.document = document
         self.language = language
@@ -42,6 +45,7 @@ public struct NativeCodeEditor: NSViewRepresentable {
         self.markers = markers
         self.diagnostics = diagnostics
         self.wrapsLines = wrapsLines
+        self.chrome = chrome
         self.onCaretChange = onCaretChange
         self.onEdited = onEdited
     }
@@ -57,6 +61,7 @@ public struct NativeCodeEditor: NSViewRepresentable {
         model.isEditable = isEditable
         let view = OMEditorView(model: model, theme: EditorTheme.default, font: EditorFontPrefs.preferredFont)
         view.wrapsLines = wrapsLines
+        view.chrome = chrome
         context.coordinator.language = language
         sync(view, context.coordinator)
         return view
@@ -71,6 +76,7 @@ public struct NativeCodeEditor: NSViewRepresentable {
             view.reloadSyntax()
         }
         if view.wrapsLines != wrapsLines { view.wrapsLines = wrapsLines }
+        if view.chrome != chrome { view.chrome = chrome }
         sync(view, context.coordinator)
         if let line = revealLine, context.coordinator.revealedLine != line {
             context.coordinator.revealedLine = line
@@ -78,6 +84,10 @@ public struct NativeCodeEditor: NSViewRepresentable {
             view.model.setSelections(SelectionSet(caret: document.snapshot.lineStart(target)))
             view.scrollToLine(target)
         }
+    }
+
+    public static func dismantleNSView(_ view: OMEditorView, coordinator: Coordinator) {
+        view.model.detach()
     }
 
     /// 同步回调、标记与诊断。

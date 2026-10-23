@@ -15,6 +15,8 @@ public struct EditorChrome: OptionSet, Sendable {
     public static let stickyScroll = EditorChrome(rawValue: 1 << 1)
     /// 行号栏折叠箭头与代码折叠
     public static let folding = EditorChrome(rawValue: 1 << 2)
+    /// 右侧概览尺(诊断、查找命中、Git 改动的缩略标记)
+    public static let overviewRuler = EditorChrome(rawValue: 1 << 3)
 }
 
 /// 偏好键(设置 → 编辑器 → 代码编辑)。

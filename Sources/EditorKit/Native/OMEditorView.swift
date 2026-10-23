@@ -42,7 +42,8 @@ public final class OMEditorView: NSView {
     var caretVisible = true
     var caretTimer: Timer?
     /// 行标记(新增/删除/修改/Agent)与诊断行。
-    public var lineMarkers: [Int: LineMarker] = [:] { didSet { needsDisplay = true } }
+    public var lineMarkers: [Int: LineMarker] = [:] { didSet { markersRevision &+= 1; needsDisplay = true } }
+    var markersRevision = 0
     public var diagnosticLines: [Int: EditorDiagnostic.Severity] = [:] { didSet { needsDisplay = true } }
     /// 注册到视图里的 View Zone 内容视图(按 zone id)。
     var zoneViews: [Int: NSView] = [:]
@@ -58,6 +59,22 @@ public final class OMEditorView: NSView {
     var columnAnchor: (line: Int, column: Double)?
     var autoscrollTimer: Timer?
     var lastMouseLocation = CGPoint.zero
+    /// IDE 外围视图选项(缩略图、粘性滚动、折叠、概览尺)。
+    public var chrome: EditorChrome = [] { didSet { if chrome != oldValue { chromeDidChange() } } }
+    /// 缩略图视图(启用时存在)。
+    var minimap: NativeMinimapView?
+    /// 括号索引(彩色括号与括号匹配)。
+    let brackets = NativeBracketStore()
+    /// 粘性滚动当前显示的块头行与计算键(顶行、文档版本)。
+    var stickyLines: [Int] = []
+    var stickyKey = StickyKey(topLine: -1, version: -1)
+    /// 粘性区域高度(点)。
+    var stickyHeight: CGFloat { CGFloat(stickyLines.count) * lineHeight }
+    /// 概览尺标记缓存。
+    var overviewMarks: [OverviewMark] = []
+    var overviewKey = OverviewKey()
+    /// 括号匹配装饰是否存在(避免每次选区变化都去清理)。
+    var hasBracketMatch = false
     /// 窗口大小变化时的防抖任务。
     var wrapTask: Task<Void, Never>?
     /// 主题监听。
@@ -77,6 +94,7 @@ public final class OMEditorView: NSView {
     public var onScroll: (() -> Void)?
 
     enum DragMode { case none, character, word, line, column }
+    struct StickyKey: Equatable { var topLine: Int; var version: Int }
     struct ScrollbarDrag { var vertical: Bool; var grabOffset: CGFloat }
 
     // MARK: 初始化
@@ -101,9 +119,16 @@ public final class OMEditorView: NSView {
         model.setMetrics(ColumnMetrics(tabSize: model.indentUnit == "\t" ? 4 : max(model.indentUnit.count, 2)))
         model.onDocumentChange = { [weak self] change in self?.modelDidChange(change) }
         model.onSelectionChange = { [weak self] in self?.selectionDidChange() }
+        cache.brackets = brackets
+        brackets.onUpdate = { [weak self] in
+            guard let self else { return }
+            self.cache.clear()
+            self.needsDisplay = true
+        }
         tokens.onUpdate = { [weak self] in
             guard let self else { return }
             self.cache.clear()
+            self.minimap?.invalidateAll()
             self.needsDisplay = true
         }
         themeObserver = NotificationCenter.default.addObserver(forName: ThemeRuntime.didChange, object: nil, queue: .main) { [weak self] _ in
@@ -133,7 +158,7 @@ public final class OMEditorView: NSView {
     /// 一个字符列的宽度。
     var columnWidth: CGFloat { cache.columnWidth }
     /// 文本区域(行号栏右侧)。
-    var textArea: CGRect { CGRect(x: gutterWidth, y: 0, width: max(bounds.width - gutterWidth, 0), height: bounds.height) }
+    var textArea: CGRect { CGRect(x: gutterWidth, y: 0, width: max(bounds.width - gutterWidth - rightInset, 0), height: bounds.height) }
     /// 文本原点 x(含水平滚动)。
     var textOriginX: CGFloat { gutterWidth + textInset - scrollX }
 
@@ -202,7 +227,10 @@ public final class OMEditorView: NSView {
         } else {
             cache.documentChanged(change)
             tokens.documentChanged(change, desired: visibleOffsetRange())
+            brackets.documentChanged(change)
+            minimap?.documentDidChange()
         }
+        refreshSticky()
         updateGutterWidth()
         clampScroll()
         layoutZoneViews()
@@ -215,6 +243,8 @@ public final class OMEditorView: NSView {
     private func selectionDidChange() {
         restartCaretBlink()
         revealPrimaryCaret()
+        updateBracketMatch()
+        minimap?.needsDisplay = true
         needsDisplay = true
         onSelectionChange?()
         NSAccessibility.post(element: self, notification: .selectedTextChanged)
@@ -224,6 +254,8 @@ public final class OMEditorView: NSView {
     public func reloadSyntax() {
         cache.clear()
         tokens.load(snapshot: model.document.snapshot, language: model.language, desired: visibleOffsetRange())
+        brackets.load(snapshot: model.document.snapshot, language: model.language)
+        stickyKey = StickyKey(topLine: -1, version: -1)
         needsDisplay = true
     }
 
@@ -276,7 +308,7 @@ public final class OMEditorView: NSView {
         let apply: @MainActor () -> Void = { [weak self] in
             guard let self else { return }
             let columns: Double? = self.wrapsLines
-                ? Double(max(((self.bounds.width - self.gutterWidth - self.textInset * 2 - 12) / self.columnWidth).rounded(.down), 8)) : nil
+                ? Double(max(((self.textArea.width - self.textInset * 2 - 12) / self.columnWidth).rounded(.down), 8)) : nil
             if self.model.wrapColumns != columns || self.model.lineHeight != Double(EditorFontPrefs.lineHeight(for: self.font)) {
                 self.model.setLineHeight(Double(EditorFontPrefs.lineHeight(for: self.font)))
                 self.model.setWrapColumns(columns)
@@ -301,6 +333,7 @@ public final class OMEditorView: NSView {
         super.setFrameSize(newSize)
         if widthChanged, wrapsLines { applyWrapSettings(immediate: false) }
         clampScroll()
+        layoutMinimap()
         layoutZoneViews()
         tokens.ensureCovered(visibleOffsetRange())
         needsDisplay = true
@@ -335,6 +368,8 @@ public final class OMEditorView: NSView {
     }
 
     func didScroll() {
+        refreshSticky()
+        minimap?.editorDidScroll()
         layoutZoneViews()
         tokens.ensureCovered(visibleOffsetRange())
         showScrollbars()
@@ -345,14 +380,14 @@ public final class OMEditorView: NSView {
     /// 保证偏移可见(上下留 `margin` 行,左右留若干列)。
     public func reveal(offset: Int, margin: Int = 2) {
         let rect = caretRect(forOffset: offset)
-        let top = rect.minY - CGFloat(margin) * lineHeight
+        let top = rect.minY - stickyHeight - CGFloat(margin) * lineHeight
         let bottom = rect.maxY + CGFloat(margin) * lineHeight
         var nextY = scrollY
         if top < 0 { nextY += top } else if bottom > bounds.height { nextY += bottom - bounds.height }
         var nextX = scrollX
         if !wrapsLines {
             let left = rect.minX - textArea.minX - textInset - columnWidth * 3
-            let right = rect.maxX - bounds.width + columnWidth * 6
+            let right = rect.maxX - textArea.maxX + columnWidth * 6
             if left < 0 { nextX += left } else if right > 0 { nextX += right }
         }
         scroll(toX: nextX, y: nextY)
@@ -387,7 +422,7 @@ public final class OMEditorView: NSView {
         for (index, zone) in layout.zones.enumerated() {
             guard let view = zoneViews[zone.id] else { continue }
             let y = CGFloat(layout.y(ofZoneAt: index)) + topInset - scrollY
-            let frame = CGRect(x: gutterWidth, y: y, width: max(bounds.width - gutterWidth, 0), height: CGFloat(zone.height))
+            let frame = CGRect(x: gutterWidth, y: y, width: textArea.width, height: CGFloat(zone.height))
             view.isHidden = frame.maxY < 0 || frame.minY > bounds.height
             if view.frame != frame { view.frame = frame }
         }
