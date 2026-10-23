@@ -85,19 +85,27 @@ final class EditorMinimapView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         guard editor.lineIndexIsLive else { return }
         let theme = editor.theme
-        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
-        let key = BarsKey(size: bounds.size, scale: scale, revision: contentRevision,
-                          lineCount: editor.lineIndex.lineCount, foreground: theme.foreground)
-        if barsCache == nil || !(barsCache?.key.matches(key) ?? false) {
-            barsCache = renderBars(key).map { (key, $0) }
-        }
-        barsCache?.image.draw(in: bounds, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+        barsImage()?.draw(in: bounds, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
         // 视口滑块
         let slider = sliderRect()
         theme.foreground.withAlphaComponent(0.10).setFill()
         slider.fill(using: .sourceOver)
         theme.foreground.withAlphaComponent(0.22).setStroke()
         NSBezierPath(rect: slider.insetBy(dx: 0.5, dy: 0.5)).stroke()
+    }
+
+    /// 取条形位图:键未变时复用缓存,否则重新渲染。
+    /// - Parameter scale: 位图缩放;nil 时取窗口的 backingScaleFactor
+    /// - Returns: 位图;行索引未就绪或尺寸为空时 nil
+    func barsImage(scale: CGFloat? = nil) -> NSBitmapImageRep? {
+        guard editor.lineIndexIsLive else { return nil }
+        let scale = scale ?? window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        let key = BarsKey(size: bounds.size, scale: scale, revision: contentRevision,
+                          lineCount: editor.lineIndex.lineCount, foreground: editor.theme.foreground)
+        if barsCache == nil || !(barsCache?.key.matches(key) ?? false) {
+            barsCache = renderBars(key).map { (key, $0) }
+        }
+        return barsCache?.image
     }
 
     /// 把整张条形图渲染进位图(每行一条与缩进、长度成比例的细条)。
@@ -109,9 +117,10 @@ final class EditorMinimapView: NSView {
         guard pixelsWide > 0, pixelsHigh > 0,
               let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: pixelsWide, pixelsHigh: pixelsHigh, bitsPerSample: 8,
                                          samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
-                                         bytesPerRow: 0, bitsPerPixel: 0),
-              let context = NSGraphicsContext(bitmapImageRep: rep) else { return nil }
+                                         bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
+        // 必须先设点尺寸再建上下文:上下文按此换算缩放,之后再设则按像素坐标绘制(条形缩一半并落到下半部)
         rep.size = key.size
+        guard let context = NSGraphicsContext(bitmapImageRep: rep) else { return nil }
         let theme = editor.theme
         let index = editor.lineIndex
         let ns = editor.textView.string as NSString
