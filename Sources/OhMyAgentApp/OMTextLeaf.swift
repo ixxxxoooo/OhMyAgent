@@ -91,6 +91,49 @@ final class OMLeafScrollView: NSScrollView {
 
     required init?(coder: NSCoder) { nil }
 
+    isolated deinit { hoverTimer?.invalidate() }
+
+    // MARK: 悬停显示横向滚动条
+
+    /// 悬停期间反复「闪现」滚动条的定时器:悬浮滚动条只在滚动时出现,用户不知道内容可以横向滚动;
+    /// 鼠标停在超宽内容上时让它一直显示,移开后按系统机制自然淡出。
+    private var hoverTimer: Timer?
+    private var hoverArea: NSTrackingArea?
+
+    /// 内容是否比可视区域宽(有东西可横向滚动)。
+    private var overflowsHorizontally: Bool {
+        (documentView?.frame.width ?? 0) > contentView.bounds.width + 0.5
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let hoverArea { removeTrackingArea(hoverArea) }
+        let area = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self, userInfo: nil)
+        addTrackingArea(area)
+        hoverArea = area
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        guard !persistentScroller, overflowsHorizontally else { return }
+        flashScrollers()
+        hoverTimer?.invalidate()
+        let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.overflowsHorizontally else { return }
+                self.flashScrollers()
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        hoverTimer = timer
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        hoverTimer?.invalidate()
+        hoverTimer = nil
+    }
+
     override func scrollWheel(with event: NSEvent) {
         // 横向为主的滚动留给自己,纵向为主的交给外层滚动视图
         if abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY) { super.scrollWheel(with: event) } else { nextResponder?.scrollWheel(with: event) }

@@ -142,8 +142,8 @@ struct TableTextLeaf: View {
         hasher.combine(availableWidth)
         return OMTextLeaf(
             signature: hasher.finalize(),
-            // 内边距由单元格自己带;超宽时一律常驻滚动条(悬浮滚动条只在滚动时才出现,用户不知道可以横向滚动)
-            config: OMTextLeafConfig(wrap: false, inset: .zero, persistentScroller: true, hugsContent: true)
+            // 内边距由单元格自己带;超宽时鼠标悬停即显示横向滚动条,移开消失(见 `OMLeafScrollView`)
+            config: OMTextLeafConfig(wrap: false, inset: .zero, hugsContent: true)
         ) { OMLeafContent.table(header: header, rows: rows, aligns: aligns, roomy: roomy, maxWidth: availableWidth) }
         .accessibilityLabel(String(localized: "表格"))
     }
