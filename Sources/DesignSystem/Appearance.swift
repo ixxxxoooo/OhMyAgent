@@ -67,6 +67,24 @@ public enum AccentChoice: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// 流光样式:运行中文字上扫过的高亮效果。
+public enum FlowStyle: String, CaseIterable, Identifiable, Sendable {
+    /// 经典:单色高亮带。
+    case classic
+    /// 流光溢彩:多色渐变带,随主题强调色流动。
+    case aurora
+
+    public var id: String { rawValue }
+
+    /// 设置页显示名。
+    public var title: String {
+        switch self {
+        case .classic: "经典"
+        case .aurora: "流光溢彩"
+        }
+    }
+}
+
 /// 外观偏好模型。
 @MainActor
 @Observable
@@ -89,6 +107,8 @@ public final class AppearanceModel {
     public var uiFontScale: Double { didSet { save("uiFontScale", uiFontScale); applyScale() } }
     /// 时间线字号缩放(0.85–1.5)
     public var timelineFontScale: Double { didSet { save("timelineFontScale", timelineFontScale); applyScale() } }
+    /// 流光样式(运行中会话标题等文字的流光)。
+    public var flowStyle: FlowStyle { didSet { save("flowStyle", flowStyle.rawValue) } }
     /// 紧凑密度
     public var isCompact: Bool { didSet { save("compact", isCompact) } }
     /// 减弱动效(也会跟随系统"减少动态效果")
@@ -149,6 +169,7 @@ public final class AppearanceModel {
         syntaxOverrides = defaults.dictionary(forKey: Self.prefix + "syntaxOverrides") as? [String: String] ?? [:]
         uiFontScale = double("uiFontScale", 1)
         timelineFontScale = double("timelineFontScale", 1)
+        flowStyle = FlowStyle(rawValue: string("flowStyle") ?? "") ?? .classic
         isCompact = bool("compact", false)
         reduceMotion = bool("reduceMotion", false)
         alwaysOpaque = bool("alwaysOpaque", false)
@@ -191,7 +212,7 @@ public final class AppearanceModel {
     public func reset() {
         theme = .system; themeID = ThemePackage.defaultID; accent = .system; accent2 = .system
         customAccentHex = "#D97757"; customAccent2Hex = "#5769F7"; uiFontScale = 1; timelineFontScale = 1
-        isCompact = false; themedDiff = true; reduceMotion = false; alwaysOpaque = false; fallbackOnLowPower = true
+        isCompact = false; flowStyle = .classic; themedDiff = true; reduceMotion = false; alwaysOpaque = false; fallbackOnLowPower = true
         syntaxSchemeID = SyntaxScheme.followThemeID; syntaxOverrides = [:]
     }
 

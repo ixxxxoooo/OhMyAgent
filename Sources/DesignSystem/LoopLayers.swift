@@ -211,12 +211,29 @@ final class OMFlowBandLayerView: OMLoopLayerView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
 
-    func configure(color: Color) {
-        let cg = Self.cgColor(color)
-        band.colors = [cg.copy(alpha: 0) ?? cg, cg, cg.copy(alpha: 0) ?? cg]
+    /// 多色模式(流光溢彩)下带宽更大、扫动更慢,让色彩有展开的空间。
+    private var multicolor = false
+
+    func configure(color: Color, palette: [Color]) {
+        if palette.count > 1 {
+            let cgs = palette.map(Self.cgColor)
+            let edge = cgs[0].copy(alpha: 0) ?? cgs[0]
+            let tail = cgs[cgs.count - 1].copy(alpha: 0) ?? cgs[cgs.count - 1]
+            band.colors = [edge] + cgs + [tail]
+            band.locations = nil
+        } else {
+            let cg = Self.cgColor(color)
+            band.colors = [cg.copy(alpha: 0) ?? cg, cg, cg.copy(alpha: 0) ?? cg]
+        }
+        let isMulti = palette.count > 1
+        if isMulti != multicolor {
+            multicolor = isMulti
+            layoutLayers()
+            if running { applyAnimations() }
+        }
     }
 
-    private var bandWidth: CGFloat { max(bounds.width * 0.45, 28) }
+    private var bandWidth: CGFloat { max(bounds.width * (multicolor ? 0.9 : 0.45), multicolor ? 56 : 28) }
 
     override func layoutLayers() {
         CATransaction.begin()
@@ -236,7 +253,7 @@ final class OMFlowBandLayerView: OMLoopLayerView {
         let sweep = CABasicAnimation(keyPath: "position.x")
         sweep.fromValue = -bandWidth / 2
         sweep.toValue = bounds.width + bandWidth / 2
-        sweep.duration = 2.4
+        sweep.duration = multicolor ? 3.2 : 2.4
         sweep.repeatCount = .infinity
         sweep.isRemovedOnCompletion = false
         band.add(sweep, forKey: "flow")
@@ -246,22 +263,28 @@ final class OMFlowBandLayerView: OMLoopLayerView {
 /// 流光高亮带的 SwiftUI 桥接。
 struct OMFlowBand: NSViewRepresentable {
     let color: Color
+    /// 多色调色板(≥2 色时为流光溢彩,否则用 `color` 单色)。
+    let palette: [Color]
     let running: Bool
 
     func makeNSView(context: Context) -> OMFlowBandLayerView { OMFlowBandLayerView(frame: .zero) }
 
     func updateNSView(_ view: OMFlowBandLayerView, context: Context) {
-        view.configure(color: color)
+        view.configure(color: color, palette: palette)
         view.running = running
     }
 }
 
 extension View {
     /// 文字流光:在内容之上叠一条循环扫过的高亮带,并用内容自身作遮罩(只照亮笔画)。
-    /// - Parameter color: 高亮带颜色
+    /// - Parameter color: 高亮带颜色(经典样式);流光溢彩样式改用主题强调色等组成的多色渐变
     public func omFlowOverlay(color: Color) -> some View {
-        overlay {
-            OMLoopGated { running in OMFlowBand(color: color, running: running) }
+        let aurora = AppearanceModel.shared.flowStyle == .aurora
+        let palette: [Color] = aurora
+            ? [OMColors.accent, OMColors.accent2, OMColors.success, OMColors.warning, OMColors.accent]
+            : []
+        return overlay {
+            OMLoopGated { running in OMFlowBand(color: color, palette: palette, running: running) }
                 .mask(self)
                 .allowsHitTesting(false)
         }

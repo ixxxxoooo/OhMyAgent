@@ -293,6 +293,18 @@ struct AppearancePage: View {
                 }
                 Note("把鼠标滚轮「一格一跳」的滚动变成连续的平滑滚动,只作用于本应用,无需额外权限;触控板不受影响,立即生效。").footnote()
             }
+            SettingsCard("流光") {
+                SettingsRow("流光样式") {
+                    Picker("", selection: $appearance.flowStyle) {
+                        ForEach(FlowStyle.allCases) { Text(LocalizedStringKey($0.title)).tag($0) }
+                    }
+                    .labelsHidden().pickerStyle(.segmented).fixedSize()
+                }
+                Text("运行中的会话标题").font(OMFonts.body).flowingText(true)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(8)
+                    .background(OMColors.card, in: RoundedRectangle(cornerRadius: OMRadius.control))
+                Note("运行中的会话标题与最新一步上扫过的高亮效果:「经典」为单色高亮带,「流光溢彩」为随主题强调色流动的多色渐变。").footnote()
+            }
             SettingsCard("等待动画(Spinner Verbs)") {
                 ForEach(WorkingVerbStyle.allCases) { style in
                     VerbStyleRow(style: style, selected: WorkingVerbStyle.resolve(verbStyle) == style) { verbStyle = style.rawValue }

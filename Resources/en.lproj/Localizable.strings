@@ -2940,3 +2940,9 @@
 "在项目目录运行命令" = "Run commands in the project";
 "打开网页与本地预览" = "Open web pages and local previews";
 "查看运行输出与日志" = "View run output and logs";
+
+"流光" = "Shimmer";
+"流光样式" = "Shimmer style";
+"流光溢彩" = "Aurora";
+"运行中的会话标题" = "Running session title";
+"运行中的会话标题与最新一步上扫过的高亮效果:「经典」为单色高亮带,「流光溢彩」为随主题强调色流动的多色渐变。" = "The highlight sweeping over running session titles and the latest step: Classic is a single-color band; Aurora is a multi-color gradient that flows with the theme accent colors.";
