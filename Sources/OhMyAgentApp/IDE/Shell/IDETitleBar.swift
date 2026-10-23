@@ -1,6 +1,7 @@
 // @author ixxxxoooo
-// IDE 窗口标题栏(35pt,与 Agent 窗口一致):左侧红绿灯让位 + 侧栏开关;中间工作区名称(可拖动窗口);
-// 右侧面板开关、Agent 面板开关、设置、最外侧「Agents Window ↗」。
+// IDE 窗口标题栏(35pt,与 Agent 窗口一致):左侧红绿灯让位 + 侧栏开关;
+// 中间命令中心(对齐 VS Code:回退 / 前进 + 显示工作区名的搜索框,点击打开快速打开);
+// 右侧面板开关、Agent 面板开关、设置、最外侧「Agents Window ↗」;空白处可拖动窗口。
 
 import DesignSystem
 import IconKit
@@ -12,6 +13,7 @@ private struct TitleBarIconButton: View {
     let icon: String
     let label: String
     var isOn = false
+    var enabled = true
     let action: () -> Void
     @State private var hovering = false
 
@@ -19,11 +21,40 @@ private struct TitleBarIconButton: View {
         Button(action: action) {
             Image.om(icon, size: 14)
                 .frame(width: TitlebarMetrics.buttonSize, height: TitlebarMetrics.buttonSize)
-                .background(hovering ? OMColors.pressedFill : .clear, in: RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))
+                .background(hovering && enabled ? OMColors.pressedFill : .clear, in: RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .foregroundStyle(isOn ? OMColors.primaryText : OMColors.secondaryText)
+        .disabled(!enabled)
+        .foregroundStyle(!enabled ? OMColors.tertiaryText.opacity(0.6) : isOn ? OMColors.primaryText : OMColors.secondaryText)
+        .onHover { hovering = $0 }
+        .omTooltip(label)
+        .accessibilityLabel(label)
+    }
+}
+
+/// 标题栏中间的搜索框:显示工作区名,点击打开快速打开(⌘P)。
+private struct CommandCenterField: View {
+    let title: String
+    let label: String
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: OMSpacing.xs) {
+                Image.om("search", size: 12)
+                Text(title).lineLimit(1).truncationMode(.middle)
+            }
+            .font(OMFonts.small)
+            .foregroundStyle(OMColors.secondaryText)
+            .frame(maxWidth: .infinity)
+            .frame(height: 22)
+            .background(hovering ? OMColors.hoverFill : OMColors.subtleFill, in: RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: OMRadius.control, style: .continuous).strokeBorder(OMColors.hairline))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .omTooltip(label)
         .accessibilityLabel(label)
@@ -32,24 +63,57 @@ private struct TitleBarIconButton: View {
 
 /// IDE 标题栏。
 struct IDETitleBar: View {
-    let model: IDEWindowModel
+    let workspace: IDEWorkspace
+    private var model: IDEWindowModel { workspace.model }
+    /// 中间命令中心两侧为左右按钮组预留的宽度(取较宽的右侧,保证命令中心在窗口内居中)
+    private static let sideReserve: CGFloat = 224
+    /// 命令中心最大宽度
+    private static let centerMaxWidth: CGFloat = 560
 
     var body: some View {
+        buttons
+            .overlay { commandCenter }
+            .frame(height: TitlebarMetrics.height)
+            .frame(maxWidth: .infinity)
+            // 拖动区必须在背景色之上(先加拖动区、再加背景色),否则不透明背景会拦住按下事件
+            .background(WindowDragArea())
+            .background(OMColors.contentBackground)
+    }
+
+    /// 命令中心:回退 / 前进 + 搜索框,整体在窗口内水平居中。
+    private var commandCenter: some View {
         let shortcuts = ShortcutStore.shared
-        HStack(spacing: TitlebarMetrics.buttonSpacing) {
+        return HStack(spacing: TitlebarMetrics.buttonSpacing) {
+            TitleBarIconButton(
+                icon: "arrow-left",
+                label: String(localized: "回退") + " (\(shortcuts.binding(for: .goBack).display))",
+                enabled: model.canGoBack
+            ) { model.goBack() }
+            TitleBarIconButton(
+                icon: "arrow-right",
+                label: String(localized: "前进") + " (\(shortcuts.binding(for: .goForward).display))",
+                enabled: model.canGoForward
+            ) { model.goForward() }
+            CommandCenterField(
+                title: model.workspaceName ?? String(localized: "未打开文件夹"),
+                label: String(localized: "转到文件…") + " (\(shortcuts.binding(for: .quickOpen).display))"
+            ) { workspace.openPalette("") }
+                .padding(.leading, OMSpacing.xs)
+        }
+        .frame(maxWidth: Self.centerMaxWidth)
+        .padding(.horizontal, Self.sideReserve)
+    }
+
+    /// 左右两侧的按钮组。
+    private var buttons: some View {
+        let shortcuts = ShortcutStore.shared
+        return HStack(spacing: TitlebarMetrics.buttonSpacing) {
             TitleBarIconButton(
                 icon: "panel-left",
                 label: (model.sidebarVisible ? String(localized: "隐藏侧栏") : String(localized: "显示侧栏")) + " (\(shortcuts.binding(for: .toggleSidebar).display))",
                 isOn: model.sidebarVisible
             ) { model.toggleSidebar() }
                 .padding(.leading, TitlebarMetrics.trafficLightInset)
-            Spacer(minLength: 8)
-            Text(model.workspaceName ?? String(localized: "未打开文件夹"))
-                .font(OMFonts.small)
-                .foregroundStyle(OMColors.secondaryText)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .allowsHitTesting(false)
             Spacer(minLength: 8)
             TitleBarIconButton(
                 icon: "panel-bottom",
@@ -67,10 +131,5 @@ struct IDETitleBar: View {
             ModeSwitchButton(target: .agent)
                 .padding(.trailing, 8)
         }
-        .frame(height: TitlebarMetrics.height)
-        .frame(maxWidth: .infinity)
-        // 拖动区必须在背景色之上(先加拖动区、再加背景色),否则不透明背景会拦住按下事件
-        .background(WindowDragArea())
-        .background(OMColors.contentBackground)
     }
 }

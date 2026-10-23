@@ -113,6 +113,7 @@ public extension IDEWindowModel {
             return file == path || file.hasPrefix(path + "/")
         }
         editor = layout
+        forgetNavigation(under: path)
     }
 
     /// 把指向 `from`(或其子路径)的文件标签改指 `to`(重命名/移动后)。
@@ -126,6 +127,7 @@ public extension IDEWindowModel {
             let newPath = to + file.dropFirst(from.count)
             layout.retarget(tab.id, kind: .file(path: String(newPath)), title: (newPath as NSString).lastPathComponent)
         }
+        forgetNavigation(under: from)
         editor = layout
     }
 

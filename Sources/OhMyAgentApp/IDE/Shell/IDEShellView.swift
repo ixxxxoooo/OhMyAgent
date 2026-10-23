@@ -15,7 +15,7 @@ struct IDEShellView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            IDETitleBar(model: model)
+            IDETitleBar(workspace: workspace)
             Rectangle().fill(OMColors.hairline).frame(height: 1)
             if model.settingsShown {
                 // 设置页内嵌在本窗口:与 Agent 窗口共用同一套设置视图,不切窗口

@@ -239,10 +239,15 @@ enum MouseNavigationMonitor {
         guard token == nil else { return }
         token = NSEvent.addLocalMonitorForEvents(matching: .otherMouseDown) { event in
             let handled = MainActor.assumeIsolated { () -> Bool in
-                guard workbench.mode == .workspace else { return false }
                 switch event.buttonNumber {
-                case 3: workbench.goBack(); return true
-                case 4: workbench.goForward(); return true
+                case 3:
+                    if IDEWindowManager.shared.route(.goBack) { return true }
+                    guard workbench.mode == .workspace else { return false }
+                    workbench.goBack(); return true
+                case 4:
+                    if IDEWindowManager.shared.route(.goForward) { return true }
+                    guard workbench.mode == .workspace else { return false }
+                    workbench.goForward(); return true
                 default: return false
                 }
             }

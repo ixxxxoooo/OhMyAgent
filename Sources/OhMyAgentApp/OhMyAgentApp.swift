@@ -261,12 +261,13 @@ struct WorkbenchCommands: Commands {
             Button("上一个标签") { if !IDEWindowManager.shared.route(.previousTab) { workbench.cycleTab(by: -1) } }
                 .keyboardShortcut(shortcuts.shortcut(for: .previousTab))
             Divider()
-            Button("回退") { workbench.goBack() }
+            // IDE 窗口为键盘窗口时走它自己的文件导航历史
+            Button("回退") { if !IDEWindowManager.shared.route(.goBack) { workbench.goBack() } }
                 .keyboardShortcut(shortcuts.shortcut(for: .goBack))
-                .disabled(!workbench.nav.canGoBack)
-            Button("前进") { workbench.goForward() }
+                .disabled(!(WindowContext.shared.ideModel?.canGoBack ?? workbench.nav.canGoBack))
+            Button("前进") { if !IDEWindowManager.shared.route(.goForward) { workbench.goForward() } }
                 .keyboardShortcut(shortcuts.shortcut(for: .goForward))
-                .disabled(!workbench.nav.canGoForward)
+                .disabled(!(WindowContext.shared.ideModel?.canGoForward ?? workbench.nav.canGoForward))
             Divider()
             ForEach(1...9, id: \.self) { number in
                 Button(number == 9 ? String(localized: "最后一个标签") : String(localized: "第 \(number) 个标签")) { workbench.selectTab(number: number) }

@@ -38,7 +38,9 @@ public final class IDEWindowModel: Identifiable {
     /// 窗口外框(由窗口控制器在移动/缩放后回写)
     public var frame: IDEWindowFrame? { didSet { if frame != oldValue { changed() } } }
     /// 编辑器停靠布局
-    public var editor: DockLayout { didSet { if editor != oldValue { changed() } } }
+    public var editor: DockLayout { didSet { if editor != oldValue { changed(); recordFileNavigation() } } }
+    /// 文件导航历史(标题栏「回退 / 前进」,仅界面状态,不持久化)
+    public internal(set) var fileNav = FilesNavStack()
     /// 最近一次激活时间
     public private(set) var lastActivated: Date
 
