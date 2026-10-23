@@ -39,6 +39,8 @@ public struct FoldState: Sendable, Equatable {
 
     /// 被隐藏的行区间(已合并、升序、互不相交)。
     public func hiddenRanges() -> [ClosedRange<Int>] {
+        // 热路径(视图行换算)大多没有折叠:直接返回,避免每次遍历全部区域
+        if collapsedStarts.isEmpty { return [] }
         var result: [ClosedRange<Int>] = []
         for region in regions where collapsedStarts.contains(region.startLine) {
             let hidden = (region.startLine + 1)...region.endLine

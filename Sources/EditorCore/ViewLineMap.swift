@@ -11,8 +11,8 @@ public struct ViewLineMap: Sendable {
     private var rows: [Int32]
     /// 每个模型行是否被折叠隐藏。
     private var hidden: [Bool]
-    /// 树状数组(1 起),累计「有效视图行数」(隐藏行为 0)。
-    private var tree: [Int]
+    /// 树状数组(1 起),累计「有效视图行数」(隐藏行为 0);用 Int32 省一半内存(视图行总数不会超过 21 亿),溢出时回绕而不崩溃。
+    private var tree: [Int32]
 
     /// 创建映射,所有行占 1 个视图行。
     /// - Parameter lineCount: 模型行数(至少 1)
@@ -20,7 +20,7 @@ public struct ViewLineMap: Sendable {
         let count = max(1, lineCount)
         rows = [Int32](repeating: 1, count: count)
         hidden = [Bool](repeating: false, count: count)
-        tree = [Int](repeating: 0, count: count + 1)
+        tree = [Int32](repeating: 0, count: count + 1)
         rebuildTree()
     }
 
@@ -47,9 +47,9 @@ public struct ViewLineMap: Sendable {
         while step * 2 <= lineCount { step *= 2 }
         while step > 0 {
             let next = position + step
-            if next <= lineCount, tree[next] <= remaining {
+            if next <= lineCount, Int(tree[next]) <= remaining {
                 position = next
-                remaining -= tree[next]
+                remaining -= Int(tree[next])
             }
             step /= 2
         }
@@ -89,7 +89,7 @@ public struct ViewLineMap: Sendable {
             rows = [1]
             hidden = [false]
         }
-        tree = [Int](repeating: 0, count: rows.count + 1)
+        tree = [Int32](repeating: 0, count: rows.count + 1)
         rebuildTree()
     }
 
@@ -99,7 +99,7 @@ public struct ViewLineMap: Sendable {
         var sum = 0
         var index = min(count, rows.count)
         while index > 0 {
-            sum += tree[index]
+            sum += Int(tree[index])
             index -= index & -index
         }
         return sum
@@ -108,18 +108,18 @@ public struct ViewLineMap: Sendable {
     private mutating func add(_ delta: Int, at line: Int) {
         var index = line + 1
         while index <= rows.count {
-            tree[index] += delta
+            tree[index] &+= Int32(truncatingIfNeeded: delta)
             index += index & -index
         }
     }
 
     private mutating func rebuildTree() {
         let count = rows.count
-        if tree.count != count + 1 { tree = [Int](repeating: 0, count: count + 1) }
-        for index in 1...count { tree[index] = hidden[index - 1] ? 0 : Int(rows[index - 1]) }
+        if tree.count != count + 1 { tree = [Int32](repeating: 0, count: count + 1) }
+        for index in 1...count { tree[index] = hidden[index - 1] ? 0 : rows[index - 1] }
         for index in 1...count {
             let parent = index + (index & -index)
-            if parent <= count { tree[parent] += tree[index] }
+            if parent <= count { tree[parent] &+= tree[index] }
         }
     }
 }

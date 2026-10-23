@@ -83,10 +83,17 @@ public final class EditorDocument {
     ///   - text: 原始文本
     ///   - clock: 时间源(测试可注入以控制撤销合并)
     public init(text: String, clock: @escaping @MainActor () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }) {
-        let normalized = LineEnding.normalize(ContiguousArray(text.utf16))
-        self.snapshot = TextRope(utf16: normalized.units)
-        self.lineEnding = normalized.dominant
-        self.hadMixedLineEndings = normalized.isMixed
+        // 绝大多数文件只含 `\n`:无 `\r` 时走流式装载,省掉整份 UTF-16 临时数组
+        if !text.utf8.contains(13) {
+            self.snapshot = TextRope.streaming(text)
+            self.lineEnding = .lf
+            self.hadMixedLineEndings = false
+        } else {
+            let normalized = LineEnding.normalize(ContiguousArray(text.utf16))
+            self.snapshot = TextRope(utf16: normalized.units)
+            self.lineEnding = normalized.dominant
+            self.hadMixedLineEndings = normalized.isMixed
+        }
         self.clock = clock
     }
 

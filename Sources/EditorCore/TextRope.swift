@@ -55,7 +55,8 @@ enum RopeTuning {
     /// 叶子允许的最大 UTF-16 单元数,超过则切分。
     static let leafMax = 2048
     /// 切分与合并的目标叶子大小。
-    static let leafTarget = 1024
+    /// 取 1008:2 字节 × 1008 + 32 字节数组头恰为 2048,贴合 malloc 的 512 字节档位,避免 1024 单元时被取整到 2560(浪费约 20%)。
+    static let leafTarget = 1008
     /// 内部节点最大子节点数。
     static let maxChildren = 32
 }
@@ -77,6 +78,29 @@ public struct TextRope: Sendable {
     /// 由字符串构建(不做换行归一,调用方保证只含 `\n`)。
     public init(_ string: String) {
         self.init(utf16: ContiguousArray(string.utf16))
+    }
+
+    /// 由字符串流式构建:边遍历 UTF-16 边切叶子,不先复制出整份 UTF-16 数组(大文件装载少一份瞬时峰值)。
+    /// 调用方保证文本只含 `\n` 换行。
+    /// - Parameter string: 源文本
+    /// - Returns: 绳
+    public static func streaming(_ string: String) -> TextRope {
+        // UTF-16 单元数 ≤ UTF-8 字节数:小文本沿用单叶路径
+        if string.utf8.count <= RopeTuning.leafMax { return TextRope(string) }
+        var leaves: [RopeNode] = []
+        leaves.reserveCapacity(string.utf8.count / RopeTuning.leafTarget + 1)
+        var chunk = ContiguousArray<UInt16>()
+        chunk.reserveCapacity(RopeTuning.leafTarget)
+        for unit in string.utf16 {
+            chunk.append(unit)
+            if chunk.count == RopeTuning.leafTarget {
+                leaves.append(RopeNode(leaf: chunk))
+                chunk = ContiguousArray<UInt16>()
+                chunk.reserveCapacity(RopeTuning.leafTarget)
+            }
+        }
+        if !chunk.isEmpty || leaves.isEmpty { leaves.append(RopeNode(leaf: chunk)) }
+        return TextRope(root: normalize(leaves))
     }
 
     /// 总长度(UTF-16)。

@@ -48,6 +48,8 @@ public final class OMEditorView: NSView {
     public var diagnosticLines: [Int: EditorDiagnostic.Severity] = [:] { didSet { needsDisplay = true } }
     /// 注册到视图里的 View Zone 内容视图(按 zone id)。
     var zoneViews: [Int: NSView] = [:]
+    /// 惰性 Zone 内容视图的工厂:只有 zone 进入(或接近)视口时才创建,几百个 hunk 的审阅不会一次创建几百个 NSView。
+    var zoneFactories: [Int: @MainActor () -> NSView] = [:]
     /// 文档观察者令牌。
     var observerToken: Int?
     /// 滚动条交互状态。
@@ -453,20 +455,47 @@ public final class OMEditorView: NSView {
     /// 设置某个 View Zone 的内容视图(高度由模型里的 zone 决定)。
     public func setZoneView(_ view: NSView?, forZone id: Int) {
         zoneViews[id]?.removeFromSuperview()
+        zoneFactories[id] = nil
         zoneViews[id] = view
         if let view { addSubview(view) }
         layoutZoneViews()
     }
 
-    /// 按滚动位置重排所有 Zone 内容视图。
+    /// 批量设置惰性 Zone 内容视图(工厂在 zone 接近视口时才调用),只在最后重排一次。
+    /// - Parameters:
+    ///   - factories: (zone id, 视图工厂)
+    ///   - removing: 同时移除的 zone id(其视图与工厂都被丢弃)
+    func setLazyZoneViews(_ factories: [(id: Int, make: @MainActor () -> NSView)], removing: [Int] = []) {
+        for id in removing {
+            zoneViews[id]?.removeFromSuperview()
+            zoneViews[id] = nil
+            zoneFactories[id] = nil
+        }
+        for item in factories {
+            zoneViews[item.id]?.removeFromSuperview()
+            zoneViews[item.id] = nil
+            zoneFactories[item.id] = item.make
+        }
+        layoutZoneViews()
+    }
+
+    /// 按滚动位置重排所有 Zone 内容视图(接近视口的惰性视图在此创建)。
     func layoutZoneViews() {
-        guard !zoneViews.isEmpty else { return }
+        guard !zoneViews.isEmpty || !zoneFactories.isEmpty else { return }
         let layout = model.zoneLayout
         for (index, zone) in layout.zones.enumerated() {
-            guard let view = zoneViews[zone.id] else { continue }
             let y = CGFloat(layout.y(ofZoneAt: index)) + topInset - scrollY
             let frame = CGRect(x: gutterWidth, y: y, width: textArea.width, height: CGFloat(zone.height))
-            view.isHidden = frame.maxY < 0 || frame.minY > bounds.height
+            let visible = frame.maxY >= 0 && frame.minY <= bounds.height
+            var view = zoneViews[zone.id]
+            if view == nil, let make = zoneFactories[zone.id], frame.maxY >= -bounds.height, frame.minY <= bounds.height * 2 {
+                let created = make()
+                addSubview(created)
+                zoneViews[zone.id] = created
+                view = created
+            }
+            guard let view else { continue }
+            view.isHidden = !visible
             if view.frame != frame { view.frame = frame }
         }
         let active = Set(layout.zones.map(\.id))

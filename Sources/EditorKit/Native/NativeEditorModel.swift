@@ -33,6 +33,11 @@ public final class NativeEditorModel {
     public private(set) var metrics = ColumnMetrics()
     /// 软换行列数;`nil` 表示不换行。
     public private(set) var wrapColumns: Double?
+    /// 超长行保护:即使不自动换行,超过该视觉列数的行也强制硬断成多个视图行,
+    /// 否则压缩后的 JSON/JS(单行数 MB)会整行交给 CoreText 排版,首帧与每次按键都会卡住。
+    static let hardWrapColumns: Double = 4_000
+    /// 实际用于计算视图行的列数:自动换行时取视口列数,否则取硬断保护阈值。
+    var effectiveWrapColumns: Double { wrapColumns ?? Self.hardWrapColumns }
     /// 是否可编辑。
     public var isEditable = true
     /// 单次 Tab 插入的缩进单位。
@@ -80,6 +85,7 @@ public final class NativeEditorModel {
         observerToken = document.addObserver { [weak self] change in self?.documentDidChange(change) }
         indentUnit = Self.detectIndentUnit(document.snapshot, language: language)
         recomputeContentColumns()
+        reflow()
     }
 
     deinit {
@@ -123,16 +129,19 @@ public final class NativeEditorModel {
         wrapCache.removeAll(keepingCapacity: true)
         generation += 1
         let snapshot = document.snapshot
-        let columns = wrapColumns
+        let columns = effectiveWrapColumns
         let metrics = self.metrics
-        if columns == nil || snapshot.lineCount <= 60_000 {
+        if wrapColumns != nil, snapshot.lineCount <= 60_000 {
             applyRows(WrapRows.compute(rope: snapshot, maxColumns: columns, metrics: metrics))
         } else {
-            // 大文件:先以一行一视图行占位,后台算完再回写。
-            applyRows([Int32](repeating: 1, count: snapshot.lineCount))
+            // 大文件或仅超长行保护(不换行):后台算完再回写;已有映射先保持不动(软换行大文件先以一行一视图行占位)。
+            if wrapColumns != nil { applyRows([Int32](repeating: 1, count: snapshot.lineCount)) }
             let token = generation
+            let guardOnly = wrapColumns == nil
             Task.detached(priority: .userInitiated) { [weak self] in
                 let rows = WrapRows.compute(rope: snapshot, maxColumns: columns, metrics: metrics)
+                // 只做超长行保护且没有任何长行:映射本来就全是 1,无需回写
+                if guardOnly, !rows.contains(where: { $0 > 1 }) { return }
                 await MainActor.run {
                     guard let self, self.generation == token, self.document.snapshot.length == snapshot.length else { return }
                     self.applyRows(rows)
@@ -235,7 +244,7 @@ public final class NativeEditorModel {
         case .user:
             break
         }
-        if wrapColumns != nil { recomputeRows(for: change) }
+        recomputeRows(for: change)
         zoneLayout.update(zones: zones, map: lineMap)
         if tracksFolds, !change.edits.isEmpty { refreshFoldRegions(after: document.lineCount > 200_000 ? .milliseconds(1_500) : .milliseconds(300)) }
         if change.snapshot.length > 0, Double(change.edits.reduce(0) { $0 + $1.newLength }) > 0 {
@@ -262,7 +271,7 @@ public final class NativeEditorModel {
 
     /// 重新计算受编辑影响的行的软换行行数。
     private func recomputeRows(for change: DocumentChange) {
-        guard let columns = wrapColumns else { return }
+        let columns = effectiveWrapColumns
         let rope = change.snapshot
         var lines = Set<Int>()
         for (index, edit) in change.edits.enumerated() {
@@ -283,7 +292,7 @@ public final class NativeEditorModel {
 
     /// 某行的续行起点(行内 UTF-16 偏移);不换行或短行为空。
     public func wrapPoints(forLine line: Int) -> [Int] {
-        guard let columns = wrapColumns else { return [] }
+        let columns = effectiveWrapColumns
         if let cached = wrapCache[line] { return cached }
         guard let range = document.snapshot.lineRange(line) else { return [] }
         let points: [Int]

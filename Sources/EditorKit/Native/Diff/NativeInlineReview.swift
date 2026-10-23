@@ -74,17 +74,22 @@ public final class NativeInlineReview {
             }
         }
         var zones: [ViewZone] = []
+        var zoneFactories: [(id: Int, make: @MainActor () -> NSView)] = []
         var zoneID = Self.idBase
         for (anchor, slot) in slots.sorted(by: { $0.key < $1.key }) {
             let height = (slot.header == nil ? 0 : NativeDiffZoneView.headerHeight) + CGFloat(slot.deleted.count) * lineHeight
             guard height > 0 else { continue }
             zones.append(ViewZone(id: zoneID, afterLine: anchor, height: Double(height)))
-            view.setZoneView(NativeDiffZoneView(header: slot.header, deleted: slot.deleted, padHeight: 0, font: EditorFontPrefs.preferredFont,
-                                                lineHeight: lineHeight, textInset: view.textInset), forZone: zoneID)
+            let header = slot.header, deleted = slot.deleted, textInset = view.textInset
+            zoneFactories.append((zoneID, {
+                NativeDiffZoneView(header: header, deleted: deleted, padHeight: 0, font: EditorFontPrefs.preferredFont,
+                                   lineHeight: lineHeight, textInset: textInset)
+            }))
             zoneIDs.append(zoneID)
             zoneID += 1
         }
         view.model.setZones(view.model.zones.filter { !(Self.idBase..<Self.idLimit).contains($0.id) } + zones)
+        view.setLazyZoneViews(zoneFactories)
         view.model.decorations.removeAll { $0.id >= Self.idBase && $0.id < Self.idLimit }
         for item in items { view.model.decorations.insert(item) }
         hunkLines = lines
@@ -95,7 +100,7 @@ public final class NativeInlineReview {
     /// 清除展示(zone 与装饰)。
     public func clear() {
         guard let view, isShowing else { return }
-        for id in zoneIDs { view.setZoneView(nil, forZone: id) }
+        view.setLazyZoneViews([], removing: zoneIDs)
         zoneIDs = []
         hunkLines = [:]
         view.model.setZones(view.model.zones.filter { !(Self.idBase..<Self.idLimit).contains($0.id) })
