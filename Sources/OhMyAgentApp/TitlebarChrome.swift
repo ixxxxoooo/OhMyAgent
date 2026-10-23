@@ -112,7 +112,11 @@ struct TitlebarOverlay: View {
             Spacer(minLength: 0)
             HStack(spacing: TitlebarMetrics.buttonSpacing) {
                 // 右侧由内向外:工具栏在项目栏内侧
-                ForEach(toggles(on: .right).reversed()) { toggleButton($0, side: .right) }
+                ForEach(toggles(on: .right).reversed()) { column in
+                    // 「扩展」按钮紧贴工具栏开关的内侧,只在右栏打开时显示
+                    if column == .tools, workbench.layout.isVisible(.tools) { expandButton }
+                    toggleButton(column, side: .right)
+                }
                 // 最外侧:切到 IDE 窗口(⌃⌘I;⌥ 点击新开窗口)
                 ModeSwitchButton(target: .ide)
             }
@@ -120,6 +124,15 @@ struct TitlebarOverlay: View {
         }
         .frame(height: TitlebarMetrics.height)
         .frame(maxWidth: .infinity, alignment: .top)
+    }
+
+    /// 右栏「扩展」按钮:右栏覆盖中栏,占满项目栏以外的全部宽度;再点还原。
+    private var expandButton: some View {
+        let expanded = workbench.rightExpanded
+        return OverlayButton(
+            icon: expanded ? "minimize-2" : "maximize-2",
+            label: expanded ? String(localized: "还原") : String(localized: "扩展全屏")
+        ) { workbench.rightExpanded.toggle() }
     }
 
     /// 某一侧的面板开关(项目栏、工具栏),由外向内。
@@ -169,7 +182,7 @@ extension WorkbenchLayout {
         guard column != .sidebar, visibleColumns(on: side).first == column else { return (0, 0) }
         return side == .left
             ? (TitlebarMetrics.leftClusterWidth(toggles: toggleCount(on: .left)), 0)
-            : (0, TitlebarMetrics.rightClusterWidth(toggles: toggleCount(on: .right), includesModeSwitch: true))
+            : (0, TitlebarMetrics.rightClusterWidth(toggles: toggleCount(on: .right) + (column == .tools ? 1 : 0), includesModeSwitch: true))
     }
 }
 

@@ -190,16 +190,8 @@ private struct FilesWorkspaceBody: View {
         }
     }
 
-    /// 本标签是否在右栏里(扩展全屏只对右栏有意义)。
-    private var inRightDock: Bool { workbench.rightDock.allTabs.contains { $0.id == tab.id } }
-
     @ViewBuilder
     private var trailingButtons: some View {
-        if inRightDock {
-            let expanded = workbench.rightExpanded
-            let help = expanded ? String(localized: "还原") : String(localized: "扩展全屏")
-            headerButton(expanded ? "minimize-2" : "maximize-2", help) { workbench.rightExpanded.toggle() }
-        }
         let treeHelp = collapsed ? String(localized: "展开资源管理器") : String(localized: "收起资源管理器")
         headerButton("list-tree", treeHelp) { toggleTree() }
     }
