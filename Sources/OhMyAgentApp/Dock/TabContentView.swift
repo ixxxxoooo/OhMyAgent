@@ -248,7 +248,7 @@ struct FileTabView: View {
         if EditorEngine.current == .native2, let editorDocument = doc.ensureEditorDocument() {
             NativeCodeEditor(document: editorDocument, language: SyntaxLanguage.detect(path: path), isEditable: !doc.isReadOnly,
                              revealLine: tab.line, markers: markers, diagnostics: lsp?.diagnostics ?? [],
-                             chrome: ideHost == nil ? [] : [.minimap, .stickyScroll, .folding, .overviewRuler],
+                             chrome: ideHost == nil ? [] : [.minimap, .stickyScroll, .folding, .overviewRuler], filePath: path,
                              onCaretChange: ideHost.map { host in { host.caret(path, $0) } })
                 .id(ObjectIdentifier(editorDocument))
         } else {

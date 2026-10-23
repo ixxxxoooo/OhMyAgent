@@ -16,6 +16,8 @@ public struct NativeCodeEditor: NSViewRepresentable {
     public var markers: [Int: LineMarker]
     public var diagnostics: [EditorDiagnostic]
     public var wrapsLines: Bool
+    /// 文件路径(snippet 变量 `TM_FILENAME` 等使用)。
+    public var filePath: String?
     /// IDE 外围视图(缩略图、粘性滚动、折叠、概览尺)。
     public var chrome: EditorChrome
     /// 光标/选区变化回调(状态栏「行 列」)。
@@ -33,10 +35,11 @@ public struct NativeCodeEditor: NSViewRepresentable {
     ///   - diagnostics: 语言服务器诊断
     ///   - wrapsLines: 是否软换行
     ///   - chrome: 外围视图
+    ///   - filePath: 文件路径
     ///   - onCaretChange: 光标变化回调
     ///   - onEdited: 文档变化回调
     public init(document: EditorDocument, language: SyntaxLanguage, isEditable: Bool = true, revealLine: Int? = nil,
-                markers: [Int: LineMarker] = [:], diagnostics: [EditorDiagnostic] = [], wrapsLines: Bool = false, chrome: EditorChrome = [],
+                markers: [Int: LineMarker] = [:], diagnostics: [EditorDiagnostic] = [], wrapsLines: Bool = false, chrome: EditorChrome = [], filePath: String? = nil,
                 onCaretChange: ((EditorCaret) -> Void)? = nil, onEdited: ((DocumentChange) -> Void)? = nil) {
         self.document = document
         self.language = language
@@ -46,6 +49,7 @@ public struct NativeCodeEditor: NSViewRepresentable {
         self.diagnostics = diagnostics
         self.wrapsLines = wrapsLines
         self.chrome = chrome
+        self.filePath = filePath
         self.onCaretChange = onCaretChange
         self.onEdited = onEdited
     }
@@ -59,6 +63,7 @@ public struct NativeCodeEditor: NSViewRepresentable {
     public func makeNSView(context: Context) -> OMEditorView {
         let model = NativeEditorModel(document: document, language: language)
         model.isEditable = isEditable
+        model.fileName = filePath
         let view = OMEditorView(model: model, theme: EditorTheme.default, font: EditorFontPrefs.preferredFont)
         view.wrapsLines = wrapsLines
         view.chrome = chrome

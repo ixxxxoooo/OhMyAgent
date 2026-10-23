@@ -216,6 +216,8 @@ extension OMEditorView {
         case .agentAdded, .gitAdded: return NSColor(OMColors.diffAdded).withAlphaComponent(0.16)
         case .agentRemoved, .gitRemoved: return NSColor(OMColors.diffRemoved).withAlphaComponent(0.16)
         case .agentModified, .gitModified: return NSColor(OMColors.warning).withAlphaComponent(0.14)
+        case .snippetStop: return NSColor(OMColors.accent).withAlphaComponent(0.12)
+        case .snippetStopActive: return NSColor(OMColors.accent).withAlphaComponent(0.26)
         default: return nil
         }
     }

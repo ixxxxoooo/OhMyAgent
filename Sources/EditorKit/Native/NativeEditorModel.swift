@@ -36,6 +36,12 @@ public final class NativeEditorModel {
     public var indentUnit = "    "
     /// 是否自动闭合括号与引号。
     public var autoClosePairs = true
+    /// 文件名(snippet 变量 `TM_FILENAME` 等使用)。
+    public var fileName: String?
+    /// 活动的 snippet 会话(Tab 在占位间跳转)。
+    public internal(set) var snippetSession: SnippetSession?
+    /// 「扩大选择」历史,供「缩小选择」回退。
+    var expandHistory: [SelectionSet] = []
     /// 垂直移动时记住的视觉列。
     var preferredColumn: Double?
     /// 文档变更(已更新派生结构)后回调,视图据此失效缓存并重绘。
@@ -205,6 +211,7 @@ public final class NativeEditorModel {
             if !folds.collapsedStarts.isEmpty { lineMap.setHiddenRanges(folds.hiddenRanges()) }
         }
         decorations.apply(edits: change.edits)
+        snippetSession?.map(through: change.edits)
         switch change.origin {
         case .undo, .redo:
             if let restored = change.restoredSelections, !restored.isEmpty {
@@ -319,6 +326,7 @@ public final class NativeEditorModel {
         guard clamped != selections else { return }
         selections = clamped
         if !keepPreferredColumn { preferredColumn = nil }
+        validateSnippetSession()
         onSelectionChange?()
     }
 

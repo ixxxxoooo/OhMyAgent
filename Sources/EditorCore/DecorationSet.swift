@@ -15,6 +15,8 @@ public enum DecorationKind: Sendable, Hashable {
     case agentAdded, agentRemoved, agentModified
     case gitAdded, gitModified, gitRemoved
     case link
+    /// snippet 占位(非当前 / 当前)。
+    case snippetStop, snippetStopActive
     /// 零宽 inlay 文本(类型提示、参数名)。
     case inlay
     /// 幽灵补全文本。

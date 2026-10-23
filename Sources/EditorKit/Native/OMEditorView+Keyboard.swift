@@ -8,8 +8,51 @@ import EditorCore
 extension OMEditorView: NSUserInterfaceValidations {
     public override func keyDown(with event: NSEvent) {
         model.document.breakUndoCoalescing()
+        // 编辑器快捷键(行操作、多光标等)优先于系统键位表(⌥↑ 等在系统表里是段落移动)。
+        if composition == nil, handleShortcut(event) { return }
         // 先交给输入法/键位表;ESC 单独处理(折叠多光标)。
         interpretKeyEvents([event])
+    }
+
+    /// ⌘ 组合键先于菜单到达时在这里处理。
+    public override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard window?.firstResponder === self, composition == nil else { return super.performKeyEquivalent(with: event) }
+        if handleShortcut(event) { return true }
+        return super.performKeyEquivalent(with: event)
+    }
+
+    /// 编辑器快捷键表(键码 + 修饰键)。命中并执行返回 true。
+    func handleShortcut(_ event: NSEvent) -> Bool {
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.numericPad, .function, .capsLock])
+        let cmd = NSEvent.ModifierFlags.command, opt = NSEvent.ModifierFlags.option
+        let shift = NSEvent.ModifierFlags.shift, ctrl = NSEvent.ModifierFlags.control
+        let editable = model.isEditable
+        switch (event.keyCode, flags) {
+        // 行操作(需可编辑)
+        case (44, [cmd]) where editable: model.toggleLineComment()
+        case (0, [opt, shift]) where editable: model.toggleBlockComment()
+        case (40, [cmd, shift]) where editable: model.deleteLines()
+        case (126, [opt]) where editable: model.moveLines(up: true)
+        case (125, [opt]) where editable: model.moveLines(up: false)
+        case (126, [opt, shift]) where editable: model.duplicateLines(down: false)
+        case (125, [opt, shift]) where editable: model.duplicateLines(down: true)
+        case (38, [ctrl]) where editable: model.joinLines()
+        case (36, [cmd]) where editable: model.insertLine(below: true)
+        case (36, [cmd, shift]) where editable: model.insertLine(below: false)
+        case (30, [cmd]) where editable: model.shiftLines(outdent: false)
+        case (33, [cmd]) where editable: model.shiftLines(outdent: true)
+        // 多光标与选择
+        case (2, [cmd]): _ = model.selectNextOccurrence()
+        case (120, [cmd]): model.selectAllOccurrences()
+        case (126, [cmd, opt]): model.addCursor(above: true)
+        case (125, [cmd, opt]): model.addCursor(above: false)
+        case (34, [opt, shift]): model.splitSelectionIntoLines()
+        case (124, [cmd, ctrl, shift]): model.expandSelection()
+        case (123, [cmd, ctrl, shift]): model.shrinkSelection()
+        default: return false
+        }
+        revealPrimaryCaret()
+        return true
     }
 
     /// 可见视图行数(翻页步长)。
@@ -63,8 +106,8 @@ extension OMEditorView: NSUserInterfaceValidations {
         case #selector(deleteToEndOfLine(_:)): model.deleteToLineEnd()
         // 插入
         case #selector(insertNewline(_:)), #selector(insertLineBreak(_:)), #selector(insertNewlineIgnoringFieldEditor(_:)): model.insertNewline()
-        case #selector(insertTab(_:)): model.indent()
-        case #selector(insertBacktab(_:)): model.outdent()
+        case #selector(insertTab(_:)): model.tabAction()
+        case #selector(insertBacktab(_:)): model.backtabAction()
         case #selector(cancelOperation(_:)): escape()
         case #selector(selectAll(_:)): model.selectAll()
         case #selector(selectLine(_:)): model.selectLine()
@@ -83,7 +126,9 @@ extension OMEditorView: NSUserInterfaceValidations {
 
     /// ESC:多光标 → 保留主光标;有选区 → 取消选区。
     private func escape() {
-        if model.selections.isMulti {
+        if model.snippetSession != nil {
+            model.endSnippet()
+        } else if model.selections.isMulti {
             model.setSelections(model.selections.collapsedToPrimary())
         } else if !model.selections.primary.isEmpty {
             model.setSelections(SelectionSet(caret: model.selections.primary.head))

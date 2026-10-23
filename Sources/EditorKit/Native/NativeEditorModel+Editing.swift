@@ -57,6 +57,8 @@ extension NativeEditorModel {
         }
         selections = SelectionSet(after, primary: selections.primaryIndex).clamped(toLength: document.length)
         preferredColumn = nil
+        expandHistory.removeAll()
+        syncSnippetMirrors()
         onSelectionChange?()
         return true
     }
