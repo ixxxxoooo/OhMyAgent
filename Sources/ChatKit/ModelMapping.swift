@@ -169,6 +169,8 @@ public struct ResolvedMapping: Sendable {
     var others: [ModelSlot: ResolvedTarget]
     /// 非致命问题(某槽位的提供商缺密钥/已停用等,该槽位退回默认槽位)
     public var warnings: [String]
+    /// 用户的思考强度偏好(别名按真实模型继承强度,见 `MappedEffort`)
+    public var effortPrefs = ClaudeEffortPrefs()
 
     /// 全部有效槽位(含默认)。
     var all: [ModelSlot: ResolvedTarget] {
@@ -256,6 +258,8 @@ public enum ProviderLaunch {
         if let window = contextWindow(of: mapping.main), SessionOptions.autoCompactRange.contains(window) {
             fields[SessionOptions.autoCompactSettingKey] = .int(window)
         }
+        // 别名是 Claude Code 不认识的模型:按真实模型补上强度,否则一律落到未知模型默认的 high
+        if let modelSettings = MappedEffort.modelSettings(mapping, prefs: mapping.effortPrefs) { fields["modelSettings"] = modelSettings }
         let settings: JSONValue = .object(fields)
         let secretEnv: JSONValue = .object(["ANTHROPIC_AUTH_TOKEN": .string(placeholderToken)])
         return .object(["claudeCode": .object(["options": .object(["settings": settings, "env": secretEnv])])])

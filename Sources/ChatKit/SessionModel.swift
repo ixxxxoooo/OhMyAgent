@@ -1104,7 +1104,11 @@ public final class SessionModel {
         let environment = providerEnvironment
         configuredMappings = await Task.detached(priority: .userInitiated) { ProviderStorage.configuredInfos(directory: directory) }.value
         let initial = await Task.detached(priority: .userInitiated) { () -> Result<ResolvedMapping?, ProviderStorage.ResolveError> in
-            do { return .success(try ProviderStorage.resolveMapping(directory: directory, environment: environment)) }
+            do {
+                guard var resolved = try ProviderStorage.resolveMapping(directory: directory, environment: environment) else { return .success(nil) }
+                resolved.effortPrefs = ClaudeEffortPrefs.load()
+                return .success(resolved)
+            }
             catch let error as ProviderStorage.ResolveError { return .failure(error) }
             catch {
                 Log.config.warning("解析模型映射时遇到未预期的错误,回退默认配置", ["error": "\(error)"])
