@@ -130,6 +130,7 @@ def scan_file(path):
 # 有意不翻译的位置(协议/日志/辅助进程/不可恢复错误/字符串比较用的字面量)。
 # 元素为 (文件路径前缀, 键或 None);键为 None 表示该前缀下全部放行。
 ALLOWLIST = (
+    ("Sources/EditorKit/Native/NativeSnippets.swift", None),   # 内置 snippet 的说明与模板正文(代码片段内容)
     ("Sources/OhMyAgentApp/ProjectTreeView.swift", "前"),
     *(("Sources/ProviderProxyKit/UpstreamHints.swift", w) for w in ("额度不足", "余额不足", "额度已用尽", "配额已用尽")),   # 上游错误正文的匹配特征,非界面文案   # 相对时间后缀裁剪(去掉「前」只做字符串比较,非界面文案)
     ("Sources/OhMyAgentApp/Demo/DemoBenchmarkRunner.swift", None),   # 演示基准的明细文本(仅演示模式,面向开发者)
