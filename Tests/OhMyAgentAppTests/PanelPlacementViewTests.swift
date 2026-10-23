@@ -25,8 +25,8 @@ struct PanelPlacementViewTests {
     func columnInsets() {
         var layout = WorkbenchLayout()
         layout.rightVisible = true
-        // 默认:工具栏在右侧最外
-        #expect(layout.titlebarInsets(for: .tools) == (0, TitlebarMetrics.rightClusterWidth(toggles: 1, includesModeSwitch: true)))
+        // 默认:工具栏在右侧最外;右侧开关 = 工具栏开关 + 标题栏右上角的右栏扩展按钮
+        #expect(layout.titlebarInsets(for: .tools) == (0, TitlebarMetrics.rightClusterWidth(toggles: 2, includesModeSwitch: true)))
         #expect(layout.titlebarInsets(for: .sidebar) == (0, 0))
 
         // 工具栏换到左侧且项目栏隐藏:工具栏成为左侧最外列,需要让开红绿灯与回退/前进/开关

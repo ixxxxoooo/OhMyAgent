@@ -9,6 +9,7 @@ import DesignSystem
 import EditorCore
 import OMLog
 import SwiftUI
+import Synchronization
 
 /// 原生编辑视图。
 @MainActor
@@ -138,6 +139,7 @@ public final class OMEditorView: NSView {
         self.font = font
         cache = NativeLayoutCache(model: model, tokens: tokens, font: font, theme: theme)
         super.init(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        editorLiveCounter.add(1, ordering: .relaxed)
         wantsLayer = true
         layerContentsRedrawPolicy = .onSetNeedsDisplay
         clipsToBounds = true
@@ -171,6 +173,7 @@ public final class OMEditorView: NSView {
     required init?(coder: NSCoder) { nil }
 
     deinit {
+        editorLiveCounter.subtract(1, ordering: .relaxed)
         if let themeObserver { NotificationCenter.default.removeObserver(themeObserver) }
     }
 
