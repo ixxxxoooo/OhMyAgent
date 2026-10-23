@@ -62,19 +62,19 @@ private struct ExplorerProjectView: View {
     @State private var probe = ExplorerScrollProbe()
 
     /// 固定行高:窗口化需要按行号直接换算位置
-    static let rowHeight: CGFloat = 22
+    static let rowHeight: CGFloat = 28
     /// 内容区上下内边距
     static let verticalPadding: CGFloat = 4
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                Text(projectName).font(OMFonts.small.weight(.medium)).lineLimit(1)
+                Text(projectName).font(OMFonts.small).foregroundStyle(OMColors.secondaryText).lineLimit(1)
                 Spacer()
+                // 对照 Cursor:刷新 / 新建文件 / 新建文件夹(不再放「折叠全部」)
+                toolButton("refresh-cw", "刷新") { model.bump(); WorkspaceIndexModel.shared.refresh(root: projectID) }
                 toolButton("file-plus", "新建文件") { ExplorerActions.create(in: projectID, directory: false, workbench: workbench) }
                 toolButton("folder-plus", "新建文件夹") { ExplorerActions.create(in: projectID, directory: true, workbench: workbench) }
-                toolButton("chevrons-down-up", "折叠全部文件夹") { model.collapseAll() }
-                toolButton("refresh-cw", "刷新") { model.bump(); WorkspaceIndexModel.shared.refresh(root: projectID) }
                 if let trailing = hooks.trailingAction { toolButton(trailing.icon, trailing.help, action: trailing.action) }
             }
             .padding(.horizontal, 10).padding(.vertical, 6)
@@ -172,7 +172,6 @@ private struct ExplorerTreeRow: View {
     var body: some View {
         let entry = item.entry
         ExplorerRow(depth: item.depth, name: entry.name, isDirectory: entry.isDirectory, expanded: item.isExpanded,
-                    chevron: entry.isDirectory ? (item.isExpanded ? "chevron-down" : "chevron-right") : nil,
                     isActive: isActive, decoration: decoration, isDropTarget: isDropTarget) {
             if entry.isDirectory { tree.toggle(entry.path); return }
             let optionHeld = NSEvent.modifierFlags.contains(.option)
@@ -257,7 +256,6 @@ private struct ExplorerRow: View {
     let name: String
     let isDirectory: Bool
     let expanded: Bool
-    let chevron: String?
     let isActive: Bool
     /// Git 装饰(有未提交变化时文字着色并在右侧显示字母/圆点)
     let decoration: GitDecorationKind?
@@ -268,13 +266,9 @@ private struct ExplorerRow: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 5) {
-                Group {
-                    if let chevron { Image.om(chevron, size: 10) } else { Color.clear }
-                }
-                .frame(width: 12)
+            HStack(spacing: 8) {
                 OMFileIcon(name: name, isDirectory: isDirectory, expanded: expanded, size: OMMetrics.fileIconList)
-                Text(name).font(OMFonts.small).lineLimit(1).truncationMode(.middle)
+                Text(name).font(OMFonts.body).lineLimit(1).truncationMode(.middle)
                     .foregroundStyle(decoration.map(Self.tint) ?? OMColors.primaryText)
                 Spacer(minLength: 0)
                 if let decoration {
@@ -285,7 +279,7 @@ private struct ExplorerRow: View {
                     }
                 }
             }
-            .padding(.leading, 8 + CGFloat(depth) * 12)
+            .padding(.leading, 12 + CGFloat(depth) * 16)
             .padding(.vertical, 3)
             .padding(.trailing, 6)
             .frame(maxWidth: .infinity, alignment: .leading)

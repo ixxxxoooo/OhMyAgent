@@ -1,6 +1,6 @@
 // @author ixxxxoooo
 // 文件标签页顶部的面包屑工具条(参考 kuku 的 FileViewer 与 Cursor 的 breadcrumbs):
-// 左侧是相对项目根的路径(目录弱化、文件名突出),右侧依次是显示模式切换(仅可渲染的类型)、在 Finder 中显示、复制内容。
+// 左侧是相对项目根的路径(目录弱化、文件名突出),右侧只保留显示模式切换(仅可渲染的类型);Finder 显示与拷贝路径在右键菜单里。
 
 import ChatKit
 import DesignSystem
@@ -39,22 +39,11 @@ struct FileHeaderBar: View {
     /// Files 工作区附加控件;nil 表示普通文件标签
     var filesControls: FilesHeaderControls?
 
-    @State private var copied = false
     /// 当前展开下拉的面包屑段(绝对路径)
     @State private var openedSegment: String?
 
     var body: some View {
-        Group {
-            if filesControls == nil {
-                row(compact: false)
-            } else {
-                // Files 工作区的内容区可能很窄:放不下时去掉次要按钮(对比/复制/Finder),保证面包屑与 ← → 可见
-                ViewThatFits(in: .horizontal) {
-                    row(compact: false)
-                    row(compact: true)
-                }
-            }
-        }
+        row
         .padding(.horizontal, 14)
         .frame(height: 30)
         // 与内容区同色(OMColors.surface),不再画底部分隔线
@@ -62,8 +51,7 @@ struct FileHeaderBar: View {
     }
 
     /// 一行内容。
-    /// - Parameter compact: 紧凑模式:省略对比、复制与在 Finder 中显示
-    private func row(compact: Bool) -> some View {
+    private var row: some View {
         HStack(spacing: 10) {
             if let controls = filesControls {
                 HStack(spacing: 0) {
@@ -75,15 +63,6 @@ struct FileHeaderBar: View {
             Spacer(minLength: 8)
             if modes.count > 1 {
                 HeaderIconButton(icon: mode.toggleIcon, help: mode == .preview ? "切换到源码" : "切换到预览", tint: nil) { onMode(mode.other) }
-            }
-            if !compact {
-                if let onToggleCompare {
-                    HeaderIconButton(icon: "file-diff", help: isComparing ? "返回编辑器" : "对比 HEAD(Git 差异)", tint: isComparing ? OMColors.accent : nil, action: onToggleCompare)
-                }
-                iconButton(copied ? "check" : "copy", help: copied ? "已复制" : "复制内容", tint: copied ? OMColors.success : nil) { copy() }
-                iconButton("folder-open", help: "在 Finder 中显示") {
-                    NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
-                }
             }
             // 资源管理器收起时,右上角悬浮着「展开」按钮,留出位置避免重叠
             if filesControls?.treeCollapsed == true { Color.clear.frame(width: 24, height: 1) }
@@ -125,23 +104,6 @@ struct FileHeaderBar: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel(String(localized: "文件路径"))
         .accessibilityValue(FileBreadcrumb.relativePath(path, root: projectRoot))
-    }
-
-    // MARK: 操作
-
-    private func copy() {
-        guard let text = currentText() else { return }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
-        copied = true
-        Task {
-            try? await Task.sleep(for: .seconds(1.5))
-            copied = false
-        }
-    }
-
-    private func iconButton(_ icon: String, help: LocalizedStringKey, tint: Color? = nil, action: @escaping () -> Void) -> some View {
-        HeaderIconButton(icon: icon, help: help, tint: tint, action: action)
     }
 }
 
