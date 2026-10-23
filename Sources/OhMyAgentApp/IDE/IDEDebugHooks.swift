@@ -65,6 +65,17 @@ enum IDEDebugHooks {
         if let raw = env["OMA_IDE_EDITOR_ACTIONS"], !raw.isEmpty { await runEditorActions(raw) }
     }
 
+    /// 在所有窗口里找第一个原生编辑器(应用在后台时没有键盘焦点)。
+    private static func firstNativeEditor() -> OMEditorView? {
+        func search(_ view: NSView) -> OMEditorView? {
+            if let editor = view as? OMEditorView, !editor.isHiddenOrHasHiddenAncestor { return editor }
+            for sub in view.subviews { if let found = search(sub) { return found } }
+            return nil
+        }
+        for window in NSApp.windows { if let content = window.contentView, let found = search(content) { return found } }
+        return nil
+    }
+
     /// 在所有窗口里找第一个可见的代码编辑器(应用在后台时没有键盘焦点,`activeEditor` 为空)。
     private static func firstEditor() -> CodeEditorView? {
         func search(_ view: NSView) -> CodeEditorView? {
@@ -82,6 +93,25 @@ enum IDEDebugHooks {
         for token in raw.split(separator: ";").map({ String($0).trimmingCharacters(in: .whitespaces) }) {
             let parts = token.split(separator: ":", maxSplits: 1).map(String.init)
             let argument = parts.count > 1 ? parts[1] : ""
+            // 原生引擎(native2)的编辑器:动作经 `EditorRouter` 路由,并补充查找/空白渲染等原生专属动作。
+            if let native = OMEditorView.activeEditor() ?? firstNativeEditor() {
+                switch parts.first ?? "" {
+                case "goto": native.goToLine(line: Int(argument) ?? 1, column: 1)
+                case "foldline": native.model.fold(line: max((Int(argument) ?? 1) - 1, 0))
+                case "fold": native.perform(.fold)
+                case "unfold": native.perform(.unfold)
+                case "foldAll": native.perform(.foldAll)
+                case "unfoldAll": native.perform(.unfoldAll)
+                case "nextOcc": native.perform(.addNextOccurrence)
+                case "find": native.showFind(); native.setFindQuery(argument)
+                case "findClose": native.hideFind()
+                case "ws": native.whitespaceRendering = WhitespaceRendering(rawValue: argument) ?? .all
+                case "type": native.insertText(argument, replacementRange: NSRange(location: NSNotFound, length: 0))
+                case "wait": try? await Task.sleep(for: .milliseconds(Int(argument) ?? 500))
+                default: Log.app.warning("编辑器动作:未知", ["action": token])
+                }
+                continue
+            }
             guard let editor = CodeEditorView.activeEditor() ?? firstEditor() else {
                 Log.app.warning("编辑器动作:没有活动编辑器", ["action": token])
                 continue

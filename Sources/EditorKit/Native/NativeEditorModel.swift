@@ -48,6 +48,13 @@ public final class NativeEditorModel {
     public var onDocumentChange: ((DocumentChange) -> Void)?
     /// 选区变化回调。
     public var onSelectionChange: (() -> Void)?
+    /// 折叠等导致视图行映射变化后的回调(视图据此重排与重绘)。
+    public var onLayoutChange: (() -> Void)?
+    /// 折叠区域后台推断的任务与代数。
+    var foldTask: Task<Void, Never>?
+    /// 是否持续推断折叠区域(IDE 编辑器开启 `.folding` 时为真)。
+    public var tracksFolds = false
+    var foldGeneration = 0
     /// 行换行点缓存(行号 → 续行起点),结构变化时清空。
     private var wrapCache: [Int: [Int]] = [:]
     private var observerToken: Int?
@@ -179,6 +186,7 @@ public final class NativeEditorModel {
     func applyFolds() {
         lineMap.setHiddenRanges(folds.hiddenRanges())
         zoneLayout.update(zones: zones, map: lineMap)
+        defer { onLayoutChange?() }
         // 选区落在被隐藏行内时移到折叠起始行末尾。
         let hidden = folds.hiddenRanges()
         guard !hidden.isEmpty else { return }
@@ -226,6 +234,7 @@ public final class NativeEditorModel {
         }
         if wrapColumns != nil { recomputeRows(for: change) }
         zoneLayout.update(zones: zones, map: lineMap)
+        if tracksFolds, !change.edits.isEmpty { refreshFoldRegions(after: document.lineCount > 200_000 ? .milliseconds(1_500) : .milliseconds(300)) }
         if change.snapshot.length > 0, Double(change.edits.reduce(0) { $0 + $1.newLength }) > 0 {
             // 新增内容可能更宽;精确值由后台扫描修正。
             for edit in change.edits where edit.newLength > 0 && edit.newLength <= 4_096 {
@@ -326,6 +335,7 @@ public final class NativeEditorModel {
         guard clamped != selections else { return }
         selections = clamped
         if !keepPreferredColumn { preferredColumn = nil }
+        revealHiddenSelection()
         validateSnippetSession()
         onSelectionChange?()
     }

@@ -8,6 +8,7 @@ import CoreText
 import DesignSystem
 import EditorCore
 import OMLog
+import SwiftUI
 
 /// 原生编辑视图。
 @MainActor
@@ -75,6 +76,21 @@ public final class OMEditorView: NSView {
     var overviewKey = OverviewKey()
     /// 括号匹配装饰是否存在(避免每次选区变化都去清理)。
     var hasBracketMatch = false
+    /// 空白字符渲染模式与 Unicode 高亮开关。
+    public var whitespaceRendering = OMEditorView.preferredWhitespaceRendering { didSet { needsDisplay = true } }
+    public var highlightsUnicode = true { didSet { needsDisplay = true } }
+    /// 鼠标是否悬停在行号栏(折叠箭头据此显示)。
+    var gutterHovered = false
+    /// 查找条模型与宿主(⌘F 打开)。
+    let findModel = EditorFindModel()
+    var findHost: NSHostingView<EditorFindBar>?
+    /// 当前查找结果(升序)。
+    var findMatches: [TextSpan] = []
+    /// 查找后台任务与代数(过期结果丢弃)。
+    var findTask: Task<Void, Never>?
+    var findGeneration = 0
+    /// 最近获得焦点的原生编辑器(菜单命令在焦点不在文本区时的兜底)。
+    static weak var lastFocused: OMEditorView?
     /// 窗口大小变化时的防抖任务。
     var wrapTask: Task<Void, Never>?
     /// 主题监听。
@@ -119,6 +135,7 @@ public final class OMEditorView: NSView {
         model.setMetrics(ColumnMetrics(tabSize: model.indentUnit == "\t" ? 4 : max(model.indentUnit.count, 2)))
         model.onDocumentChange = { [weak self] change in self?.modelDidChange(change) }
         model.onSelectionChange = { [weak self] in self?.selectionDidChange() }
+        model.onLayoutChange = { [weak self] in self?.modelLayoutDidChange() }
         cache.brackets = brackets
         brackets.onUpdate = { [weak self] in
             guard let self else { return }
@@ -236,8 +253,19 @@ public final class OMEditorView: NSView {
         layoutZoneViews()
         restartCaretBlink()
         needsDisplay = true
+        if findHost != nil, !change.edits.isEmpty { scheduleFindRefresh() }
         onTextChange?(change)
         if !change.edits.isEmpty { NSAccessibility.post(element: self, notification: .valueChanged) }
+    }
+
+    /// 折叠导致视图行映射变化:重排并重绘。
+    private func modelLayoutDidChange() {
+        clampScroll()
+        layoutZoneViews()
+        refreshSticky()
+        minimap?.invalidateAll()
+        overviewKey = OverviewKey()
+        needsDisplay = true
     }
 
     private func selectionDidChange() {
@@ -455,6 +483,7 @@ public final class OMEditorView: NSView {
     }
 
     public override func becomeFirstResponder() -> Bool {
+        Self.lastFocused = self
         restartCaretBlink()
         needsDisplay = true
         return true

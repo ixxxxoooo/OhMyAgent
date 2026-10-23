@@ -58,7 +58,7 @@ struct IDEOutlineSection: View {
     private func jump(to symbol: LSPSymbol) {
         guard let path = workspace.model.activeFilePath else { return }
         // 活动编辑器已在该文件:直接转到行;否则经窗口模型打开并定位
-        if let editor = CodeEditorView.activeEditor() { editor.goToLine(symbol.line + 1, column: symbol.character + 1) }
+        if EditorRouter.hasActiveEditor { EditorRouter.goToLine(symbol.line + 1, column: symbol.character + 1) }
         else { workspace.model.openFile(path, line: symbol.line + 1, preview: false) }
     }
 }

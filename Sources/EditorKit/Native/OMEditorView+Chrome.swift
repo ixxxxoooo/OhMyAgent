@@ -54,6 +54,11 @@ extension OMEditorView {
             minimap = nil
         }
         if !chrome.contains(.stickyScroll) { stickyLines = [] }
+        let wantsFolds = chrome.contains(.folding)
+        if wantsFolds != model.tracksFolds {
+            model.tracksFolds = wantsFolds
+            if wantsFolds { model.refreshFoldRegions() } else { model.setFoldRegions([]) }
+        }
         layoutMinimap()
         applyWrapSettings(immediate: true)
         refreshSticky()

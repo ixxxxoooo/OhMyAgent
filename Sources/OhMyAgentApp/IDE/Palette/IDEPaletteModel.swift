@@ -321,7 +321,7 @@ extension IDEWorkspace {
             Task { @MainActor in
                 // 等面板收起、焦点回到编辑器后再定位
                 try? await Task.sleep(for: .milliseconds(60))
-                CodeEditorView.activeEditor()?.goToLine(line, column: column ?? 1)
+                EditorRouter.goToLine(line, column: column ?? 1)
             }
         }
     }
@@ -350,14 +350,14 @@ extension IDEWorkspace {
         case "lsp.rename": renameSymbol()
         case "lsp.codeAction": showCodeActions()
         case "lsp.format": formatDocument()
-        case "edit.toggleComment": CodeEditorView.activeEditor()?.perform(.toggleComment)
-        case "edit.moveLineUp": CodeEditorView.activeEditor()?.perform(.moveLineUp)
-        case "edit.moveLineDown": CodeEditorView.activeEditor()?.perform(.moveLineDown)
-        case "edit.addNextOccurrence": CodeEditorView.activeEditor()?.perform(.addNextOccurrence)
-        case "edit.fold": CodeEditorView.activeEditor()?.perform(.fold)
-        case "edit.unfold": CodeEditorView.activeEditor()?.perform(.unfold)
-        case "edit.foldAll": CodeEditorView.activeEditor()?.perform(.foldAll)
-        case "edit.unfoldAll": CodeEditorView.activeEditor()?.perform(.unfoldAll)
+        case "edit.toggleComment": EditorRouter.perform(.toggleComment)
+        case "edit.moveLineUp": EditorRouter.perform(.moveLineUp)
+        case "edit.moveLineDown": EditorRouter.perform(.moveLineDown)
+        case "edit.addNextOccurrence": EditorRouter.perform(.addNextOccurrence)
+        case "edit.fold": EditorRouter.perform(.fold)
+        case "edit.unfold": EditorRouter.perform(.unfold)
+        case "edit.foldAll": EditorRouter.perform(.foldAll)
+        case "edit.unfoldAll": EditorRouter.perform(.unfoldAll)
         case "view.toggleSidebar": model.toggleSidebar()
         case "view.togglePanel": model.togglePanel()
         case "view.toggleAgentPane": model.toggleAgentPane()

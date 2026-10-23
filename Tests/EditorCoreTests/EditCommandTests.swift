@@ -241,3 +241,28 @@ struct EmmetTests {
         #expect(Emmet.expand("zzzz", syntax: .css) == nil)
     }
 }
+
+@Suite("Unicode 高亮")
+struct UnicodeHighlightTests {
+    private func scan(_ text: String) -> [UnicodeFinding] { UnicodeHighlight.scan(ContiguousArray(text.utf16)) }
+
+    @Test("纯 ASCII 与全中文不报")
+    func clean() {
+        #expect(scan("let a = 1").isEmpty)
+        #expect(scan("你好,世界").isEmpty)
+        #expect(scan("привет").isEmpty)
+    }
+
+    @Test("零宽、双向控制符、不间断空格")
+    func invisibles() {
+        let findings = scan("a\u{200B}b\u{202E}c\u{00A0}d")
+        #expect(findings.map(\.kind) == [.invisible, .bidiControl, .nonBreakingSpace])
+        #expect(findings.map(\.offset) == [1, 3, 5])
+    }
+
+    @Test("混在拉丁词里的形近字")
+    func lookalike() {
+        let findings = scan("pаypal")   // а 为西里尔字母
+        #expect(findings == [UnicodeFinding(offset: 1, length: 1, kind: .lookalike)])
+    }
+}

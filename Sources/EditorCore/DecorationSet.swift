@@ -65,6 +65,13 @@ public struct DecorationSet: Sendable {
         rebuildMaxEnd()
     }
 
+    /// 一次性替换某几种类的全部装饰:保留其它种类,与新装饰合并后整体排序(批量场景比逐个 `insert` 快得多)。
+    public mutating func replace(kinds: Set<DecorationKind>, with newItems: [Decoration]) {
+        var merged = items.filter { !kinds.contains($0.kind) }
+        merged.append(contentsOf: newItems)
+        replaceAll(merged)
+    }
+
     /// 移除某种类的全部装饰(例如重新发布诊断前先清空旧诊断)。
     public mutating func removeAll(where predicate: (Decoration) -> Bool) {
         items.removeAll(where: predicate)

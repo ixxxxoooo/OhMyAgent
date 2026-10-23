@@ -116,6 +116,6 @@ extension FileTabView {
         guard !hunks.isEmpty else { return }
         let next = (min(reviewIndex, hunks.count - 1) + delta + hunks.count) % hunks.count
         reviewIndex = next
-        CodeEditorView.activeEditor()?.goToLine(AgentHunkKey.firstLine(of: hunks[next]), column: 1)
+        EditorRouter.goToLine(AgentHunkKey.firstLine(of: hunks[next]), column: 1)
     }
 }

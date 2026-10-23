@@ -33,13 +33,18 @@ extension OMEditorView {
     public override func updateTrackingAreas() {
         super.updateTrackingAreas()
         trackingAreas.forEach(removeTrackingArea)
-        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseMoved, .activeInKeyWindow, .inVisibleRect], owner: self))
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self))
     }
 
     public override func mouseMoved(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
         // 靠近右/下边缘时显示滚动条,方便抓取。
         if point.x > bounds.width - 14 || point.y > bounds.height - 14 { showScrollbars() }
+        updateGutterHover(at: point)
+    }
+
+    public override func mouseExited(with event: NSEvent) {
+        updateGutterHover(at: nil)
     }
 
     // MARK: 按下
@@ -51,6 +56,7 @@ extension OMEditorView {
         model.document.breakUndoCoalescing()
         if beginScrollbarDrag(at: point) { return }
         if stickyClick(at: point) { return }
+        if foldPlaceholderClick(at: point) { return }
         if point.x < gutterWidth { gutterClick(at: point, event: event); return }
 
         let offset = offset(at: point)
@@ -194,6 +200,7 @@ extension OMEditorView {
     // MARK: 行号栏
 
     private func gutterClick(at point: CGPoint, event: NSEvent) {
+        if foldGutterClick(at: point) { return }
         let offset = offset(at: CGPoint(x: gutterWidth + 1, y: point.y))
         let line = model.document.snapshot.line(containing: offset)
         if point.x < 12 { onGutterClick?(line); return }
