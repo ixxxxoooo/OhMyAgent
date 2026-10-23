@@ -31,7 +31,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .shortcuts: return ["快捷键", "shortcut", "keybinding"]
         case .about: return ["关于", "about", "版本", "version", "更新", "update", "升级", "检查更新"]
         case .network: return ["网络", "代理", "proxy", "连通性", "测试", "connectivity", "ping", "延迟"]
-        case .sourceControl: return ["git", "提交", "commit", "署名", "co-authored-by", "提交说明", "scm", "工作树", "worktree"]
+        case .sourceControl: return ["git", "提交", "commit", "署名", "协作者", "collaborator", "co-authored-by", "提交说明", "scm", "工作树", "worktree"]
         case .browser: return ["browser", "浏览器", "网页", "webview", "cookie", "审批", "localhost"]
         case .codeIntelligence: return ["lsp", "语言服务器", "诊断", "补全", "忽略", "ignore", "glob", "索引", "language server"]
         default: return []

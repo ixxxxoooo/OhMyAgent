@@ -8,6 +8,7 @@ import SwiftUI
 /// 源代码管理:提交署名与 AI 提交说明。
 struct SourceControlPage: View {
     @AppStorage(ClientPrefs.Key.scmCoAuthor) private var coAuthor = false
+    @AppStorage(ClientPrefs.Key.scmCollaborators) private var collaboratorsJSON = ""
     @AppStorage(ClientPrefs.Key.scmAICommitMessage) private var aiMessage = true
     @AppStorage(ClientPrefs.Key.worktreeMaxCount) private var worktreeMax = 25
     @AppStorage(ClientPrefs.Key.worktreeCleanupHours) private var worktreeHours = 6
@@ -27,12 +28,86 @@ struct SourceControlPage: View {
                 )
                 Note("署名只在通过 OhMyAgent 提交时追加,不会修改你的 git 配置;已包含同一署名时不会重复追加。").footnote()
             }
+            SettingsCard("协作者") {
+                ForEach(collaborators) { item in
+                    CollaboratorRow(item: item, update: update, remove: remove)
+                }
+                HStack {
+                    Button { add() } label: { Label("添加协作者", om: "plus") }
+                        .buttonStyle(.omSecondary)
+                        .accessibilityLabel("添加协作者")
+                    Spacer()
+                }
+                Note("名单里的协作者会在提交说明末尾追加 Co-authored-by 尾注。在源代码管理面板提交时自动追加;智能体自己执行 git commit 时也会被要求带上(对新建的会话生效)。名字和邮箱都填写完整、邮箱格式正确才会生效。").footnote()
+            }
             SettingsCard("工作树") {
                 SettingsNumericField(title: "数量上限", value: $worktreeMax, format: IntegerFormatStyle<Int>(), unit: "个")
                 SettingsNumericField(title: "检查间隔", value: $worktreeHours, format: IntegerFormatStyle<Int>(), unit: "小时")
                 Note("`/worktree` 与「在工作树中运行」会在 ~/.ohmyagent/worktrees 下创建隔离检出。超过数量上限时,会询问是否清理最旧且没有未提交改动的工作树,不会静默删除。初始化脚本放在项目的 .oma/worktrees.json(也兼容 .cursor/worktrees.json),键 setup-worktree 为命令数组或脚本路径,运行时可用环境变量 ROOT_WORKTREE_PATH 取得主检出路径。").footnote()
             }
         }
+    }
+}
+
+extension SourceControlPage {
+    /// 当前名单(来自偏好)。
+    fileprivate var collaborators: [CommitCollaborator] { CommitCollaborator.decode(collaboratorsJSON) }
+
+    /// 新增一个空白协作者,等待用户填写。
+    fileprivate func add() {
+        collaboratorsJSON = CommitCollaborator.encode(collaborators + [CommitCollaborator()])
+    }
+
+    /// 保存某位协作者的修改。
+    fileprivate func update(_ item: CommitCollaborator) {
+        var list = collaborators
+        guard let index = list.firstIndex(where: { $0.id == item.id }), list[index] != item else { return }
+        list[index] = item
+        collaboratorsJSON = CommitCollaborator.encode(list)
+    }
+
+    /// 删除某位协作者。
+    fileprivate func remove(_ item: CommitCollaborator) {
+        collaboratorsJSON = CommitCollaborator.encode(collaborators.filter { $0.id != item.id })
+    }
+}
+
+/// 协作者的一行:姓名、邮箱与删除按钮;填写不完整时用警告色提示该行暂不生效。
+private struct CollaboratorRow: View {
+    let item: CommitCollaborator
+    let update: (CommitCollaborator) -> Void
+    let remove: (CommitCollaborator) -> Void
+    @State private var draft: CommitCollaborator
+
+    init(item: CommitCollaborator, update: @escaping (CommitCollaborator) -> Void, remove: @escaping (CommitCollaborator) -> Void) {
+        self.item = item
+        self.update = update
+        self.remove = remove
+        _draft = State(initialValue: item)
+    }
+
+    var body: some View {
+        HStack(spacing: OMSpacing.sm) {
+            TextField("", text: $draft.name, prompt: Text("姓名"))
+                .labelsHidden()
+                .textFieldStyle(.roundedBorder)
+                .accessibilityLabel("协作者姓名")
+            TextField("", text: $draft.email, prompt: Text("邮箱"))
+                .labelsHidden()
+                .textFieldStyle(.roundedBorder)
+                .accessibilityLabel("协作者邮箱")
+            Image.om(draft.isValid ? "check" : "circle-alert", size: 12)
+                .foregroundStyle(draft.isValid ? OMColors.success : OMColors.warning)
+                .omTooltip(draft.isValid ? "有效" : "名字与邮箱需填写完整,否则不会追加")
+                .accessibilityLabel(draft.isValid ? "有效" : "未填写完整")
+            Button { remove(item) } label: {
+                Image.om("trash", size: 13).foregroundStyle(OMColors.tertiaryText).frame(width: 22, height: 22)
+            }
+            .buttonStyle(.plain)
+            .omTooltip("删除")
+            .accessibilityLabel("删除协作者")
+        }
+        .onChange(of: draft) { _, value in update(value) }
     }
 }
 

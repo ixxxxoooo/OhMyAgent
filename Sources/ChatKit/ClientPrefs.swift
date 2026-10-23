@@ -104,6 +104,8 @@ public enum ClientPrefs {
         public static let chatCodeWrap = "chat.codeWrap"
         /// 提交时附带 `Co-authored-by: OhMyAgent` 署名(默认关闭)
         public static let scmCoAuthor = "scm.coAuthor"
+        /// 提交协作者名单(JSON,见 `CommitCollaborator`):应用内提交自动追加 `Co-authored-by`,智能体提交时也被要求带上
+        public static let scmCollaborators = "scm.collaborators"
         /// 源代码管理面板显示「AI 生成提交说明」按钮(默认开启)
         public static let scmAICommitMessage = "scm.aiCommitMessage"
         /// 同时保留的语言服务器工作区上限(1–8,默认 4)

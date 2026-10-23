@@ -148,6 +148,7 @@ ALLOWLIST = (
     ("Sources/ChatKit/CodeSearch.swift", None),            # search_code 工具返回给 Agent 的错误文本
     ("Sources/ChatKit/AskBridge.swift", None),             # ask_user_question 工具返回给 Agent 的错误文本
     ("Sources/ChatKit/ChartPrompt.swift", None),           # 追加给 Agent 的图表系统提示词
+    ("Sources/ChatKit/CommitCollaborator.swift", None),    # 追加给 Agent 的协作者尾注提示词
     ("Sources/ChatKit/PickedElement.swift", None),         # 选中页面元素后发给 Agent 的描述文本
     ("Sources/OhMyAgentApp/Browser/BrowserProbe.swift", None),  # 调试钩子 OMA_BROWSER_PROBE 的输出文件
     ("Sources/CanvasKit/", None),                          # 画布校验错误(给模型看,带路径便于重试)
