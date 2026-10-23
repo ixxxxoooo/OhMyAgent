@@ -155,7 +155,7 @@ public enum GitParsers {
     }
 
     /// `for-each-ref` 使用的格式串。
-    public static let branchFormat = "%(refname)%1f%(refname:short)%1f%(HEAD)%1f%(upstream:short)%1f%(objectname)%1f%(contents:subject)"
+    public static let branchFormat = "%(refname)%1f%(refname:short)%1f%(HEAD)%1f%(upstream:short)%1f%(objectname)%1f%(contents:subject)%1f%(committerdate:relative)%1f%(authorname)"
 
     /// 解析 `git for-each-ref --format=<branchFormat>` 输出;跳过 `origin/HEAD` 这类符号引用。
     public static func parseBranches(_ text: String) -> [GitBranch] {
@@ -167,7 +167,10 @@ public enum GitParsers {
             if isRemote, full.hasSuffix("/HEAD") { return nil }
             return GitBranch(name: String(fields[1]), isCurrent: fields[2] == "*", isRemote: isRemote,
                              upstream: fields[3].isEmpty ? nil : String(fields[3]), hash: String(fields[4]),
-                             subject: fields.count > 5 ? String(fields[5]) : "")
+                             subject: fields.count > 5 ? String(fields[5]) : "",
+                             relativeDate: fields.count > 6 ? String(fields[6]) : "",
+                             author: fields.count > 7 ? String(fields[7]) : "",
+                             isTag: full.hasPrefix("refs/tags/"))
         }
     }
 

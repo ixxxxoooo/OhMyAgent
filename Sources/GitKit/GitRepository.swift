@@ -346,10 +346,33 @@ public struct GitRepository: Sendable {
         return GitParsers.parseBranches(output.text)
     }
 
+    /// 标签列表(新的在前),复用分支的展示字段。
+    public func tags() async throws -> [GitBranch] {
+        let output = try await git(["for-each-ref", "--format=\(GitParsers.branchFormat)", "--sort=-creatordate", "refs/tags"])
+        return GitParsers.parseBranches(output.text)
+    }
+
     /// 切换分支(远程分支会创建同名本地分支并跟踪)。
     public func checkout(_ branch: String) async throws {
         try validateRef(branch)
         try await git(["switch", branch], lockFree: false)
+    }
+
+    /// 切换到已分离的 HEAD(标签或提交)。
+    /// - Parameter ref: 标签名或提交
+    public func checkoutDetached(_ ref: String) async throws {
+        try validateRef(ref)
+        try await git(["switch", "--detach", ref], lockFree: false)
+    }
+
+    /// 以某个引用为起点新建分支并切换。
+    /// - Parameters:
+    ///   - name: 分支名
+    ///   - base: 起点(分支、标签或提交)
+    public func createBranch(_ name: String, from base: String) async throws {
+        try validateRef(name)
+        try validateRef(base)
+        try await git(["switch", "-c", name, base], lockFree: false)
     }
 
     /// 新建分支。

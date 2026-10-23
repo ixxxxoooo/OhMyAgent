@@ -80,6 +80,14 @@ struct IDEStatusBar: View {
             Label(model.workspaceName ?? String(localized: "未打开文件夹"), om: "folder")
                 .labelStyle(.titleAndIcon)
                 .lineLimit(1)
+            if let root = workspace.root, let branch = GitStore.shared.model(for: root).status.branch {
+                Button { workspace.showBranchPicker() } label: {
+                    Label(branch, om: "git-branch").labelStyle(.titleAndIcon).lineLimit(1)
+                }
+                .buttonStyle(.plain)
+                .omTooltip(String(localized: "签出到…"))
+                .accessibilityLabel(String(localized: "签出到…"))
+            }
             Button { model.showPanel(.problems) } label: {
                 HStack(spacing: 4) {
                     Image.om("circle-x", size: 12)

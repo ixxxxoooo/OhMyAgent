@@ -94,15 +94,25 @@ public struct GitLineStats: Sendable, Equatable {
 
 /// 分支。
 public struct GitBranch: Sendable, Hashable, Identifiable {
-    public var id: String { (isRemote ? "remotes/" : "heads/") + name }
+    public var id: String { (isTag ? "tags/" : isRemote ? "remotes/" : "heads/") + name }
     public var name: String
     public var isCurrent: Bool
     public var isRemote: Bool
     public var upstream: String?
     public var hash: String
     public var subject: String
+    /// 最近提交的相对时间(如「3 分钟前」),取自 `committerdate:relative`
+    public var relativeDate = ""
+    /// 最近提交的作者
+    public var author = ""
+    /// 是否为标签
+    public var isTag = false
 
-    public init(name: String, isCurrent: Bool, isRemote: Bool, upstream: String?, hash: String, subject: String) {
+    public init(name: String, isCurrent: Bool, isRemote: Bool, upstream: String?, hash: String, subject: String,
+                relativeDate: String = "", author: String = "", isTag: Bool = false) {
+        self.relativeDate = relativeDate
+        self.author = author
+        self.isTag = isTag
         self.name = name
         self.isCurrent = isCurrent
         self.isRemote = isRemote

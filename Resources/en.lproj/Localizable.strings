@@ -2951,3 +2951,11 @@
 "下一处" = "Next";
 "关闭查找" = "Close find";
 "查找 (⌘F)" = "Find (⌘F)";
+"创建新分支…" = "Create New Branch…";
+"创建新分支依据…" = "Create New Branch From…";
+"签出已分离…" = "Checkout Detached…";
+"选择要签出的分支或标记" = "Select a branch or tag to check out";
+"选择作为新分支起点的引用" = "Select a ref to create the branch from";
+"选择要以分离 HEAD 签出的引用" = "Select a ref to check out detached";
+"签出到…" = "Checkout to…";
+"分支名不能为空或包含空白" = "Branch name can't be empty or contain whitespace";

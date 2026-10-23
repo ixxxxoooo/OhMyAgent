@@ -117,6 +117,15 @@ struct GitParsersTests {
         #expect(lines.first?.text == "// 注释内容")
     }
 
+    @Test("分支列表带相对时间、作者,标签被识别")
+    func branchExtraFields() {
+        let text = "refs/heads/main\u{1f}main\u{1f}*\u{1f}\u{1f}abc\u{1f}修复\u{1f}3 分钟前\u{1f}Jason\n"
+            + "refs/tags/v1.0\u{1f}v1.0\u{1f} \u{1f}\u{1f}def\u{1f}发布\u{1f}4 天前\u{1f}Jason\n"
+        let refs = GitParsers.parseBranches(text)
+        #expect(refs[0].relativeDate == "3 分钟前" && refs[0].author == "Jason" && !refs[0].isTag)
+        #expect(refs[1].isTag && refs[1].id == "tags/v1.0")
+    }
+
     @Test("分支与 stash 解析")
     func branchesAndStashes() {
         let text = "refs/heads/main\u{1f}main\u{1f}*\u{1f}origin/main\u{1f}abc\u{1f}修复\n"
