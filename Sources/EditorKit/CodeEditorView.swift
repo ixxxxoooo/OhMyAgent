@@ -425,6 +425,7 @@ public final class CodeEditorView: NSView {
                 self.lineIndexIsLive = true
                 self.ruler.lineIndex = index
                 self.refreshChrome()
+                self.minimap?.syntaxDidChange()
                 self.applyLargeFileMode(index.lineCount > Self.largeFileLineThreshold)
                 self.updateNoWrapGeometry()
                 self.scheduleHighlight()
@@ -505,6 +506,7 @@ public final class CodeEditorView: NSView {
                     self.ruler.lineIndex = index
                     self.refreshChrome()
                 }
+                self.minimap?.syntaxDidChange()
                 self.applyLargeFileMode(self.lineIndex.lineCount > Self.largeFileLineThreshold)
                 self.updateNoWrapGeometry()
                 self.highlightedRange = NSRange(location: 0, length: 0)

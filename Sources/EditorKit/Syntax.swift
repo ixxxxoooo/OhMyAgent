@@ -463,6 +463,13 @@ public actor HighlightEngine {
         return true
     }
 
+    /// 按多个范围分别取片段(缩略图按采样行批量查询,只进入 actor 一次)。
+    /// - Parameter ranges: UTF-16 范围数组
+    /// - Returns: 与 `ranges` 一一对应的片段数组
+    public func spans(inEach ranges: [NSRange]) -> [[SyntaxSpan]] {
+        ranges.map { $0.length > 0 ? spans(in: $0) : [] }
+    }
+
     /// 取与范围相交的片段。tree-sitter 模式按文档顺序返回,重叠时后者应覆盖前者;词法模式互不重叠。
     /// - Parameter range: UTF-16 范围
     /// - Returns: 片段数组

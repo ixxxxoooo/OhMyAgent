@@ -1,5 +1,5 @@
 // @author ixxxxoooo
-// 缩略图(I7):Retina 位图按点坐标绘制,第 N 行的条形落在第 N 个 2pt 行,不缩一半、不落到下半部。
+// 缩略图(I7):Retina 位图按点坐标绘制,第 N 行的条形落在第 N 个 2pt 行,不缩一半、不落到下半部;字符块按语法色上色。
 
 import AppKit
 import Testing
@@ -40,5 +40,30 @@ struct EditorMinimapTests {
         #expect(hasInk(rep, x: 6, y: 19, scale: scale))      // 第 10 行(y 18–19.5)
         #expect(!hasInk(rep, x: 6, y: 21, scale: scale))     // 第 10 行之后为空
         #expect(!hasInk(rep, x: 6, y: minimap.bounds.height / 2 + 1, scale: scale))
+    }
+
+    @Test("字符块按语法色绘制:关键字与普通标识符颜色不同,空白不画")
+    func blocksUseSyntaxColors() async throws {
+        let (editor, window) = makeEditor()
+        defer { window.close() }
+        editor.setText("let value = 1\n", language: .swift)
+        let minimap = try #require(editor.minimap)
+        window.layoutIfNeeded()
+        // 等引擎完成首次同步(之后会回调缩略图重取片段),再按位图取色
+        // 每列 (84 − 10) / 120 ≈ 0.62pt:`let` 在 x 5–6.9,空格在 6.9–7.5,`value` 在 7.5–10.6
+        var keyword: NSColor?
+        var identifier: NSColor?
+        for _ in 0..<300 {
+            let rep = try #require(minimap.barsImage(scale: 2))
+            keyword = rep.colorAt(x: 12, y: 1)
+            identifier = rep.colorAt(x: 18, y: 1)
+            if let keyword, let identifier, keyword != identifier { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(minimap.syntaxRevision > 0)
+        #expect((keyword?.alphaComponent ?? 0) > 0 && (identifier?.alphaComponent ?? 0) > 0)
+        #expect(keyword != identifier)
+        let rep = try #require(minimap.barsImage(scale: 2))
+        #expect((rep.colorAt(x: 14, y: 1)?.alphaComponent ?? 0) < 0.1)
     }
 }
