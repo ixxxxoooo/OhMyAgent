@@ -3,6 +3,7 @@
 // 编辑发生时先在主线程平移现有片段(输入不闪色),随后在后台增量同步语法树并回写,主线程不做任何解析。
 
 import AppKit
+import Darwin
 import EditorCore
 import OMLog
 
@@ -118,6 +119,10 @@ final class NativeTokenStore {
             let text = await Task.detached(priority: .userInitiated) { snapshot.string() }.value
             await engine.rebuild(text: text, language: language)
             span.end()
+            // 全量解析会产生大量瞬时分配(文本副本、解析栈);大文件解析完后把空闲页还给系统,常驻内存才不会停在峰值
+            if snapshot.length > 400_000 {
+                Task.detached(priority: .background) { _ = malloc_zone_pressure_relief(nil, 0) }
+            }
         }
         guard token == generation else { return }
         needsRebuild = false
