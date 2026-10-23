@@ -187,7 +187,9 @@ actor ClaudeSession: ClaudeQueryDelegate {
         }
         options.permissionMode = initialMode
         options.allowDangerouslySkipPermissions = allowBypass
-        options.settingSources = ["user", "project", "local"]
+        // 与 Node 适配器一致:客户端显式给出的设置来源与「仅用 --mcp-config」优先(纯文字会话据此不加载 CLAUDE.md、技能、钩子、插件与用户 MCP)
+        options.settingSources = userOptions?["settingSources"]?.arrayValue.map { $0.compactMap(\.stringValue) } ?? ["user", "project", "local"]
+        options.strictMCPConfig = userOptions?["strictMcpConfig"]?.boolValue ?? false
         options.includePartialMessages = true
         options.replayUserMessages = true
         options.mcpServers = Self.mcpServerConfigs(spec.mcpServers, extra: userOptions?["mcpServers"])
