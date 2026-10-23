@@ -59,6 +59,7 @@ final class DemoBenchmarkRunner {
         if categories.contains(.load) || categories.contains(.copy) || categories.contains(.switching) || categories.contains(.memory) { await runLoadCopySwitch(categories: categories) }
         if categories.contains(.render) { await runRender() }
         if categories.contains(.ide) { await runIDE() }
+        if categories.contains(.editor) { await runEditor() }
         if categories.contains(.memory) { await finishMemory(baseline: baseline) }
         report.finishedAt = Date()
         span.end()

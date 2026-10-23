@@ -26,7 +26,7 @@ DEFAULT_BASELINE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "per
 def ide_values(result):
     """取结果 JSON 里全部有值的 ide.* 度量:{id: (值, 预算, 单位)}。"""
     return {m["id"]: (m["value"], m.get("budget"), m.get("unit", "milliseconds"))
-            for m in result.get("metrics", []) if m["id"].startswith("ide.") and m.get("value") is not None}
+            for m in result.get("metrics", []) if m["id"].startswith(("ide.", "editor.")) and m.get("value") is not None}
 
 
 def over_budget_ids(result):
@@ -54,7 +54,7 @@ def compare(result, baseline, tolerance=1.5, slack=1.0):
             regressions.append(f"{metric_id}: {value:.2f} > 基线 {reference:.2f} × {tolerance} + {slack} = {limit:.2f}")
     # 预算内但失败的项(没有值且有预算)
     for m in result.get("metrics", []):
-        if m["id"].startswith("ide.") and m.get("budget") is not None and m.get("value") is None and m.get("detail"):
+        if m["id"].startswith(("ide.", "editor.")) and m.get("budget") is not None and m.get("value") is None and m.get("detail"):
             over_budget.append(f"{m['id']}: 运行失败({m['detail']})")
     return regressions, over_budget, notes
 
@@ -83,9 +83,18 @@ def cmd_update(args):
     result = json.load(open(args["result"]))
     values = {k: round(v[0], 3) for k, v in ide_values(result).items()}
     if not values:
-        print("结果里没有 ide.* 数据", file=sys.stderr)
+        print("结果里没有 ide.*/editor.* 数据", file=sys.stderr)
         return 2
-    payload = {"updated": date.today().isoformat(), "system": platform.platform(), "machine": platform.machine(), "knownOverBudget": over_budget_ids(result), "metrics": values}
+    # 合并:只刷新本次结果里有的项(`--only editor` 不会抹掉 ide.* 基线,反之亦然)
+    metrics, known = dict(values), set(over_budget_ids(result))
+    if os.path.exists(args["baseline"]):
+        try:
+            old = json.load(open(args["baseline"]))
+            metrics = {**old.get("metrics", {}), **values}
+            known |= {k for k in old.get("knownOverBudget", []) if k not in values}
+        except (OSError, ValueError):
+            pass
+    payload = {"updated": date.today().isoformat(), "system": platform.platform(), "machine": platform.machine(), "knownOverBudget": sorted(known), "metrics": metrics}
     with open(args["baseline"], "w") as handle:
         json.dump(payload, handle, ensure_ascii=False, indent=2, sort_keys=True)
         handle.write("\n")
@@ -101,6 +110,7 @@ def self_test():
         {"id": "ide.c", "value": None, "budget": 10, "detail": "超时"},
         {"id": "ide.d", "value": 1.0, "budget": None},
         {"id": "render.x", "value": 999.0, "budget": 1},
+        {"id": "editor.e", "value": 2.0, "budget": 4, "unit": "milliseconds"},
     ]}
     regressions, over, notes = compare(result, {"metrics": {"ide.a": 5.0, "ide.b": 25.0}}, 1.5, 1.0)
     # 已知差距:登记后 ide.b 不再因超预算失败,但回归检查仍然生效
@@ -117,7 +127,14 @@ def self_test():
         json.dump(result, open(src, "w"))
         assert cmd_update({"result": src, "baseline": base}) == 0
         saved = json.load(open(base))["metrics"]
-        assert saved == {"ide.a": 10.0, "ide.b": 30.0, "ide.d": 1.0}, saved
+        assert saved == {"ide.a": 10.0, "ide.b": 30.0, "ide.d": 1.0, "editor.e": 2.0}, saved
+        # 合并:只含 editor 的结果更新不会抹掉其他项
+        only_editor = os.path.join(tmp, "e.json")
+        json.dump({"metrics": [{"id": "editor.e", "value": 3.0, "budget": 4}]}, open(only_editor, "w"))
+        assert cmd_update({"result": only_editor, "baseline": base}) == 0
+        merged = json.load(open(base))["metrics"]
+        assert merged["editor.e"] == 3.0 and merged["ide.a"] == 10.0, merged
+        assert cmd_update({"result": src, "baseline": base}) == 0
         assert json.load(open(base))["knownOverBudget"] == ["ide.b"]
         assert compare(result, json.load(open(base)))[0] == []
     print("ide-bench-check 自检通过")

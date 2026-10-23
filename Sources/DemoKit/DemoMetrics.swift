@@ -21,6 +21,8 @@ public enum DemoMetricCategory: String, Codable, CaseIterable, Sendable {
     case memory
     /// IDE 模式(编辑器、窗口切换、资源管理器、搜索、主题;I13 前仅登记为展示项)
     case ide
+    /// 原生编辑器内核(native2:打开/滚动/输入/语法/补全/Agent 补丁,120Hz 预算)
+    case editor
 
     /// 中文标题。
     public var title: String {
@@ -32,6 +34,7 @@ public enum DemoMetricCategory: String, Codable, CaseIterable, Sendable {
         case .switching: "模型/引擎切换与恢复"
         case .memory: "运行时内存"
         case .ide: "IDE 模式"
+        case .editor: "原生编辑器"
         }
     }
 }
@@ -40,9 +43,17 @@ public enum DemoMetricCategory: String, Codable, CaseIterable, Sendable {
 public enum DemoMetricUnit: String, Codable, Sendable {
     case milliseconds
     case megabytes
+    /// 百分比(如掉帧率)
+    case percent
 
     /// 展示用后缀。
-    public var suffix: String { self == .milliseconds ? "ms" : "MB" }
+    public var suffix: String {
+        switch self {
+        case .milliseconds: "ms"
+        case .megabytes: "MB"
+        case .percent: "%"
+        }
+    }
 }
 
 /// 度量结果状态。
@@ -239,6 +250,11 @@ public enum DemoBenchmarkCatalog {
         DemoBenchmarkItem(id: id, category: .ide, title: title, purpose: "\(purpose)(目标 \(target))", unit: .megabytes, budget: budget)
     }
 
+    /// 原生编辑器条目:预算按 120Hz(帧预算 8.3ms)制定,见迁移计划「性能预算」。
+    private static func editor(_ id: String, _ title: String, _ purpose: String, unit: DemoMetricUnit = .milliseconds, budget: Double) -> DemoBenchmarkItem {
+        DemoBenchmarkItem(id: id, category: .editor, title: title, purpose: "\(purpose)(预算 ≤ \(budget < 10 ? String(format: "%.1f", budget) : String(Int(budget))) \(unit.suffix))", unit: unit, budget: budget)
+    }
+
     /// 全部条目(顺序即运行与展示顺序)。
     public static let items: [DemoBenchmarkItem] = [
         ms("open.perf-longchat", .open, "打开 perf-longchat", "切换到项目并让会话就绪(含首次创建)", budget: 800),
@@ -287,6 +303,18 @@ public enum DemoBenchmarkCatalog {
         ideMB("ide.memory-50k", "打开 50k 行文件内存", "打开 50k 行文件的内存增量", target: "≤ 80 MB", budget: 80),
         ideMB("ide.memory-3-windows", "3 个 IDE 窗口空闲增量", "3 个 IDE 窗口各开 3 个文件,相对关闭全部窗口后的应用占用增量(绝对占用随启动状态波动大,不适合做门槛;计划的绝对值 ≤ 250 MB 约等于基线 70 MB + 此增量)", target: "≤ 150 MB", budget: 150),
         ideMB("ide.memory-drift", "开关窗口 20 次漂移", "开关 IDE 窗口 20 次后的内存漂移", target: "≤ 10 MB", budget: 10),
+        editor("editor.open-50k", "原生:打开 5 万行", "5 万行 / 1.6MB 文件装入到首帧绘制", budget: 40),
+        editor("editor.open-50k-interactive", "原生:5 万行可交互", "首帧 + 首批语法着色 + 首次按键", budget: 100),
+        editor("editor.open-1m", "原生:打开 100 万行", "100 万行文件装入 rope 到首帧", budget: 800),
+        editor("editor.memory-1m", "原生:100 万行内存", "打开 100 万行后相对打开前的内存增量(≤ 文件大小的 2.5 倍,文件约 33MB)", unit: .megabytes, budget: 83),
+        editor("editor.scroll-p50", "原生:滚动单帧中位数", "5 万行文件同步滚动 + 绘制的单帧耗时 P50", budget: 8.4),
+        editor("editor.scroll-p99", "原生:滚动单帧 P99", "同上 P99", budget: 11),
+        editor("editor.scroll-dropped", "原生:滚动掉帧率", "显示链接下匀速滚动,相邻帧间隔超过名义帧时长 1.5 倍的占比", unit: .percent, budget: 1),
+        editor("editor.typing-p95", "原生:按键到上屏 P95", "5 万行文件中部连续输入(插入 + 布局 + 绘制)", budget: 4),
+        editor("editor.typing-max", "原生:按键到上屏 max", "同上最大值", budget: 8),
+        editor("editor.syntax-incremental", "原生:增量语法", "单字符编辑后 tree-sitter 增量重解析耗时中位数", budget: 2),
+        editor("editor.completion-popup", "原生:补全浮层", "500 个候选从触发到浮层绘制完成 P95", budget: 16),
+        editor("editor.agent-patch", "原生:Agent 流式补丁", "2000 行文件上每个补丁重算 Diff + 行内审阅 + 绘制 P95(200 补丁/秒 = 5ms/个)", budget: 5),
         ideMB("ide.soak-drift", "3 窗口浸泡漂移", "3 个 IDE 窗口持续开文件/切标签/输入一段时间后的内存漂移(默认 24 秒,OMA_IDE_SOAK_SECONDS 可调;malloc 堆全程持平,波动主要来自窗口图层缓冲与分配器,故门槛放宽到 60 MB)", target: "≤ 60 MB", budget: 60),
     ]
 

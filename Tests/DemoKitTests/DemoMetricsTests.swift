@@ -90,6 +90,22 @@ struct DemoMetricsTests {
         #expect(DemoBenchmarkCatalog.categories(from: "ide") == [.ide])
     }
 
+    @Test("原生编辑器分类:12 项全部带 120Hz 预算,关键预算与迁移计划一致")
+    func editorCategoryRegistered() {
+        let items = DemoBenchmarkCatalog.items(in: .editor)
+        #expect(items.count == 12)
+        #expect(items.allSatisfy { $0.budget != nil && $0.id.hasPrefix("editor.") })
+        let expected: [String: Double] = [
+            "editor.scroll-p50": 8.4, "editor.scroll-p99": 11, "editor.scroll-dropped": 1,
+            "editor.typing-p95": 4, "editor.typing-max": 8, "editor.open-50k": 40, "editor.open-50k-interactive": 100,
+            "editor.open-1m": 800, "editor.syntax-incremental": 2, "editor.completion-popup": 16, "editor.agent-patch": 5,
+        ]
+        for (id, budget) in expected { #expect(DemoBenchmarkCatalog.item(id: id)?.budget == budget, "\(id) 预算不符") }
+        #expect(DemoBenchmarkCatalog.item(id: "editor.scroll-dropped")?.unit == .percent)
+        #expect(DemoBenchmarkCatalog.item(id: "editor.memory-1m")?.unit == .megabytes)
+        #expect(DemoBenchmarkCatalog.categories(from: "editor") == [.editor])
+    }
+
     @Test("OMA_DEMO_BENCH 解析:all/1 全部,逗号分隔取分类,非法为 nil")
     func parseCategories() {
         #expect(DemoBenchmarkCatalog.categories(from: "all") == Set(DemoMetricCategory.allCases))

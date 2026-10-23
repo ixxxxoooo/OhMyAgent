@@ -195,6 +195,9 @@ public final class NativeLanguageController {
         }
     }
 
+    /// 补全 / 签名等浮层是否正在显示。
+    public var isPopupShown: Bool { popup != nil }
+
     /// 触发补全。
     /// - Parameter auto: 是否由输入自动触发(自动触发时不打扰:无结果静默)
     public func triggerCompletion(auto: Bool) {

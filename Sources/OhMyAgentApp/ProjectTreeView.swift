@@ -21,13 +21,17 @@ struct ProjectTreeView: View {
 
     var body: some View {
         let _ = PanelToggleProbe.count("tree")
-        // 行数据(快照)在这里一次性生成;滚动只改窗口,不会重算
-        let rows = workbench.sidebarRows(showArchived: showArchived, expandedMore: expandedMore)
         VStack(spacing: 0) {
-            // 顶部 35pt:红绿灯与侧栏开关浮层所在区域,可拖动窗口
-            Color.clear.frame(height: TitlebarMetrics.height).background(WindowDragArea())
-            navigation
-            SidebarWindowedList(rows: rows) { row in rowView(row) }
+            // 顶部 35pt:红绿灯与侧栏开关浮层所在区域(可拖动窗口),右侧是「会话 / 代码」模式切换
+            SidebarTopStrip(workbench: workbench)
+            switch workbench.layout.leftPane {
+            case .files:
+                // 代码模式:当前项目的文件树
+                ExplorerView(workbench: workbench)
+                    .frame(maxHeight: .infinity)
+            default:
+                sessionsContent
+            }
             footer
         }
         .dropDestination(for: URL.self) { urls, _ in
@@ -37,6 +41,13 @@ struct ProjectTreeView: View {
             }
             return added
         }
+    }
+
+    /// 会话模式:主操作 + 置顶/会话/工作区列表。行数据(快照)在这里一次性生成;滚动只改窗口,不会重算。
+    @ViewBuilder private var sessionsContent: some View {
+        let rows = workbench.sidebarRows(showArchived: showArchived, expandedMore: expandedMore)
+        navigation
+        SidebarWindowedList(rows: rows) { row in rowView(row) }
     }
 
     /// 单行内容(窗口内才会被调用)。

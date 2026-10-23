@@ -67,6 +67,32 @@ enum IDEDebugHooks {
         }
         if let raw = env["OMA_IDE_OPEN_DIFF"], !raw.isEmpty { workspace.model.openDiff(absolute(raw)) }
         if let raw = env["OMA_IDE_EDITOR_ACTIONS"], !raw.isEmpty { await runEditorActions(raw) }
+        if let raw = env["OMA_IDE_EDITOR_SWEEP"], let seconds = Double(raw), seconds > 0 { await runEditorSweep(seconds: seconds) }
+    }
+
+    /// `OMA_IDE_EDITOR_SWEEP=秒数`:在真实 IDE 窗口里对第一个原生编辑器匀速滚动,用显示链接采样帧间隔,
+    /// 结束输出一条 perf 日志「编辑器滚动基准」(帧数、平均/最长帧间隔、超过 33ms 的掉帧数)。
+    /// 与 `Scripts/editor-bench.sh` 的合成素材基准互补:这里量的是带 SwiftUI 外壳的整窗口真实表现。
+    private static func runEditorSweep(seconds: Double) async {
+        for _ in 0..<100 where firstNativeEditor() == nil { try? await Task.sleep(for: .milliseconds(100)) }
+        guard let editor = firstNativeEditor() else {
+            Log.perf.warning("编辑器滚动基准:没有可用的原生编辑器")
+            return
+        }
+        try? await Task.sleep(for: .seconds(1))
+        let row = Double(editor.model.lineHeight)
+        let nominal = 1000.0 / Double(max(editor.window?.screen?.maximumFramesPerSecond ?? 60, 30))
+        let sampler = SweepSampler(view: editor)
+        let started = ContinuousClock.now
+        var offset = 0.0
+        while (ContinuousClock.now - started) < .seconds(seconds) {
+            offset += row * 2
+            editor.scroll(y: CGFloat(offset.truncatingRemainder(dividingBy: max(Double(editor.model.contentHeight) - 700, row))))
+            try? await Task.sleep(for: .milliseconds(Int(nominal)))
+        }
+        let result = sampler.stop()
+        Log.perf.info("编辑器滚动基准", ["frames": "\(result.frames)", "avgMs": String(format: "%.2f", result.avgMs),
+                                  "maxMs": String(format: "%.1f", result.maxMs), "hitches": "\(result.hitches)", "nominalMs": String(format: "%.1f", nominal)])
     }
 
     /// 在所有窗口里找原生编辑器(应用在后台时没有键盘焦点);优先取正在编辑 `OMA_IDE_OPEN_FILE` 的那个。

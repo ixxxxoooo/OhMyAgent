@@ -95,6 +95,17 @@ final class NativeTokenStore {
         pendingEdits = []
         let range = Self.padded(desired, length: snapshot.length)
         let language = self.language
+        // 超大文件:不进后台引擎(全量词法扫描会常驻数百 MB 片段),只对视口附近按行对齐的窗口做词法扫描,
+        // 代价与文件大小无关;窗口起点之前的跨行上下文(长块注释、多行字符串)不参与,属于大文件模式的取舍。
+        if snapshot.length > HighlightEngine.treeSitterMaxUnits, language != .plain {
+            needsRebuild = true
+            engineLength = -1
+            let spans = await Task.detached(priority: .userInitiated) { Self.lexWindow(snapshot, range: range, language: language) }.value
+            guard token == generation else { return }
+            if !pendingEdits.isEmpty { dirty = true; return }
+            publish(spans: spans, range: range)
+            return
+        }
         var synced = false
         if !needsRebuild, engineLength >= 0, !edits.isEmpty, edits.allSatisfy({ $0.inserted != nil }) {
             let units = edits.map { TextUnitEdit(location: $0.location, oldLength: $0.oldLength, replacement: Array($0.inserted ?? [])) }
@@ -115,6 +126,23 @@ final class NativeTokenStore {
         guard token == generation else { return }
         // 同步期间又有新编辑:结果已过期,留给下一轮。
         if !pendingEdits.isEmpty { dirty = true; return }
+        publish(spans: spans, range: range)
+    }
+
+    /// 对 `range`(向外扩到整行)做词法扫描,片段坐标还原为文档偏移。
+    nonisolated static func lexWindow(_ snapshot: TextRope, range: NSRange, language: SyntaxLanguage) -> [SyntaxSpan] {
+        guard snapshot.length > 0, range.length > 0 else { return [] }
+        let first = snapshot.line(containing: min(range.location, snapshot.length))
+        let last = snapshot.line(containing: min(range.location + range.length, snapshot.length))
+        let lower = snapshot.lineStart(first)
+        let upper = min(snapshot.lineStart(last) + snapshot.lineLength(last), snapshot.length)
+        guard upper > lower else { return [] }
+        let text = snapshot.string(in: TextSpan(location: lower, length: upper - lower))
+        return SimpleLexer.lex(text, language: language).map { SyntaxSpan(location: $0.location + lower, length: $0.length, kind: $0.kind) }
+    }
+
+    /// 把片段落成装饰并通知视图重绘。
+    private func publish(spans: [SyntaxSpan], range: NSRange) {
         var items: [Decoration] = []
         items.reserveCapacity(spans.count)
         for (index, span) in spans.enumerated() where span.length > 0 {
