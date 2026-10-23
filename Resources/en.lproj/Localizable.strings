@@ -2959,3 +2959,4 @@
 "选择要以分离 HEAD 签出的引用" = "Select a ref to check out detached";
 "签出到…" = "Checkout to…";
 "分支名不能为空或包含空白" = "Branch name can't be empty or contain whitespace";
+"第 %lld / %lld 次提问" = "Prompt %lld of %lld";
