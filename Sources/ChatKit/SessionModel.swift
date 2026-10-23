@@ -394,7 +394,11 @@ public final class SessionModel {
     var archiveHidden: (sessionId: String, turns: Int)?
     private(set) var client: ACPClient?
     /// 正在接回引擎的存档会话 ID:期间屏蔽回放内容进时间线、发送进入排队
-    @ObservationIgnored var archiveSyncing: String?
+    @ObservationIgnored var archiveSyncing: String? {
+        didSet { if isAttachingEngine != (archiveSyncing != nil) { isAttachingEngine = archiveSyncing != nil } }
+    }
+    /// 存档会话正在接回引擎(可观察):期间引擎里还没有这个会话,依赖引擎的刷新(如上下文明细)应等它结束
+    public private(set) var isAttachingEngine = false
     /// 预恢复时启动的存档回显(连接就绪后据此只接回引擎、不重置时间线)
     @ObservationIgnored var archiveRender: (sessionId: String, task: Task<ArchiveRenderResult, Never>)?
     private var coalescer: EventCoalescer?
@@ -1733,7 +1737,7 @@ public final class SessionModel {
     /// 轮次进行中、未连接、已在探测或 Agent 不支持时直接跳过;失败只记日志,不打扰用户。
     public func refreshContextUsage() async {
         // 纯文字会话禁用了斜杠命令,`/context` 不可用;用量改由记录还原/Agent 上报
-        guard supportsContextBreakdown, !isPlainChat, phase == .ready, !isRunning, contextProbeChunks == nil, let client, let sessionId else { return }
+        guard supportsContextBreakdown, !isPlainChat, phase == .ready, !isRunning, archiveSyncing == nil, contextProbeChunks == nil, let client, let sessionId else { return }
         let started = ContinuousClock.now
         if activeDescriptor.kind == .claudeACP {
             do {

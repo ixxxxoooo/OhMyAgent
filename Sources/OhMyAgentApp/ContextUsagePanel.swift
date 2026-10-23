@@ -44,8 +44,8 @@ struct ContextUsagePanel: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .omGlassCard()
         .accessibilityElement(children: .contain)
-        .task(id: RefreshKey(sessionId: model.sessionId, running: model.isRunning)) {
-            // 打开、换会话、回合结束时各刷新一次明细(回合进行中 refresh 会自行跳过)
+        .task(id: RefreshKey(sessionId: model.sessionId, running: model.isRunning, ready: model.phase == .ready && !model.isAttachingEngine)) {
+            // 打开、换会话、引擎就绪、回合结束时各刷新一次明细(回合进行中 refresh 会自行跳过)
             await model.refreshContextUsage()
         }
         .task(id: model.sessionId) {
@@ -54,10 +54,12 @@ struct ContextUsagePanel: View {
         }
     }
 
-    /// 触发明细刷新的条件:会话变化或运行状态变化。
+    /// 触发明细刷新的条件:会话变化、运行状态变化或引擎就绪。
+    /// 打开存档会话时先回显(已有 sessionId)再接回引擎,只看 sessionId 会错过就绪那一刻。
     private struct RefreshKey: Equatable {
         let sessionId: String?
         let running: Bool
+        let ready: Bool
     }
 
     /// 标题行:「上下文窗口」+ 已用 / 窗口与百分比 + 关闭。
