@@ -124,7 +124,8 @@ public final class LSPStdioTransport: ACPTransport, @unchecked Sendable {
         writeQueue.async { [self] in
             guard !stdinClosed else { return }
             stdinClosed = true
-            if stdinFileDescriptor >= 0 { close(stdinFileDescriptor) }
+            // 经 FileHandle 关闭,避免与 Pipe 释放时的关闭形成 fd 双重关闭(fd 号可能已被其他连接复用)
+            try? stdinPipe.fileHandleForWriting.close()
         }
         if process.isRunning { process.terminate() }
     }
