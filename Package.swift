@@ -45,6 +45,8 @@ let package = Package(
         .target(name: "ClaudeConfigKit", dependencies: ["OMLog"]),
         // Diff 与检查点
         .target(name: "DiffKit"),
+        // 编辑器内核(无视图):持久化文本绳、撤销栈、共享文档;视图模型与装饰随 E2 起加入
+        .target(name: "EditorCore"),
         // AppKit TextKit 2 编辑器
         .target(name: "EditorKit", dependencies: ["DiffKit", "DesignSystem", "IconKit", "OMLog", "CTreeSitter", "TreeSitterGrammars"]),
         // Lucide 原生图标:SVG path 解析 + 模板图像渲染
@@ -102,6 +104,7 @@ let package = Package(
         .testTarget(name: "CanvasKitTests", dependencies: ["CanvasKit"]),
         .testTarget(name: "AutomationKitTests", dependencies: ["AutomationKit"]),
         .testTarget(name: "EditorKitTests", dependencies: ["EditorKit"]),
+        .testTarget(name: "EditorCoreTests", dependencies: ["EditorCore"]),
         .testTarget(name: "IDEKitTests", dependencies: ["IDEKit", "WorkbenchKit"]),
         .testTarget(name: "MermaidKitTests", dependencies: ["MermaidKit"]),
         .testTarget(name: "OhMyAgentAppTests", dependencies: ["OhMyAgentApp", "ChatKit", "ACPKit", "DesignSystem", "EditorKit", "LSPKit", "CanvasKit", "DemoKit"]),

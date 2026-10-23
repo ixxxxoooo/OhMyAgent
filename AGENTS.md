@@ -16,6 +16,7 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit;**唯一例外**:内置
 - `ClaudeAgentKit`:Claude Code 原生 ACP 适配器(纯 Swift,驱动 `claude` stream-json;`CLI/`、`Translate/`、`Session/`、`Permissions/`),项目不依赖 Node。
 - `ChatKit`:会话模型 `SessionModel`、时间线、补全、Markdown、计划、提供商与模型映射、会话存档、用量与缓存统计(无视图)。
 - `WorkbenchKit`:工作台模型:多项目、会话树、布局与持久化、停靠 `DockHost`、搜索索引、工作树(无视图)。
+- `EditorCore`(原生 Monaco 级编辑器内核,无视图;迁移计划见 `.specstory/history/docs/` 的「编辑器内核迁移」文档):持久化文本绳 `TextRope`、撤销栈、共享文档 `EditorDocument`,后续加入选区/折叠/换行/装饰/View Zone 视图模型。
 - `ClaudeConfigKit`(`~/.claude`、`.mcp.json`)、`DiffKit`、`EditorKit`(高亮、tree-sitter、Markdown 就地渲染)、`GitKit`、`LSPKit`。
 - `ProviderProxyKit`:本机回环网关 `LocalGateway` 与模型代理(Anthropic 透传 / OpenAI 转换);真实密钥只在代理内存。
 - `MermaidKit`、`IconKit`(Lucide、`OMFileIcon`、品牌图标;界面禁用 SF Symbol)、`DesignSystem`(令牌、主题包、玻璃材质)。
