@@ -2946,3 +2946,8 @@
 "流光溢彩" = "Aurora";
 "运行中的会话标题" = "Running session title";
 "运行中的会话标题与最新一步上扫过的高亮效果:「经典」为单色高亮带,「流光溢彩」为随主题强调色流动的多色渐变。" = "The highlight sweeping over running session titles and the latest step: Classic is a single-color band; Aurora is a multi-color gradient that flows with the theme accent colors.";
+"在表格中查找" = "Find in table";
+"上一处" = "Previous";
+"下一处" = "Next";
+"关闭查找" = "Close find";
+"查找 (⌘F)" = "Find (⌘F)";

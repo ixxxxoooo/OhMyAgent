@@ -8,6 +8,7 @@ import EditorKit
 import IconKit
 import Observation
 import PDFKit
+import SpreadsheetKit
 import SwiftUI
 
 /// 可渲染预览的文件类型。
@@ -334,32 +335,32 @@ enum CSVParser {
     }
 }
 
-/// 表格预览:首行作表头,列宽按内容估算,大表格懒加载。
+/// 表格预览:首行作表头,列宽按内容估算,大表格懒加载;⌘F 查找(命中单元格高亮,回车跳到下一处)。
 struct CSVTableView: View {
     let text: String
     let delimiter: Character
     @State private var rows: [[String]] = []
+    @State private var find = TableFindState()
+    @Environment(\.tabIsActive) private var tabActive
+
+    /// 查找任务的触发键:关键词、文本、查找条开关任一变化都重新匹配。
+    private struct FindKey: Equatable {
+        let query: String
+        let rowCount: Int
+        let isOpen: Bool
+    }
 
     var body: some View {
         Group {
             if rows.isEmpty {
                 OMEmptyState { Label("表格为空", om: "columns-2", size: 28) } description: { Text("文件里没有可显示的行。") }
             } else {
-                let columns = rows.map(\.count).max() ?? 0
-                let widths = columnWidths(columns: columns)
-                ScrollView([.horizontal, .vertical]) {
-                    LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
-                        Section {
-                            ForEach(Array(rows.dropFirst().enumerated()), id: \.offset) { index, row in
-                                rowView(row, widths: widths, header: false)
-                                    .background(index % 2 == 1 ? OMColors.subtleFill : Color.clear)
-                            }
-                        } header: {
-                            rowView(rows[0], widths: widths, header: true)
-                                .background(OMColors.card)
-                        }
+                VStack(spacing: 0) {
+                    if find.isOpen {
+                        TableFindBar(state: find)
+                        Divider()
                     }
-                    .padding(12)
+                    grid
                 }
             }
         }
@@ -368,6 +369,57 @@ struct CSVTableView: View {
             let source = text
             let separator = delimiter
             rows = await Task.detached(priority: .userInitiated) { CSVParser.parse(source, delimiter: separator) }.value
+        }
+        .task(id: FindKey(query: find.query, rowCount: rows.count, isOpen: find.isOpen)) { await refreshMatches() }
+        .onReceive(NotificationCenter.default.publisher(for: .omTableFind)) { note in
+            guard tabActive, !rows.isEmpty, let action = TableFindRouter.action(from: note) else { return }
+            find.handle(action)
+        }
+    }
+
+    /// 防抖后在后台线程匹配(表头也参与搜索),保持当前选中的匹配。
+    private func refreshMatches() async {
+        guard find.isOpen, !rows.isEmpty else { find.setMatches([], keeping: nil); return }
+        let query = find.query
+        let table = rows
+        try? await Task.sleep(for: .milliseconds(150))
+        guard !Task.isCancelled else { return }
+        let found = await Task.detached(priority: .userInitiated) {
+            TableSearch.matches(query: query, rows: Array(table.indices), columnCount: table.map(\.count).max() ?? 0) { row, column in
+                table[row].indices.contains(column) ? table[row][column] : ""
+            }
+        }.value
+        guard !Task.isCancelled else { return }
+        find.setMatches(found, keeping: find.current)
+    }
+
+    private var grid: some View {
+        let columns = rows.map(\.count).max() ?? 0
+        let widths = columnWidths(columns: columns)
+        return ScrollViewReader { proxy in
+            ScrollView([.horizontal, .vertical]) {
+                LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
+                    Section {
+                        ForEach(Array(rows.dropFirst().enumerated()), id: \.offset) { index, row in
+                            rowView(row, index: index + 1, widths: widths, header: false)
+                                .background(index % 2 == 1 ? OMColors.subtleFill : Color.clear)
+                        }
+                    } header: {
+                        rowView(rows[0], index: 0, widths: widths, header: true)
+                            .background(OMColors.card)
+                    }
+                }
+                .padding(12)
+            }
+            .onChange(of: find.current) { _, new in
+                guard let new else { return }
+                // 数据行 id 为去掉表头后的序号;行是懒加载的,先滚到所在行,再把该列滚进可视区
+                withAnimation(nil) { if new.row > 0 { proxy.scrollTo(new.row - 1, anchor: .center) } }
+                Task {
+                    try? await Task.sleep(for: .milliseconds(50))
+                    withAnimation(nil) { proxy.scrollTo(new, anchor: .center) }
+                }
+            }
         }
     }
 
@@ -378,14 +430,18 @@ struct CSVTableView: View {
         }
     }
 
-    private func rowView(_ row: [String], widths: [CGFloat], header: Bool) -> some View {
+    private func rowView(_ row: [String], index: Int, widths: [CGFloat], header: Bool) -> some View {
         HStack(alignment: .top, spacing: 0) {
             ForEach(Array(widths.enumerated()), id: \.offset) { column, width in
+                let position = TableMatch(row: index, column: column)
+                let isCurrent = find.current == position
                 Text(row.indices.contains(column) ? row[column] : "")
                     .font(header ? OMFonts.small.weight(.medium) : OMFonts.small)
                     .lineLimit(3)
                     .padding(.horizontal, 8).padding(.vertical, 4)
                     .frame(width: width, alignment: .leading)
+                    .background(isCurrent ? OMColors.warning.opacity(0.55) : find.matchSet.contains(position) ? OMColors.warning.opacity(0.25) : Color.clear)
+                    .id(position)
                     .overlay(alignment: .trailing) { Rectangle().fill(OMColors.hairline.opacity(0.5)).frame(width: 0.5) }
             }
         }

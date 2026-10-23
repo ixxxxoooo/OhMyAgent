@@ -36,6 +36,10 @@ struct SpreadsheetTabView: View {
     @State private var visibleRows: [Int] = []
     /// 筛选模式:列头显示筛选按钮(类似 Excel 的「筛选」开关)
     @State private var filterMode = false
+    /// 查找(⌘F):状态模型;可见行/工作表变化时递增 `findRevision` 触发重新匹配
+    @State private var find = TableFindState()
+    @State private var findRevision = 0
+    @Environment(\.tabIsActive) private var tabActive
 
     private enum Phase: Equatable { case loading, ready, failed(String) }
 
@@ -57,18 +61,49 @@ struct SpreadsheetTabView: View {
         .background(OMColors.surface)
         .task(id: path) { await load() }
         .onChange(of: filterState) { _, _ in refreshVisibleRows() }
+        .task(id: FindKey(query: find.query, revision: findRevision, isOpen: find.isOpen)) { await refreshMatches() }
+        .onChange(of: find.current) { _, new in
+            if let new { selection = CellPosition(row: new.row, column: new.column) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .omTableFind)) { note in
+            guard tabActive, phase == .ready, let action = TableFindRouter.action(from: note) else { return }
+            find.handle(action)
+        }
+    }
+
+    /// 查找任务的触发键:关键词、可见行/工作表版本、查找条开关任一变化都重新匹配。
+    private struct FindKey: Equatable {
+        let query: String
+        let revision: Int
+        let isOpen: Bool
+    }
+
+    /// 在可见行里重新匹配(防抖后在后台线程算,保持当前选中的匹配)。
+    private func refreshMatches() async {
+        guard find.isOpen, let sheet else { find.setMatches([], keeping: nil); return }
+        let query = find.query
+        let rows = visibleRows
+        try? await Task.sleep(for: .milliseconds(150))
+        guard !Task.isCancelled else { return }
+        let found = await Task.detached(priority: .userInitiated) {
+            TableSearch.matches(query: query, rows: rows, columnCount: sheet.columnCount) { sheet.cell(row: $0, column: $1).text }
+        }.value
+        guard !Task.isCancelled else { return }
+        find.setMatches(found, keeping: find.current)
     }
 
     /// 按当前筛选/排序重算可见行。
     private func refreshVisibleRows() {
         guard let sheet else { visibleRows = []; return }
         visibleRows = SheetFilter.visibleRows(in: sheet, state: filterState)
+        findRevision += 1
     }
 
     /// 载入或切换工作表后重置筛选状态。
     private func resetFilters(for sheet: SpreadsheetSheet?) {
         filterState = SheetFilterState()
         visibleRows = sheet.map { SheetFilter.visibleRows(in: $0, state: SheetFilterState()) } ?? []
+        findRevision += 1
     }
 
     @ViewBuilder
@@ -77,7 +112,11 @@ struct SpreadsheetTabView: View {
             VStack(spacing: 0) {
                 formulaBar(sheet)
                 Divider()
-                SpreadsheetGrid(sheet: sheet, visibleRows: visibleRows, filterMode: filterMode, filterState: $filterState, selection: $selection)
+                if find.isOpen {
+                    TableFindBar(state: find)
+                    Divider()
+                }
+                SpreadsheetGrid(sheet: sheet, visibleRows: visibleRows, filterMode: filterMode, filterState: $filterState, selection: $selection, matches: find.matchSet, current: find.current)
                 Divider()
                 footer(sheet, workbook: workbook)
             }
@@ -109,6 +148,13 @@ struct SpreadsheetTabView: View {
     /// 编辑栏右侧的筛选控件:筛选开关、首行表头开关、清除全部筛选。
     private var filterControls: some View {
         HStack(spacing: 4) {
+            Button { find.isOpen ? find.close() : find.show() } label: {
+                Image.om("search", size: 12)
+            }
+            .buttonStyle(find.isOpen ? .omSecondary : .omIcon)
+            .omTooltip("查找 (⌘F)")
+            .accessibilityLabel("查找")
+            .accessibilityAddTraits(find.isOpen ? .isSelected : [])
             if filterState.isActive {
                 Button {
                     filterState.clearFilters()
@@ -229,6 +275,9 @@ private struct SpreadsheetGrid: View {
     let filterMode: Bool
     @Binding var filterState: SheetFilterState
     @Binding var selection: CellPosition?
+    /// 查找命中的单元格与当前命中(高亮并滚动到可见)
+    let matches: Set<TableMatch>
+    let current: TableMatch?
 
     /// 各列宽度:文件声明优先,否则按前若干行内容估算。
     private var widths: [CGFloat] {
@@ -248,11 +297,12 @@ private struct SpreadsheetGrid: View {
 
     var body: some View {
         let columnWidths = widths
+        ScrollViewReader { proxy in
         ScrollView([.vertical, .horizontal]) {
             LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
                 Section {
                     ForEach(visibleRows.isEmpty && sheet.rows.isEmpty ? [0] : visibleRows, id: \.self) { row in
-                        GridRow(sheet: sheet, row: row, widths: columnWidths, selection: $selection)
+                        GridRow(sheet: sheet, row: row, widths: columnWidths, selection: $selection, matches: matches, current: current)
                     }
                     if visibleRows.count <= (filterState.firstRowIsHeader ? 1 : 0), !sheet.rows.isEmpty {
                         Text("没有符合筛选条件的行")
@@ -263,6 +313,16 @@ private struct SpreadsheetGrid: View {
                     HeaderRow(sheet: sheet, widths: columnWidths, filterMode: filterMode, filterState: $filterState)
                 }
             }
+        }
+        .onChange(of: current) { _, new in
+            guard let new else { return }
+            // 行是懒加载的:先滚到所在行,行创建出来后再把该列滚进可视区
+            withAnimation(nil) { proxy.scrollTo(new.row, anchor: .center) }
+            Task {
+                try? await Task.sleep(for: .milliseconds(50))
+                withAnimation(nil) { proxy.scrollTo(new, anchor: .center) }
+            }
+        }
         }
     }
 }
@@ -486,6 +546,8 @@ private struct GridRow: View {
     let row: Int
     let widths: [CGFloat]
     @Binding var selection: CellPosition?
+    let matches: Set<TableMatch>
+    let current: TableMatch?
 
     var body: some View {
         HStack(spacing: 0) {
@@ -504,6 +566,9 @@ private struct GridRow: View {
     private func cell(column: Int, width: CGFloat) -> some View {
         let value = sheet.cell(row: row, column: column)
         let isSelected = selection == CellPosition(row: row, column: column)
+        let position = TableMatch(row: row, column: column)
+        let isCurrentMatch = current == position
+        let isMatch = isCurrentMatch || matches.contains(position)
         return Text(value.text)
             .font(OMFonts.small)
             .foregroundStyle(value.kind == .error ? OMColors.danger : OMColors.primaryText)
@@ -511,7 +576,8 @@ private struct GridRow: View {
             .truncationMode(.tail)
             .padding(.horizontal, 6)
             .frame(width: width, height: GridMetrics.rowHeight, alignment: value.kind == .number ? .trailing : .leading)
-            .background(isSelected ? OMColors.selectedFill : Color.clear)
+            .background(isCurrentMatch ? OMColors.warning.opacity(0.55) : isMatch ? OMColors.warning.opacity(0.25) : isSelected ? OMColors.selectedFill : Color.clear)
+            .id(position)
             .overlay { if isSelected { Rectangle().strokeBorder(OMColors.accent, lineWidth: 1.5) } }
             .overlay(alignment: .trailing) { Rectangle().fill(OMColors.hairline.opacity(0.6)).frame(width: 0.5) }
             .contentShape(Rectangle())

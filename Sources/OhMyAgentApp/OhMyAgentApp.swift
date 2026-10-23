@@ -275,13 +275,13 @@ struct WorkbenchCommands: Commands {
             }
         }
         CommandGroup(after: .textEditing) {
-            Button("在编辑器中查找…") { CodeEditorView.showFindInActiveEditor() }
+            Button("在编辑器中查找…") { if !CodeEditorView.showFindInActiveEditor() { TableFindRouter.post(.show) } }
                 .keyboardShortcut("f", modifiers: .command)
             Button("替换…") { CodeEditorView.showFindInActiveEditor(replace: true) }
                 .keyboardShortcut("f", modifiers: [.command, .option])
-            Button("查找下一个") { CodeEditorView.findInActiveEditor(forward: true) }
+            Button("查找下一个") { if !CodeEditorView.findInActiveEditor(forward: true) { TableFindRouter.post(.next) } }
                 .keyboardShortcut("g", modifiers: .command)
-            Button("查找上一个") { CodeEditorView.findInActiveEditor(forward: false) }
+            Button("查找上一个") { if !CodeEditorView.findInActiveEditor(forward: false) { TableFindRouter.post(.previous) } }
                 .keyboardShortcut("g", modifiers: [.command, .shift])
             Divider()
             Button("搜索…") { HubModel.shared.present(.all, workbench: workbench) }
