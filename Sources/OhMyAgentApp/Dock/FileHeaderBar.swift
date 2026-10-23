@@ -14,9 +14,6 @@ struct FilesHeaderControls {
     var canGoForward: Bool
     var onBack: () -> Void
     var onForward: () -> Void
-    /// 右侧资源管理器当前是否收起
-    var treeCollapsed: Bool
-    var onToggleTree: () -> Void
 }
 
 /// 文件面包屑工具条。
@@ -38,6 +35,8 @@ struct FileHeaderBar: View {
     var onToggleCompare: (() -> Void)?
     /// Files 工作区附加控件;nil 表示普通文件标签
     var filesControls: FilesHeaderControls?
+    /// 行最右端的附加控件(Files 工作区放「扩展全屏」与「收起资源管理器」)
+    var trailing: AnyView?
 
     /// 当前展开下拉的面包屑段(绝对路径)
     @State private var openedSegment: String?
@@ -64,8 +63,7 @@ struct FileHeaderBar: View {
             if modes.count > 1 {
                 HeaderIconButton(icon: mode.toggleIcon, help: mode == .preview ? "切换到源码" : "切换到预览", tint: nil) { onMode(mode.other) }
             }
-            // 资源管理器收起时,右上角悬浮着「展开」按钮,留出位置避免重叠
-            if filesControls?.treeCollapsed == true { Color.clear.frame(width: 34, height: 1) }
+            if let trailing { trailing }
         }
     }
 

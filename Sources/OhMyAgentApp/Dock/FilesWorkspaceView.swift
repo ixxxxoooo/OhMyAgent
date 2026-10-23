@@ -124,6 +124,20 @@ private struct FilesWorkspaceBody: View {
     private var collapsed: Bool { workbench.layout.filesTreeCollapsed }
 
     var body: some View {
+        VStack(spacing: 0) {
+            header
+            OMColors.hairline.frame(height: 0.5)
+            columns
+        }
+        .background(OMColors.surface)
+        // 文件被外部删除/重命名后,别让左侧停在失效路径上
+        .task(id: ExplorerModel.shared.revision) {
+            if let path = model.current, !FileManager.default.fileExists(atPath: path) { model.forget(path) }
+        }
+    }
+
+    /// 左内容区 + 右资源管理器。
+    private var columns: some View {
         GeometryReader { proxy in
             let range = PanelMetrics.filesTreeRange
             let cap = max(range.lowerBound, proxy.size.width - 240)
@@ -147,38 +161,56 @@ private struct FilesWorkspaceBody: View {
                         },
                         onDoubleClick: { workbench.layout.filesTreeWidth = PanelMetrics.filesTreeDefault }
                     )
-                    .padding(.top, Self.headerHeight)
                     .zIndex(1)
                     .accessibilityLabel(String(localized: "调整资源管理器宽度"))
-                    // 资源管理器在面包屑那一行下面,面包屑行通栏
                     ExplorerView(workbench: workbench, hooks: hooks)
                         .frame(width: treeWidth)
                         .frame(maxHeight: .infinity)
-                        .padding(.top, Self.headerHeight)
                 }
             }
         }
-        .background(OMColors.surface)
-        // 面包屑行下边框:通栏,覆盖内容区与资源管理器上方
-        .overlay(alignment: .top) {
-            OMColors.hairline.frame(height: 0.5).padding(.top, Self.headerHeight - 0.5).allowsHitTesting(false)
-        }
-        // 面包屑行右端的「收起 / 展开资源管理器」按钮:两种状态同一位置
-        .overlay(alignment: .topTrailing) {
-            Button { toggleTree() } label: { Image.om("list-tree", size: 13) }
-                .buttonStyle(.plain).foregroundStyle(OMColors.secondaryText)
-                .padding(.horizontal, 10)
-                .frame(height: Self.headerHeight)
-                .omTooltip(collapsed ? "展开资源管理器" : "收起资源管理器")
-                .accessibilityLabel(collapsed ? String(localized: "展开资源管理器") : String(localized: "收起资源管理器"))
-        }
-        // 文件被外部删除/重命名后,别让左侧停在失效路径上
-        .task(id: ExplorerModel.shared.revision) {
-            if let path = model.current, !FileManager.default.fileExists(atPath: path) { model.forget(path) }
+    }
+
+    /// 通栏面包屑行:← → 面包屑 … 源码/预览切换 · 扩展全屏 · 收起资源管理器。
+    @ViewBuilder
+    private var header: some View {
+        if let current = model.current {
+            let kind = FilePreviewKind.of(path: current)
+            let modes = kind.flatMap { $0.isBinary ? nil : FileViewMode.available(for: $0) } ?? []
+            FileHeaderBar(
+                path: current, projectRoot: projectID,
+                modes: modes,
+                mode: kind.map { FileViewModeStore.shared.mode(for: current, kind: $0) } ?? .source,
+                onMode: { mode in kind.map { FileViewModeStore.shared.set(mode, for: $0) } },
+                currentText: { nil }, onOpen: { open($0) },
+                filesControls: controls, trailing: AnyView(trailingButtons))
+        } else {
+            HStack(spacing: 10) { Spacer(minLength: 0); trailingButtons }
+                .padding(.horizontal, 14).frame(height: Self.headerHeight)
         }
     }
 
-    /// 资源管理器接管点:单击在左侧打开,高亮当前文件,顶部带「收起」按钮。
+    /// 本标签是否在右栏里(扩展全屏只对右栏有意义)。
+    private var inRightDock: Bool { workbench.rightDock.allTabs.contains { $0.id == tab.id } }
+
+    @ViewBuilder
+    private var trailingButtons: some View {
+        if inRightDock {
+            let expanded = workbench.rightExpanded
+            let help = expanded ? String(localized: "还原") : String(localized: "扩展全屏")
+            headerButton(expanded ? "minimize-2" : "maximize-2", help) { workbench.rightExpanded.toggle() }
+        }
+        let treeHelp = collapsed ? String(localized: "展开资源管理器") : String(localized: "收起资源管理器")
+        headerButton("list-tree", treeHelp) { toggleTree() }
+    }
+
+    private func headerButton(_ icon: String, _ help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) { Image.om(icon, size: 13) }
+            .buttonStyle(.plain).foregroundStyle(OMColors.secondaryText)
+            .omTooltip(help).accessibilityLabel(help)
+    }
+
+    /// 资源管理器接管点:单击在左侧打开,高亮当前文件。
     private var hooks: ExplorerHooks {
         ExplorerHooks(
             openFile: { open($0) },
@@ -198,8 +230,7 @@ private struct FilesWorkspaceBody: View {
     private var controls: FilesHeaderControls {
         FilesHeaderControls(
             canGoBack: model.nav.canGoBack, canGoForward: model.nav.canGoForward,
-            onBack: { model.back() }, onForward: { model.forward() },
-            treeCollapsed: collapsed, onToggleTree: { toggleTree() })
+            onBack: { model.back() }, onForward: { model.forward() })
     }
 
     private func open(_ path: String) {

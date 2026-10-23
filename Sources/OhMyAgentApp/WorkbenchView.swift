@@ -82,22 +82,29 @@ struct WorkbenchView: View {
         // 面板列宽由外层量到的总宽度直接算死(见 `panelColumn`),不交给 HStack 在多个可伸缩视图间协商:
         // 协商会把剩余空间对半分,右栏拖到约半个窗口就被卡住。
         GeometryReader { geo in
+        // 扩展全屏:右栏可见时隐藏项目栏与中栏,右栏占满窗口(中栏仍保留在视图树里,只是宽度为 0,会话与终端不被销毁)
+        let expanded = workbench.rightExpanded && workbench.layout.visibleColumns(on: .right).contains(.tools)
         HStack(spacing: 0) {
-            ForEach(workbench.layout.visibleColumns(on: .left)) { panelColumn($0, side: .left, total: Double(geo.size.width)) }
+            if !expanded {
+                ForEach(workbench.layout.visibleColumns(on: .left)) { panelColumn($0, side: .left, total: Double(geo.size.width)) }
+            }
             // GeometryReader 不向父级报告内容的固有最小宽度:中栏内部(标签条、输入区工具行)的刚性最小宽度
             // 不会再把右栏挤窄,右栏因此能一直拖到只给中栏留 `centerMinimum`;超出的内容被裁掉。
             GeometryReader { _ in
                 CenterColumn(workbench: workbench)
             }
-            .frame(minWidth: CGFloat(PanelMetrics.centerMinimum), maxWidth: .infinity)
+            .frame(minWidth: expanded ? 0 : CGFloat(PanelMetrics.centerMinimum), maxWidth: expanded ? 0 : .infinity)
             .clipped()
+            .opacity(expanded ? 0 : 1)
+            .allowsHitTesting(!expanded)
             // 右侧由内向外排列
-            ForEach(workbench.layout.visibleColumns(on: .right).reversed()) { panelColumn($0, side: .right, total: Double(geo.size.width)) }
+            ForEach(workbench.layout.visibleColumns(on: .right).reversed()) { panelColumn($0, side: .right, total: Double(geo.size.width), expanded: expanded) }
         }
         }
         // 面板显隐的滑入/滑出动画只挂在面板自己的 transition 上(见 `panelTransition`),这里不给整个 HStack 加动画:
         // 否则中栏的宽度会逐帧变化,整条会话时间线与所有常驻会话标签每帧重新排版,开关侧栏就会掉帧。
         // 现在中栏一次性排到最终宽度,面板在其上方做位移 + 淡入淡出(拖动宽度同样不受影响)。
+        .onChange(of: workbench.layout.rightVisible) { _, visible in if !visible { workbench.rightExpanded = false } }
         .onChange(of: panelVisibilitySignature) { _, _ in PanelToggleProbe.begin(stamp: workbench.panelToggleStamp, window: actions.mainWindow) }
         .overlay(alignment: .topTrailing) {
             // 右栏收起(且工具栏在右侧)时显示快捷竖条
@@ -155,7 +162,7 @@ struct WorkbenchView: View {
 
     /// 一列面板 + 它与中栏之间的分隔条(分隔条总在靠近中栏的一侧)。
     @ViewBuilder
-    private func panelColumn(_ column: PanelColumn, side: PanelSide, total: Double) -> some View {
+    private func panelColumn(_ column: PanelColumn, side: PanelSide, total: Double, expanded: Bool = false) -> some View {
         // 宽度取「拖动中临时值,否则已提交值」:拖动期间 layout 不变,只有被拖动的这一列重新布局
         let dimension = PanelDimension(column: column)
         let stored = workbench.panelDrag.effective(dimension, committed: workbench.layout)
@@ -163,9 +170,9 @@ struct WorkbenchView: View {
         let layout = workbench.layout
         let others = (layout.visibleColumns(on: .left) + layout.visibleColumns(on: .right)).filter { $0 != column }
             .reduce(0.0) { $0 + workbench.panelDrag.effective(PanelDimension(column: $1), committed: layout) + 1 }
-        let width = min(stored, max(0, total - PanelMetrics.centerMinimum - others - 1))
+        let width = expanded ? total : min(stored, max(0, total - PanelMetrics.centerMinimum - others - 1))
         let defaultWidth = column == .sidebar ? PanelMetrics.leftDefault : PanelMetrics.rightDefault
-        if side == .right { PanelResizer(workbench: workbench, dimension: dimension, side: side, defaultWidth: defaultWidth).zIndex(2).transition(panelTransition(side)) }
+        if side == .right, !expanded { PanelResizer(workbench: workbench, dimension: dimension, side: side, defaultWidth: defaultWidth).zIndex(2).transition(panelTransition(side)) }
         Group {
             switch column {
             case .sidebar:
@@ -173,7 +180,10 @@ struct WorkbenchView: View {
                     .id(appearance.renderKey)
                     .background(SidebarBackground())
             case .tools:
+                // 扩展全屏时让出标题栏高度,避免红绿灯与左上浮层盖住右栏标签条
                 RightDockView(workbench: workbench)
+                    .padding(.top, expanded ? TitlebarMetrics.height : 0)
+                    .background(expanded ? OMColors.surface : .clear)
             }
         }
         .frame(width: CGFloat(width))

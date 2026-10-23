@@ -128,12 +128,6 @@ struct FileTabView: View {
         if let kind = FilePreviewKind.of(path: path), kind.isBinary {
             // 图片 / PDF:只有预览,不当作文本载入
             VStack(spacing: 0) {
-                // 普通文件标签的图片/PDF 没有面包屑条;Files 工作区内嵌时需要它来承载 ← → 与收起按钮
-                if filesControls != nil {
-                    FileHeaderBar(
-                        path: path, projectRoot: projectRoot(), modes: [], mode: .source, onMode: { _ in }, currentText: { nil },
-                        onOpen: { target in openInPlace?(target) }, filesControls: filesControls)
-                }
                 BinaryPreviewTab(path: path, kind: kind)
             }
         } else {
@@ -154,6 +148,8 @@ struct FileTabView: View {
             return gitMarks.merging(marks.lines.map { ($0 - 1, LineMarker.agent) }) { _, agent in agent }
         }()
         VStack(spacing: 0) {
+            // Files 工作区内嵌时,面包屑行由工作区通栏绘制
+            if filesControls == nil {
             FileHeaderBar(
                 path: path, projectRoot: projectRoot(),
                 modes: previewKind.map { FileViewMode.available(for: $0) } ?? [],
@@ -167,6 +163,7 @@ struct FileTabView: View {
                 onToggleCompare: { comparing.toggle() },
                 filesControls: filesControls
             )
+            }
             banner(doc)
             agentReviewBar(doc)
             Group {
