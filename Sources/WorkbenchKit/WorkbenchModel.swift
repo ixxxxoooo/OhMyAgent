@@ -1002,7 +1002,7 @@ public final class WorkbenchModel {
     /// 最近一次侧栏开关的时间戳(性能探针读取,用于计算点击到首帧的耗时)。
     public var panelToggleStamp: PanelToggleStamp?
 
-    /// 右栏是否「扩展全屏」:隐藏项目栏与中栏,右栏占满整个窗口(临时状态,不落盘;右栏收起时自动还原)。
+    /// 右栏是否「扩展」:覆盖中栏,占满项目栏以外的整个窗口(临时状态,不落盘;右栏收起时自动还原)。
     public var rightExpanded = false
 
     public func toggleLeft() { panelToggleStamp = PanelToggleStamp(name: "left", at: .now); layout.leftVisible.toggle() }

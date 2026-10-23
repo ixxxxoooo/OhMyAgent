@@ -82,12 +82,10 @@ struct WorkbenchView: View {
         // 面板列宽由外层量到的总宽度直接算死(见 `panelColumn`),不交给 HStack 在多个可伸缩视图间协商:
         // 协商会把剩余空间对半分,右栏拖到约半个窗口就被卡住。
         GeometryReader { geo in
-        // 扩展全屏:右栏可见时隐藏项目栏与中栏,右栏占满窗口(中栏仍保留在视图树里,只是宽度为 0,会话与终端不被销毁)
+        // 扩展:右栏可见时覆盖中栏并占满项目栏以外的全部宽度(中栏仍保留在视图树里,只是宽度为 0,会话与终端不被销毁)
         let expanded = workbench.rightExpanded && workbench.layout.visibleColumns(on: .right).contains(.tools)
         HStack(spacing: 0) {
-            if !expanded {
-                ForEach(workbench.layout.visibleColumns(on: .left)) { panelColumn($0, side: .left, total: Double(geo.size.width)) }
-            }
+            ForEach(workbench.layout.visibleColumns(on: .left)) { panelColumn($0, side: .left, total: Double(geo.size.width)) }
             // GeometryReader 不向父级报告内容的固有最小宽度:中栏内部(标签条、输入区工具行)的刚性最小宽度
             // 不会再把右栏挤窄,右栏因此能一直拖到只给中栏留 `centerMinimum`;超出的内容被裁掉。
             GeometryReader { _ in
@@ -170,7 +168,7 @@ struct WorkbenchView: View {
         let layout = workbench.layout
         let others = (layout.visibleColumns(on: .left) + layout.visibleColumns(on: .right)).filter { $0 != column }
             .reduce(0.0) { $0 + workbench.panelDrag.effective(PanelDimension(column: $1), committed: layout) + 1 }
-        let width = expanded ? total : min(stored, max(0, total - PanelMetrics.centerMinimum - others - 1))
+        let width = expanded ? max(0, total - others - 1) : min(stored, max(0, total - PanelMetrics.centerMinimum - others - 1))
         let defaultWidth = column == .sidebar ? PanelMetrics.leftDefault : PanelMetrics.rightDefault
         if side == .right, !expanded { PanelResizer(workbench: workbench, dimension: dimension, side: side, defaultWidth: defaultWidth).zIndex(2).transition(panelTransition(side)) }
         Group {
@@ -180,9 +178,9 @@ struct WorkbenchView: View {
                     .id(appearance.renderKey)
                     .background(SidebarBackground())
             case .tools:
-                // 扩展全屏时让出标题栏高度,避免红绿灯与左上浮层盖住右栏标签条
+                // 扩展且项目栏也收起时,右栏顶到窗口左缘:让出标题栏高度,避免红绿灯与左上浮层盖住标签条
                 RightDockView(workbench: workbench)
-                    .padding(.top, expanded ? TitlebarMetrics.height : 0)
+                    .padding(.top, expanded && workbench.layout.visibleColumns(on: .left).isEmpty ? TitlebarMetrics.height : 0)
                     .background(expanded ? OMColors.surface : .clear)
             }
         }
