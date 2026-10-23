@@ -3,6 +3,8 @@
 // 标签切换/重建不丢失未保存的编辑;支持保存、外部修改检测与重新载入。
 
 import AppKit
+import EditorCore
+import EditorKit
 import Foundation
 import Observation
 import OMLog
@@ -13,8 +15,16 @@ import WorkbenchKit
 @Observable
 final class FileDocument {
     let path: String
-    /// 编辑器中的当前文本(尚未加载为 nil)
-    var text: String?
+    /// 编辑器中的当前文本(尚未加载为 nil)。
+    /// 原生引擎下它是 `editorDocument` 的字符串镜像(停止输入约 250ms 后同步),外部整体写入会反向应用到 rope 文档。
+    var text: String? { didSet { textDidSet() } }
+    /// 原生编辑器共享的 rope 文档(仅 native2 引擎创建)。
+    @ObservationIgnored private(set) var editorDocument: EditorDocument?
+    /// rope 文档的脏状态镜像(只在切换时变化,避免每次按键都触发视图刷新)。
+    private var editorDirty = false
+    @ObservationIgnored private var observerToken: Int?
+    @ObservationIgnored private var mirrorTask: Task<Void, Never>?
+    @ObservationIgnored private var mirroring = false
     /// 最近一次读取/保存时磁盘上的内容
     private(set) var savedText: String = ""
     /// 加载失败原因
@@ -36,13 +46,58 @@ final class FileDocument {
 
     /// 是否有未保存的修改。
     var isDirty: Bool {
+        if editorDocument != nil { return editorDirty }
         guard let text else { return false }
         return text != savedText
+    }
+
+    /// 取得(必要时创建)与原生编辑器共享的 rope 文档;文本尚未加载时返回 nil。
+    func ensureEditorDocument() -> EditorDocument? {
+        if let editorDocument { return editorDocument }
+        guard let text else { return nil }
+        let document = EditorDocument(text: text)
+        // 以已保存文本为基准:读入时就有的差异(如 CRLF 规范化)不算修改。
+        if text != savedText { editorDirty = true } else { document.markSaved() }
+        editorDocument = document
+        observerToken = document.addObserver { [weak self] _ in self?.editorChanged() }
+        return document
+    }
+
+    /// rope 文档变化:更新脏标记并防抖同步字符串镜像。
+    private func editorChanged() {
+        guard let editorDocument else { return }
+        if editorDirty != editorDocument.isDirty { editorDirty = editorDocument.isDirty }
+        mirrorTask?.cancel()
+        mirrorTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            self?.syncFromEditor()
+        }
+    }
+
+    /// 立刻把 rope 文档内容同步到字符串镜像(保存、对比、复制前调用)。
+    func syncFromEditor() {
+        mirrorTask?.cancel()
+        guard let editorDocument else { return }
+        let latest = editorDocument.textForSaving()
+        guard latest != text else { return }
+        mirroring = true
+        text = latest
+        mirroring = false
+    }
+
+    /// 字符串镜像被外部整体改写(磁盘重载、格式化、Agent 追加):同步到 rope 文档。
+    private func textDidSet() {
+        guard !mirroring, let editorDocument, let text else { return }
+        _ = editorDocument.applyExternal(text: text, markSaved: false)
+        if editorDirty != editorDocument.isDirty { editorDirty = editorDocument.isDirty }
     }
 
     fileprivate func apply(loaded: String, modified: Date?) {
         text = loaded
         savedText = loaded
+        editorDocument?.markSaved()
+        editorDirty = false
         diskModified = modified
         externalChange = false
         loadError = nil
@@ -50,6 +105,8 @@ final class FileDocument {
 
     fileprivate func markSaved(_ content: String, modified: Date?) {
         savedText = content
+        editorDocument?.markSaved()
+        editorDirty = false
         diskModified = modified
         externalChange = false
     }
@@ -180,8 +237,10 @@ final class FileDocumentStore {
     /// - Returns: 是否成功
     @discardableResult
     func save(_ path: String) async -> Bool {
-        guard let doc = documents[path], let text = doc.text, !doc.isReadOnly else { return false }
+        guard let doc = documents[path], doc.text != nil, !doc.isReadOnly else { return false }
         guard doc.isDirty else { return true }
+        doc.syncFromEditor()
+        guard let text = doc.text else { return false }
         let encoding = doc.encoding
         let started = ContinuousClock.now
         let outcome = await Task.detached(priority: .userInitiated) { () -> Result<Date?, any Error> in

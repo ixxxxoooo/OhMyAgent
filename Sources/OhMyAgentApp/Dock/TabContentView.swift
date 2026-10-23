@@ -5,6 +5,7 @@ import ACPKit
 import ChatKit
 import DesignSystem
 import DiffKit
+import EditorCore
 import EditorKit
 import GitKit
 import IconKit
@@ -168,13 +169,7 @@ struct FileTabView: View {
             agentReviewBar(doc)
             Group {
                 if let text = doc.text {
-                    CodeEditor(text: text, language: SyntaxLanguage.detect(path: path), isEditable: !doc.isReadOnly, revealLine: tab.line, markers: markers,
-                               diagnostics: lsp?.diagnostics ?? [], features: lsp?.features ?? EditorLanguageFeatures(),
-                               onReferenceSelection: { range in referenceSelection(range, text: doc.text ?? text) },
-                               chrome: ideHost == nil ? [] : [.minimap, .stickyScroll, .folding],
-                               onCaretChange: ideHost.map { host in { host.caret(path, $0) } },
-                               inlineNote: !doc.isDirty && !blameLines.isEmpty ? { blameNote($0) } : nil,
-                               onChange: { newText in doc.text = newText })
+                    codeEditor(doc: doc, text: text, markers: markers)
                         .environment(\.tabIsActive, isActive && mode.showsEditor)
                         .opacity(mode.showsEditor ? 1 : 0)
                         .allowsHitTesting(mode.showsEditor)
@@ -244,6 +239,25 @@ struct FileTabView: View {
             await store.checkExternalChange(path)
             // 工作区内由文件系统事件驱动;工作区之外(含切换项目后的旧项目文件)低频轮询磁盘修改时间
             await WorkspaceWatchCenter.shared.follow(path, poll: .seconds(2)) { await store.checkExternalChange(path) }
+        }
+    }
+
+    /// 编辑器本体:按 `EditorEngine` 选择原生 rope 引擎(native2)或 TextKit 引擎。
+    @ViewBuilder
+    private func codeEditor(doc: FileDocument, text: String, markers: [Int: LineMarker]) -> some View {
+        if EditorEngine.current == .native2, let editorDocument = doc.ensureEditorDocument() {
+            NativeCodeEditor(document: editorDocument, language: SyntaxLanguage.detect(path: path), isEditable: !doc.isReadOnly,
+                             revealLine: tab.line, markers: markers, diagnostics: lsp?.diagnostics ?? [],
+                             onCaretChange: ideHost.map { host in { host.caret(path, $0) } })
+                .id(ObjectIdentifier(editorDocument))
+        } else {
+            CodeEditor(text: text, language: SyntaxLanguage.detect(path: path), isEditable: !doc.isReadOnly, revealLine: tab.line, markers: markers,
+                       diagnostics: lsp?.diagnostics ?? [], features: lsp?.features ?? EditorLanguageFeatures(),
+                       onReferenceSelection: { range in referenceSelection(range, text: doc.text ?? text) },
+                       chrome: ideHost == nil ? [] : [.minimap, .stickyScroll, .folding],
+                       onCaretChange: ideHost.map { host in { host.caret(path, $0) } },
+                       inlineNote: !doc.isDirty && !blameLines.isEmpty ? { blameNote($0) } : nil,
+                       onChange: { newText in doc.text = newText })
         }
     }
 
