@@ -47,6 +47,7 @@ public final class CodeEditorView: NSView {
     var sticky: EditorStickyView?
     private var scrollTrailing: NSLayoutConstraint?
     private var stickyHeight: NSLayoutConstraint?
+    private var stickyTrailing: NSLayoutConstraint?
     /// 光标变化回调(状态栏用)
     public var onCaretChange: ((EditorCaret) -> Void)?
     var language: SyntaxLanguage = .plain { didSet { textView.language = language } }
@@ -266,9 +267,12 @@ public final class CodeEditorView: NSView {
             addSubview(view)
             let height = view.heightAnchor.constraint(equalToConstant: 0)
             stickyHeight = height
+            // 右边界固定为「编辑器右缘 - 缩略图宽度」,不依赖滚动视图,避免伸到缩略图下面
+            let trailing = view.trailingAnchor.constraint(equalTo: trailingAnchor)
+            stickyTrailing = trailing
             NSLayoutConstraint.activate([
                 view.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor, constant: 0),
-                view.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+                trailing,
                 view.topAnchor.constraint(equalTo: topAnchor),
                 height,
             ])
@@ -277,7 +281,10 @@ public final class CodeEditorView: NSView {
             view.removeFromSuperview()
             sticky = nil
             stickyHeight = nil
+            stickyTrailing = nil
         }
+        stickyTrailing?.constant = minimap == nil ? 0 : -EditorMinimapView.width
+        if let view = sticky, let minimap { addSubview(view, positioned: .below, relativeTo: minimap) }
         sticky?.refresh()
         minimap?.needsDisplay = true
     }

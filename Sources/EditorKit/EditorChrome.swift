@@ -40,6 +40,7 @@ final class EditorStickyView: NSView {
         self.editor = editor
         super.init(frame: .zero)
         wantsLayer = true
+        layer?.masksToBounds = true
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
