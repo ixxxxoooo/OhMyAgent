@@ -1618,7 +1618,7 @@
 "放大编辑" = "Expand to edit";
 "双击放大编辑" = "Double-click to expand and edit";
 "编辑并重新发送" = "Edit and resend";
-"回合进行中,结束后才能重新发送。" = "A turn is running; you can resend after it finishes.";
+"回合进行中,将排到本轮结束后发送。" = "A turn is running; it will be sent after this turn finishes.";
 "将作为新消息发送,原消息与回复会保留。" = "Sent as a new message; the original message and replies are kept.";
 "重新发送" = "Resend";
 "切换模型" = "Switch model";

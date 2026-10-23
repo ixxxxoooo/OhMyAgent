@@ -299,17 +299,17 @@ struct UserMessageEditor: View {
         _text = State(initialValue: entry.displayText)
     }
 
-    /// 作为新消息重新发送(原消息与回复保留)。
+    /// 作为新消息重新发送(原消息与回复保留);回合进行中时排到本轮结束后发送。
     private func resend() {
         guard canResend else { return }
         let images = entry.attachments
         let prompt = text
         onClose()
-        model.send(prompt, images: images)
+        model.send(prompt, images: images, afterTurn: model.isRunning)
     }
 
     private var canResend: Bool {
-        !model.isRunning && (!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !entry.attachments.isEmpty)
+        (!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !entry.attachments.isEmpty)
     }
 
     var body: some View {
@@ -335,7 +335,7 @@ struct UserMessageEditor: View {
             )
             .frame(height: editorHeight)
             if model.isRunning {
-                Text("回合进行中,结束后才能重新发送。").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
+                Text("回合进行中,将排到本轮结束后发送。").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
             }
             HStack(spacing: 6) {
                 modelButton
