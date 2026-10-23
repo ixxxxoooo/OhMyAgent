@@ -40,7 +40,7 @@ struct SidebarModeSwitch: View {
     /// 单个模式按钮:选中态用选中底色与主文字色。
     private func modeButton(_ pane: LeftPane, icon: String, label: String) -> some View {
         let selected = workbench.layout.leftPane == pane
-        return Button { workbench.layout.leftPane = pane } label: {
+        return Button { workbench.switchLeftPane(pane) } label: {
             Image.om(icon, size: 14)
                 .frame(width: TitlebarMetrics.buttonSize, height: TitlebarMetrics.buttonSize)
                 .background(selected ? OMColors.selectedFill : .clear, in: RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))

@@ -18,20 +18,30 @@ struct ProjectTreeView: View {
     @State private var showArchived = false
     /// 已点开「显示更多」的列表键
     @State private var expandedMore: Set<String> = []
+    /// 代码模式是否进入过:进入后文件树常驻,切回会话模式也不销毁
+    @State private var codeVisited = false
 
     var body: some View {
         let _ = PanelToggleProbe.count("tree")
         VStack(spacing: 0) {
             // 顶部 35pt:红绿灯与侧栏开关浮层所在区域(可拖动窗口),右侧是「会话 / 代码」模式切换
             SidebarTopStrip(workbench: workbench)
-            switch workbench.layout.leftPane {
-            case .files:
-                // 代码模式:当前项目的文件树
-                ExplorerView(workbench: workbench)
-                    .frame(maxHeight: .infinity)
-            default:
-                sessionsContent
+            // 两个模式的内容常驻、只切换显隐:文件树的展开与滚动位置、会话列表的滚动位置切回来都还在
+            let inCode = workbench.layout.leftPane == .files
+            ZStack {
+                VStack(spacing: 0) { sessionsContent }
+                    .opacity(inCode ? 0 : 1)
+                    .allowsHitTesting(!inCode)
+                    .accessibilityHidden(inCode)
+                if codeVisited || inCode {
+                    ExplorerView(workbench: workbench)
+                        .opacity(inCode ? 1 : 0)
+                        .allowsHitTesting(inCode)
+                        .accessibilityHidden(!inCode)
+                }
             }
+            .frame(maxHeight: .infinity)
+            .onChange(of: inCode, initial: true) { _, now in if now { codeVisited = true } }
             footer
         }
         .dropDestination(for: URL.self) { urls, _ in

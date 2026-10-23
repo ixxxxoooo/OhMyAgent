@@ -143,3 +143,67 @@ struct DockIntegrationTests {
         reopened.shutdownAll()
     }
 }
+
+@MainActor
+@Suite("侧栏模式的工作区记忆")
+struct PaneMemoryTests {
+    private func makeModel() throws -> (WorkbenchModel, [String], URL) {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("oma-pane-\(UUID().uuidString)")
+        let dirs = try ["a", "b"].map { name -> URL in
+            let dir = root.appendingPathComponent(name)
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            return dir
+        }
+        let store = WorkbenchStore(fileURL: root.appendingPathComponent("state/workbench.json"))
+        let model = WorkbenchModel(store: store, autoConnect: false) { url in
+            let session = SessionModel(workspace: url)
+            session.attention = AttentionCenter()
+            return session
+        }
+        let ids = try dirs.map { try #require(model.openProject($0)) }
+        model.layout.fileOpenTarget = .editor
+        return (model, ids, root)
+    }
+
+    @Test("代码模式已开放;切到相同模式或未开放的模式被忽略")
+    func availability() throws {
+        let (model, _, root) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        #expect(LeftPane.available.contains(.files))
+        model.switchLeftPane(.sessions)
+        #expect(model.layout.leftPane == .sessions)
+        model.switchLeftPane(.git)
+        #expect(model.layout.leftPane == .sessions)
+    }
+
+    @Test("来回切换:会话回到之前的会话,代码回到原来的文件")
+    func restoresEachWorkspace() throws {
+        let (model, ids, root) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        model.select(project: ids[0])
+        let sessionTab = try #require(model.focusedActiveTab?.id)
+        // 会话模式 → 代码模式:第一次进入,打开两个文件,停在第二个
+        model.switchLeftPane(.files)
+        _ = model.openFile(ids[0] + "/x.swift", preview: false, target: .editor)
+        let codeTab = model.openFile(ids[0] + "/y.swift", preview: false, target: .editor)
+        #expect(model.focusedActiveTab?.id == codeTab)
+        // 回会话模式:回到原会话标签
+        model.switchLeftPane(.sessions)
+        #expect(model.layout.leftPane == .sessions)
+        #expect(model.focusedActiveTab?.id == sessionTab)
+        // 再回代码模式:仍停在 y.swift,而不是 x.swift
+        model.switchLeftPane(.files)
+        #expect(model.focusedActiveTab?.id == codeTab)
+    }
+
+    @Test("记住的标签已关闭时,会话模式退回到记住的项目")
+    func fallsBackToProject() throws {
+        let (model, ids, root) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        model.select(project: ids[1])
+        model.switchLeftPane(.files)
+        model.select(project: ids[0])
+        model.switchLeftPane(.sessions)
+        #expect(model.selectedProjectID == ids[1])
+    }
+}

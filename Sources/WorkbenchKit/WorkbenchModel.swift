@@ -24,6 +24,8 @@ public struct ConversationKey: Hashable, Sendable {
 public final class WorkbenchModel {
     public internal(set) var projects: [ProjectEntry]
     public private(set) var selectedProjectID: String?
+    /// 侧栏各模式离开时的工作区位置(见 `switchLeftPane`);只在本次运行内记忆
+    var paneMemory: [LeftPane: PaneMemory] = [:]
     public var layout: WorkbenchLayout { didSet { if layout != oldValue { scheduleSave() } } }
     /// 全部会话:每个会话标签对应一个独立的 SessionModel(按需创建,标签关闭时回收)
     public private(set) var conversations: [ConversationKey: SessionModel] = [:]

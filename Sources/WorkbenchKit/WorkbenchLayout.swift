@@ -17,7 +17,8 @@ public enum LeftPane: String, Codable, CaseIterable, Sendable {
     case sessions, files, git, search
 
     /// 已实现的视图(随里程碑逐步开放)。
-    public static var available: [LeftPane] { [.sessions] }
+    /// `.sessions` 是侧栏的「会话模式」,`.files` 是「代码模式」(当前项目的文件树)。
+    public static var available: [LeftPane] { [.sessions, .files] }
 }
 
 /// 右栏视图(文件 / 搜索 / Git)。它们是右栏停靠区里的工具面板标签(`oma-tools:<rawValue>`)。
