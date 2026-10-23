@@ -25,13 +25,21 @@ enum TableExpander {
         let parent = NSApp.keyWindow ?? NSApp.mainWindow
         let container = parent?.frame.size ?? CGSize(width: 1200, height: 800)
         let maxWidth = max(container.width - 2 * shadowInset - 48, 480)
-        let width = maxWidth
+        let natural = naturalWidth(header: header, rows: rows, aligns: aligns)
+        let width = min(max(natural + 2 * contentPadding + 2, 400), maxWidth)
         let lineHeight = ceil(11.5 * OMScale.ui * 1.3) + 16 + 1
         let maxHeight = max(container.height * 0.8 - 60, 200)
         let height = min(CGFloat(rows.count + 1) * lineHeight + 4, maxHeight)
         OMModal.run(width: width) { handle in
             TableExpandCard(header: header, rows: rows, aligns: aligns, height: height, width: width) { handle.finish(-1) }
         }
+    }
+
+    /// 单行排版下整张表格的自然宽度。
+    private static func naturalWidth(header: [String], rows: [[String]], aligns: [MarkdownTableAlign]) -> CGFloat {
+        let text = OMLeafContent.table(header: header, rows: rows, aligns: aligns, roomy: true, maxWidth: nil)
+        guard text.length > 0, let width = text.attribute(omIntrinsicWidthKey, at: 0, effectiveRange: nil) as? CGFloat else { return 0 }
+        return width
     }
 }
 
@@ -56,7 +64,8 @@ private struct TableExpandCard: View {
                     .accessibilityLabel(String(localized: "关闭"))
             }
             ScrollView([.horizontal, .vertical]) {
-                TableTextLeaf(header: header, rows: rows, aligns: aligns, roomy: true, availableWidth: width - 2 * 16 - 2)
+                TableTextLeaf(header: header, rows: rows, aligns: aligns, roomy: true, availableWidth: nil)
+                    .frame(minWidth: width - 2 * 16, alignment: .center)
                     .clipShape(RoundedRectangle(cornerRadius: OMMetrics.cardRadius, style: .continuous))
                     .omSolidCard()
             }
