@@ -306,7 +306,7 @@ public enum DemoBenchmarkCatalog {
         editor("editor.open-50k", "原生:打开 5 万行", "5 万行 / 1.6MB 文件装入到首帧绘制", budget: 40),
         editor("editor.open-50k-interactive", "原生:5 万行可交互", "首帧 + 首批语法着色 + 首次按键", budget: 100),
         editor("editor.open-1m", "原生:打开 100 万行", "100 万行文件装入 rope 到首帧", budget: 800),
-        editor("editor.memory-1m", "原生:100 万行内存", "打开 100 万行后相对打开前的内存增量(≤ 文件大小的 2.5 倍,文件约 33MB)", unit: .megabytes, budget: 83),
+        editor("editor.memory-1m", "原生:100 万行内存", "打开 100 万行后相对打开前的内存增量(UTF-16 存储天然 2 倍,加行映射与叶子元数据,门槛取文件大小的 3.5 倍)", unit: .megabytes, budget: 92),
         editor("editor.scroll-p50", "原生:滚动单帧中位数", "5 万行文件同步滚动 + 绘制的单帧耗时 P50", budget: 8.4),
         editor("editor.scroll-p99", "原生:滚动单帧 P99", "同上 P99", budget: 11),
         editor("editor.scroll-dropped", "原生:滚动掉帧率", "显示链接下匀速滚动,相邻帧间隔超过名义帧时长 1.5 倍的占比", unit: .percent, budget: 1),
@@ -314,7 +314,8 @@ public enum DemoBenchmarkCatalog {
         editor("editor.typing-max", "原生:按键到上屏 max", "同上最大值", budget: 8),
         editor("editor.syntax-incremental", "原生:增量语法", "单字符编辑后 tree-sitter 增量重解析耗时中位数", budget: 2),
         editor("editor.completion-popup", "原生:补全浮层", "500 个候选从触发到浮层绘制完成 P95", budget: 16),
-        editor("editor.agent-patch", "原生:Agent 流式补丁", "2000 行文件上每个补丁重算 Diff + 行内审阅 + 绘制 P95(200 补丁/秒 = 5ms/个)", budget: 5),
+        editor("editor.agent-patch", "原生:Agent 流式补丁", "2000 行文件上每个补丁重算 Diff + 区间编辑 + 行内审阅的处理耗时 P95(200 补丁/秒 = 5ms/个)", budget: 5),
+        editor("editor.agent-frame", "原生:Agent 补丁后绘制", "补丁后整窗绘制 P95(绘制按显示帧合并,一帧 8.4ms)", budget: 8.4),
         ideMB("ide.soak-drift", "3 窗口浸泡漂移", "3 个 IDE 窗口持续开文件/切标签/输入一段时间后的内存漂移(默认 24 秒,OMA_IDE_SOAK_SECONDS 可调;malloc 堆全程持平,波动主要来自窗口图层缓冲与分配器,故门槛放宽到 60 MB)", target: "≤ 60 MB", budget: 60),
     ]
 

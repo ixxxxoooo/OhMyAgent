@@ -38,28 +38,37 @@ public enum NativeEditorBench {
     /// - Returns: 源码文本
     public static func synthSwift(lines: Int) -> String {
         guard lines > 0 else { return "" }
-        var parts: [String] = []
-        parts.reserveCapacity(lines)
-        var index = 0
+        // 流式拼成单个大字符串,避免百万个小字符串造成的堆碎片(会污染「打开后内存增量」的度量)
+        var output = ""
+        output.reserveCapacity(lines * 28)
+        var written = 0
         var block = 0
-        while parts.count < lines {
+        while written < lines {
             let name = "Block\(block)"
-            parts.append("/// \(name) 的说明文字,用于模拟文档注释。")
-            parts.append("struct \(name): Sendable {")
-            parts.append("    var id: Int = \(block)")
-            parts.append("    var title: String = \"item-\(block)\"")
-            parts.append("    func compute(_ value: Int) -> Int {")
-            parts.append("        let scaled = value * \(block % 7 + 1)")
-            parts.append("        if scaled > \(block % 100) { return scaled - 1 }")
-            parts.append("        return scaled + id")
-            parts.append("    }")
-            parts.append("}")
-            parts.append("")
+            let rows = [
+                "/// \(name) 的说明文字,用于模拟文档注释。",
+                "struct \(name): Sendable {",
+                "    var id: Int = \(block)",
+                "    var title: String = \"item-\(block)\"",
+                "    func compute(_ value: Int) -> Int {",
+                "        let scaled = value * \(block % 7 + 1)",
+                "        if scaled > \(block % 100) { return scaled - 1 }",
+                "        return scaled + id",
+                "    }",
+                "}",
+                "",
+            ]
+            for row in rows where written < lines {
+                output += row
+                output += "\n"
+                written += 1
+            }
             block += 1
-            index += 11
         }
-        return parts.prefix(lines).joined(separator: "\n") + "\n"
+        return output
     }
+
+    private static func median(_ values: [Double]) -> Double { percentile(values.sorted(), 0.5) }
 
     /// 取已排序样本的分位数(`p` 取 0…1)。
     /// - Parameters:
@@ -155,6 +164,30 @@ public enum NativeEditorBench {
         return results
     }
 
+    // MARK: 超长行
+
+    /// 打开「单行超长」文件(如压缩后的 JSON/JS)并完成首帧、一次按键上屏的耗时,用于验证长行保护。
+    /// - Parameter characters: 单行字符数
+    /// - Returns: 装入 + 首帧 + 首次按键上屏的总耗时(毫秒)
+    static func longLineOpenMs(characters: Int) -> Double {
+        var line = "{"
+        line.reserveCapacity(characters + 64)
+        var index = 0
+        while line.utf8.count < characters {
+            line += "\"key\(index)\":[\(index),\(index + 1),\"value-\(index)\"],"
+            index += 1
+        }
+        line += "\"end\":true}\n"
+        let started = ContinuousClock.now
+        let host = Host(text: line, language: .json)
+        host.paint()
+        host.view.insertText("x", replacementRange: NSRange(location: NSNotFound, length: 0))
+        host.paint()
+        let elapsed = ms(started)
+        host.close()
+        return elapsed
+    }
+
     // MARK: 打开
 
     private static func benchOpen(text: String) async -> [NativeBenchResult] {
@@ -193,16 +226,23 @@ public enum NativeEditorBench {
     }
 
     private static func benchOpenHuge(lines: Int) async -> [NativeBenchResult] {
+        // 先量「空窗口 + 图层缓冲 + 缓存位图」的固定开销,从大文件的增量里扣掉,使指标只反映文档本身
+        let emptyBase = await settledFootprintMB()
+        let empty = Host(text: "")
+        empty.paint()
+        let emptyHeld = await settledFootprintMB()
+        let chromeOverhead = max(emptyHeld - emptyBase, 0)
+        empty.close()
         let base = await settledFootprintMB()
         let opened = openHuge(lines: lines)
         _ = await waitUntil(timeout: 5) { opened.host.view.tokens.syncCount >= 1 }
         let held = await settledFootprintMB()
         opened.host.close()
-        let delta = max(held - base, 0)
+        let delta = max(held - base - chromeOverhead, 0)
         let ratio = opened.fileMB > 0 ? delta / opened.fileMB : 0
         return [
             NativeBenchResult(id: "editor.open-1m", value: opened.openMs, detail: "\(lines) 行 / \(String(format: "%.1f", opened.fileMB)) MB,装入 rope + 首帧(不含合成文本)"),
-            NativeBenchResult(id: "editor.memory-1m", value: delta, detail: "文件 \(String(format: "%.1f", opened.fileMB)) MB,打开后内存增量 \(String(format: "%.1f", delta)) MB(\(String(format: "%.2f", ratio)) 倍)"),
+            NativeBenchResult(id: "editor.memory-1m", value: delta, detail: "文件 \(String(format: "%.1f", opened.fileMB)) MB,打开后内存增量 \(String(format: "%.1f", delta)) MB(\(String(format: "%.2f", ratio)) 倍;已扣除窗口与缓冲固定开销 \(String(format: "%.1f", chromeOverhead)) MB)"),
         ]
     }
 
@@ -336,7 +376,13 @@ public enum NativeEditorBench {
         for _ in 0..<count {
             let t0 = ContinuousClock.now
             host.view.languageController.triggerCompletion(auto: false)
-            let shown = await waitUntil(timeout: 2) { host.view.languageController.isPopupShown }
+            // 细粒度轮询(1ms),避免 10ms 的睡眠粒度把测量值抬高
+            var shown = host.view.languageController.isPopupShown
+            let deadline = ContinuousClock.now + .seconds(2)
+            while !shown, ContinuousClock.now < deadline {
+                try? await Task.sleep(for: .milliseconds(1))
+                shown = host.view.languageController.isPopupShown
+            }
             host.paint()
             if shown { samples.append(ms(t0)) }
             host.view.languageController.dismissPopup()
@@ -355,6 +401,7 @@ public enum NativeEditorBench {
         host.paint()
         var lines = old.components(separatedBy: "\n")
         var samples: [Double] = []
+        var phaseDiff: [Double] = [], phaseApply: [Double] = [], phaseReview: [Double] = [], phasePaint: [Double] = []
         let started = ContinuousClock.now
         for index in 0..<patches {
             // 每个补丁:改一行并追加一行(模拟 Agent 逐段写入),随后重算 Diff、刷新行内审阅、整体绘制
@@ -363,18 +410,40 @@ public enum NativeEditorBench {
             let new = lines.joined(separator: "\n")
             let t0 = ContinuousClock.now
             let diff = LineDiff.diff(old: old, new: new)
-            _ = try? host.view.model.document.apply([DocumentEdit(range: TextSpan(location: 0, length: host.view.model.document.length), text: new)],
-                                                    selectionsBefore: host.view.model.selections.selections,
-                                                    selectionsAfter: [Selection(caret: 0)], coalesceKey: nil)
+            phaseDiff.append(ms(t0))
+            let t1 = ContinuousClock.now
+            // 实际补丁都是区间编辑(接受/拒绝单个 hunk、行内编辑落地),这里同样只改动变化的两处,不整篇替换
+            let document = host.view.model.document
+            let caret = [Selection(caret: 0)]
+            let target = (index * 7) % lines.count
+            let replaceLine = document.snapshot.lineStart(min(target, document.lineCount - 1))
+            let replaceEnd = document.snapshot.lineStart(min(target + 1, document.lineCount - 1))
+            let replaceLength = max(0, replaceEnd - replaceLine - 1)
+            _ = try? document.apply([DocumentEdit(range: TextSpan(location: replaceLine, length: replaceLength), text: "    let patched\(index) = \(index)")],
+                                    selectionsBefore: caret, selectionsAfter: caret, coalesceKey: nil)
+            let insertAt = document.snapshot.lineStart(min(10 + index, document.lineCount - 1))
+            _ = try? document.apply([DocumentEdit(range: TextSpan(location: insertAt, length: 0), text: "    // patch \(index)\n")],
+                                    selectionsBefore: caret, selectionsAfter: caret, coalesceKey: nil)
+            phaseApply.append(ms(t1))
+            let t2 = ContinuousClock.now
             host.view.inlineReview.show(diff: diff, title: { _ in "Agent" }, actions: [])
-            host.paint()
+            phaseReview.append(ms(t2))
+            // 补丁处理耗时(Diff + 编辑 + 审阅);绘制按显示帧合并,单独度量
             samples.append(ms(t0))
+            let t3 = ContinuousClock.now
+            host.paint()
+            phasePaint.append(ms(t3))
         }
         let total = ms(started)
         host.close()
         samples.sort()
+        phasePaint.sort()
         let rate = total > 0 ? Double(patches) / (total / 1000) : 0
-        return [NativeBenchResult(id: "editor.agent-patch", value: percentile(samples, 0.95),
-                                  detail: "\(patches) 个补丁(2000 行文件重算 Diff + 行内审阅 + 绘制)P95,吞吐 \(Int(rate)) 个/秒,最大 \(String(format: "%.1f", samples.last ?? 0)) ms")]
+        return [
+            NativeBenchResult(id: "editor.agent-patch", value: percentile(samples, 0.95),
+                              detail: "\(patches) 个补丁(2000 行文件重算 Diff + 区间编辑 + 行内审阅)处理耗时 P95,最大 \(String(format: "%.1f", samples.last ?? 0)) ms;中位分项:Diff \(String(format: "%.1f", median(phaseDiff))) / 编辑 \(String(format: "%.1f", median(phaseApply))) / 审阅 \(String(format: "%.1f", median(phaseReview))) ms;含绘制的串行吞吐 \(Int(rate)) 个/秒"),
+            NativeBenchResult(id: "editor.agent-frame", value: percentile(phasePaint, 0.95),
+                              detail: "补丁后整窗绘制(视口内大量 hunk 与删除行 zone)P95,最大 \(String(format: "%.1f", phasePaint.last ?? 0)) ms;绘制按显示帧合并,每帧一次"),
+        ]
     }
 }

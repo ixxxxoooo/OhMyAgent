@@ -78,6 +78,27 @@ enum DemoBudgetIDs {
     static let editor = [
         "editor.open-50k", "editor.open-50k-interactive", "editor.open-1m", "editor.memory-1m",
         "editor.scroll-p50", "editor.scroll-p99", "editor.scroll-dropped", "editor.typing-p95", "editor.typing-max",
-        "editor.syntax-incremental", "editor.completion-popup", "editor.agent-patch",
+        "editor.syntax-incremental", "editor.completion-popup", "editor.agent-patch", "editor.agent-frame",
     ]
+}
+
+/// 超长单行(压缩 JSON)不能把界面卡死:首帧 + 首次按键应在可接受时间内完成。
+@Suite("原生编辑器长行保护", .serialized)
+@MainActor
+struct NativeLongLineTests {
+    @Test("200 万字符单行 1.5 秒内完成首帧与首次按键")
+    func longLineStaysResponsive() {
+        let elapsed = NativeEditorBench.longLineOpenMs(characters: 2_000_000)
+        #expect(elapsed < 1_500, "耗时 \(elapsed) ms")
+    }
+
+    @Test("不自动换行时超长行也被硬断成多个视图行,短行不受影响")
+    func hardWrapSplitsOnlyLongLines() async {
+        let text = "short\n" + String(repeating: "a", count: 20_000) + "\nend\n"
+        let model = NativeEditorModel(document: EditorDocument(text: text), language: .plain)
+        for _ in 0..<200 where model.lineMap.wrapRows(ofLine: 1) <= 1 { try? await Task.sleep(for: .milliseconds(10)) }
+        #expect(model.lineMap.wrapRows(ofLine: 0) == 1)
+        #expect(model.lineMap.wrapRows(ofLine: 1) == 5)
+        #expect(model.lineMap.wrapRows(ofLine: 2) == 1)
+    }
 }

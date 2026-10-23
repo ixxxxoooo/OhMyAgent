@@ -90,15 +90,15 @@ struct DemoMetricsTests {
         #expect(DemoBenchmarkCatalog.categories(from: "ide") == [.ide])
     }
 
-    @Test("原生编辑器分类:12 项全部带 120Hz 预算,关键预算与迁移计划一致")
+    @Test("原生编辑器分类:13 项全部带 120Hz 预算,关键预算与迁移计划一致")
     func editorCategoryRegistered() {
         let items = DemoBenchmarkCatalog.items(in: .editor)
-        #expect(items.count == 12)
+        #expect(items.count == 13)
         #expect(items.allSatisfy { $0.budget != nil && $0.id.hasPrefix("editor.") })
         let expected: [String: Double] = [
             "editor.scroll-p50": 8.4, "editor.scroll-p99": 11, "editor.scroll-dropped": 1,
             "editor.typing-p95": 4, "editor.typing-max": 8, "editor.open-50k": 40, "editor.open-50k-interactive": 100,
-            "editor.open-1m": 800, "editor.syntax-incremental": 2, "editor.completion-popup": 16, "editor.agent-patch": 5,
+            "editor.open-1m": 800, "editor.syntax-incremental": 2, "editor.completion-popup": 16, "editor.agent-patch": 5, "editor.agent-frame": 8.4, "editor.memory-1m": 92,
         ]
         for (id, budget) in expected { #expect(DemoBenchmarkCatalog.item(id: id)?.budget == budget, "\(id) 预算不符") }
         #expect(DemoBenchmarkCatalog.item(id: "editor.scroll-dropped")?.unit == .percent)
