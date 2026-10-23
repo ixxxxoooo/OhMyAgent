@@ -90,6 +90,32 @@ public extension WorkbenchModel {
         activateAnyTab(tab)
     }
 
+    /// 切到已有的终端标签(当前显示的优先,否则第一个),不新建。
+    /// - Returns: 是否找到并切换了终端标签
+    @discardableResult
+    func focusExistingTerminal() -> Bool {
+        let tabs = terminalTabs
+        let shown = tabs.first { tab in host(of: tab.id).map { isTabShown(tab.id, in: $0) } ?? false }
+        guard let target = shown ?? tabs.first else { return false }
+        activateAnyTab(target.id)
+        return true
+    }
+
+    /// 切到已有的浏览器标签(当前显示的优先,否则第一个符合条件的),不新建。
+    /// - Parameter include: 按浏览器标签 id 过滤(如只取当前项目的浏览器)
+    /// - Returns: 是否找到并切换了浏览器标签
+    @discardableResult
+    func focusExistingBrowser(where include: (String) -> Bool) -> Bool {
+        let tabs = (rightDock.allTabs + dock.allTabs).filter { tab in
+            guard case .preview(let id) = tab.kind, let browserID = Self.browserID(fromTab: id) else { return false }
+            return include(browserID)
+        }
+        let shown = tabs.first { tab in host(of: tab.id).map { isTabShown(tab.id, in: $0) } ?? false }
+        guard let target = shown ?? tabs.first else { return false }
+        activateAnyTab(target.id)
+        return true
+    }
+
     /// 隐藏终端(关闭标签;终端进程由终端存储保留)。
     /// - Parameter root: 要关闭哪个项目的终端标签(默认当前项目)
     func hideTerminal(root: String? = nil) {

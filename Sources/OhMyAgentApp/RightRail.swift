@@ -4,7 +4,7 @@ import IconKit
 import SwiftUI
 import WorkbenchKit
 
-/// 右栏收起时,悬浮在工作区右上角的快捷竖条(对照 Cursor):展开右栏,或直接打开 Git 改动、浏览器、终端、文件标签。
+/// 右栏收起时,悬浮在工作区右上角的快捷竖条(对照 Cursor):展开右栏,或切到 Git 改动、浏览器、终端、文件标签(已有则复用,不重复新建)。
 /// - Author: ixxxxoooo
 struct RightRail: View {
     @Bindable var workbench: WorkbenchModel
@@ -15,10 +15,10 @@ struct RightRail: View {
     var body: some View {
         VStack(spacing: 2) {
             RailButton(icon: "chevrons-left", label: WorkbenchPanelNames.toggleTitle(.tools, visible: false)) { workbench.toggleRight() }
-            RailButton(icon: "git-branch", label: String(localized: "源代码管理"), badge: gitModel.map { !$0.status.isClean } ?? false) { actions.addRightTab("git") }
-            RailButton(icon: "globe", label: String(localized: "浏览器")) { actions.addRightTab("browser") }
-            RailButton(icon: "square-terminal", label: String(localized: "终端")) { actions.addRightTab("terminal") }
-            RailButton(icon: "file", label: String(localized: "文件")) { actions.addRightTab("files") }
+            RailButton(icon: "git-branch", label: String(localized: "源代码管理"), badge: gitModel.map { !$0.status.isClean } ?? false) { actions.focusRightTab("git") }
+            RailButton(icon: "globe", label: String(localized: "浏览器")) { actions.focusRightTab("browser") }
+            RailButton(icon: "square-terminal", label: String(localized: "终端")) { actions.focusRightTab("terminal") }
+            RailButton(icon: "file", label: String(localized: "文件")) { actions.focusRightTab("files") }
         }
         .padding(4)
         .omGlassCard(cornerRadius: OMRadius.floating)

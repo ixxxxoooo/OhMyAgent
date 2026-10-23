@@ -149,6 +149,26 @@ struct WorkbenchTests {
         model.shutdownAll()
     }
 
+    @Test("切到已有终端/浏览器标签:有则激活不新建,没有返回 false")
+    func focusExistingTabs() throws {
+        let env = try makeEnvironment()
+        defer { try? FileManager.default.removeItem(at: env.root) }
+        let model = makeModel(env.store)
+        _ = try #require(model.openProject(env.dirs[0]))
+        #expect(!model.focusExistingTerminal())
+        #expect(!model.focusExistingBrowser { _ in true })
+        model.openTerminal(id: "t1", title: "终端")
+        model.openBrowser(id: "b1", title: "浏览器")
+        model.layout.rightVisible = false
+        let count = model.rightDock.allTabs.count
+        #expect(model.focusExistingTerminal())
+        #expect(model.isTerminalShown && model.layout.rightVisible)
+        #expect(!model.focusExistingBrowser { $0 == "other" })
+        #expect(model.focusExistingBrowser { $0 == "b1" })
+        #expect(!model.isTerminalShown)
+        #expect(model.rightDock.allTabs.count == count)
+    }
+
     @Test("终端是右栏标签:每个项目各一个,显隐只作用于当前项目;移除项目会回调")
     func rightTerminalsPerProject() throws {
         let env = try makeEnvironment()

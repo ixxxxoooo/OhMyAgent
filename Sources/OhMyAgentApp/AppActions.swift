@@ -278,6 +278,22 @@ final class AppActions {
         workbench.layout.rightVisible = true
     }
 
+    /// 右栏收起时的快捷竖条:终端/浏览器已有标签时直接切过去,没有才新建;其余同 `addRightTab`。
+    /// - Parameter kind: 同 `addRightTab`
+    func focusRightTab(_ kind: String) {
+        let workbench = AppEnvironment.shared.workbench
+        switch kind {
+        case "terminal":
+            if workbench.focusExistingTerminal() { return }
+        case "browser":
+            guard let workspace = workbench.selectedProjectID else { return }
+            let browsers = BrowserController.shared
+            if workbench.focusExistingBrowser(where: { browsers.tabs[$0]?.workspace == workspace }) { return }
+        default: break
+        }
+        addRightTab(kind)
+    }
+
     /// 新建终端(⌃⇧`):新开一个终端标签。
     func newTerminal() {
         if IDEWindowManager.shared.route(.newTerminal) { return }
