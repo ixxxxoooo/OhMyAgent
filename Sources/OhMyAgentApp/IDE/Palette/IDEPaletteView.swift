@@ -15,12 +15,13 @@ struct IDEPaletteOverlay: View {
     var body: some View {
         if workspace.palette.isPresented {
             ZStack(alignment: .top) {
-                OMColors.scrim
+                // 对齐 VS Code:面板吸附在标题栏搜索框正下方,不压暗背景,点击空白处关闭
+                Color.clear
                     .ignoresSafeArea()
                     .contentShape(Rectangle())
                     .onTapGesture { workspace.palette.dismiss() }
                 IDEPaletteCard(workspace: workspace)
-                    .padding(.top, 56)
+                    .padding(.top, TitlebarMetrics.height - 4)
             }
             .transition(.opacity)
         }
@@ -50,7 +51,7 @@ private struct IDEPaletteCard: View {
             Rectangle().fill(OMColors.hairline).frame(height: 1)
             list(items)
         }
-        .frame(width: 560)
+        .frame(width: 600)
         .omGlassCard(cornerRadius: OMRadius.modal)
         .omFloatingShadow()
         .onAppear { focused = true }
