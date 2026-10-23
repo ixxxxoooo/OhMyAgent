@@ -125,6 +125,25 @@ public final class EditorTextView: NSTextView {
     /// 最近一次与文本一致的 Markdown 块布局(用于避开围栏代码里的伪任务框);可能为 nil
     var markdownLayout: (() -> MarkdownLiveLayout?)?
 
+    /// 是否允许滚动到最后一行之后(对应 VS Code 的 `editor.scrollBeyondLastLine`)。
+    var scrollsBeyondLastLine = true
+
+    /// 文档末尾额外的可滚动空白:视口高度减一行行高,使最后一行能滚到视口顶部(与 VS Code 一致)。
+    private var beyondLastLineExtra: CGFloat {
+        guard scrollsBeyondLastLine, let clip = enclosingScrollView?.contentView else { return 0 }
+        let metrics = font ?? NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+        let lineHeight = ceil(metrics.ascender - metrics.descender + metrics.leading)
+        return max(0, clip.bounds.height - lineHeight)
+    }
+
+    /// 文本布局改变高度时追加末尾空白;高度未变(如仅宽度自适应)则原样放行,避免重复叠加。
+    /// - Parameter newSize: 目标尺寸。
+    public override func setFrameSize(_ newSize: NSSize) {
+        var size = newSize
+        if abs(newSize.height - frame.height) > 0.5 { size.height += beyondLastLineExtra }
+        super.setFrameSize(size)
+    }
+
     /// 是否启用 Markdown 交互。
     private var markdownInteractive: Bool { markdownInteraction?() ?? false }
 
