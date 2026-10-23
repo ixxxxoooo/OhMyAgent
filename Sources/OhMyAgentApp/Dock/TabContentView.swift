@@ -295,10 +295,10 @@ struct FileTabView: View {
         }
     }
 
-    /// 编辑器本体:按 `EditorEngine` 选择原生 rope 引擎(native2)或 TextKit 引擎。
+    /// 编辑器本体:默认原生 rope 引擎(native2);Markdown 文件(就地渲染)或显式回退时用 TextKit 引擎。
     @ViewBuilder
     private func codeEditor(doc: FileDocument, text: String, markers: [Int: LineMarker]) -> some View {
-        if EditorEngine.current == .native2, let editorDocument = doc.ensureEditorDocument() {
+        if EditorEngine.usesNative(for: SyntaxLanguage.detect(path: path)), let editorDocument = doc.ensureEditorDocument() {
             NativeCodeEditor(document: editorDocument, language: SyntaxLanguage.detect(path: path), isEditable: !doc.isReadOnly,
                              revealLine: tab.line, markers: markers, diagnostics: lsp?.diagnostics ?? [],
                              chrome: ideHost == nil ? [] : [.minimap, .stickyScroll, .folding, .overviewRuler], filePath: path,

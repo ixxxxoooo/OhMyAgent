@@ -233,16 +233,27 @@ public enum NativeEditorBench {
         let emptyHeld = await settledFootprintMB()
         let chromeOverhead = max(emptyHeld - emptyBase, 0)
         empty.close()
-        let base = await settledFootprintMB()
-        let opened = openHuge(lines: lines)
-        _ = await waitUntil(timeout: 5) { opened.host.view.tokens.syncCount >= 1 }
-        let held = await settledFootprintMB()
-        opened.host.close()
-        let delta = max(held - base - chromeOverhead, 0)
-        let ratio = opened.fileMB > 0 ? delta / opened.fileMB : 0
+        // 分配器的脏页回收有随机性(单次测量会在 60~120 MB 间漂移),取三次的中位数
+        var deltas: [Double] = []
+        var openMs: [Double] = []
+        var fileMB = 0.0
+        for _ in 0..<(lines < 100_000 ? 1 : 3) {
+            let base = await settledFootprintMB()
+            let opened = openHuge(lines: lines)
+            _ = await waitUntil(timeout: 5) { opened.host.view.tokens.syncCount >= 1 }
+            let held = await settledFootprintMB()
+            opened.host.close()
+            deltas.append(max(held - base - chromeOverhead, 0))
+            openMs.append(opened.openMs)
+            fileMB = opened.fileMB
+        }
+        let delta = deltas.sorted()[deltas.count / 2]
+        let openTime = openMs.sorted()[openMs.count / 2]
+        let ratio = fileMB > 0 ? delta / fileMB : 0
+        let spread = deltas.map { String(format: "%.0f", $0) }.joined(separator: "/")
         return [
-            NativeBenchResult(id: "editor.open-1m", value: opened.openMs, detail: "\(lines) 行 / \(String(format: "%.1f", opened.fileMB)) MB,装入 rope + 首帧(不含合成文本)"),
-            NativeBenchResult(id: "editor.memory-1m", value: delta, detail: "文件 \(String(format: "%.1f", opened.fileMB)) MB,打开后内存增量 \(String(format: "%.1f", delta)) MB(\(String(format: "%.2f", ratio)) 倍;已扣除窗口与缓冲固定开销 \(String(format: "%.1f", chromeOverhead)) MB)"),
+            NativeBenchResult(id: "editor.open-1m", value: openTime, detail: "\(lines) 行 / \(String(format: "%.1f", fileMB)) MB,装入 rope + 首帧(不含合成文本),中位数"),
+            NativeBenchResult(id: "editor.memory-1m", value: delta, detail: "文件 \(String(format: "%.1f", fileMB)) MB,打开后内存增量 \(String(format: "%.1f", delta)) MB(\(String(format: "%.2f", ratio)) 倍;已扣除窗口与缓冲固定开销 \(String(format: "%.1f", chromeOverhead)) MB;三次 \(spread) MB 取中位)"),
         ]
     }
 
