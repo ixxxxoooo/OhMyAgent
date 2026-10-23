@@ -1,6 +1,7 @@
 // @author ixxxxoooo
 // 全局搜索面板:关键词、区分大小写/整词/正则、路径过滤;结果按文件分组,点击跳转到行。
 
+import AppKit
 import DesignSystem
 import IconKit
 import SwiftUI
@@ -32,9 +33,15 @@ struct SearchPaneView: View {
             Divider()
             results
         }
-        .onAppear { model.root = workbench.selectedProjectID; focused = true }
+        .onAppear { model.root = workbench.selectedProjectID }
+        .task(id: model.focusToken) {
+            // 先让持有焦点的编辑器/终端放手,再把焦点交给输入框;输入框出现晚一帧时补一次
+            NSApp.keyWindow?.makeFirstResponder(nil)
+            focused = true
+            try? await Task.sleep(for: .milliseconds(60))
+            focused = true
+        }
         .onChange(of: workbench.selectedProjectID) { _, new in model.root = new; model.schedule() }
-        .onChange(of: model.focusToken) { focused = true }
     }
 
     private func toggle(_ label: String, _ binding: Binding<Bool>, help: LocalizedStringKey) -> some View {

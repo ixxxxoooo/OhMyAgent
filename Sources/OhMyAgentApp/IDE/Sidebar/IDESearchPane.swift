@@ -2,6 +2,7 @@
 // IDE 侧栏「搜索」视图:查询/替换输入、大小写/全词/正则开关、包含路径过滤、按文件分组的结果列表;
 // 支持替换单条、整文件与全部,并可撤销最近一次替换。
 
+import AppKit
 import DesignSystem
 import IconKit
 import IDEKit
@@ -19,8 +20,14 @@ struct IDESearchPane: View {
             if let notice = model.notice { noticeBar(notice) }
             results
         }
-        .task(id: workspace.root) { model.root = workspace.root; focused = true }
-        .onChange(of: model.focusToken) { focused = true }
+        .task(id: workspace.root) { model.root = workspace.root }
+        .task(id: model.focusToken) {
+            // 先让持有焦点的编辑器/终端放手,再把焦点交给输入框;输入框出现晚一帧时补一次
+            NSApp.keyWindow?.makeFirstResponder(nil)
+            focused = true
+            try? await Task.sleep(for: .milliseconds(60))
+            focused = true
+        }
     }
 
     // MARK: 输入区
