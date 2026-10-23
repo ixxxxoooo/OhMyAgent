@@ -159,6 +159,10 @@ private struct FilesWorkspaceBody: View {
             }
         }
         .background(OMColors.surface)
+        // 面包屑行下边框:通栏,覆盖内容区与资源管理器上方
+        .overlay(alignment: .top) {
+            OMColors.hairline.frame(height: 0.5).padding(.top, Self.headerHeight - 0.5).allowsHitTesting(false)
+        }
         // 面包屑行右端的「收起 / 展开资源管理器」按钮:两种状态同一位置
         .overlay(alignment: .topTrailing) {
             Button { toggleTree() } label: { Image.om("list-tree", size: 13) }
