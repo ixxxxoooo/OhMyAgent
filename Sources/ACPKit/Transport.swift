@@ -181,7 +181,9 @@ public final class StdioTransport: ACPTransport, @unchecked Sendable {
         writeQueue.async { [self] in
             guard !stdinClosed else { return }
             stdinClosed = true
-            if stdinFileDescriptor >= 0 { close(stdinFileDescriptor) }
+            // 必须经 FileHandle 关闭:Pipe 释放时会再关一次同一 fd,若这里直接 close(fd) 就会双重关闭,
+            // 而 fd 号可能已被其他会话复用,导致后续连接随机卡死。
+            try? stdinPipe.fileHandleForWriting.close()
         }
         if process.isRunning {
             process.terminate()
