@@ -99,6 +99,10 @@ struct WorkbenchView: View {
         // 否则中栏的宽度会逐帧变化,整条会话时间线与所有常驻会话标签每帧重新排版,开关侧栏就会掉帧。
         // 现在中栏一次性排到最终宽度,面板在其上方做位移 + 淡入淡出(拖动宽度同样不受影响)。
         .onChange(of: panelVisibilitySignature) { _, _ in PanelToggleProbe.begin(stamp: workbench.panelToggleStamp, window: actions.mainWindow) }
+        .overlay(alignment: .topTrailing) {
+            // 右栏收起(且工具栏在右侧)时显示快捷竖条
+            if workbench.layout.side(of: .tools) == .right, !workbench.layout.isVisible(.tools) { RightRail(workbench: workbench) }
+        }
         .overlay(alignment: .top) { TitlebarOverlay(workbench: workbench) }
         .overlay { TerminalDropOverlay() }
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { TerminalDragState.shared.workspaceFrame = $0 }
