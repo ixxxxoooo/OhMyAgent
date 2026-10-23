@@ -2977,3 +2977,10 @@
 "请输入修改指令" = "Enter an edit instruction";
 "没有可用的模型通道,请先在设置里配置模型" = "No model channel is available. Configure a model in Settings first.";
 "模型没有返回有效的修改,请重试" = "The model returned no valid edit. Please try again.";
+"撤销这一轮的全部改动" = "Revert all changes from this turn";
+"Agent 改动审阅" = "Agent change review";
+"行内编辑(让 Agent 改写选区)" = "Inline edit (let the agent rewrite the selection)";
+"把选区加入对话" = "Add selection to chat";
+"审阅 Agent 改动" = "Review agent changes";
+"幽灵补全(Tab 接受)" = "Ghost completion (Tab to accept)";
+"IDE 窗口里停止输入片刻后,用辅助模型在行尾给出灰色续写建议,Tab 接受、Esc 丢弃。会产生模型请求,默认关闭。" = "In IDE windows, after a short pause the helper model shows a gray continuation at the end of the line. Tab accepts, Esc dismisses. Sends model requests; off by default.";

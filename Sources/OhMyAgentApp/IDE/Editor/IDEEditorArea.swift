@@ -182,7 +182,10 @@ struct IDEEditorGroupView: View {
         switch tab.kind {
         case .subagent(let projectID, let toolCallID):
             SubagentTabView(workbench: AppEnvironment.shared.workbench, projectID: projectID, toolCallID: toolCallID, session: workspace.agentSession)
-        case .chat, .agentTerminal, .changes:
+        case .changes(let projectID):
+            ChangesTabView(workbench: AppEnvironment.shared.workbench, projectID: projectID, session: workspace.agentSession)
+                .environment(\.ideFileHost, workspace.fileHost)
+        case .chat, .agentTerminal:
             OMEmptyState { Label(tab.title, om: "file-text") } description: { Text("该类型的标签在 IDE 窗口中暂不支持") }
         case .file(let path):
             // 文件、差异、历史、Blame、终端、预览等复用 Agent 窗口的同一套内容视图;环境值把脏标记与跳转改接到 IDE 窗口

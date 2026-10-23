@@ -49,7 +49,7 @@ struct IDEShellView: View {
         if agentShown, model.agentPaneMaximized {
             return AnyView(HStack(spacing: 0) {
                 IDEActivityBar(model: model)
-                IDEAgentPane(workspace: workspace).frame(maxWidth: .infinity)
+                IDEAgentPane(workspace: workspace).environment(\.ideFileHost, workspace.fileHost).frame(maxWidth: .infinity)
             })
         }
         return AnyView(HStack(spacing: 0) {
@@ -72,7 +72,7 @@ struct IDEShellView: View {
             .clipped()
             if agentShown {
                 IDEResizer(model: model, kind: .agent, area: size)
-                IDEAgentPane(workspace: workspace).frame(width: agentWidth)
+                IDEAgentPane(workspace: workspace).environment(\.ideFileHost, workspace.fileHost).frame(width: agentWidth)
             }
         })
     }

@@ -459,9 +459,11 @@ struct DiffTabView: View {
 struct ChangesTabView: View {
     let workbench: WorkbenchModel
     let projectID: String
+    /// 指定承载会话(IDE 窗口的 Agent 面板可能不是项目的当前会话);为空取项目当前会话
+    var session: SessionModel?
 
     var body: some View {
-        if let model = workbench.sessions[projectID],
+        if let model = session ?? workbench.sessions[projectID],
            let entry = model.timeline.entries.last(where: { $0.kind == .changes && !$0.changes.isEmpty }) {
             ScrollView {
                 ChangesSummaryView(entry: entry)

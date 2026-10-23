@@ -12,6 +12,8 @@ import SwiftUI
 struct ChangesSummaryView: View {
     let entry: TimelineEntry
     @Environment(SessionModel.self) private var model
+    /// IDE 窗口宿主:有则「审查」打开 Composer 标签,文件行直接在 IDE 编辑器里打开(带行内审阅)。
+    @Environment(\.ideFileHost) private var ideHost
 
     var body: some View {
         if model.isRunning {
@@ -24,8 +26,23 @@ struct ChangesSummaryView: View {
                         .font(OMFonts.small.weight(.medium))
                         .foregroundStyle(OMColors.primaryText)
                     Spacer()
+                    if entry.changes.contains(where: { $0.status == .pending || $0.status == .partiallyReverted }) {
+                        Button { model.revertAll(in: entry) } label: {
+                            Text("全部撤销")
+                                .font(OMFonts.caption.weight(.medium))
+                                .foregroundStyle(OMColors.secondaryText)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(OMColors.hoverFill, in: RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                        .omTooltip(String(localized: "撤销这一轮的全部改动"), icon: "undo-2")
+                        .accessibilityLabel(String(localized: "全部撤销"))
+                    }
                     Button {
-                        if let first = entry.changes.first {
+                        if let ideHost {
+                            ideHost.openChanges()
+                        } else if let first = entry.changes.first {
                             AppEnvironment.shared.workbench.openDiff(first.path)
                         } else {
                             AppEnvironment.shared.workbench.openChanges(project: model.workspace.path)
@@ -58,12 +75,15 @@ struct ChangesSummaryView: View {
 struct FileChangeRow: View {
     let change: FileChange
     @Environment(SessionModel.self) private var model
+    @Environment(\.ideFileHost) private var ideHost
     @State private var hovering = false
 
     var body: some View {
         HStack(spacing: 8) {
             Button {
-                AppEnvironment.shared.workbench.openDiff(change.path)
+                // IDE 窗口:直接在编辑器里打开文件,逐块「保留 / 还原」以行内 Diff 呈现
+                if let ideHost { ideHost.open(change.path, change.diff.hunks.first.map(AgentHunkKey.firstLine(of:)), false) }
+                else { AppEnvironment.shared.workbench.openDiff(change.path) }
             } label: {
                 HStack(spacing: 8) {
                     OMFileIcon(name: change.fileName, size: 14)

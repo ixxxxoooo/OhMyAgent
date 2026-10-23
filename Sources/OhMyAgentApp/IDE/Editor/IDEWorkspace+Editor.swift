@@ -29,6 +29,12 @@ extension IDEWorkspace {
                 self.model.agentPaneVisible = true
                 if self.agentSession == nil { self.prepareAgentSession() }
             },
+            openChanges: { [weak self] in
+                guard let self else { return }
+                if self.agentSession == nil { self.prepareAgentSession() }
+                guard let projectID = self.agentProjectID else { return }
+                self.model.openChanges(projectID: projectID, title: String(localized: "Agent 改动审阅"))
+            },
             report: { [weak self] path, diagnostics, text in
                 let problems = diagnostics.map { item -> IDEProblem in
                     let position = IDELineMap.lineColumn(utf16Offset: item.range.location, in: text)

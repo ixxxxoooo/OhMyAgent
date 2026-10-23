@@ -371,6 +371,18 @@ extension IDEWorkspace {
         case "terminal.new": newTerminal()
         case "agent.newChat": model.agentPaneVisible = true; newAgentConversation()
         case "agent.addFile": addActiveFileToChat()
+        case "agent.inlineEdit":
+            // 等面板收起、焦点回到编辑器后再开始
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(80))
+                OMEditorView.activeEditor()?.inlineEdit.begin()
+            }
+        case "agent.referenceSelection":
+            if let editor = OMEditorView.activeEditor() {
+                let range = editor.model.selections.primary.range
+                editor.onReferenceSelection?(NSRange(location: range.location, length: range.length))
+            }
+        case "agent.reviewChanges": fileHost.openChanges()
         case "agent.openWindow": IDEWindowManager.shared.switchToAgent()
         case "window.new": IDEWindowManager.shared.newEmptyWindow()
         case "scm.refresh":

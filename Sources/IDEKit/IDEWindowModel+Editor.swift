@@ -44,6 +44,20 @@ public extension IDEWindowModel {
         return id
     }
 
+    /// 打开「Composer 多文件审阅」标签(本轮 Agent 改动汇总;已打开则聚焦)。
+    /// - Parameters:
+    ///   - projectID: Agent 面板所属项目标识
+    ///   - title: 标签标题
+    /// - Returns: 标签标识;项目为空返回 nil
+    @discardableResult
+    func openChanges(projectID: String, title: String) -> UUID? {
+        guard !projectID.isEmpty else { return nil }
+        var layout = editor
+        let id = layout.open(.changes(projectID: projectID), title: title, preview: false)
+        editor = layout
+        return id
+    }
+
     /// 打开某文件的差异标签(已打开则聚焦)。
     /// - Parameter path: 文件绝对路径(空串忽略)
     /// - Returns: 标签标识
