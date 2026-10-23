@@ -57,6 +57,8 @@ ARGS=(--env OMA_DEMO=1 --env "OMA_PROJECT_ROOT=$PWD" --env "OMA_DEMO_BENCH=$ONLY
 [[ -n "$TURNS" ]] && ARGS+=(--env "OMA_TIMELINE_TURNS=$TURNS")
 [[ -n "${OMA_IDE_SOAK_SECONDS:-}" ]] && ARGS+=(--env "OMA_IDE_SOAK_SECONDS=$OMA_IDE_SOAK_SECONDS")
 [[ -n "${OMA_DEMO_ROOT:-}" ]] && ARGS+=(--env "OMA_DEMO_ROOT=$OMA_DEMO_ROOT")
+# 编辑器引擎对照(native2 / textkit):用于同一套 ide.* 基准的 A/B
+[[ -n "${OMA_EDITOR_ENGINE:-}" ]] && ARGS+=(--env "OMA_EDITOR_ENGINE=$OMA_EDITOR_ENGINE")
 env -u TZ open -g -n build/OhMyAgent.app "${ARGS[@]}"
 echo "已启动演示基准(分类:$ONLY),等待结果写入 $OUT …"
 
