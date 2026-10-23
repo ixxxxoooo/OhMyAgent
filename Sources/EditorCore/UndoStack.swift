@@ -6,19 +6,57 @@ import Foundation
 
 /// 一次已应用的原子替换:`location` 处 `oldLength` 个单元被替换为 `newLength` 个单元。
 /// 多条编辑按「应用顺序」排列,每条的坐标相对其应用前的文本。
-public struct AppliedEdit: Sendable, Hashable {
+/// 相等性与哈希只看前三个字段;文本与行信息是供增量消费者(语法树、行映射、折叠)使用的附带数据。
+public struct AppliedEdit: Sendable {
+    /// 起点偏移(应用前坐标)。
     public var location: Int
+    /// 被替换的旧长度。
     public var oldLength: Int
+    /// 新插入的长度。
     public var newLength: Int
+    /// 新插入的文本(过大时为 nil,消费者应退回整体重建)。
+    public var inserted: ContiguousArray<UInt16>?
+    /// 被替换掉的旧文本(过大时为 nil)。
+    public var removed: ContiguousArray<UInt16>?
+    /// 编辑起点所在行(应用前坐标)。
+    public var startLine: Int
+    /// 被移除的换行数。
+    public var removedLines: Int
+    /// 新增的换行数。
+    public var insertedLines: Int
 
-    public init(location: Int, oldLength: Int, newLength: Int) {
+    /// 附带文本的体积上限(UTF-16 单元),超过则不记录。
+    public static let payloadLimit = 65_536
+
+    public init(location: Int, oldLength: Int, newLength: Int, inserted: ContiguousArray<UInt16>? = nil,
+                removed: ContiguousArray<UInt16>? = nil, startLine: Int = 0, removedLines: Int = 0, insertedLines: Int = 0) {
         self.location = location
         self.oldLength = oldLength
         self.newLength = newLength
+        self.inserted = inserted
+        self.removed = removed
+        self.startLine = startLine
+        self.removedLines = removedLines
+        self.insertedLines = insertedLines
     }
 
-    /// 逆编辑(撤销用)。
-    public var inverted: AppliedEdit { AppliedEdit(location: location, oldLength: newLength, newLength: oldLength) }
+    /// 逆编辑(撤销用):新旧文本与行数互换。
+    public var inverted: AppliedEdit {
+        AppliedEdit(location: location, oldLength: newLength, newLength: oldLength, inserted: removed, removed: inserted,
+                    startLine: startLine, removedLines: insertedLines, insertedLines: removedLines)
+    }
+}
+
+extension AppliedEdit: Hashable {
+    public static func == (lhs: AppliedEdit, rhs: AppliedEdit) -> Bool {
+        lhs.location == rhs.location && lhs.oldLength == rhs.oldLength && lhs.newLength == rhs.newLength
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(location)
+        hasher.combine(oldLength)
+        hasher.combine(newLength)
+    }
 }
 
 /// 撤销事务。

@@ -151,8 +151,8 @@ public final class EditorDocument {
         for edit in sorted.reversed() {
             let units = ContiguousArray(edit.text.utf16)
             let normalized = units.contains(13) ? LineEnding.normalize(units).units : units
+            applied.append(describe(replacing: edit.range, with: normalized, in: rope))
             rope = rope.replacing(edit.range, with: normalized)
-            applied.append(AppliedEdit(location: edit.range.location, oldLength: edit.range.length, newLength: normalized.count))
         }
         snapshot = rope
         undoStack.record(
@@ -191,9 +191,9 @@ public final class EditorDocument {
             savedMarker = undoStack.topID
             return nil
         }
+        let edit = describe(replacing: oldRange, with: inserted, in: old)
         let rope = old.replacing(oldRange, with: inserted)
         snapshot = rope
-        let edit = AppliedEdit(location: oldRange.location, oldLength: oldRange.length, newLength: inserted.count)
         undoStack.record(before: old, after: rope, edits: [edit], selectionsBefore: [], selectionsAfter: [],
                          coalesceKey: nil, time: clock())
         savedMarker = undoStack.topID
@@ -224,6 +224,19 @@ public final class EditorDocument {
     }
 
     // MARK: 内部
+
+    /// 描述一次替换(含附带文本与行信息),必须在替换发生之前、用替换前的文本调用。
+    private func describe(replacing range: TextSpan, with inserted: ContiguousArray<UInt16>, in rope: TextRope) -> AppliedEdit {
+        let startLine = rope.line(containing: range.location)
+        let endLine = range.isEmpty ? startLine : rope.line(containing: range.upperBound)
+        var insertedBreaks = 0
+        for unit in inserted where unit == 10 { insertedBreaks += 1 }
+        let keepOld = range.length <= AppliedEdit.payloadLimit
+        let keepNew = inserted.count <= AppliedEdit.payloadLimit
+        return AppliedEdit(location: range.location, oldLength: range.length, newLength: inserted.count,
+                           inserted: keepNew ? inserted : nil, removed: keepOld ? rope.slice(range) : nil,
+                           startLine: startLine, removedLines: endLine - startLine, insertedLines: insertedBreaks)
+    }
 
     /// 校验并按位置升序排序编辑。
     private func validated(_ edits: [DocumentEdit]) throws -> [DocumentEdit] {
