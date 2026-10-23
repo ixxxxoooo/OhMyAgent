@@ -420,22 +420,3 @@ struct TabStripDropDelegate: DropDelegate {
         return true
     }
 }
-
-/// 右栏没有任何标签时的空状态:提供常用入口(资源管理器、终端、输出、Git、搜索)。
-struct RightDockEmptyView: View {
-    let workbench: WorkbenchModel
-
-    var body: some View {
-        VStack(spacing: 10) {
-            Text("右栏为空").font(OMFonts.body).foregroundStyle(OMColors.secondaryText)
-            Text("打开文件、终端或资源管理器,它们会以标签显示在这里").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
-            HStack(spacing: 8) {
-                Button { workbench.showRight(.files) } label: { Label("资源管理器", om: "folder") }
-                Button { workbench.showTerminal() } label: { Label("终端", om: "square-terminal") }
-                Button { workbench.showOutput() } label: { Label("输出", om: "file-text") }
-            }
-            .buttonStyle(.omSecondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}

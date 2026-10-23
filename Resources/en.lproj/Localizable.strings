@@ -2934,3 +2934,9 @@
 "新增 %@ · 缓存读 %@ · 输出 %@ token" = "New %@ · Cache read %@ · Output %@ tokens";
 "折合全价输入约 %@(按 Claude 价格倍率)" = "≈%@ full-price input tokens (Claude price ratios)";
 "会话未就绪" = "Session is not ready";
+"浏览项目文件" = "Browse project files";
+"在项目中查找文本" = "Find text in the project";
+"查看改动与提交" = "Review changes and commits";
+"在项目目录运行命令" = "Run commands in the project";
+"打开网页与本地预览" = "Open web pages and local previews";
+"查看运行输出与日志" = "View run output and logs";
