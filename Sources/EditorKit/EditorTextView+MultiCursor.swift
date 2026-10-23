@@ -117,26 +117,45 @@ extension EditorTextView {
         setAllSelections(moved.filter { seen.insert($0.location).inserted })
     }
 
-    /// 在光标所在行的行尾绘制内联提示(只在单光标、无选区、有焦点时)。
+    /// 记录鼠标所在行(行首偏移);鼠标在文本区域之外(最后一行之下)时视为不在任何行上。
+    /// - Parameter point: 视图坐标系中的鼠标位置
+    func updateHoverNoteLine(at point: NSPoint) {
+        guard let layoutManager = textLayoutManager, !string.isEmpty,
+              point.y <= (layoutManager.usageBoundsForTextContainer.maxY + textContainerOrigin.y) else {
+            hoverNoteLineStart = nil
+            return
+        }
+        let offset = min(characterIndexForInsertion(at: point), (string as NSString).length)
+        hoverNoteLineStart = (string as NSString).lineRange(for: NSRange(location: offset, length: 0)).location
+    }
+
+    /// 在光标所在行与鼠标悬停行的行尾绘制内联提示(光标行只在单光标、无选区、有焦点时)。
     func drawInlineNote(in dirtyRect: NSRect) {
-        guard let inlineNote, selectionCount == 1, selectedRange().length == 0, let window, window.firstResponder === self else { return }
-        let caret = selectedRange().location
-        guard let note = inlineNote(caret), !note.isEmpty else { return }
+        guard let inlineNote, let window else { return }
+        var offsets: [Int] = []
+        if selectionCount == 1, selectedRange().length == 0, window.firstResponder === self {
+            offsets.append(selectedRange().location)
+        }
+        if let hover = hoverNoteLineStart { offsets.append(hover) }
         let ns = string as NSString
-        var lineStart = 0, lineEnd = 0, contentsEnd = 0
-        ns.getLineStart(&lineStart, end: &lineEnd, contentsEnd: &contentsEnd, for: NSRange(location: min(caret, ns.length), length: 0))
-        var actual = NSRange(location: 0, length: 0)
-        let screen = firstRect(forCharacterRange: NSRange(location: contentsEnd, length: 0), actualRange: &actual)
-        guard screen != .zero else { return }
-        let rect = convert(window.convertFromScreen(screen), from: nil)
-        let size = max((font?.pointSize ?? 12) - 1, 9)
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: size), .foregroundColor: NSColor(OMColors.tertiaryText),
-        ]
-        let text = NSAttributedString(string: note, attributes: attributes)
-        let textSize = text.size()
-        let origin = NSPoint(x: rect.minX + 24, y: rect.minY + (rect.height - textSize.height) / 2)
-        if NSRect(origin: origin, size: textSize).intersects(dirtyRect) { text.draw(at: origin) }
+        var drawn = Set<Int>()
+        for offset in offsets {
+            var lineStart = 0, lineEnd = 0, contentsEnd = 0
+            ns.getLineStart(&lineStart, end: &lineEnd, contentsEnd: &contentsEnd, for: NSRange(location: min(offset, ns.length), length: 0))
+            guard drawn.insert(lineStart).inserted, let note = inlineNote(lineStart), !note.isEmpty else { continue }
+            var actual = NSRange(location: 0, length: 0)
+            let screen = firstRect(forCharacterRange: NSRange(location: contentsEnd, length: 0), actualRange: &actual)
+            guard screen != .zero else { continue }
+            let rect = convert(window.convertFromScreen(screen), from: nil)
+            let size = max((font?.pointSize ?? 12) - 1, 9)
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: NSFont.systemFont(ofSize: size), .foregroundColor: NSColor(OMColors.tertiaryText),
+            ]
+            let text = NSAttributedString(string: note, attributes: attributes)
+            let textSize = text.size()
+            let origin = NSPoint(x: rect.minX + 24, y: rect.minY + (rect.height - textSize.height) / 2)
+            if NSRect(origin: origin, size: textSize).intersects(dirtyRect) { text.draw(at: origin) }
+        }
     }
 
     /// 绘制额外的空光标(细竖线,随主题的插入点颜色)。

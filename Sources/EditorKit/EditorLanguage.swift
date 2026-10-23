@@ -97,6 +97,10 @@ public final class EditorTextView: NSTextView {
     var inlineNote: ((Int) -> String?)? {
         didSet { needsDisplay = true }
     }
+    /// 鼠标悬停所在行的行首偏移(内联提示也显示在悬停行;鼠标离开为 nil)
+    var hoverNoteLineStart: Int? {
+        didSet { if oldValue != hoverNoteLineStart, inlineNote != nil { needsDisplay = true } }
+    }
     /// 正在应用多光标编辑(此时选区/文本变化不应清空额外光标)
     var isApplyingMultiEdit = false
 
@@ -427,8 +431,9 @@ public final class EditorTextView: NSTextView {
 
     public override func mouseMoved(with event: NSEvent) {
         super.mouseMoved(with: event)
-        guard onHoverDwell != nil else { return }
         let point = convert(event.locationInWindow, from: nil)
+        if inlineNote != nil { updateHoverNoteLine(at: point) }
+        guard onHoverDwell != nil else { return }
         guard let (offset, rect) = characterUnder(point) else {
             cancelHover()
             return
@@ -445,10 +450,12 @@ public final class EditorTextView: NSTextView {
 
     public override func mouseExited(with event: NSEvent) {
         super.mouseExited(with: event)
+        hoverNoteLineStart = nil
         cancelHover()
     }
 
     public override func scrollWheel(with event: NSEvent) {
+        hoverNoteLineStart = nil
         cancelHover()
         super.scrollWheel(with: event)
     }
