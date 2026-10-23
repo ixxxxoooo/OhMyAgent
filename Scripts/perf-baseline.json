@@ -4,6 +4,19 @@
   ],
   "machine": "arm64",
   "metrics": {
+    "editor.agent-frame": 3.869,
+    "editor.agent-patch": 2.446,
+    "editor.completion-popup": 5.2,
+    "editor.memory-1m": 119.766,
+    "editor.open-1m": 113.546,
+    "editor.open-50k": 16.582,
+    "editor.open-50k-interactive": 17.879,
+    "editor.scroll-dropped": 0,
+    "editor.scroll-p50": 1.057,
+    "editor.scroll-p99": 4.302,
+    "editor.syntax-incremental": 1.418,
+    "editor.typing-max": 3.201,
+    "editor.typing-p95": 3.066,
     "ide.memory-10-files": 74.016,
     "ide.memory-3-windows": 20.422,
     "ide.memory-50k": 72.313,
@@ -25,5 +38,5 @@
     "ide.window-cold": 52.085
   },
   "system": "macOS-27.0.1-arm64-arm-64bit",
-  "updated": "2026-10-22"
+  "updated": "2026-10-24"
 }
