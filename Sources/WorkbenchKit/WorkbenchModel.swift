@@ -641,6 +641,19 @@ public final class WorkbenchModel {
         projects.first { $0.id == id }?.sessions.first { $0.sessionId == sessionId }?.agentId
     }
 
+    /// 会话真正所属的引擎:以会话缓存里首次登记的归属为准,没有登记时取传入的兜底值。
+    ///
+    /// 不能直接用「当前承载它的引擎」:标签恢复时若误用默认引擎承载了别的引擎的会话(如 Claude 的 UUID 会话交给 OpenCode),
+    /// 再按承载引擎落盘会把错误写进恢复记录,之后每次启动都用错引擎去 `session/load`,报「OpenCode service failure」。
+    /// - Parameters:
+    ///   - sessionId: 协议会话 ID
+    ///   - id: 项目 ID
+    ///   - fallback: 缓存里没有登记时采用的引擎(记录里的归属或当前承载引擎)
+    /// - Returns: 引擎 ID
+    func sessionOwner(_ sessionId: String, in id: String, fallback: String?) -> String? {
+        cachedAgentID(ofSession: sessionId, in: id) ?? fallback
+    }
+
     /// 在项目下打开历史会话:已经在某个标签里打开的直接切过去;否则新开一个标签承载。
     ///
     /// 会话属于某个 Agent(引擎)。属于其他引擎的会话会用原引擎新开标签承载,
@@ -719,7 +732,9 @@ public final class WorkbenchModel {
         var restore = restore
         if restore == nil, agentID == nil, let record = pendingRestores.removeValue(forKey: key), !isSessionDeleted(record.sessionId, in: id) {
             restore = SessionSummary(sessionId: record.sessionId, cwd: id, title: record.title)
-            if let owner = record.agentId, makeAgentSession != nil { agentID = owner }
+            if let owner = sessionOwner(record.sessionId, in: id, fallback: record.agentId), makeAgentSession != nil { agentID = owner }
+            // 缓存里还没有归属时按记录补登记,此后以首次登记为准
+            if let owner = record.agentId { rememberSession(record.sessionId, title: record.title, agentID: owner, for: id) }
         }
         // 指定引擎:先认领待命会话;未指定时认领默认引擎的待命会话(新对话/打开历史不再等启动与握手)
         let model: SessionModel
@@ -823,10 +838,11 @@ public final class WorkbenchModel {
                 let simulated = now.addingTimeInterval(-Double(offset) * 1.0)
                 createdAt = simulated.formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true))
             }
-            // 沿用已登记的所属引擎:避免旧缓存里的归属被无归属的刷新抹掉
+            // 首次登记的所属引擎优先、不被后来的刷新改写:恢复中的会话可能出现在别的引擎承载的列表里,
+            // 若按「当前承载引擎」覆盖,会把 Claude 的会话改标成 OpenCode,之后用错引擎打开
             return CachedSession(
                 sessionId: item.sessionId, title: item.title, updatedAt: item.updatedAt,
-                createdAt: createdAt, firstSeenAt: createdAt, agentId: agentID ?? previous[item.sessionId]?.agentId
+                createdAt: createdAt, firstSeenAt: createdAt, agentId: previous[item.sessionId]?.agentId ?? agentID
             )
         }
         // 本次列表没有返回的条目一律保留:引擎列表可能分页、瞬时变短或失败,
@@ -1241,7 +1257,7 @@ public final class WorkbenchModel {
         for (key, record) in pendingRestores where openTabs.contains(key) { result[key] = record }
         for (key, model) in conversations where openTabs.contains(key) {
             guard let sessionId = model.sessionId, !model.isPristine || model.isReplaying else { continue }
-            result[key] = ChatSlotRecord(projectID: key.projectID, slot: key.slot, sessionId: sessionId, agentId: model.descriptor.id, title: model.sessionTitle)
+            result[key] = ChatSlotRecord(projectID: key.projectID, slot: key.slot, sessionId: sessionId, agentId: sessionOwner(sessionId, in: key.projectID, fallback: model.descriptor.id), title: model.sessionTitle)
         }
         return result.values.sorted { ($0.projectID, $0.slot ?? "") < ($1.projectID, $1.slot ?? "") }
     }

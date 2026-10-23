@@ -119,6 +119,50 @@ struct SessionOrderTests {
         reopened.shutdownAll()
     }
 
+    @Test("缓存归属:首次登记的引擎不被别的引擎承载的列表刷新改写")
+    func cachedOwnerNotOverwrittenByOtherEngine() throws {
+        let (model, id, root) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let summary = SessionSummary(sessionId: "0cf7fd62-uuid", cwd: id, title: "您是谁")
+        model.cacheHistory([summary], agentID: "claude-code", for: id)
+        model.cacheHistory([summary], agentID: "opencode", for: id)
+        #expect(model.cachedAgentID(ofSession: "0cf7fd62-uuid", in: id) == "claude-code")
+        // 新会话没有登记过时,取这次刷新的引擎
+        model.cacheHistory([SessionSummary(sessionId: "ses_new", cwd: id, title: "新")], agentID: "opencode", for: id)
+        #expect(model.cachedAgentID(ofSession: "ses_new", in: id) == "opencode")
+        model.shutdownAll()
+    }
+
+    @Test("重启恢复:记录里的引擎与缓存归属冲突时,按缓存归属选择承载引擎并落盘纠正")
+    func restoreUsesCachedOwner() throws {
+        let (model, id, root) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        model.cacheHistory([SessionSummary(sessionId: "claude-uuid", cwd: id, title: "您是谁")], agentID: "claude-code", for: id)
+        model.sessions[id]?.draft = "占位"
+        model.openHistory(project: id, sessionId: "claude-uuid", title: "您是谁")
+        model.saveNow()
+        model.shutdownAll()
+
+        // 模拟旧数据:恢复记录被错误地写成 opencode
+        let file = root.appendingPathComponent("state/workbench.json")
+        var state = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any])
+        var slots = try #require(state["chatSlots"] as? [[String: Any]])
+        #expect(slots.first?["agentId"] as? String == "claude-code")
+        for index in slots.indices { slots[index]["agentId"] = "opencode" }
+        state["chatSlots"] = slots
+        try JSONSerialization.data(withJSONObject: state).write(to: file)
+
+        let requested = LockedBox<[String]>([])
+        let reopened = WorkbenchModel(store: WorkbenchStore(fileURL: file), autoConnect: false) { url in SessionModel(workspace: url) }
+        reopened.makeAgentSession = { url, agent in
+            requested.value.append(agent)
+            return SessionModel(workspace: url)
+        }
+        reopened.select(project: id)
+        #expect(requested.value.last == "claude-code")
+        reopened.shutdownAll()
+    }
+
     @Test("删除会话:清缓存/置顶/归档并写墓碑,列表刷新后不会回来")
     func forgetSessionKeepsTombstone() throws {
         let (model, id, root) = try makeModel()
@@ -133,5 +177,16 @@ struct SessionOrderTests {
         model.cacheHistory(items, agentID: "claude-code", for: id)
         #expect(model.projects[0].sessions.map(\.sessionId) == ["d2"])
         model.shutdownAll()
+    }
+}
+
+/// 测试用的简单线程安全盒子。
+private final class LockedBox<Value>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: Value
+    init(_ value: Value) { stored = value }
+    var value: Value {
+        get { lock.withLock { stored } }
+        set { lock.withLock { stored = newValue } }
     }
 }
