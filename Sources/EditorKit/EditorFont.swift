@@ -110,6 +110,15 @@ public enum EditorFontPrefs {
         return max(0, (target - natural).rounded(toPlaces: 2))
     }
 
+    /// 原生编辑器的行高:目标行高与字体自然行高取大,并取整到像素。
+    /// - Parameter font: 编辑器字体
+    /// - Returns: 行高(pt)
+    public static func lineHeight(for font: NSFont) -> CGFloat {
+        let target = font.pointSize * referenceLineHeight / referenceSize
+        let natural = font.ascender - font.descender + font.leading
+        return max(target, natural).rounded()
+    }
+
     /// 编辑器默认段落样式(只设置行间距,不改变对齐与缩进)。
     /// - Parameter font: 编辑器字体
     /// - Returns: 段落样式

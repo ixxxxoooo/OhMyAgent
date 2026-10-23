@@ -30,6 +30,15 @@ public struct DocumentChange: Sendable {
     public var snapshot: TextRope
     /// 撤销/重做时应还原的选区(普通编辑为 nil)。
     public var restoredSelections: [Selection]?
+
+    public init(edits: [AppliedEdit], origin: ChangeOrigin, version: Int, previous: TextRope, snapshot: TextRope, restoredSelections: [Selection]?) {
+        self.edits = edits
+        self.origin = origin
+        self.version = version
+        self.previous = previous
+        self.snapshot = snapshot
+        self.restoredSelections = restoredSelections
+    }
 }
 
 /// 文档层错误。
@@ -172,7 +181,7 @@ public final class EditorDocument {
 
     /// 以外部内容整体替换(磁盘重载、Agent 写盘):只改动首尾公共部分之外的最小区间,保留撤销栈且视为已保存。
     @discardableResult
-    public func applyExternal(text newText: String) -> DocumentChange? {
+    public func applyExternal(text newText: String, markSaved: Bool = true) -> DocumentChange? {
         let normalized = LineEnding.normalize(ContiguousArray(newText.utf16))
         lineEnding = normalized.dominant
         hadMixedLineEndings = normalized.isMixed
@@ -188,7 +197,7 @@ public final class EditorDocument {
         let oldRange = TextSpan(lower: prefix, upper: oldUnits.count - suffix)
         let inserted = ContiguousArray(incoming[prefix..<(incoming.count - suffix)])
         if oldRange.isEmpty && inserted.isEmpty {
-            savedMarker = undoStack.topID
+            if markSaved { savedMarker = undoStack.topID }
             return nil
         }
         let edit = describe(replacing: oldRange, with: inserted, in: old)
@@ -196,7 +205,7 @@ public final class EditorDocument {
         snapshot = rope
         undoStack.record(before: old, after: rope, edits: [edit], selectionsBefore: [], selectionsAfter: [],
                          coalesceKey: nil, time: clock())
-        savedMarker = undoStack.topID
+        if markSaved { savedMarker = undoStack.topID }
         return publish(edits: [edit], origin: .external, previous: old, restored: nil)
     }
 

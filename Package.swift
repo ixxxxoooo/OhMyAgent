@@ -48,7 +48,7 @@ let package = Package(
         // 编辑器内核(无视图):持久化文本绳、撤销栈、共享文档;视图模型与装饰随 E2 起加入
         .target(name: "EditorCore"),
         // AppKit TextKit 2 编辑器
-        .target(name: "EditorKit", dependencies: ["DiffKit", "DesignSystem", "IconKit", "OMLog", "CTreeSitter", "TreeSitterGrammars"]),
+        .target(name: "EditorKit", dependencies: ["EditorCore", "DiffKit", "DesignSystem", "IconKit", "OMLog", "CTreeSitter", "TreeSitterGrammars"]),
         // Lucide 原生图标:SVG path 解析 + 模板图像渲染
         .target(name: "IconKit", dependencies: ["OMLog"]),
         // Mermaid 原生渲染:解析 → 分层布局 → 绘制场景(纯 Swift,无 WebView)
@@ -77,7 +77,7 @@ let package = Package(
         // 应用本体
         .executableTarget(
             name: "OhMyAgentApp",
-            dependencies: ["ACPKit", "AgentHost", "ChatKit", "ClaudeConfigKit", "DiffKit", "EditorKit", "DesignSystem", "IconKit", "MermaidKit", "GitKit", "LSPKit", "DemoKit", "OMLog", "SpreadsheetKit", "AutomationKit", "WorkbenchKit", "CanvasKit", "IDEKit",
+            dependencies: ["ACPKit", "AgentHost", "ChatKit", "ClaudeConfigKit", "DiffKit", "EditorKit", "EditorCore", "DesignSystem", "IconKit", "MermaidKit", "GitKit", "LSPKit", "DemoKit", "OMLog", "SpreadsheetKit", "AutomationKit", "WorkbenchKit", "CanvasKit", "IDEKit",
                            .product(name: "SwiftTerm", package: "SwiftTerm")]
         ),
         // 脚本化 ACP Agent,用于测试与预览
@@ -103,7 +103,7 @@ let package = Package(
         .testTarget(name: "SpreadsheetKitTests", dependencies: ["SpreadsheetKit"]),
         .testTarget(name: "CanvasKitTests", dependencies: ["CanvasKit"]),
         .testTarget(name: "AutomationKitTests", dependencies: ["AutomationKit"]),
-        .testTarget(name: "EditorKitTests", dependencies: ["EditorKit"]),
+        .testTarget(name: "EditorKitTests", dependencies: ["EditorKit", "EditorCore"]),
         .testTarget(name: "EditorCoreTests", dependencies: ["EditorCore"]),
         .testTarget(name: "IDEKitTests", dependencies: ["IDEKit", "WorkbenchKit"]),
         .testTarget(name: "MermaidKitTests", dependencies: ["MermaidKit"]),

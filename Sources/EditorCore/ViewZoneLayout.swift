@@ -110,6 +110,9 @@ public struct ViewZoneLayout: Sendable {
         return .row(row, offset: position - Double(row) * lineHeight)
     }
 
+    /// 第 `index` 个 Zone 的锚点视图行(Zone 位于该行之前)。
+    public func anchorRow(ofZoneAt index: Int) -> Int { anchorRows[index] }
+
     /// 锚点视图行 ≤ `row` 的 Zone 个数。
     private func anchorsNotAfter(_ row: Int) -> Int {
         var low = 0, high = anchorRows.count
