@@ -23,7 +23,6 @@ extension FileTabView {
     ///   - doc: 文件文档
     ///   - editorDocument: 共享的 rope 文档
     func agentHooks(_ doc: FileDocument, editorDocument: EditorDocument) -> NativeAgentHooks {
-        let path = path
         return NativeAgentHooks(
             review: nativeReview(doc),
             // ⌘K 只在 IDE 窗口接管(Agent 窗口里 ⌘K 仍是全局搜索)

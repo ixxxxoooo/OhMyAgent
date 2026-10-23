@@ -106,6 +106,8 @@ struct FileTabView: View {
     @Environment(\.ideFileHost) var ideHost
     @AppStorage(ClientPrefs.Key.editorLSP) private var lspEnabled = true
     @State private var lsp: EditorLSPController?
+    /// 原生编辑器的操作句柄(右键菜单据此执行剪切/粘贴/跳转定义等)
+    @State private var editorHandle = NativeEditorHandle()
     /// 最近一次 Agent 改动在新文件中新增的行(仅当文本仍等于 Agent 写入的内容时显示)
     @State private var agentMarks: AgentMarks?
     /// 相对 HEAD 的改动标记(仅 IDE 窗口;按未保存的缓冲区内容计算)
@@ -254,6 +256,45 @@ struct FileTabView: View {
         return ObjectIdentifier(lsp).hashValue | 1
     }
 
+    /// 原生编辑器右键菜单:先把光标移到点击处(不在选区内时),再按当前状态生成条目。
+    private func nativeEditorMenu() -> [MenuEntry] {
+        editorHandle.prepareContextMenu()
+        return nativeEditorMenuEntries(editorHandle)
+    }
+
+    @OMMenuBuilder
+    private func nativeEditorMenuEntries(_ handle: NativeEditorHandle) -> [MenuEntry] {
+        if handle.supportsDefinition {
+            OMMenuItem("跳转到定义", icon: "corner-down-right", shortcut: "F12") { handle.goToDefinition() }
+        }
+        if handle.supportsReferences {
+            OMMenuItem("查找所有引用", icon: "file-search", shortcut: "⇧F12") { handle.findReferences() }
+        }
+        if handle.supportsCodeActions {
+            OMMenuItem("代码操作", icon: "wand-sparkles", shortcut: "⌘.") { handle.showCodeActions() }
+        }
+        if handle.supportsDefinition || handle.supportsReferences || handle.supportsCodeActions { OMMenuDivider() }
+        if handle.supportsInlineEdit {
+            OMMenuItem("行内编辑", icon: "sparkles", shortcut: "⌘K") { handle.beginInlineEdit() }
+        }
+        if handle.supportsReference, handle.hasSelection {
+            OMMenuItem("在对话中引用选区", icon: "message-square", shortcut: "⌘L") { handle.referenceSelection() }
+        }
+        if handle.supportsInlineEdit || (handle.supportsReference && handle.hasSelection) { OMMenuDivider() }
+        OMMenuItem("撤销输入", icon: "undo-2", shortcut: "⌘Z", isEnabled: handle.canUndo) { handle.undo() }
+        OMMenuItem("重做", shortcut: "⇧⌘Z", isEnabled: handle.canRedo) { handle.redo() }
+        OMMenuDivider()
+        OMMenuItem("剪切", shortcut: "⌘X", isEnabled: handle.isEditable) { handle.cut() }
+        OMMenuItem("复制", icon: "copy", shortcut: "⌘C") { handle.copy() }
+        OMMenuItem("粘贴", icon: "clipboard-paste", shortcut: "⌘V", isEnabled: handle.canPaste) { handle.paste() }
+        OMMenuItem("全选", shortcut: "⌘A") { handle.selectAll() }
+        OMMenuDivider()
+        OMMenuItem("查找", icon: "search", shortcut: "⌘F") { handle.find() }
+        if handle.supportsFormat {
+            OMMenuItem("格式化文档", icon: "list-checks", shortcut: "⇧⌥F") { handle.formatDocument() }
+        }
+    }
+
     /// 编辑器本体:按 `EditorEngine` 选择原生 rope 引擎(native2)或 TextKit 引擎。
     @ViewBuilder
     private func codeEditor(doc: FileDocument, text: String, markers: [Int: LineMarker]) -> some View {
@@ -263,7 +304,9 @@ struct FileTabView: View {
                              chrome: ideHost == nil ? [] : [.minimap, .stickyScroll, .folding, .overviewRuler], filePath: path,
                              services: nativeServices, servicesKey: nativeServicesKey,
                              onCaretChange: ideHost.map { host in { host.caret(path, $0) } })
+                .handle(editorHandle)
                 .agentHooks(agentHooks(doc, editorDocument: editorDocument))
+                .omContextMenu { nativeEditorMenu() }
                 .id(ObjectIdentifier(editorDocument))
         } else {
             CodeEditor(text: text, language: SyntaxLanguage.detect(path: path), isEditable: !doc.isReadOnly, revealLine: tab.line, markers: markers,

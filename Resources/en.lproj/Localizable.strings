@@ -2987,3 +2987,11 @@
 "放大查看" = "Expand";
 "会话模式" = "Chat mode";
 "代码模式" = "Code mode";
+"跳转到定义" = "Go to Definition";
+"查找所有引用" = "Find All References";
+"代码操作" = "Code Actions";
+"行内编辑" = "Inline Edit";
+"撤销输入" = "Undo";
+"重做" = "Redo";
+"剪切" = "Cut";
+"粘贴" = "Paste";

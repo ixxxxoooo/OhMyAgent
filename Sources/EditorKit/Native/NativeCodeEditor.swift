@@ -71,6 +71,16 @@ public struct NativeCodeEditor: NSViewRepresentable {
     public var onEdited: ((DocumentChange) -> Void)?
     /// Agent 钩子(行内审阅、⌘K、⌘L)。
     public var agent = NativeAgentHooks()
+    /// 外部操作句柄(宿主据此构建右键菜单);视图装入时绑定。
+    public var handle: NativeEditorHandle?
+
+    /// 返回绑定了操作句柄的副本。
+    /// - Parameter handle: 句柄
+    public func handle(_ handle: NativeEditorHandle) -> NativeCodeEditor {
+        var copy = self
+        copy.handle = handle
+        return copy
+    }
 
     /// 返回带 Agent 钩子的副本。
     /// - Parameter hooks: 钩子
@@ -126,11 +136,13 @@ public struct NativeCodeEditor: NSViewRepresentable {
         view.wrapsLines = wrapsLines
         view.chrome = chrome
         context.coordinator.language = language
+        handle?.view = view
         sync(view, context.coordinator)
         return view
     }
 
     public func updateNSView(_ view: OMEditorView, context: Context) {
+        if let handle, handle.view !== view { handle.view = view }
         view.model.isEditable = isEditable
         if context.coordinator.language != language {
             context.coordinator.language = language
