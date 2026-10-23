@@ -308,6 +308,22 @@ struct FollowUpNowTests {
         model.shutdown()
     }
 
+    @Test("运行中点「打断并发送」:取消本轮后,排队消息作为新一轮发出并出队")
+    func interruptAndSendRuns() async throws {
+        let model = try await model()
+        model.send("slow #long 请持续输出")
+        #expect(await SessionModelTests.wait { model.isRunning })
+        model.send("改问另一件事", afterTurn: true)
+        let id = try #require(model.followUps.first?.id)
+        model.interruptAndSend(id)
+        #expect(await SessionModelTests.wait(timeout: .seconds(15)) {
+            model.followUps.isEmpty && model.timeline.entries.contains { $0.kind == .user && $0.text == "改问另一件事" }
+        })
+        model.cancel()
+        #expect(await SessionModelTests.wait { !model.isRunning })
+        model.shutdown()
+    }
+
     @Test("空闲时点「发送」:排队消息直接发出并出队")
     func sendNowWhenIdle() async throws {
         let model = try await model()

@@ -2960,3 +2960,5 @@
 "签出到…" = "Checkout to…";
 "分支名不能为空或包含空白" = "Branch name can't be empty or contain whitespace";
 "第 %lld / %lld 次提问" = "Prompt %lld of %lld";
+"打断并发送" = "Interrupt and send";
+"当前 Agent 不支持运行中引导:先中断本轮,再发送这条消息" = "This agent can't be steered mid-turn: stop the current turn, then send this message";

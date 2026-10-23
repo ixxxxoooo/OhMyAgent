@@ -274,17 +274,29 @@ private struct QueuedRow: View {
     let model: SessionModel
     let item: QueuedMessage
 
+    /// 「立即发送」按钮:空闲发送;运行中支持引导的 Agent 注入当前轮次,不支持的(如 OpenCode)改为打断本轮后发送。
+    @ViewBuilder private var sendNowButton: some View {
+        if !model.isRunning {
+            Button(String(localized: "发送")) { model.sendFollowUpNow(item.id) }
+                .buttonStyle(.plain).font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
+                .omTooltip(String(localized: "立即发送"))
+        } else if model.canSteer {
+            Button(String(localized: "引导")) { model.sendFollowUpNow(item.id) }
+                .buttonStyle(.plain).font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
+                .omTooltip(String(localized: "立即引导进当前轮次"))
+        } else {
+            Button(String(localized: "打断并发送")) { model.interruptAndSend(item.id) }
+                .buttonStyle(.plain).font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
+                .omTooltip(String(localized: "当前 Agent 不支持运行中引导:先中断本轮,再发送这条消息"))
+        }
+    }
+
     var body: some View {
         DockRowShell(title: item.text.replacingOccurrences(of: "\n", with: " "), meta: nil, tap: nil) {
             Image.om(item.images.isEmpty ? "message-square" : "image", size: 12).foregroundStyle(OMColors.tertiaryText)
         } actions: {
             HStack(spacing: 2) {
-                Button(model.isRunning ? String(localized: "引导") : String(localized: "发送")) { model.sendFollowUpNow(item.id) }
-                    .buttonStyle(.plain)
-                    .font(OMFonts.small)
-                    .foregroundStyle(OMColors.secondaryText)
-                    .disabled(model.isRunning && !model.canSteer)
-                    .omTooltip(model.isRunning ? String(localized: "立即引导进当前轮次") : String(localized: "立即发送"))
+                sendNowButton
                     .padding(.trailing, 4)
                 RowIconButton(icon: "pencil", label: String(localized: "编辑")) { model.editFollowUp(item.id) }
                 RowIconButton(icon: "trash", label: String(localized: "移除")) { model.removeFollowUp(item.id) }

@@ -347,6 +347,8 @@ public final class SessionModel {
     public var attachments: [ImageAttachment] = []
     /// 本轮结束后依次发送的排队消息
     public private(set) var followUps: [QueuedMessage] = []
+    /// 「打断并发送」等待中的排队消息:当前轮次结束(被取消或恰好自然结束)后发出
+    private var interruptSendID: UUID?
     /// 当前 `/goal` 目标(客户端根据命令推断;适配器不向普通客户端推送结构化目标)
     public private(set) var goal: GoalState?
     /// 客户端接管命令的执行回调(由应用层打开设置页、面板等)
@@ -802,6 +804,16 @@ public final class SessionModel {
         }
         followUps.removeAll { $0.id == id }
         send(item.text, images: item.images)
+    }
+
+    /// 打断当前轮次并发送某条排队消息:用于不支持运行中引导的 Agent(如 OpenCode)。
+    /// 先取消本轮,轮次结束后把这条消息作为新一轮发出;不运行时等同于直接发送。
+    /// - Parameter id: 排队消息 ID
+    public func interruptAndSend(_ id: UUID) {
+        guard followUps.contains(where: { $0.id == id }) else { return }
+        guard isRunning else { sendFollowUpNow(id); return }
+        interruptSendID = id
+        cancel()
     }
 
     /// 轮次结束后发送队列中的下一条。
@@ -1353,6 +1365,15 @@ public final class SessionModel {
             self.promptTask = nil
             if self.goal?.isActive == true { self.goal?.isActive = false }
             self.refreshHistory()
+            // 用户点了「打断并发送」:无论取消还是自然结束都发出那一条;失败则放弃并保留在队列
+            if let id = self.interruptSendID {
+                self.interruptSendID = nil
+                if error == nil, let item = self.followUps.first(where: { $0.id == id }) {
+                    self.followUps.removeAll { $0.id == id }
+                    self.send(item.text, images: item.images)
+                    return
+                }
+            }
             // 本轮正常结束才自动发送排队消息;被取消/失败时保留队列,由用户决定
             if error == nil, reason == .endTurn { self.flushNextFollowUp() }
         }
