@@ -84,6 +84,31 @@ struct ConversationTabTests {
         model.shutdownAll()
     }
 
+    @Test("同一窗口多个会话槽位:各自持有互不回收,按窗口前缀整体释放")
+    func externalHoldMultiSlotPrefixRelease() throws {
+        let env = try makeEnvironment()
+        defer { try? FileManager.default.removeItem(at: env.root) }
+        let model = env.model
+        for slot in ["ide-a", "ide-b"] {
+            _ = try #require(model.ensureSession(project: env.project, slot: slot))
+            model.holdConversation(owner: "win-1|\(slot)", project: env.project, slot: slot)
+        }
+        #expect(model.externalHoldCount == 2)
+        #expect(model.conversations[ConversationKey(projectID: env.project, slot: "ide-a")] != nil)
+        // 单个槽位关闭:只回收它自己
+        model.releaseConversation(owner: "win-1|ide-a")
+        #expect(model.conversations[ConversationKey(projectID: env.project, slot: "ide-a")] == nil)
+        #expect(model.conversations[ConversationKey(projectID: env.project, slot: "ide-b")] != nil)
+        // 窗口关闭:按前缀整体释放;空前缀与不匹配的前缀无副作用
+        model.releaseConversations(ownerPrefix: "")
+        model.releaseConversations(ownerPrefix: "win-2")
+        #expect(model.externalHoldCount == 1)
+        model.releaseConversations(ownerPrefix: "win-1")
+        #expect(model.externalHoldCount == 0)
+        #expect(model.conversations[ConversationKey(projectID: env.project, slot: "ide-b")] == nil)
+        model.shutdownAll()
+    }
+
     @Test("关闭会话标签回收对应会话,激活标签后项目当前会话随之切换")
     func closeReapsConversation() throws {
         let env = try makeEnvironment()

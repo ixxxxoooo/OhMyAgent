@@ -5,7 +5,7 @@
 import Foundation
 
 extension WorkbenchModel {
-    /// 登记某个持有者占用的会话。一个持有者同一时刻只占用一个会话,换槽位会释放(并回收)旧的。
+    /// 登记某个持有者占用的会话。一个持有者同一时刻只占用一个会话,换槽位会释放(并回收)旧的;一个窗口有多个会话槽位时,每个槽位用独立的持有者标识。
     /// - Parameters:
     ///   - owner: 持有者标识(如 IDE 窗口 ID),不能为空
     ///   - project: 项目 ID
@@ -22,6 +22,16 @@ extension WorkbenchModel {
     /// - Parameter owner: 持有者标识
     public func releaseConversation(owner: String) {
         guard externalHolds.removeValue(forKey: owner) != nil else { return }
+        reapConversations()
+    }
+
+    /// 释放以某前缀开头的全部持有者(一个窗口可有多个会话槽位,持有者形如 `窗口ID|槽位`)并回收。
+    /// - Parameter prefix: 持有者标识前缀(如 IDE 窗口 ID),不能为空
+    public func releaseConversations(ownerPrefix prefix: String) {
+        guard !prefix.isEmpty else { return }
+        let owners = externalHolds.keys.filter { $0.hasPrefix(prefix) }
+        guard !owners.isEmpty else { return }
+        for owner in owners { externalHolds.removeValue(forKey: owner) }
         reapConversations()
     }
 

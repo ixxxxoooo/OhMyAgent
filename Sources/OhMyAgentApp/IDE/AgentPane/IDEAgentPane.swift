@@ -38,7 +38,8 @@ struct IDEAgentPane: View {
 
     /// 标签条里的一项。
     struct PaneTab: Identifiable {
-        let id: UUID
+        /// 融合模式为工作台标签 UUID 字符串;非融合模式为会话槽位
+        let id: String
         let title: String
         let isActive: Bool
         let isRunning: Bool
@@ -102,14 +103,17 @@ struct IDEAgentPane: View {
             let tabs = workbench.chatTabs(in: projectID)
             if !tabs.isEmpty {
                 return tabs.map { tab in
-                    PaneTab(id: tab.id, title: workbench.displayTitle(tab), isActive: tab.id == active,
+                    PaneTab(id: tab.id.uuidString, title: workbench.displayTitle(tab), isActive: tab.id == active,
                             isRunning: workbench.session(forTab: tab)?.isRunning ?? false, closable: true)
                 }
             }
         }
-        let session = workspace.agentSession
-        let title = session?.sessionTitle.flatMap { $0.isEmpty ? nil : $0 } ?? String(localized: "新对话")
-        return [PaneTab(id: workspace.model.id, title: title, isActive: true, isRunning: session?.isRunning ?? false, closable: true)]
+        let projectID = workspace.agentProjectID
+        return workspace.agentSlots.map { slot in
+            let session = projectID.flatMap { workbench.conversations[ConversationKey(projectID: $0, slot: slot)] }
+            let title = session?.sessionTitle.flatMap { $0.isEmpty ? nil : $0 } ?? String(localized: "新对话")
+            return PaneTab(id: slot, title: title, isActive: slot == workspace.agentSlot, isRunning: session?.isRunning ?? false, closable: true)
+        }
     }
 
     /// 历史对话下拉的条目(新的在前;已归档/已删除的不列出)。
@@ -227,12 +231,13 @@ extension IDEWorkspace {
         } else {
             workbench.ensureSession(project: projectID, slot: agentSlot)
             // 专属槽位没有 dock 标签:登记持有关系,避免被回收;窗口关闭时释放
-            workbench.holdConversation(owner: model.id.uuidString, project: projectID, slot: agentSlot)
+            workbench.holdConversation(owner: Self.holdOwner(window: model.id, slot: agentSlot), project: projectID, slot: agentSlot)
         }
         Log.ui.info("IDE Agent 面板会话就绪", ["project": (projectID as NSString).lastPathComponent, "slot": agentSlot ?? "-", "fusion": "\(FusionMode.shared.isEnabled)", "ms": "\(Int((ContinuousClock.now - started).seconds * 1000))"])
     }
 
-    /// 开始一个新对话。融合模式下在工作台里新开会话标签(Agent 窗口同步出现);否则换本窗口的槽位。
+    /// 开始一个新对话。融合模式下在工作台里新开会话标签(Agent 窗口同步出现);
+    /// 非融合模式在本窗口的标签条里新增一个会话槽位并切过去(当前会话还是空白时不重复新建)。
     func newAgentConversation() {
         if FusionMode.shared.isEnabled {
             if agentProjectID == nil { prepareAgentSession() }
@@ -240,30 +245,59 @@ extension IDEWorkspace {
             AppEnvironment.shared.workbench.newConversation(in: projectID)
             return
         }
-        agentSlot = "ide-" + UUID().uuidString.prefix(8).lowercased()
+        if agentSession?.isPristine == true { return }
+        let slot = "ide-" + UUID().uuidString.prefix(8).lowercased()
+        agentSlots.append(slot)
+        agentSlot = slot
         prepareAgentSession()
     }
 
-    /// 切到标签条里的某个会话标签(仅融合模式有多个标签)。
-    /// - Parameter tabID: 工作台会话标签 ID
-    func activateAgentTab(_ tabID: UUID) {
-        guard FusionMode.shared.isEnabled else { return }
-        AppEnvironment.shared.workbench.activateTab(tabID)
+    /// 切到标签条里的某个会话标签。
+    /// - Parameter tabID: 融合模式为工作台会话标签 UUID 字符串,非融合模式为会话槽位
+    func activateAgentTab(_ tabID: String) {
+        if FusionMode.shared.isEnabled {
+            guard let uuid = UUID(uuidString: tabID) else { return }
+            AppEnvironment.shared.workbench.activateTab(uuid)
+        } else if agentSlots.contains(tabID), agentSlot != tabID {
+            agentSlot = tabID
+            prepareAgentSession()
+        }
     }
 
     /// 关闭标签条里的某个会话标签。
-    /// - Parameter tabID: 工作台会话标签 ID
-    func closeAgentTab(_ tabID: UUID) {
+    /// - Parameter tabID: 融合模式为工作台会话标签 UUID 字符串,非融合模式为会话槽位
+    func closeAgentTab(_ tabID: String) {
         guard FusionMode.shared.isEnabled else {
-            // 非融合:本面板只有一个会话。空白会话关闭 = 收起面板;已有内容的会话关闭 = 换成新的空白对话(旧的留在历史里)
-            if agentSession?.isPristine == true { model.agentPaneVisible = false } else { newAgentConversation() }
+            closeAgentSlot(tabID)
             return
         }
         let workbench = AppEnvironment.shared.workbench
         // 会话标签还没建立时(占位标签):关闭 = 收起面板
-        guard workbench.anyTab(tabID) != nil else { model.agentPaneVisible = false; return }
-        workbench.closeTab(tabID)
+        guard let uuid = UUID(uuidString: tabID), workbench.anyTab(uuid) != nil else { model.agentPaneVisible = false; return }
+        workbench.closeTab(uuid)
     }
+
+    /// 非融合模式关闭一个会话槽位:释放持有(旧会话留在历史里);只剩一个且为空白 = 收起面板,只剩一个有内容 = 换成新的空白对话。
+    private func closeAgentSlot(_ slot: String) {
+        guard let index = agentSlots.firstIndex(of: slot) else { return }
+        let workbench = AppEnvironment.shared.workbench
+        if agentSlots.count == 1 {
+            if agentSession?.isPristine == true { model.agentPaneVisible = false; return }
+            let fresh = "ide-" + UUID().uuidString.prefix(8).lowercased()
+            agentSlots = [fresh]
+            agentSlot = fresh
+            workbench.releaseConversation(owner: Self.holdOwner(window: model.id, slot: slot))
+            prepareAgentSession()
+            return
+        }
+        agentSlots.remove(at: index)
+        if agentSlot == slot { agentSlot = agentSlots[min(index, agentSlots.count - 1)] }
+        workbench.releaseConversation(owner: Self.holdOwner(window: model.id, slot: slot))
+        prepareAgentSession()
+    }
+
+    /// 非融合模式下某个会话槽位的外部持有者标识(`窗口ID|槽位`,窗口关闭时按窗口 ID 前缀整体释放)。
+    static func holdOwner(window: UUID, slot: String?) -> String { "\(window.uuidString)|\(slot ?? "-")" }
 
     /// 打开历史对话。融合模式:在工作台新开(或切到已打开的)会话标签,Agent 窗口同步;
     /// 非融合:把它载入本面板的会话。

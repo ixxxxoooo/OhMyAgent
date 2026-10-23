@@ -42,7 +42,9 @@ final class IDEWorkspace {
     /// Agent 面板所用会话的项目标识与槽位(每窗口一个专属槽位,不与 Agents Window 的会话标签冲突)
     /// (`agentProjectID` 必须可观察:面板在它赋值前渲染过一次,赋值后要能重新取会话)
     var agentProjectID: String?
-    @ObservationIgnored var agentSlot: String?
+    var agentSlot: String?
+    /// 非融合模式下本窗口 Agent 面板里打开的全部会话槽位(标签条顺序);融合模式不使用
+    var agentSlots: [String] = []
     /// 在底部终端面板里查看的 Agent 终端(只读,不属于项目共享的 shell 终端)
     var agentTerminals: [IDEAgentTerminal] = []
     /// 最近关闭的文件标签(供「重新打开已关闭的标签」)
@@ -65,7 +67,9 @@ final class IDEWorkspace {
     /// - Parameter model: 窗口模型
     init(model: IDEWindowModel) {
         self.model = model
-        agentSlot = "ide-" + model.id.uuidString.prefix(8).lowercased()
+        let slot = "ide-" + model.id.uuidString.prefix(8).lowercased()
+        agentSlot = slot
+        agentSlots = [slot]
     }
 
     /// 工作区根目录;未打开文件夹为 nil。

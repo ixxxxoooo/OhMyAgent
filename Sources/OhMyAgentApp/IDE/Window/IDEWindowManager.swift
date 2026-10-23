@@ -238,7 +238,7 @@ final class IDEWindowManager {
         if !isTerminating {
             controller?.workspace.closeAllTerminals()
             // 释放本窗口 Agent 面板的专属会话(结束其 Agent 进程),否则每开一个 IDE 窗口就泄漏一个进程
-            AppEnvironment.shared.workbench.releaseConversation(owner: id.uuidString)
+            AppEnvironment.shared.workbench.releaseConversations(ownerPrefix: id.uuidString)
         }
         if !isTerminating { registry.remove(id) }
         Task { @MainActor in withExtendedLifetime(controller) {} }
