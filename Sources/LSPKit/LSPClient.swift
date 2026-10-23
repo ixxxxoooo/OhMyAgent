@@ -25,6 +25,7 @@ public enum LSPError: Error, Sendable, Equatable, LocalizedError {
 struct LSPRequestHandler: ACPRequestHandler {
     let rootURI: String
     let rootName: String
+    let bridge: LSPEditBridge
 
     func handleRequest(method: String, params: JSONValue?) async throws -> JSONValue {
         switch method {
@@ -38,7 +39,9 @@ struct LSPRequestHandler: ACPRequestHandler {
              "window/workDoneProgress/create", "window/showMessageRequest", "window/showDocument":
             return .null
         case "workspace/applyEdit":
-            return ["applied": false]
+            guard let edit = params?["edit"] else { return ["applied": false] }
+            let applied = await bridge.apply(LSPDecode.workspaceEdit(edit))
+            return ["applied": .bool(applied)]
         default:
             throw JSONRPCError(code: JSONRPCError.methodNotFound, message: "未实现: \(method)")
         }
@@ -60,6 +63,8 @@ public actor LSPClient {
     /// 服务器名称(来自 `serverInfo`)
     public private(set) var serverName: String?
 
+    /// `workspace/applyEdit` 的宿主桥。
+    var editBridge = LSPEditBridge()
     private var documents: [String: Int] = [:]
     private var latest: [String: LSPDiagnosticsUpdate] = [:]
     private var subscribers: [UUID: AsyncStream<LSPDiagnosticsUpdate>.Continuation] = [:]
@@ -103,7 +108,7 @@ public actor LSPClient {
         let begin = ContinuousClock.now
         let rootURI = LSPURI.make(path: rootPath)
         let name = (rootPath as NSString).lastPathComponent
-        await connection.setRequestHandler(LSPRequestHandler(rootURI: rootURI, rootName: name))
+        await connection.setRequestHandler(LSPRequestHandler(rootURI: rootURI, rootName: name, bridge: editBridge))
         do {
             try await connection.start()
         } catch {
@@ -156,13 +161,31 @@ public actor LSPClient {
             "workspaceFolders": .array([["uri": .string(rootURI), "name": .string(rootName)]]),
             "capabilities": [
                 "general": ["positionEncodings": ["utf-16"]],
-                "workspace": ["workspaceFolders": true, "configuration": true],
+                "workspace": [
+                    "workspaceFolders": true, "configuration": true, "applyEdit": true,
+                    "symbol": ["dynamicRegistration": false],
+                    "workspaceEdit": ["documentChanges": true],
+                ],
                 "textDocument": [
                     "synchronization": ["didSave": true, "dynamicRegistration": false],
                     "publishDiagnostics": ["versionSupport": true],
                     "hover": ["contentFormat": ["plaintext", "markdown"]],
                     "definition": ["linkSupport": true],
-                    "completion": ["completionItem": ["snippetSupport": false]],
+                    "completion": ["completionItem": ["snippetSupport": true, "documentationFormat": ["markdown", "plaintext"]]],
+                    "references": [:],
+                    "documentSymbol": ["hierarchicalDocumentSymbolSupport": true],
+                    "rangeFormatting": [:],
+                    "onTypeFormatting": [:],
+                    "inlayHint": ["dynamicRegistration": false],
+                    "semanticTokens": [
+                        "requests": ["full": true],
+                        "tokenTypes": ["namespace", "type", "class", "enum", "interface", "struct", "typeParameter", "parameter", "variable",
+                                       "property", "enumMember", "event", "function", "method", "macro", "keyword", "modifier", "comment",
+                                       "string", "number", "regexp", "operator", "decorator"],
+                        "tokenModifiers": ["declaration", "definition", "readonly", "static", "deprecated", "abstract", "async", "modification",
+                                           "documentation", "defaultLibrary"],
+                        "formats": ["relative"],
+                    ],
                     "signatureHelp": ["signatureInformation": ["parameterInformation": ["labelOffsetSupport": true]]],
                     "codeAction": [
                         "codeActionLiteralSupport": ["codeActionKind": ["valueSet": ["quickfix", "refactor", "source"]]],

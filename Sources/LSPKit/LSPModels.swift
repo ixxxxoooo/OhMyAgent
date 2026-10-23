@@ -83,13 +83,26 @@ public struct LSPCompletionItem: Sendable, Hashable {
     /// LSP `CompletionItemKind` 数值
     public var kind: Int?
     public var sortText: String
+    /// 原始片段文本(`insertTextFormat == 2` 时才有,保留 `$1`、`${1:x}` 占位)。
+    public var snippet: String?
+    /// 服务器指定的替换区间(`textEdit.range`);无则按光标前的单词前缀替换。
+    public var replaceRange: LSPRange?
+    /// 文档说明(纯文本/Markdown)。
+    public var documentation: String?
+    /// 参与过滤的文本;无则用 `label`。
+    public var filterText: String?
 
-    public init(label: String, detail: String? = nil, insertText: String? = nil, kind: Int? = nil, sortText: String? = nil) {
+    public init(label: String, detail: String? = nil, insertText: String? = nil, kind: Int? = nil, sortText: String? = nil,
+                snippet: String? = nil, replaceRange: LSPRange? = nil, documentation: String? = nil, filterText: String? = nil) {
         self.label = label
         self.detail = detail
         self.insertText = insertText ?? label
         self.kind = kind
         self.sortText = sortText ?? label
+        self.snippet = snippet
+        self.replaceRange = replaceRange
+        self.documentation = documentation
+        self.filterText = filterText
     }
 }
 
@@ -157,7 +170,11 @@ enum LSPDecode {
                 detail: item["detail"]?.stringValue,
                 insertText: isSnippet ? stripSnippet(raw) : raw,
                 kind: item["kind"]?.intValue,
-                sortText: item["sortText"]?.stringValue
+                sortText: item["sortText"]?.stringValue,
+                snippet: isSnippet ? raw : nil,
+                replaceRange: (item["textEdit"]?["range"] ?? item["textEdit"]?["replace"]).flatMap { try? $0.decode(LSPRange.self) },
+                documentation: item["documentation"]?.stringValue ?? item["documentation"]?["value"]?.stringValue,
+                filterText: item["filterText"]?.stringValue
             )
         }
     }

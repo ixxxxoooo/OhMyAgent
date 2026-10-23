@@ -59,6 +59,17 @@ struct SourceKitIntegrationTests {
         #expect(defs.first?.range.start.line == 0)
         let comps = try await client.completion(uri: uri, at: LSPPosition(line: 6, character: 22))
         #expect(comps.contains { $0.label.hasPrefix("hello") })
+
+        // 扩展能力:语义标记与内嵌提示(服务器声明支持才断言)
+        if await client.capabilities["semanticTokensProvider"] != nil {
+            let tokens = try await client.semanticTokens(uri: uri)
+            #expect(tokens.contains { $0.line == 5 && $0.type == "variable" || $0.type == "struct" || $0.type == "class" })
+        }
+        if await client.supports("inlayHintProvider") {
+            let range = LSPRange(start: LSPPosition(line: 0, character: 0), end: LSPPosition(line: 8, character: 0))
+            let hints = try await client.inlayHints(uri: uri, range: range)
+            #expect(hints.contains { $0.label.contains("Greeter") })
+        }
         await client.shutdown()
     }
 }
