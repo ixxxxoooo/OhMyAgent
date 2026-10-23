@@ -65,7 +65,7 @@ struct FileHeaderBar: View {
                 HeaderIconButton(icon: mode.toggleIcon, help: mode == .preview ? "切换到源码" : "切换到预览", tint: nil) { onMode(mode.other) }
             }
             // 资源管理器收起时,右上角悬浮着「展开」按钮,留出位置避免重叠
-            if filesControls?.treeCollapsed == true { Color.clear.frame(width: 24, height: 1) }
+            if filesControls?.treeCollapsed == true { Color.clear.frame(width: 34, height: 1) }
         }
     }
 

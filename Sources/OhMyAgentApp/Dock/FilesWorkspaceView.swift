@@ -117,6 +117,9 @@ private struct FilesWorkspaceBody: View {
     /// 开始拖动时的树宽度
     @State private var dragBase: Double?
 
+    /// 通栏面包屑行的高度(与 `FileHeaderBar` 一致)
+    private static let headerHeight: CGFloat = 30
+
     private var model: FilesWorkspaceModel { FilesWorkspaceStore.shared.model(for: projectID) }
     private var collapsed: Bool { workbench.layout.filesTreeCollapsed }
 
@@ -144,24 +147,26 @@ private struct FilesWorkspaceBody: View {
                         },
                         onDoubleClick: { workbench.layout.filesTreeWidth = PanelMetrics.filesTreeDefault }
                     )
+                    .padding(.top, Self.headerHeight)
                     .zIndex(1)
                     .accessibilityLabel(String(localized: "调整资源管理器宽度"))
+                    // 资源管理器在面包屑那一行下面,面包屑行通栏
                     ExplorerView(workbench: workbench, hooks: hooks)
                         .frame(width: treeWidth)
                         .frame(maxHeight: .infinity)
+                        .padding(.top, Self.headerHeight)
                 }
             }
         }
         .background(OMColors.surface)
-        // 收起后的「展开」按钮:与资源管理器头部的按钮同一位置(右上角,同样的内边距)
+        // 面包屑行右端的「收起 / 展开资源管理器」按钮:两种状态同一位置
         .overlay(alignment: .topTrailing) {
-            if collapsed {
-                Button { toggleTree() } label: { Image.om("list-tree", size: 13) }
-                    .buttonStyle(.plain).foregroundStyle(OMColors.secondaryText)
-                    .padding(.horizontal, 10).padding(.vertical, 6)
-                    .omTooltip("展开资源管理器")
-                    .accessibilityLabel(String(localized: "展开资源管理器"))
-            }
+            Button { toggleTree() } label: { Image.om("list-tree", size: 13) }
+                .buttonStyle(.plain).foregroundStyle(OMColors.secondaryText)
+                .padding(.horizontal, 10)
+                .frame(height: Self.headerHeight)
+                .omTooltip(collapsed ? "展开资源管理器" : "收起资源管理器")
+                .accessibilityLabel(collapsed ? String(localized: "展开资源管理器") : String(localized: "收起资源管理器"))
         }
         // 文件被外部删除/重命名后,别让左侧停在失效路径上
         .task(id: ExplorerModel.shared.revision) {
@@ -173,8 +178,7 @@ private struct FilesWorkspaceBody: View {
     private var hooks: ExplorerHooks {
         ExplorerHooks(
             openFile: { open($0) },
-            activePath: model.current,
-            trailingAction: (icon: "list-tree", help: "收起资源管理器", action: { toggleTree() }))
+            activePath: model.current)
     }
 
     @ViewBuilder
