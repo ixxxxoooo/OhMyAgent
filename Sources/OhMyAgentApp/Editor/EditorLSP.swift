@@ -73,12 +73,19 @@ final class EditorLSPController {
     /// 跳转到其它位置:(绝对路径, 行号 1 起)。
     @ObservationIgnored var openLocation: ((String, Int) -> Void)?
 
-    @ObservationIgnored private var handle: LSPDocumentHandle?
-    @ObservationIgnored private var currentText = ""
+    @ObservationIgnored var handle: LSPDocumentHandle?
+    @ObservationIgnored var currentText = ""
     @ObservationIgnored private var syncedText = ""
     @ObservationIgnored private var syncTask: Task<Void, Never>?
     @ObservationIgnored private var diagnosticsTask: Task<Void, Never>?
     @ObservationIgnored private var closing = false
+    /// 原生编辑器句柄(native2 引擎):应用编辑、读取文本。
+    @ObservationIgnored weak var nativeEditor: NativeLanguageController?
+    /// 服务器声明的触发字符(attach 后填充)。
+    /// 最近一次代码操作结果(按序号执行)。
+    @ObservationIgnored var nativeActionCache: [LSPCodeAction] = []
+    @ObservationIgnored var completionTriggers: Set<Character> = []
+    @ObservationIgnored var onTypeTriggers: Set<Character> = []
 
     /// - Parameters:
     ///   - path: 文件绝对路径
@@ -125,7 +132,10 @@ final class EditorLSPController {
         case .ready(let opened):
             handle = opened
             let name = await opened.client.serverName ?? opened.kind.displayName
+            completionTriggers = Set(await opened.client.completionTriggerCharacters.compactMap(\.first))
+            onTypeTriggers = Set(await opened.client.onTypeTriggerCharacters.compactMap(\.first))
             status = .ready(name)
+            await installEditBridge(opened)
             let updates = await opened.client.diagnosticUpdates()
             let uri = opened.uri
             diagnosticsTask = Task { [weak self] in
@@ -157,6 +167,7 @@ final class EditorLSPController {
     /// 视图消失:关闭文档。
     func detach() {
         closing = true
+        unregisterNative()
         syncTask?.cancel()
         diagnosticsTask?.cancel()
         let opened = handle
@@ -192,7 +203,7 @@ final class EditorLSPController {
     }
 
     /// 立刻把未同步的文本发给服务器(查询前调用,保证位置一致)。
-    private func flush() async {
+    func flush() async {
         guard let handle, currentText != syncedText else { return }
         let previous = syncedText
         syncedText = currentText
@@ -324,7 +335,7 @@ final class EditorLSPController {
         return (try? await handle.client.resolve(action)) ?? action
     }
 
-    private func hover(at offset: Int) async -> String? {
+    func hover(at offset: Int) async -> String? {
         guard let handle else { return nil }
         await flush()
         let position = LSPTextMapping.position(offset: offset, in: LineIndex(text: currentText))

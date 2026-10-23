@@ -91,6 +91,8 @@ public final class OMEditorView: NSView {
     var findGeneration = 0
     /// 最近获得焦点的原生编辑器(菜单命令在焦点不在文本区时的兜底)。
     static weak var lastFocused: OMEditorView?
+    /// 语言智能控制器(补全、悬停、签名、灯泡、内嵌提示、语义着色)。
+    public private(set) lazy var languageController = NativeLanguageController(view: self)
     /// 窗口大小变化时的防抖任务。
     var wrapTask: Task<Void, Never>?
     /// 主题监听。
@@ -255,6 +257,7 @@ public final class OMEditorView: NSView {
         needsDisplay = true
         if findHost != nil, !change.edits.isEmpty { scheduleFindRefresh() }
         onTextChange?(change)
+        if !change.edits.isEmpty { languageController.documentChanged() }
         if !change.edits.isEmpty { NSAccessibility.post(element: self, notification: .valueChanged) }
     }
 
@@ -275,6 +278,7 @@ public final class OMEditorView: NSView {
         minimap?.needsDisplay = true
         needsDisplay = true
         onSelectionChange?()
+        languageController.selectionChanged()
         NSAccessibility.post(element: self, notification: .selectedTextChanged)
     }
 
@@ -363,6 +367,7 @@ public final class OMEditorView: NSView {
         clampScroll()
         layoutMinimap()
         layoutZoneViews()
+        languageController.repositionOverlays()
         tokens.ensureCovered(visibleOffsetRange())
         needsDisplay = true
     }
@@ -403,6 +408,7 @@ public final class OMEditorView: NSView {
         showScrollbars()
         needsDisplay = true
         onScroll?()
+        languageController.scrolled()
     }
 
     /// 保证偏移可见(上下留 `margin` 行,左右留若干列)。

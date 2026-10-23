@@ -41,10 +41,12 @@ extension OMEditorView {
         // 靠近右/下边缘时显示滚动条,方便抓取。
         if point.x > bounds.width - 14 || point.y > bounds.height - 14 { showScrollbars() }
         updateGutterHover(at: point)
+        languageController.mouseMoved(point)
     }
 
     public override func mouseExited(with event: NSEvent) {
         updateGutterHover(at: nil)
+        languageController.mouseExited(convert(event.locationInWindow, from: nil))
     }
 
     // MARK: 按下
@@ -54,6 +56,7 @@ extension OMEditorView {
         let point = convert(event.locationInWindow, from: nil)
         lastMouseLocation = point
         model.document.breakUndoCoalescing()
+        languageController.mouseDown()
         if beginScrollbarDrag(at: point) { return }
         if stickyClick(at: point) { return }
         if foldPlaceholderClick(at: point) { return }
@@ -65,7 +68,7 @@ extension OMEditorView {
         switch event.clickCount {
         case 1:
             if flags.contains(.command), !flags.contains(.option) {
-                onCommandClick?(offset)
+                if languageController.services.definition != nil { languageController.goToDefinition(at: offset) } else { onCommandClick?(offset) }
                 return
             }
             if flags.contains(.option), flags.contains(.shift) {

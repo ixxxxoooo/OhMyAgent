@@ -20,6 +20,9 @@ public struct NativeCodeEditor: NSViewRepresentable {
     public var filePath: String?
     /// IDE 外围视图(缩略图、粘性滚动、折叠、概览尺)。
     public var chrome: EditorChrome
+    /// 语言智能回调与其版本号(版本变化才会重新装入,避免每次 SwiftUI 刷新都触发)。
+    public var services = NativeLanguageServices()
+    public var servicesKey = 0
     /// 光标/选区变化回调(状态栏「行 列」)。
     public var onCaretChange: ((EditorCaret) -> Void)?
     /// 文档变化(用户编辑或外部写入)回调,宿主据此防抖同步字符串镜像与脏标记。
@@ -40,6 +43,7 @@ public struct NativeCodeEditor: NSViewRepresentable {
     ///   - onEdited: 文档变化回调
     public init(document: EditorDocument, language: SyntaxLanguage, isEditable: Bool = true, revealLine: Int? = nil,
                 markers: [Int: LineMarker] = [:], diagnostics: [EditorDiagnostic] = [], wrapsLines: Bool = false, chrome: EditorChrome = [], filePath: String? = nil,
+                services: NativeLanguageServices = NativeLanguageServices(), servicesKey: Int = 0,
                 onCaretChange: ((EditorCaret) -> Void)? = nil, onEdited: ((DocumentChange) -> Void)? = nil) {
         self.document = document
         self.language = language
@@ -50,6 +54,8 @@ public struct NativeCodeEditor: NSViewRepresentable {
         self.wrapsLines = wrapsLines
         self.chrome = chrome
         self.filePath = filePath
+        self.services = services
+        self.servicesKey = servicesKey
         self.onCaretChange = onCaretChange
         self.onEdited = onEdited
     }
@@ -92,12 +98,17 @@ public struct NativeCodeEditor: NSViewRepresentable {
     }
 
     public static func dismantleNSView(_ view: OMEditorView, coordinator: Coordinator) {
+        view.languageController.teardown()
         view.model.detach()
     }
 
     /// 同步回调、标记与诊断。
     private func sync(_ view: OMEditorView, _ coordinator: Coordinator) {
         view.onTextChange = onEdited
+        if coordinator.servicesKey != servicesKey {
+            coordinator.servicesKey = servicesKey
+            view.languageController.services = services
+        }
         view.lineMarkers = markers
         if coordinator.diagnostics != diagnostics {
             coordinator.diagnostics = diagnostics
@@ -122,6 +133,7 @@ public struct NativeCodeEditor: NSViewRepresentable {
     public final class Coordinator {
         var language: SyntaxLanguage?
         var revealedLine: Int?
+        var servicesKey = 0
         var diagnostics: [EditorDiagnostic] = []
     }
 }

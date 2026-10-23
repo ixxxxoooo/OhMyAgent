@@ -6,7 +6,7 @@
 // - `OMA_IDE_SIDEBAR=explorer|search|scm`:启动后切到该侧栏视图;`OMA_IDE_QUERY=词` 预填搜索词(配合 search);
 // - `OMA_IDE_PANEL=terminal|problems|output`:启动后显示底部面板并切到该标签页;
 // - `OMA_IDE_PALETTE=<输入>`:启动后打开命令面板并预填输入(如 `>保存`、`:12`、`main`);
-// - `OMA_IDE_EDITOR_ACTIONS=动作1;动作2`:打开文件后依次执行编辑器动作(`goto:行`、`foldline:行`、`fold`、`unfold`、`foldAll`、`unfoldAll`、`nextOcc`、`type:文本`、`wait:毫秒`);
+// - `OMA_IDE_EDITOR_ACTIONS=动作1;动作2`:打开文件后依次执行编辑器动作(`goto:行`、`foldline:行`、`fold`、`unfold`、`foldAll`、`unfoldAll`、`nextOcc`、`type:文本`、`complete`、`hover:行:列`、`sig`、`actions`、`format`、`refs`、`wait:毫秒`);
 // - `OMA_IDE_SWEEP=N`:开关/切换基准,重复 N 轮「冷开 → 切回 Agent → 热切到 IDE → 关闭」,
 //   perf 日志「IDE 窗口基准」记录每轮耗时与内存漂移(计划预算:热切换 ≤ 50ms、冷开 ≤ 250ms、20 轮漂移 ≤ 10MB)。
 
@@ -65,15 +65,19 @@ enum IDEDebugHooks {
         if let raw = env["OMA_IDE_EDITOR_ACTIONS"], !raw.isEmpty { await runEditorActions(raw) }
     }
 
-    /// 在所有窗口里找第一个原生编辑器(应用在后台时没有键盘焦点)。
+    /// 在所有窗口里找原生编辑器(应用在后台时没有键盘焦点);优先取正在编辑 `OMA_IDE_OPEN_FILE` 的那个。
     private static func firstNativeEditor() -> OMEditorView? {
-        func search(_ view: NSView) -> OMEditorView? {
-            if let editor = view as? OMEditorView, !editor.isHiddenOrHasHiddenAncestor { return editor }
-            for sub in view.subviews { if let found = search(sub) { return found } }
-            return nil
+        var found: [OMEditorView] = []
+        func search(_ view: NSView) {
+            if let editor = view as? OMEditorView, !editor.isHiddenOrHasHiddenAncestor { found.append(editor) }
+            for sub in view.subviews { search(sub) }
         }
-        for window in NSApp.windows { if let content = window.contentView, let found = search(content) { return found } }
-        return nil
+        for window in NSApp.windows { if let content = window.contentView { search(content) } }
+        if let raw = ProcessInfo.processInfo.environment["OMA_IDE_OPEN_FILE"], !raw.isEmpty {
+            let path = raw.split(separator: ":").first.map(String.init) ?? raw
+            if let match = found.first(where: { $0.model.fileName == path }) { return match }
+        }
+        return found.first
     }
 
     /// 在所有窗口里找第一个可见的代码编辑器(应用在后台时没有键盘焦点,`activeEditor` 为空)。
@@ -93,8 +97,13 @@ enum IDEDebugHooks {
         for token in raw.split(separator: ";").map({ String($0).trimmingCharacters(in: .whitespaces) }) {
             let parts = token.split(separator: ":", maxSplits: 1).map(String.init)
             let argument = parts.count > 1 ? parts[1] : ""
+            if parts.first == "wait" { try? await Task.sleep(for: .milliseconds(Int(argument) ?? 500)); continue }
+            // 文件刚打开时编辑器尚未创建:最多等 10 秒再执行动作(wait 之外的动作才需要编辑器)。
+            for _ in 0..<100 where OMEditorView.activeEditor() == nil && firstNativeEditor() == nil && firstEditor() == nil {
+                try? await Task.sleep(for: .milliseconds(100))
+            }
             // 原生引擎(native2)的编辑器:动作经 `EditorRouter` 路由,并补充查找/空白渲染等原生专属动作。
-            if let native = OMEditorView.activeEditor() ?? firstNativeEditor() {
+            if let native = firstNativeEditor() ?? OMEditorView.activeEditor() {
                 switch parts.first ?? "" {
                 case "goto": native.goToLine(line: Int(argument) ?? 1, column: 1)
                 case "foldline": native.model.fold(line: max((Int(argument) ?? 1) - 1, 0))
@@ -107,6 +116,16 @@ enum IDEDebugHooks {
                 case "findClose": native.hideFind()
                 case "ws": native.whitespaceRendering = WhitespaceRendering(rawValue: argument) ?? .all
                 case "type": native.insertText(argument, replacementRange: NSRange(location: NSNotFound, length: 0))
+                case "complete": native.languageController.triggerCompletion(auto: false)
+                case "hover":
+                    // hover:行:列(1 起):把光标移到该处并模拟鼠标驻留
+                    let parts = argument.split(separator: ":").compactMap { Int($0) }
+                    if parts.count == 2 { native.goToLine(line: parts[0], column: parts[1]) }
+                    native.languageController.debugShowHover(at: native.model.selections.primary.head)
+                case "sig": native.languageController.triggerSignature()
+                case "actions": native.languageController.showCodeActions()
+                case "format": native.languageController.formatDocument()
+                case "refs": native.languageController.findReferences()
                 case "wait": try? await Task.sleep(for: .milliseconds(Int(argument) ?? 500))
                 default: Log.app.warning("编辑器动作:未知", ["action": token])
                 }

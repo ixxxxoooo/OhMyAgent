@@ -242,6 +242,18 @@ struct FileTabView: View {
         }
     }
 
+    /// 原生编辑器的语言智能回调(语言服务器就绪后才有内容)。
+    private var nativeServices: NativeLanguageServices {
+        guard let lsp, case .ready = lsp.status else { return NativeLanguageServices() }
+        return lsp.makeNativeServices()
+    }
+
+    /// 语言服务器会话标识:就绪(或换了会话)时变化,驱动原生编辑器重新装入回调。
+    private var nativeServicesKey: Int {
+        guard let lsp, case .ready = lsp.status else { return 0 }
+        return ObjectIdentifier(lsp).hashValue | 1
+    }
+
     /// 编辑器本体:按 `EditorEngine` 选择原生 rope 引擎(native2)或 TextKit 引擎。
     @ViewBuilder
     private func codeEditor(doc: FileDocument, text: String, markers: [Int: LineMarker]) -> some View {
@@ -249,6 +261,7 @@ struct FileTabView: View {
             NativeCodeEditor(document: editorDocument, language: SyntaxLanguage.detect(path: path), isEditable: !doc.isReadOnly,
                              revealLine: tab.line, markers: markers, diagnostics: lsp?.diagnostics ?? [],
                              chrome: ideHost == nil ? [] : [.minimap, .stickyScroll, .folding, .overviewRuler], filePath: path,
+                             services: nativeServices, servicesKey: nativeServicesKey,
                              onCaretChange: ideHost.map { host in { host.caret(path, $0) } })
                 .id(ObjectIdentifier(editorDocument))
         } else {

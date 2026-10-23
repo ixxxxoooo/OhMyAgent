@@ -20,6 +20,7 @@ extension OMEditorView: @preconcurrency NSTextInputClient {
         } else {
             model.insertText(text)
         }
+        languageController.didInsert(text)
     }
 
     public func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {

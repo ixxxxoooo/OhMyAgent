@@ -23,6 +23,9 @@ public final class NativeEditorModel {
     /// 全部 View Zone(锚点以模型行计)。
     public private(set) var zones: [ViewZone] = []
     /// 装饰集合(诊断、查找命中、Agent 改动……)。
+    /// 是否存在内嵌提示/语义标记装饰(排版据此跳过查询)。
+    public internal(set) var hasInlays = false
+    public internal(set) var hasSemantic = false
     public var decorations = DecorationSet() { didSet { decorationsRevision &+= 1 } }
     /// 装饰集合的修订号(概览尺等派生缓存据此失效)。
     public private(set) var decorationsRevision = 0

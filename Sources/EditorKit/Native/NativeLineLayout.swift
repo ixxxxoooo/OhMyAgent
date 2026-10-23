@@ -87,7 +87,7 @@ final class NativeLayoutCache {
     private var syntaxColors: [SyntaxKind: NSColor] = [:]
     /// 彩色括号的循环色与未配对括号色。
     private var rainbow: [NSColor] = []
-    private var unmatchedColor = NSColor.red
+    private var unmatchedColor = NSColor(OMColors.danger)
     /// 括号索引(nil 或未启用则不着色)。
     weak var brackets: NativeBracketStore?
     /// 是否启用彩色括号。
@@ -121,10 +121,10 @@ final class NativeLayoutCache {
         foreground = resolvedForeground
         syntaxColors = resolved
         var rainbowColors: [NSColor] = []
-        var unmatched = NSColor.red
+        var unmatched = NSColor(OMColors.danger)
         appearance.performAsCurrentDrawingAppearance {
             rainbowColors = [SyntaxKind.type, .function, .keyword, .number].compactMap { resolved[$0] }
-            unmatched = (NSColor(OMColors.danger).usingColorSpace(.sRGB)) ?? NSColor.red
+            unmatched = NSColor(OMColors.danger).usingColorSpace(.sRGB) ?? NSColor(OMColors.danger)
         }
         rainbow = rainbowColors.isEmpty ? [resolvedForeground] : rainbowColors
         unmatchedColor = unmatched
@@ -226,9 +226,29 @@ final class NativeLayoutCache {
         var display = [UInt16]()
         display.reserveCapacity(end - start + 8)
         var needsMap = false
+        // 内嵌提示:本行内(含行尾)的零宽装饰,按偏移升序。
+        let inlays = inlayHints(rowStart: start, rowEnd: end, lineStartOffset: lineStartOffset, isLastRow: end == units.count)
+        var inlayCursor = 0
+        var inlayDisplayRanges: [NSRange] = []
+        if !inlays.isEmpty { needsMap = true }
         var modelToDisplay = [Int32]()
         var displayToModel = [Int32]()
         modelToDisplay.reserveCapacity(end - start + 1)
+        /// 在 `local` 处插入全部内嵌提示,返回插入前的显示下标(光标停在提示之前)。
+        func emitInlays(at local: Int) -> Int? {
+            var firstDisplay: Int?
+            while inlayCursor < inlays.count, inlays[inlayCursor].local <= local {
+                if firstDisplay == nil { firstDisplay = display.count }
+                let begin = display.count
+                for unit in inlays[inlayCursor].label.utf16 {
+                    display.append(unit)
+                    displayToModel.append(Int32(local))
+                }
+                inlayDisplayRanges.append(NSRange(location: begin, length: display.count - begin))
+                inlayCursor += 1
+            }
+            return firstDisplay
+        }
         var column = 0.0
         var index = start
         while index < end {
@@ -243,10 +263,11 @@ final class NativeLayoutCache {
                 }
             }
             let local = index - start
+            let hintStart = inlays.isEmpty ? nil : emitInlays(at: local)
             if unit == 0x09 {
                 needsMap = true
                 let spaces = max(metrics.tabSize - Int(column) % max(metrics.tabSize, 1), 1)
-                modelToDisplay.append(Int32(display.count))
+                modelToDisplay.append(Int32(hintStart ?? display.count))
                 for _ in 0..<spaces { display.append(0x20); displayToModel.append(Int32(local)) }
                 column += Double(spaces)
                 index += 1
@@ -254,22 +275,31 @@ final class NativeLayoutCache {
             }
             let replaced: UInt16? = (unit < 0x20 || unit == 0x7F || unit == 0x2028 || unit == 0x2029) ? 0xFFFD : nil
             for step in 0..<size {
-                modelToDisplay.append(Int32(display.count))
+                modelToDisplay.append(Int32(step == 0 ? (hintStart ?? display.count) : display.count))
                 display.append(replaced ?? units[index + step])
                 displayToModel.append(Int32(local + step))
             }
             column += metrics.width(of: scalar, atColumn: column)
             index += size
         }
-        modelToDisplay.append(Int32(display.count))
+        let tailHint = inlays.isEmpty ? nil : emitInlays(at: end - start)
+        modelToDisplay.append(Int32(tailHint ?? display.count))
         displayToModel.append(Int32(end - start))
 
         let attributed = NSMutableAttributedString(string: String(decoding: display, as: UTF16.self),
                                                    attributes: [.font: font, .foregroundColor: foreground])
         applySyntax(to: attributed, rowStart: start, rowEnd: end, lineStartOffset: lineStartOffset,
                     modelToDisplay: needsMap || display.count != end - start ? modelToDisplay : nil)
+        applySemantic(to: attributed, rowStart: start, rowEnd: end, lineStartOffset: lineStartOffset,
+                      modelToDisplay: needsMap || display.count != end - start ? modelToDisplay : nil)
         applyBrackets(to: attributed, rowStart: start, rowEnd: end, lineStartOffset: lineStartOffset,
                       modelToDisplay: needsMap || display.count != end - start ? modelToDisplay : nil)
+        if !inlayDisplayRanges.isEmpty {
+            let hintColor = foreground.withAlphaComponent(0.5)
+            for range in inlayDisplayRanges where NSMaxRange(range) <= attributed.length {
+                attributed.addAttribute(.foregroundColor, value: hintColor, range: range)
+            }
+        }
         let ctLine = CTLineCreateWithAttributedString(attributed)
         let width = CGFloat(CTLineGetTypographicBounds(ctLine, nil, nil, nil))
         let identity = !needsMap && display.count == end - start
@@ -292,6 +322,36 @@ final class NativeLayoutCache {
             let displayLower = modelToDisplay.map { Int($0[lower]) } ?? lower
             let displayUpper = modelToDisplay.map { Int($0[upper]) } ?? upper
             guard displayUpper > displayLower, displayUpper <= displayLength else { continue }
+            text.addAttribute(.foregroundColor, value: color, range: NSRange(location: displayLower, length: displayUpper - displayLower))
+        }
+    }
+
+    /// 取本行内的内嵌提示。
+    private func inlayHints(rowStart: Int, rowEnd: Int, lineStartOffset: Int, isLastRow: Bool) -> [(local: Int, label: String)] {
+        guard model.hasInlays else { return [] }
+        let absolute = TextSpan(location: lineStartOffset + rowStart, length: rowEnd - rowStart)
+        var result: [(local: Int, label: String)] = []
+        for item in model.decorations.intersecting(absolute) where item.kind == .inlay {
+            let local = item.range.location - lineStartOffset - rowStart
+            guard local >= 0, local <= rowEnd - rowStart, local < rowEnd - rowStart || isLastRow, let label = item.payload else { continue }
+            result.append((local, label))
+        }
+        return result
+    }
+
+    /// 语义着色:语言服务器给出的标记覆盖语法色(仅覆盖有对应语法类别的标记)。
+    private func applySemantic(to text: NSMutableAttributedString, rowStart: Int, rowEnd: Int, lineStartOffset: Int, modelToDisplay: [Int32]?) {
+        guard model.hasSemantic, rowEnd > rowStart else { return }
+        let absolute = TextSpan(location: lineStartOffset + rowStart, length: rowEnd - rowStart)
+        for item in model.decorations.intersecting(absolute) {
+            guard case .custom(let code) = item.kind, code >= nativeSemanticBase, code < nativeSemanticBase + 16,
+                  let kind = SyntaxKind(rawValue: UInt8(code - nativeSemanticBase)), let color = syntaxColors[kind] else { continue }
+            let lower = max(item.range.location - absolute.location, 0)
+            let upper = min(item.range.upperBound - absolute.location, rowEnd - rowStart)
+            guard upper > lower else { continue }
+            let displayLower = modelToDisplay.map { Int($0[lower]) } ?? lower
+            let displayUpper = modelToDisplay.map { Int($0[upper]) } ?? upper
+            guard displayUpper > displayLower, displayUpper <= text.length else { continue }
             text.addAttribute(.foregroundColor, value: color, range: NSRange(location: displayLower, length: displayUpper - displayLower))
         }
     }

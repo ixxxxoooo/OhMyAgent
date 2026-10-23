@@ -9,6 +9,7 @@ extension OMEditorView: NSUserInterfaceValidations {
     public override func keyDown(with event: NSEvent) {
         model.document.breakUndoCoalescing()
         // 编辑器快捷键(行操作、多光标等)优先于系统键位表(⌥↑ 等在系统表里是段落移动)。
+        if composition == nil, languageController.keyDown(event) { return }
         if composition == nil, handleShortcut(event) { return }
         // 先交给输入法/键位表;ESC 单独处理(折叠多光标)。
         interpretKeyEvents([event])
@@ -17,6 +18,7 @@ extension OMEditorView: NSUserInterfaceValidations {
     /// ⌘ 组合键先于菜单到达时在这里处理。
     public override func performKeyEquivalent(with event: NSEvent) -> Bool {
         guard window?.firstResponder === self, composition == nil else { return super.performKeyEquivalent(with: event) }
+        if languageController.keyDown(event) { return true }
         if handleShortcut(event) { return true }
         return super.performKeyEquivalent(with: event)
     }
