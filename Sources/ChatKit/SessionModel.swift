@@ -1014,6 +1014,8 @@ public final class SessionModel {
     func effectiveMeta() -> JSONValue? {
         guard activeDescriptor.kind == .claudeACP else { return providerMeta }
         var options = SessionOptions(defaults: .standard)
+        // 映射主模型已记过窗口(含显式「自动」= 0)时以它为准,不让全局偏好在 `merged` 里兜底覆盖
+        if providerMeta != nil, mappedModels[.main]?.contextWindow != nil { options.autoCompactWindow = 0 }
         // 直连官方 API(无模型映射、~/.claude 也没配第三方网关)时,「自动」默认启用 MCP 工具按需加载:
         // Bridge 的十几个工具定义不再每轮随请求发送,用到时由模型搜索加载;第三方网关未必支持 tool_reference,保持 Claude Code 默认
         if options.mcpToolSearch == .auto, providerMeta == nil, defaultGatewayMeta == nil { options.mcpToolSearch = .on }
@@ -1818,9 +1820,10 @@ public final class SessionModel {
         }
     }
 
-    /// 当前生效的上下文窗口(token;0 = 自动):启用映射时取主模型的模型级窗口,没有再退回全局偏好(未设置时 200K)。
+    /// 当前生效的上下文窗口(token;0 = 自动):启用映射时取主模型的窗口(0 表示用户显式选了「自动」,不再退回全局偏好);
+    /// 主模型没记过窗口才退回全局偏好(未设置时 200K)。
     public var contextWindowTokens: Int {
-        if let window = mappedModels[.main]?.contextWindow, window > 0 { return ContextWindowChoice.normalized(window) }
+        if let window = mappedModels[.main]?.contextWindow { return ContextWindowChoice.normalized(window) }
         return ContextWindowChoice.normalized(SessionOptions.storedAutoCompactWindow(.standard))
     }
 
@@ -1842,7 +1845,7 @@ public final class SessionModel {
             Task { [weak self] in
                 do {
                     try await Task.detached(priority: .userInitiated) {
-                        try ProviderStorage.setModelContextWindow(value > 0 ? value : nil, model: main.modelId, providerId: main.providerId, directory: directory)
+                        try ProviderStorage.setModelContextWindow(value, model: main.modelId, providerId: main.providerId, directory: directory)
                     }.value
                     NotificationCenter.default.post(name: .omModelMappingChanged, object: nil)
                 } catch {

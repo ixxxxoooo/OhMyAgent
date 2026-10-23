@@ -51,6 +51,18 @@ struct ModelContextWindowStorageTests {
         #expect(models.first { $0.id == "a" }?.contextWindow == nil)
     }
 
+    @Test("显式「自动」(0)写进模型条目,覆盖提供商级窗口且 MappedModel 带 0")
+    func explicitAutoOverridesProviderWindow() throws {
+        let dir = try ModelProviderTests.tempDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        var provider = ModelProviderTests.deepseek
+        provider.contextWindow = 500_000
+        provider.models = [ProviderModel(id: "a")]
+        try ProviderStorage.save(ProviderSnapshot(mapping: ModelMapping(slots: [.main: ModelTarget(providerId: provider.id, model: "a")]), providers: [provider]), directory: dir)
+        try ProviderStorage.setModelContextWindow(0, model: "a", providerId: provider.id, directory: dir)
+        #expect(ProviderStorage.configuredInfos(directory: dir)[.main]?.contextWindow == 0)
+    }
+
     @Test("未登记的模型会新增条目;未知提供商静默忽略")
     func unknownModelAndProvider() throws {
         let dir = try ModelProviderTests.tempDirectory()

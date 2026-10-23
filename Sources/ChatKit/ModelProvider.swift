@@ -391,7 +391,7 @@ public enum ProviderStorage {
 
     /// 设置某个提供商下某个模型的上下文窗口(读-改-写 providers.json;nil 清除,恢复「自动」)。
     /// - Parameters:
-    ///   - tokens: 窗口 token 数(nil = 自动)
+    ///   - tokens: 窗口 token 数(0 = 显式「自动」,会覆盖提供商级窗口与全局偏好;nil = 清除记忆,沿用上一级)
     ///   - model: 模型 ID
     ///   - providerId: 提供商 ID
     ///   - directory: 存储目录
