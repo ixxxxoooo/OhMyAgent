@@ -1,6 +1,7 @@
 // @author ixxxxoooo
 // 上下文用量明细:解析 Claude Code 本地命令 `/context` 的 Markdown 输出,并提供圆环色调与兜底分类。
-// ACP 的 `usage_update` 只有「已用 / 窗口」两个数,没有分类;分类明细来自 `/context`(不调用模型)。
+// ACP 的 `usage_update` 只有「已用 / 窗口」两个数,没有分类;Claude Code 的分类明细来自适配器扩展方法
+// `_session/context_usage`(CLI 控制请求 `get_context_usage`,不进对话),其他 Agent 仍解析 `/context` 输出。
 
 import ACPKit
 import Foundation
@@ -90,6 +91,28 @@ public struct ContextUsage: Sendable, Hashable {
             ContextCategory(name: ChatL10n.t("已用"), tokens: max(0, used), kind: .used),
             ContextCategory(name: ChatL10n.t("剩余"), tokens: max(0, size - used), kind: .free),
         ])
+    }
+}
+
+extension ContextUsage {
+    /// 由适配器 `_session/context_usage` 的结构化结果构造。
+    ///
+    /// 延迟加载(`deferred`)的工具只在名单里占位、不计入总量,不作为分类展示。
+    /// - Parameter report: `{categories:[{name,tokens,kind}], totalTokens, maxTokens, model?}`
+    /// - Returns: 用量明细;窗口无效或没有分类时返回 nil
+    public init?(report: JSONValue) {
+        let maxTokens = report["maxTokens"]?.intValue ?? 0
+        let categories: [ContextCategory] = (report["categories"]?.arrayValue ?? []).compactMap { entry in
+            guard let name = entry["name"]?.stringValue, let tokens = entry["tokens"]?.intValue else { return nil }
+            switch entry["kind"]?.stringValue {
+            case "deferred": return nil
+            case "free": return ContextCategory(name: name, tokens: tokens, kind: .free)
+            case "buffer": return ContextCategory(name: name, tokens: tokens, kind: .buffer)
+            default: return ContextCategory(name: name, tokens: tokens, kind: .used)
+            }
+        }
+        guard maxTokens > 0, !categories.isEmpty else { return nil }
+        self.init(model: report["model"]?.stringValue ?? "", totalTokens: report["totalTokens"]?.intValue ?? 0, maxTokens: maxTokens, categories: categories)
     }
 }
 

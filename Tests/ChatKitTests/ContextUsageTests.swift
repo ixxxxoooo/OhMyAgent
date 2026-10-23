@@ -34,6 +34,26 @@ struct ContextUsageParserTests {
     | dataviz | Built-in | ~480 |
     """
 
+    @Test("结构化明细:按 kind 归类,延迟加载的工具不展示")
+    func parsesReport() throws {
+        let report: JSONValue = [
+            "categories": [
+                ["name": "System prompt", "tokens": 2494, "kind": "used"],
+                ["name": "MCP tools (deferred)", "tokens": 1429, "kind": "deferred"],
+                ["name": "Autocompact buffer", "tokens": 33000, "kind": "buffer"],
+                ["name": "Free space", "tokens": 937350, "kind": "free"],
+            ],
+            "totalTokens": 29650, "maxTokens": 1_000_000,
+        ]
+        let usage = try #require(ContextUsage(report: report))
+        #expect(usage.totalTokens == 29650)
+        #expect(usage.maxTokens == 1_000_000)
+        #expect(usage.categories.map(\.name) == ["System prompt", "Autocompact buffer", "Free space"])
+        #expect(usage.categories.map(\.kind) == [.used, .buffer, .free])
+        #expect(ContextUsage(report: ["categories": [], "totalTokens": 1, "maxTokens": 10]) == nil)
+        #expect(ContextUsage(report: ["categories": [["name": "A", "tokens": 1, "kind": "used"]], "maxTokens": 0]) == nil)
+    }
+
     @Test("解析模型、总量、窗口与分类,并识别剩余/压缩预留")
     func parsesSample() throws {
         let usage = try #require(ContextUsageParser.parse(Self.sample))

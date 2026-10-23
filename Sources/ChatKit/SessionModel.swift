@@ -1726,13 +1726,30 @@ public final class SessionModel {
         activeDescriptor.kind == .claudeACP || availableCommands.contains { $0.name == "context" }
     }
 
-    /// 刷新上下文分类明细:向 Agent 发送本地命令 `/context` 并解析(不调用模型、不进时间线)。
+    /// 刷新上下文分类明细(不调用模型、不进时间线)。
     ///
+    /// Claude Code 走适配器扩展方法 `_session/context_usage`:发送 `/context` 会把命令输出写进对话历史
+    /// (实测每次约 2.5k token 永久留在上下文里),之后每个请求都要多读一遍。其他 Agent 仍发 `/context` 并解析。
     /// 轮次进行中、未连接、已在探测或 Agent 不支持时直接跳过;失败只记日志,不打扰用户。
     public func refreshContextUsage() async {
         // 纯文字会话禁用了斜杠命令,`/context` 不可用;用量改由记录还原/Agent 上报
         guard supportsContextBreakdown, !isPlainChat, phase == .ready, !isRunning, contextProbeChunks == nil, let client, let sessionId else { return }
         let started = ContinuousClock.now
+        if activeDescriptor.kind == .claudeACP {
+            do {
+                let report = try await client.extensionRequest("_session/context_usage", params: ["sessionId": .string(sessionId)])
+                if let parsed = ContextUsage(report: report) {
+                    contextUsage = parsed
+                    log.info("上下文明细已刷新", ["session": sessionId, "categories": "\(parsed.categories.count)", "ms": "\(OMLogger.milliseconds(since: started))"])
+                } else {
+                    log.warning("上下文明细为空", ["session": sessionId])
+                }
+            } catch {
+                // 不回退到 `/context`:宁可没有明细,也不往对话里写命令输出
+                log.warning("上下文明细读取失败", ["session": sessionId, "error": "\(error)"])
+            }
+            return
+        }
         contextProbeChunks = [:]
         defer { contextProbeChunks = nil }
         do {

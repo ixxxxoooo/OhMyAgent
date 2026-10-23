@@ -111,6 +111,7 @@ public actor ClaudeAcpAgent: ACPRequestHandler {
         case "session/prompt": return try await prompt(p)
         case "_session/steering": return try await steering(p)
         case "_session/rename": return try await rename(p)
+        case "_session/context_usage": return try await session(p).contextUsage()
         default:
             throw JSONRPCError(code: JSONRPCError.methodNotFound, message: "\"Method not found\": \(method)", data: ["method": .string(method)])
         }
