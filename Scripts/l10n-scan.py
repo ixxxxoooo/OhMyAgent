@@ -137,6 +137,7 @@ ALLOWLIST = (
     ("Sources/ACPKit/ACPClient.swift", None),            # JSON-RPC 错误文本(给 Agent 看)
     ("Sources/ACPKit/JSONRPC.swift", None),
     ("Sources/ACPKit/JSONValue.swift", None),
+    ("Sources/ACPKit/JSONFast.swift", None),             # JSON 解析错误原因(仅进日志,面向开发者)
     ("Sources/ACPKit/ScenarioEngine.swift", None),
     ("Sources/ACPKit/ACPConnection.swift", "未实现: \u0000"),
     ("Sources/ACPKit/Models.swift", "开"),                # 协议值的回退显示,与选项值比较
