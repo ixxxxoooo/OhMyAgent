@@ -49,7 +49,7 @@ private struct CollapsibleHeader<Actions: View>: View {
 /// 点击一行在原地展开该提交的文件列表,点文件再展开内联差异(对标 VS Code 的 Source Control Graph);
 /// 右上角按钮才打开完整历史标签。
 struct GitGraphSection: View {
-    let workbench: WorkbenchModel
+    let host: any SCMHost
     let model: GitModel
     @State private var expanded = true
     @State private var rows: [GitGraphRow] = []
@@ -74,7 +74,7 @@ struct GitGraphSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             CollapsibleHeader(title: "提交图谱", count: nil, expanded: $expanded) {
-                Button { workbench.openHistory(project: model.projectPath) } label: {
+                Button { host.openHistory(project: model.projectPath, path: nil) } label: {
                     Image.om("external-link", size: 12)
                         .frame(width: 22, height: 22)
                         .contentShape(Rectangle())
@@ -106,10 +106,10 @@ struct GitGraphSection: View {
                                         NSPasteboard.general.clearContents()
                                         NSPasteboard.general.setString(row.commit.hash, forType: .string)
                                     }
-                                    OMMenuItem("打开完整历史", icon: "git-commit-horizontal") { workbench.openHistory(project: model.projectPath) }
+                                    OMMenuItem("打开完整历史", icon: "git-commit-horizontal") { host.openHistory(project: model.projectPath, path: nil) }
                                 }
                             if isOpen, let repo = model.repo {
-                                GraphCommitDetail(repo: repo, commit: row.commit, workbench: workbench)
+                                GraphCommitDetail(repo: repo, commit: row.commit, host: host)
                                     .id(row.commit.hash)
                             }
                         }
@@ -176,7 +176,7 @@ struct GitGraphSection: View {
 private struct GraphCommitDetail: View {
     let repo: GitRepository
     let commit: GitCommit
-    let workbench: WorkbenchModel
+    let host: any SCMHost
     @State private var files: [GitFileChange] = []
     @State private var loaded = false
     @State private var openFile: String?
@@ -234,8 +234,8 @@ private struct GraphCommitDetail: View {
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .omContextMenu {
-            OMMenuItem("在编辑器中打开当前版本", icon: "file-text") { workbench.openFile(repo.root.path + "/" + file.path, preview: false) }
-            OMMenuItem("文件历史", icon: "clock") { workbench.openHistory(project: repo.root.path, path: repo.root.path + "/" + file.path) }
+            OMMenuItem("在编辑器中打开当前版本", icon: "file-text") { host.openFile(repo.root.path + "/" + file.path, preview: false) }
+            OMMenuItem("文件历史", icon: "clock") { host.openHistory(project: repo.root.path, path: repo.root.path + "/" + file.path) }
         }
     }
 

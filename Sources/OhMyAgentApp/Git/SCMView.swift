@@ -25,7 +25,7 @@ struct SCMView: View {
                     rootBar(roots: roots, active: active)
                     Divider()
                 }
-                SCMContent(workbench: workbench, model: GitStore.shared.model(for: active))
+                SCMContent(host: WorkbenchSCMHost(workbench: workbench), model: GitStore.shared.model(for: active))
                     .id(active)
             }
         } else {
@@ -55,10 +55,10 @@ struct SCMView: View {
     }
 }
 
-private struct SCMContent: View {
+struct SCMContent: View {
     /// 是否显示「AI 生成提交说明」按钮(设置 → 源代码管理)
     @AppStorage(ClientPrefs.Key.scmAICommitMessage) private var aiCommitMessage = true
-    let workbench: WorkbenchModel
+    let host: any SCMHost
     @Bindable var model: GitModel
     @State private var branchShown = false
     @State private var commitMenuShown = false
@@ -194,7 +194,7 @@ private struct SCMContent: View {
                 }
             }
             Button("刷新") { Task { await model.refresh() } }
-            Button("在标签页打开提交历史") { workbench.openHistory(project: model.projectPath) }
+            Button("在标签页打开提交历史") { host.openHistory(project: model.projectPath, path: nil) }
             deleteBranchMenu
             Divider()
             Button("暂存当前更改到 stash…") {
@@ -259,7 +259,7 @@ private struct SCMContent: View {
 
                 if aiCommitMessage {
                     Button {
-                        Task { await model.generateCommitMessage(gateway: workbench.activeSession?.utilityGateway) }
+                        Task { await model.generateCommitMessage(gateway: host.utilityGateway) }
                     } label: {
                         if model.isGeneratingCommitMessage {
                             OMSpinner(.regular)
@@ -410,7 +410,7 @@ private struct SCMContent: View {
                 if !conflicts.isEmpty {
                     SectionHeader(title: "冲突", count: conflicts.count, tint: OMColors.warning) { EmptyView() }
                     ForEach(conflicts) { change in
-                        ChangeRow(workbench: workbench, model: model, change: change, section: .conflict)
+                        ChangeRow(host: host, model: model, change: change, section: .conflict)
                     }
                 }
                 let staged = model.status.stagedChanges
@@ -418,13 +418,13 @@ private struct SCMContent: View {
                     SectionHeader(title: "已暂存的更改", count: staged.count) {
                         iconButton("minus", "全部取消暂存") { Task { await model.unstageAll() } }
                     }
-                    ForEach(staged) { change in ChangeRow(workbench: workbench, model: model, change: change, section: .staged) }
+                    ForEach(staged) { change in ChangeRow(host: host, model: model, change: change, section: .staged) }
                 }
                 let unstaged = model.status.unstagedChanges
                 if !unstaged.isEmpty {
                     SectionHeader(title: "更改", count: unstaged.count) {
                         iconButton("arrow-left-right", "与主分支对比") {
-                            workbench.openDiff(model.absolutePath(unstaged[0].path))
+                            host.openDiff(model.absolutePath(unstaged[0].path))
                         }
                         iconButton("undo-2", "放弃全部更改") {
                             if GitDialogs.confirmDestructive(title: String(localized: "放弃全部 \(unstaged.count) 个文件的更改?"), message: String(localized: "此操作不可撤销。"), button: String(localized: "放弃更改")) {
@@ -433,7 +433,7 @@ private struct SCMContent: View {
                         }
                         iconButton("plus", "全部暂存") { Task { await model.stage(unstaged.map(\.path)) } }
                     }
-                    ForEach(unstaged) { change in ChangeRow(workbench: workbench, model: model, change: change, section: .unstaged) }
+                    ForEach(unstaged) { change in ChangeRow(host: host, model: model, change: change, section: .unstaged) }
                 }
                 let untracked = model.status.untrackedChanges
                 if !untracked.isEmpty {
@@ -445,9 +445,9 @@ private struct SCMContent: View {
                         }
                         iconButton("plus", "全部暂存") { Task { await model.stage(untracked.map(\.path)) } }
                     }
-                    ForEach(untracked) { change in ChangeRow(workbench: workbench, model: model, change: change, section: .untracked) }
+                    ForEach(untracked) { change in ChangeRow(host: host, model: model, change: change, section: .untracked) }
                 }
-                GitGraphSection(workbench: workbench, model: model)
+                GitGraphSection(host: host, model: model)
             }
             .padding(.vertical, 4)
         }
@@ -508,8 +508,8 @@ private struct SectionHeader<Actions: View>: View {
 
 enum ChangeSection { case conflict, staged, unstaged, untracked }
 
-private struct ChangeRow: View {
-    let workbench: WorkbenchModel
+struct ChangeRow: View {
+    let host: any SCMHost
     let model: GitModel
     let change: GitFileChange
     let section: ChangeSection
@@ -548,19 +548,19 @@ private struct ChangeRow: View {
         .onHover { hovering = $0 }
         // 单击立即打开差异;双击用 simultaneousGesture 叠加,避免单击被迫等待双击判定(约 0.3~0.5s 延迟)
         .onTapGesture { model.selectedChangeKey = selectionKey; openDiff() }
-        .simultaneousGesture(TapGesture(count: 2).onEnded { workbench.openFile(model.absolutePath(change.path), preview: false) })
+        .simultaneousGesture(TapGesture(count: 2).onEnded { host.openFile(model.absolutePath(change.path), preview: false) })
         .accessibilityElement(children: .combine)
         .accessibilityLabel(name + (dir.isEmpty ? "" : "," + dir))
         .accessibilityAddTraits(.isButton)
         .accessibilityAction(named: Text("查看差异")) { openDiff() }
-        .accessibilityAction(named: Text("在编辑器中打开")) { workbench.openFile(model.absolutePath(change.path), preview: false) }
+        .accessibilityAction(named: Text("在编辑器中打开")) { host.openFile(model.absolutePath(change.path), preview: false) }
         .omContextMenu {
             OMMenuItem("查看差异", icon: "file-diff") { openDiff() }
-            OMMenuItem("在编辑器中打开", icon: "file-text") { workbench.openFile(model.absolutePath(change.path), preview: false) }
+            OMMenuItem("在编辑器中打开", icon: "file-text") { host.openFile(model.absolutePath(change.path), preview: false) }
             if !change.isUntracked {
                 OMMenuDivider()
-                OMMenuItem("Git 历史", icon: "clock") { workbench.openHistory(project: model.projectPath, path: model.absolutePath(change.path)) }
-                OMMenuItem("Git Blame", icon: "git-fork") { workbench.openBlame(model.absolutePath(change.path)) }
+                OMMenuItem("Git 历史", icon: "clock") { host.openHistory(project: model.projectPath, path: model.absolutePath(change.path)) }
+                OMMenuItem("Git Blame", icon: "git-fork") { host.openBlame(model.absolutePath(change.path)) }
             }
             OMMenuDivider()
             OMMenuItem("在 Finder 中显示", icon: "folder-open") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: model.absolutePath(change.path))]) }
@@ -573,7 +573,7 @@ private struct ChangeRow: View {
         .accessibilityLabel("\(change.path) \(kind?.badge ?? "U")")
     }
 
-    private func openDiff() { workbench.openDiff(model.absolutePath(change.path)) }
+    private func openDiff() { host.openDiff(model.absolutePath(change.path)) }
 
     /// 冲突整文件取一方会丢掉另一方的修改,先确认。
     private func confirmResolve(_ resolution: GitConflictResolution) {
@@ -586,7 +586,7 @@ private struct ChangeRow: View {
 
     @ViewBuilder
     private var actions: some View {
-        rowButton("arrow.up.forward.square", "在编辑器中打开") { workbench.openFile(model.absolutePath(change.path), preview: false) }
+        rowButton("arrow.up.forward.square", "在编辑器中打开") { host.openFile(model.absolutePath(change.path), preview: false) }
         switch section {
         case .staged:
             rowButton("minus", "取消暂存") { Task { await model.unstage([change.path]) } }
