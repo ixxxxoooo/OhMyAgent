@@ -98,6 +98,21 @@ struct SessionOrderTests {
         model.shutdownAll()
     }
 
+    @Test("重复点击同一历史会话:标签已关闭但会话仍保留时重开原槽位,不再每点一次多一个同名会话")
+    func openHistoryDoesNotDuplicate() throws {
+        let (model, id, root) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        model.sessions[id]?.draft = "占位"
+        model.openHistory(project: id, sessionId: "hist-dup", title: "遮挡问题")
+        let first = model.conversations.count
+        let tab = try #require(model.dock.allTabs.last)
+        model.closeTab(tab.id)
+        for _ in 0..<4 { model.openHistory(project: id, sessionId: "hist-dup", title: "遮挡问题") }
+        #expect(model.conversations.count == first)
+        #expect(model.conversations.values.filter { $0.sessionId == "hist-dup" }.count == 1)
+        model.shutdownAll()
+    }
+
     @Test("重启恢复:有内容的会话标签在原标签里恢复同一个会话")
     func chatSlotsRestoredAfterRelaunch() throws {
         let (model, id, root) = try makeModel()

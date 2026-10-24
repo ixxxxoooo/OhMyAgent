@@ -693,10 +693,22 @@ public final class WorkbenchModel {
         let owner = agentID ?? cachedAgentID(ofSession: sessionId, in: id)
         mode = .workspace
         selectedProjectID = id
-        if let (key, _) = conversations.first(where: { $0.key.projectID == id && $0.value.sessionId == sessionId }),
-           let tab = dock.tab(for: .chat(projectID: id, slot: key.slot)) {
+        // 同一会话可能有多个承载槽位(旧版本重复点击遗留的、或标签已关闭但会话仍保留的):
+        // 先找仍有标签的槽位直接切过去;都没有标签就在最早的槽位上重开标签,不再新建重复会话。
+        // (只取 first 会总命中那个没有标签的旧槽位,于是每点一次就多出一个同名会话。)
+        let holders = conversations.filter { $0.key.projectID == id && $0.value.sessionId == sessionId }
+        if let tab = holders.keys.lazy.compactMap({ self.dock.tab(for: .chat(projectID: id, slot: $0.slot)) }).first {
             dock.activate(tab.id)
             syncSelectionFromDock()
+            return
+        }
+        if let key = holders.keys.min(by: { ($0.slot ?? "") < ($1.slot ?? "") }) {
+            let tab = dock.open(.chat(projectID: id, slot: key.slot), title: title ?? project.name)
+            dock.activate(tab)
+            lastSlot[id] = .some(key.slot)
+            syncSelectionFromDock()
+            closeSubagentTabs(in: id)
+            scheduleSave()
             return
         }
         // 总是新开标签打开历史会话:空白新对话也是真实会话,必须保留在侧栏里,不能被顶替;会话属于别的引擎时用原引擎承载
