@@ -168,21 +168,9 @@ struct TabGroupView: View {
     /// 会话模式(中栏停靠区)不需要多标签:隐藏标签栏。
     private var hidesTabBar: Bool { host != .right && workbench.layout.leftPane == .sessions }
 
-    /// 会话模式的标题栏:只显示当前会话名,字号与会话正文一致。
+    /// 会话模式的标题栏:不显示标签栏与会话名,只保留同高的可拖动窗口区域。
     private var sessionTitleHeader: some View {
-        // 还没有标题的新会话显示「新对话」,避免标题栏整条空白
-        let raw = group.active.map { workbench.displayTitle($0) } ?? ""
-        let title = raw.isEmpty ? String(localized: "新对话") : raw
-        return HStack(spacing: 0) {
-            Text(title).font(OMFonts.reading).foregroundStyle(OMColors.primaryText).lineLimit(1)
-            Spacer(minLength: 0)
-        }
-        .padding(.leading, max(insets.leading, 0) + 16)
-        .padding(.trailing, max(insets.trailing, 0))
-        .frame(height: TitlebarMetrics.height)
-        .frame(maxWidth: .infinity)
-        .background(OMColors.surface)
-        .background(WindowDragArea())
+        OMColors.surface.frame(height: TitlebarMetrics.height).background(WindowDragArea())
     }
 
     private var isFocused: Bool { workbench.dock(host).focusedGroupID == group.id }
@@ -207,7 +195,7 @@ struct TabGroupView: View {
         let _ = PanelToggleProbe.count("tabGroup")
         VStack(spacing: 0) {
             if hidesTabBar {
-                // 会话模式只有侧栏会话列表一个入口,不显示标签栏;原位置显示当前会话名(同高的标题栏区域,可拖动窗口)
+                // 会话模式只有侧栏会话列表一个入口,不显示标签栏与会话名(同高的标题栏区域,可拖动窗口)
                 sessionTitleHeader
             } else {
                 TabBarView(
