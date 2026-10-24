@@ -3007,3 +3007,9 @@
 "当前行最近一次修改" = "Last change to this line";
 "制表符" = "Tabs";
 "空格: %lld" = "Spaces: %lld";
+"转到文件" = "Go to File";
+"显示并运行命令" = "Show and Run Commands";
+"搜索文本" = "Search Text";
+"转到编辑器中的符号" = "Go to Symbol in Editor";
+"转到行" = "Go to Line";
+"最近打开" = "Recently opened";

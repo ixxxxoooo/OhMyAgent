@@ -32,7 +32,33 @@ struct IDEPaletteLocation: Identifiable, Equatable {
     var themeID: String?
 }
 
+/// 输入框为空时列在最前面的「模式入口」(对照 VS Code 快速打开):点击切换到对应模式或直接执行。
+struct IDEPaletteMode: Identifiable, Equatable {
+    let id: String
+    let title: String
+    /// 模式前缀提示(如 `>`、`:`),没有为空
+    let hint: String
+    /// 快捷键,如「⇧⌘P」
+    let shortcut: String
+    /// 点击后写进输入框的前缀;nil 表示直接执行 `commandID`
+    let prefix: String?
+    let commandID: String?
+
+    /// 全部入口(顺序即显示顺序)。
+    static var all: [IDEPaletteMode] {
+        [
+            IDEPaletteMode(id: "files", title: String(localized: "转到文件"), hint: "", shortcut: "⌘P", prefix: "", commandID: nil),
+            IDEPaletteMode(id: "commands", title: String(localized: "显示并运行命令"), hint: ">", shortcut: "⇧⌘P", prefix: ">", commandID: nil),
+            IDEPaletteMode(id: "search", title: String(localized: "搜索文本"), hint: "%", shortcut: "⇧⌘F", prefix: nil, commandID: "view.search"),
+            IDEPaletteMode(id: "symbols", title: String(localized: "转到编辑器中的符号"), hint: "@", shortcut: "⇧⌘O", prefix: nil, commandID: "lsp.symbols"),
+            IDEPaletteMode(id: "line", title: String(localized: "转到行"), hint: ":", shortcut: "⌃G", prefix: ":", commandID: nil),
+            IDEPaletteMode(id: "chat", title: String(localized: "新对话"), hint: "", shortcut: "", prefix: nil, commandID: "agent.newChat"),
+        ]
+    }
+}
+
 enum IDEPaletteItem: Identifiable {
+    case mode(IDEPaletteMode)
     case file(FuzzyMatch)
     case command(IDECommandMatch)
     case line(Int?, Int?)
@@ -40,6 +66,7 @@ enum IDEPaletteItem: Identifiable {
 
     var id: String {
         switch self {
+        case .mode(let mode): "m:" + mode.id
         case .file(let match): "f:" + match.path
         case .command(let match): "c:" + match.command.id
         case .line(let line, let column): "l:\(line ?? 0):\(column ?? 0)"
@@ -58,7 +85,7 @@ final class IDEPaletteModel {
     /// 高亮行
     var highlighted = 0
     /// 每次打开面板递增:视图据此重新把焦点交给输入框(焦点可能还在终端或编辑器上)
-    private(set) var focusToken = 0
+    var focusToken = 0
     /// 工作区相对路径索引
     private(set) var files: [String] = [] { didSet { filesRevision &+= 1 } }
     /// 文件索引的修订号:索引变化后文件结果的缓存失效
@@ -191,7 +218,9 @@ final class IDEPaletteModel {
         if customItems != nil { return filteredCustom.map(IDEPaletteItem.location) }
         switch query {
         case .files(let text):
-            return rankedFiles(text: text, recents: recents)
+            let files = rankedFiles(text: text, recents: recents)
+            // 输入为空:模式入口排在最前,下面接「最近打开」
+            return text.isEmpty ? IDEPaletteMode.all.map(IDEPaletteItem.mode) + files : files
         case .commands(let text):
             return registry.search(query: text, context: context).map(IDEPaletteItem.command)
         case .line(let line, let column):
@@ -303,8 +332,16 @@ extension IDEWorkspace {
     /// - Parameter item: 结果行
     func choose(_ item: IDEPaletteItem) {
         if case .location(let location) = item, let themeID = location.themeID { palette.commitTheme(themeID) }
+        if case .mode(let mode) = item, let prefix = mode.prefix {
+            // 切换输入模式:面板保持打开,只改前缀(「转到文件」即回到当前的文件模式)
+            palette.text = prefix
+            palette.focusToken += 1
+            return
+        }
         palette.dismiss()
         switch item {
+        case .mode(let mode):
+            if let id = mode.commandID { perform(id) }
         case .file(let match):
             guard let root else { return }
             open((root as NSString).appendingPathComponent(match.path), preview: false)

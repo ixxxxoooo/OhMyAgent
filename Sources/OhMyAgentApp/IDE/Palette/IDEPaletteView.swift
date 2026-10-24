@@ -91,6 +91,12 @@ private struct IDEPaletteCard: View {
         }
     }
 
+    /// 是否是「模式入口」之后的第一个文件行(行尾标注「最近打开」)。
+    private static func isFirstFile(_ items: [IDEPaletteItem], _ index: Int) -> Bool {
+        guard case .file = items[index], index > 0, case .mode = items[index - 1] else { return false }
+        return true
+    }
+
     @ViewBuilder
     private func list(_ items: [IDEPaletteItem]) -> some View {
         if items.isEmpty {
@@ -103,7 +109,8 @@ private struct IDEPaletteCard: View {
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                            IDEPaletteRow(item: item, highlighted: index == palette.highlighted)
+                            IDEPaletteRow(item: item, highlighted: index == palette.highlighted,
+                                          isFirstFile: Self.isFirstFile(items, index))
                                 .id(item.id)
                                 .onTapGesture { workspace.choose(item) }
                                 .accessibilityAddTraits(.isButton)
@@ -124,10 +131,25 @@ private struct IDEPaletteCard: View {
 private struct IDEPaletteRow: View {
     let item: IDEPaletteItem
     let highlighted: Bool
+    /// 模式入口之后的第一个文件行:行尾显示「最近打开」
+    var isFirstFile = false
 
     var body: some View {
         HStack(spacing: OMSpacing.sm) {
             switch item {
+            case .mode(let mode):
+                Text(mode.title).font(OMFonts.body).foregroundStyle(OMColors.primaryText).lineLimit(1)
+                if !mode.hint.isEmpty { Text(mode.hint).font(OMFonts.small).foregroundStyle(OMColors.tertiaryText) }
+                Spacer(minLength: 0)
+                HStack(spacing: 4) {
+                    ForEach(Array(mode.shortcut.enumerated()), id: \.offset) { _, key in
+                        Text(String(key))
+                            .font(OMFonts.caption)
+                            .foregroundStyle(OMColors.secondaryText)
+                            .frame(minWidth: 18, minHeight: 18)
+                            .background(OMColors.subtleFill, in: RoundedRectangle(cornerRadius: OMRadius.tag, style: .continuous))
+                    }
+                }
             case .file(let match):
                 let name = (match.path as NSString).lastPathComponent
                 let dir = (match.path as NSString).deletingLastPathComponent
@@ -137,6 +159,7 @@ private struct IDEPaletteRow: View {
                     Text(dir).font(OMFonts.small).foregroundStyle(OMColors.tertiaryText).lineLimit(1).truncationMode(.head)
                 }
                 Spacer(minLength: 0)
+                if isFirstFile { Text("最近打开").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText) }
             case .command(let match):
                 HStack(spacing: 0) {
                     Text(match.command.category + ": ").foregroundStyle(OMColors.tertiaryText)
