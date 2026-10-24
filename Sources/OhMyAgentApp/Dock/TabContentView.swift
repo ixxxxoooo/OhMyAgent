@@ -110,6 +110,8 @@ struct FileTabView: View {
     @AppStorage(ClientPrefs.Key.editorLSP) private var lspEnabled = true
     /// 缩略图开关(设置 → 编辑器);原生与旧引擎共用
     @AppStorage(EditorBehaviorPrefs.minimapKey) private var minimapOn = true
+    /// 自动换行(设置 → 编辑器 → 自动换行,默认开)
+    @AppStorage(ClientPrefs.Key.editorWrap) private var wrapOn = true
     @State private var lsp: EditorLSPController?
     /// 原生编辑器的操作句柄(右键菜单据此执行剪切/粘贴/跳转定义等)
     @State private var editorHandle = NativeEditorHandle()
@@ -318,7 +320,7 @@ struct FileTabView: View {
     private func codeEditor(doc: FileDocument, text: String, markers: [Int: LineMarker]) -> some View {
         if let editorDocument = doc.ensureEditorDocument() {
             NativeCodeEditor(document: editorDocument, language: SyntaxLanguage.detect(path: path), isEditable: !doc.isReadOnly,
-                             revealLine: tab.line, markers: markers, diagnostics: lsp?.diagnostics ?? [],
+                             revealLine: tab.line, markers: markers, diagnostics: lsp?.diagnostics ?? [], wrapsLines: wrapOn,
                              chrome: ideHost == nil ? [] : editorChrome, filePath: path,
                              services: nativeServices, servicesKey: nativeServicesKey,
                              onCaretChange: ideHost.map { host in { host.caret(path, $0) } })
