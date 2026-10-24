@@ -179,6 +179,8 @@ private struct GraphCommitDetail: View {
     let host: any SCMHost
     @State private var files: [GitFileChange] = []
     @State private var loaded = false
+    /// 最近在中间栏打开差异的文件
+    @State private var selectedPath: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -203,7 +205,7 @@ private struct GraphCommitDetail: View {
             ForEach(files) { file in fileRow(file) }
         }
         .padding(.bottom, 4)
-        .background(OMColors.selectedFill)
+        .background(OMColors.subtleFill)
         .task { await loadFiles() }
     }
 
@@ -221,8 +223,12 @@ private struct GraphCommitDetail: View {
             Text(kind?.badge ?? "").font(OMFonts.caption.weight(.medium)).foregroundStyle(color(kind))
         }
         .padding(.horizontal, 12).padding(.vertical, 3)
+        .background(selectedPath == file.path ? OMColors.selectedFill : .clear)
         .contentShape(Rectangle())
-        .onTapGesture { host.openCommitDiff(root: repo.root.path, commit: commit.hash, path: file.path) }
+        .onTapGesture {
+            selectedPath = file.path
+            host.openCommitDiff(root: repo.root.path, commit: commit.hash, path: file.path)
+        }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .omContextMenu {

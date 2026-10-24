@@ -3000,3 +3000,5 @@
 "向右拆分编辑器" = "Split Editor Right";
 "关闭已保存" = "Close Saved";
 "语言服务正在建立索引,稍后自动重试…" = "The language server is indexing. Retrying shortly…";
+"引用" = "References";
+"这个提交没有改动该文件内容。" = "This commit made no content changes to this file.";

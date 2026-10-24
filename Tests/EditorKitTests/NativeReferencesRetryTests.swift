@@ -7,7 +7,8 @@ import Testing
 @testable import EditorKit
 
 @MainActor
-@Suite("查找引用重试")
+// 串行:三个用例都改同一个静态重试间隔,并行会互相覆盖
+@Suite("查找引用重试", .serialized)
 struct NativeReferencesRetryTests {
     private final class Counter: @unchecked Sendable { var calls = 0 }
 
