@@ -25,6 +25,8 @@ final class NativeMinimapView: NSView {
 
     private unowned let editor: OMEditorView
     private var lineRuns: [Int: [Run]] = [:]
+    /// 颜色表缓存(主题或语法变化时随 `invalidateAll` 失效;每帧重建会分配一批 NSColor)
+    private var paletteCache: [NSColor]?
     private var invalidateTask: Task<Void, Never>?
     private var dragging = false
 
@@ -54,6 +56,7 @@ final class NativeMinimapView: NSView {
             try? await Task.sleep(for: .milliseconds(140))
             guard !Task.isCancelled, let self else { return }
             self.lineRuns.removeAll(keepingCapacity: true)
+            self.paletteCache = nil
             self.needsDisplay = true
         }
     }
@@ -61,6 +64,7 @@ final class NativeMinimapView: NSView {
     /// 语法/主题更新:立刻失效。
     func invalidateAll() {
         lineRuns.removeAll(keepingCapacity: true)
+        paletteCache = nil
         needsDisplay = true
     }
 
@@ -99,9 +103,13 @@ final class NativeMinimapView: NSView {
         let left: CGFloat = 4
         // 按颜色分批,减少 CGContext 状态切换。
         var batches = [[CGRect]](repeating: [], count: palette.count)
+        // 滚动时缺的只是边缘几行:只补「最靠上与最靠下的未缓存行」之间的区间
+        if let low = (first...last).first(where: { lineRuns[$0] == nil }), let high = (first...last).last(where: { lineRuns[$0] == nil }) {
+            fillRuns(first: low, last: high)
+        }
         for line in first...last {
             let y = y(ofLine: line)
-            for run in runs(forLine: line) {
+            for run in lineRuns[line] ?? [] {
                 batches[Int(run.color)].append(CGRect(x: left + CGFloat(run.start) * Self.columnWidth, y: y, width: CGFloat(run.length) * Self.columnWidth, height: Self.rowHeight - 0.5))
             }
         }
@@ -128,25 +136,49 @@ final class NativeMinimapView: NSView {
 
     /// 颜色表:0 为默认前景,其余按语法类型。
     private func colorPalette() -> [NSColor] {
+        if let paletteCache { return paletteCache }
         let theme = editor.theme
         var colors = [theme.foreground.withAlphaComponent(0.55)]
         for raw in 0...6 {
             guard let kind = SyntaxKind(rawValue: UInt8(raw)), let color = theme.colors[kind] else { colors.append(colors[0]); continue }
             colors.append(color.withAlphaComponent(0.8))
         }
+        paletteCache = colors
         return colors
     }
 
-    /// 某行的色块游程(带缓存)。
-    private func runs(forLine line: Int) -> [Run] {
-        if let cached = lineRuns[line] { return cached }
+    /// 补全 `first...last` 里尚未缓存的行:整段只查一次语法片段,再按行分发(逐行查询在首帧/大幅跳转时要查数百次)。
+    /// - Parameters:
+    ///   - first: 起始模型行
+    ///   - last: 结束模型行(含)
+    private func fillRuns(first: Int, last: Int) {
+        if lineRuns.count > 6_000 { lineRuns.removeAll(keepingCapacity: true) }
         let rope = editor.model.document.snapshot
-        guard let range = rope.lineRange(line) else { return [] }
+        guard let head = rope.lineRange(first), let tail = rope.lineRange(last) else { return }
+        let blockEnd = tail.location + tail.length
+        let spans = editor.tokens.spans(intersecting: NSRange(location: head.location, length: max(blockEnd - head.location, 0)))
+        var active: [Decoration] = []
+        var next = 0
+        for line in first...last {
+            guard let range = rope.lineRange(line) else { continue }
+            let lineEnd = range.location + range.length
+            // 活跃片段 = 仍越过本行起点的(多行注释/字符串)+ 本行内开始的
+            active.removeAll { $0.range.upperBound <= range.location }
+            while next < spans.count, spans[next].range.location < lineEnd {
+                active.append(spans[next])
+                next += 1
+            }
+            if lineRuns[line] == nil { lineRuns[line] = makeRuns(lineRange: range, active: active) }
+        }
+    }
+
+    /// 由一行文本与覆盖它的语法片段生成色块游程。
+    private func makeRuns(lineRange range: TextSpan, active: [Decoration]) -> [Run] {
+        let rope = editor.model.document.snapshot
         let length = min(range.length, Self.maxColumns * 2)
         let units = rope.slice(TextSpan(location: range.location, length: length))
-        let spans = editor.tokens.spans(intersecting: NSRange(location: range.location, length: length))
         var colors = [UInt8](repeating: 0, count: units.count)
-        for span in spans {
+        for span in active {
             guard case .custom(let raw) = span.kind else { continue }
             let lower = max(span.range.location - range.location, 0)
             let upper = min(span.range.upperBound - range.location, units.count)
@@ -174,8 +206,6 @@ final class NativeMinimapView: NSView {
             if column >= Self.maxColumns { break }
         }
         if runStart >= 0 { result.append(Run(start: Int16(runStart), length: Int16(min(column, Self.maxColumns) - runStart), color: runColor)) }
-        if lineRuns.count > 6_000 { lineRuns.removeAll(keepingCapacity: true) }
-        lineRuns[line] = result
         return result
     }
 

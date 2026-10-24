@@ -226,6 +226,9 @@ extension OMEditorView {
             stickyKey = StickyKey(topLine: 0, version: model.document.version)
             return
         }
+        // 顶行与文档版本都没变就不必重扫(滚动时绝大多数事件落在同一行内;扫描最多读 800 行文本)
+        let currentTop = model.lineMap.locate(row: row(atY: CGFloat(stickyLines.count) * lineHeight)).line
+        if StickyKey(topLine: currentTop, version: model.document.version) == stickyKey { return }
         // 参考行 = 粘性区域下方第一行;粘性行数又取决于参考行,迭代至稳定(最多 3 次)。
         var count = stickyLines.count
         var found: [Int] = []
