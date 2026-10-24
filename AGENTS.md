@@ -16,13 +16,13 @@ macOS 27 专用、100% 原生(Swift 6 + SwiftUI + AppKit;**唯一例外**:内置
 - `ClaudeAgentKit`:Claude Code 原生 ACP 适配器(纯 Swift,驱动 `claude` stream-json;`CLI/`、`Translate/`、`Session/`、`Permissions/`),项目不依赖 Node。
 - `ChatKit`:会话模型 `SessionModel`、时间线、补全、Markdown、计划、提供商与模型映射、会话存档、用量与缓存统计(无视图)。
 - `WorkbenchKit`:工作台模型:多项目、会话树、布局与持久化、停靠 `DockHost`、搜索索引、工作树(无视图)。
-- `EditorCore`(原生 Monaco 级编辑器内核,无视图;设计、基准与偏差见 `.specstory/history/docs/20261024_编辑器内核迁移.md`):持久化文本绳 `TextRope`、撤销栈、共享文档 `EditorDocument`、选区/折叠/换行/装饰/View Zone 视图模型。编辑器默认引擎为 `native2`(`EditorKit/Native`),Markdown 与显式回退(`OMA_EDITOR_ENGINE=textkit`)才走旧 TextKit。
+- `EditorCore`(原生 Monaco 级编辑器内核,无视图;设计、基准与偏差见 `.specstory/history/docs/20261024_编辑器内核迁移.md`):持久化文本绳 `TextRope`、撤销栈、共享文档 `EditorDocument`、选区/折叠/换行/装饰/View Zone 视图模型。编辑器只有一个引擎:原生 rope 引擎(`EditorKit/Native`,所有文件类型含 Markdown 源码模式;Markdown 阅读走 `MarkdownPreviewPage`)。旧 TextKit 引擎已于 2026-10-24 删除。
 - `ClaudeConfigKit`(`~/.claude`、`.mcp.json`)、`DiffKit`、`EditorKit`(高亮、tree-sitter、Markdown 就地渲染)、`GitKit`、`LSPKit`。
 - `ProviderProxyKit`:本机回环网关 `LocalGateway` 与模型代理(Anthropic 透传 / OpenAI 转换);真实密钥只在代理内存。
 - `MermaidKit`、`IconKit`(Lucide、`OMFileIcon`、品牌图标;界面禁用 SF Symbol)、`DesignSystem`(令牌、主题包、玻璃材质)。
 - `SpreadsheetKit`、`CanvasKit`、`AutomationKit`、`DemoKit`、`IDEKit`(IDE 模式模型,视图在 `OhMyAgentApp/IDE/`)、`OMLog`(日志、`AppEnv` 路径隔离)。
 - `OhMyAgentApp`:应用本体(SwiftUI/AppKit 视图)。Agent 窗口是 SwiftUI `Window` 场景,IDE 窗口是 AppKit `NSWindow`(不用 `WindowGroup`);代码块、命令输出、Diff、表格、Markdown 文字统一用 AppKit 只读文本叶子(`OMReadOnlyTextView` 等,跨叶子选择由 `SelectionHub` 接管)。
-- `FakeAgent`、`ACPSpike`/`EditorSpike`:辅助/验证用可执行目标。
+- `FakeAgent`、`ACPSpike`:辅助/验证用可执行目标。
 - 新增模块请登记在本节、模块地图文档与「开发进度.md」的代码索引中。
 
 ## 2. 常用命令

@@ -200,7 +200,7 @@ def is_allowed(rel, key):
     return any(rel.startswith(prefix) and (allowed is None or allowed == key) for prefix, allowed in ALLOWLIST)
 
 
-EXCLUDE_DIRS = ("Sources/DemoKit/", "Sources/ACPSpike/", "Sources/EditorSpike/", "Sources/FakeAgent/",
+EXCLUDE_DIRS = ("Sources/DemoKit/", "Sources/ACPSpike/", "Sources/FakeAgent/",
                 "Sources/ACPKit/DemoScenarios", "Sources/ACPKit/DemoHistory", "Sources/ACPKit/ScriptedAgent")
 LOG_RE = re.compile(r"\b(Log|log)\.\w+\.?(info|debug|warning|error)?\(|\blog\.(info|debug|warning|error)\(|\bLog\.\w+\.span\(|\bPerfStats\.shared\.record\(|\bLaunchTrace\.mark\(|Logger\(|assertionFailure|precondition")
 

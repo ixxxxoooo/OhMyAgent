@@ -11,7 +11,7 @@
 #   --check-baseline     与 Scripts/perf-baseline.json 的 editor.* 比对,回归以 4 退出
 #   --update-baseline    把本次 editor.* 写入基线(与 ide.* 合并,不互相覆盖)
 #   --out <文件>         结果 JSON(默认 /tmp/oma-editor-bench.json)
-#   --ab                 另输出与旧 TextKit 冻结基线(Scripts/editor-baseline-textkit.json)的对照表
+#   --ab                 另输出与旧 TextKit 冻结基线(Scripts/editor-baseline-textkit.json,历史数据,旧引擎已删除)的对照表
 # 注意:基准会在屏幕上放一个近乎透明的小窗口(显示链接需要被合成才会触发),运行期间请勿遮挡/锁屏。
 set -euo pipefail
 cd "$(dirname "$0")/.."
