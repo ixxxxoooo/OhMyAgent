@@ -189,6 +189,15 @@ struct SidebarRow: Identifiable {
 extension WorkbenchModel {
     /// 每个分组默认展示的会话条数,超出走「显示更多」。
     static let sidebarPreviewCount = 5
+    /// 会话模式(通用会话)默认展示的条数:整个侧栏只有这一个列表,可以放得更多。
+    static let sidebarGeneralPreviewCount = 20
+
+    /// 某个列表默认展示的会话条数。
+    /// - Parameter mode: 列表类型(通用会话用更大的上限)
+    /// - Returns: 条数
+    static func sidebarPreviewCount(for mode: SessionLine.Mode) -> Int {
+        mode == .general ? sidebarGeneralPreviewCount : sidebarPreviewCount
+    }
 
     /// 把侧栏展平为一维行数组(置顶 → 会话 → 工作区 → 各项目及其会话)。
     /// - Parameters:
@@ -237,7 +246,8 @@ extension WorkbenchModel {
     private func appendSessions(of project: ProjectEntry, mode: SessionLine.Mode, key: String, indent: CGFloat, showArchived: Bool,
                                 expandedMore: Set<String>, emptyHint: SidebarRow.HintKind, collapsed: Bool, into rows: inout [SidebarRow]) {
         let expanded = expandedMore.contains(key)
-        let limit = collapsed ? 0 : (expanded ? nil : Self.sidebarPreviewCount)
+        let preview = Self.sidebarPreviewCount(for: mode)
+        let limit = collapsed ? 0 : (expanded ? nil : preview)
         let list = sidebarSessionList(for: project, filter: .unpinned(showArchived: showArchived), limit: limit)
         if mode == .tree { rows.append(SidebarRow(id: "project:\(project.id)", kind: .project(project, count: list.total))) }
         guard !collapsed else { return }
@@ -245,8 +255,8 @@ extension WorkbenchModel {
         for (index, item) in list.items.enumerated() {
             rows.append(SidebarRow(id: "\(key):\(item.id)", kind: .session(item, mode: mode, siblings: list.ids, index: index)))
         }
-        if list.total > Self.sidebarPreviewCount {
-            rows.append(SidebarRow(id: "more:\(key)", kind: .more(key: key, expanded: expanded, remaining: list.total - Self.sidebarPreviewCount, indent: indent)))
+        if list.total > preview {
+            rows.append(SidebarRow(id: "more:\(key)", kind: .more(key: key, expanded: expanded, remaining: list.total - preview, indent: indent)))
         }
     }
 }
