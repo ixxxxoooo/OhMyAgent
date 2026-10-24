@@ -168,26 +168,11 @@ struct TabGroupView: View {
     /// 会话模式(中栏停靠区)不需要多标签:隐藏标签栏。
     private var hidesTabBar: Bool { host != .right && workbench.layout.leftPane == .sessions }
 
-    /// 会话模式的标题栏:当前会话名 + 下拉箭头,点击重命名。
+    /// 会话模式的标题栏:只显示当前会话名,字号与会话正文一致。
     private var sessionTitleHeader: some View {
-        let tab = group.active
-        let title = tab.map { workbench.displayTitle($0) } ?? ""
-        return HStack(spacing: 6) {
-            if !title.isEmpty {
-                Button {
-                    guard let tab, case .chat(let project, _) = tab.kind, let id = workbench.session(forTab: tab)?.sessionId,
-                          let name = ExplorerActions.prompt(title: String(localized: "重命名会话"), initial: title) else { return }
-                    workbench.renameSession(id, in: project, to: name)
-                } label: {
-                    HStack(spacing: 6) {
-                        Text(title).font(OMFonts.title).foregroundStyle(OMColors.primaryText).lineLimit(1)
-                        Image.om("chevron-down", size: 12).foregroundStyle(OMColors.tertiaryText)
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(String(localized: "重命名会话"))
-            }
+        let title = group.active.map { workbench.displayTitle($0) } ?? ""
+        return HStack(spacing: 0) {
+            Text(title).font(OMFonts.reading).foregroundStyle(OMColors.primaryText).lineLimit(1)
             Spacer(minLength: 0)
         }
         .padding(.leading, max(insets.leading, 0) + 16)
