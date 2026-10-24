@@ -71,6 +71,14 @@ public final class OMEditorView: NSView {
     public var onFirstHighlight: (() -> Void)?
     /// 首批语法着色尚未到位:此时只画底色与行号栏,不画无色的正文,避免「先出白字、颜色随后才跟上」的闪动
     var syntaxPending = false
+    /// 行尾内联提示提供者(入参为 0 起始行号;返回 nil 不显示),如 Git blame
+    public var inlineNote: ((Int) -> String?)? {
+        didSet { needsDisplay = true }
+    }
+    /// 鼠标悬停所在的逻辑行(内联提示也显示在悬停行)
+    var hoverNoteLine: Int? {
+        didSet { if oldValue != hoverNoteLine, inlineNote != nil { needsDisplay = true } }
+    }
     /// 括号索引(彩色括号与括号匹配)。
     let brackets = NativeBracketStore()
     /// 粘性滚动当前显示的块头行与计算键(顶行、文档版本)。

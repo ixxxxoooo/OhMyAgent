@@ -396,8 +396,15 @@ public final class NativeLanguageController {
                 content.append(NativeInfoCardView.render(markdown: text, monoFont: mono))
             }
         }
+        // 先去掉首尾空白与换行再判断:空诊断消息、空 Markdown 渲染出的纯空白不能弹出一张空卡片
+        let whitespace = CharacterSet.whitespacesAndNewlines
+        while let last = content.string.unicodeScalars.last, whitespace.contains(last) {
+            content.deleteCharacters(in: NSRange(location: content.length - 1, length: 1))
+        }
+        while let first = content.string.unicodeScalars.first, whitespace.contains(first) {
+            content.deleteCharacters(in: NSRange(location: 0, length: 1))
+        }
         guard hoverWord == word, content.length > 0 else { return }
-        while content.string.hasSuffix("\n") { content = NSMutableAttributedString(attributedString: content.attributedSubstring(from: NSRange(location: 0, length: content.length - 1))) }
         let card = hoverCard ?? NativeInfoCardView(frame: .zero)
         let size = card.setContent(content)
         if card.superview == nil { view.addSubview(card) }

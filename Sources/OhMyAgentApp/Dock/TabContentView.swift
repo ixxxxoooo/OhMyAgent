@@ -314,6 +314,7 @@ struct FileTabView: View {
                              onCaretChange: ideHost.map { host in { host.caret(path, $0) } })
                 .handle(editorHandle)
                 .onReady { markReady(true) }
+                .inlineNote(!doc.isDirty && !blameLines.isEmpty ? { blameNote($0) } : nil)
                 .agentHooks(agentHooks(doc, editorDocument: editorDocument))
                 .omContextMenu { nativeEditorMenu() }
                 .id(ObjectIdentifier(editorDocument))
@@ -328,10 +329,11 @@ struct FileTabView: View {
         }
     }
 
-    /// 内联 blame 的刷新键:文件 + 仓库 HEAD + 是否有未保存修改。
+    /// 内联 blame 的刷新键:文件 + 仓库 HEAD + 是否有未保存修改 + 文本是否已载入
+    /// (冷打开时首次触发文本还没读完会直接跳过,必须在文本到位后重试,否则这个文件永远没有 blame)。
     private func blameKey(_ doc: FileDocument) -> String {
         let head = blameRoot.map { GitStore.shared.model(for: $0).status.headOID ?? "" } ?? ""
-        return "\(path)|\(head)|\(doc.isDirty)"
+        return "\(path)|\(head)|\(doc.isDirty)|\(doc.text != nil)"
     }
 
     /// 重算相对 HEAD 的行号栏改动标记(IDE 窗口专用;防抖、后台计算、2MB 以上文件不计算)。

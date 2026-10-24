@@ -75,12 +75,22 @@ public struct NativeCodeEditor: NSViewRepresentable {
     public var handle: NativeEditorHandle?
     /// 首批语法着色完成并绘制后的回调(只触发一次)。
     public var onReady: (() -> Void)?
+    /// 行尾内联提示(0 起始行号 → 文字),如 Git blame。
+    public var inlineNote: ((Int) -> String?)?
 
     /// 返回带「就绪回调」的副本。
     /// - Parameter action: 首帧着色完成后调用
     public func onReady(_ action: @escaping () -> Void) -> NativeCodeEditor {
         var copy = self
         copy.onReady = action
+        return copy
+    }
+
+    /// 返回带行尾内联提示(Git blame)的副本。
+    /// - Parameter provider: 0 起始行号 → 提示文字;nil 不显示
+    public func inlineNote(_ provider: ((Int) -> String?)?) -> NativeCodeEditor {
+        var copy = self
+        copy.inlineNote = provider
         return copy
     }
 
@@ -185,6 +195,7 @@ public struct NativeCodeEditor: NSViewRepresentable {
             view.languageController.services = services
         }
         view.lineMarkers = markers
+        view.inlineNote = inlineNote
         view.inlineEdit.generate = agent.inlineEdit
         view.inlineSuggestion.provider = agent.inlineSuggestion
         view.onReferenceSelection = agent.onReferenceSelection

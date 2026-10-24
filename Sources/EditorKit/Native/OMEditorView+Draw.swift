@@ -91,6 +91,7 @@ extension OMEditorView {
         drawDecorationBackgrounds(rows: rows)
         if !syntaxPending { drawText(rows: rows, in: context) }
         drawInvisibles(rows: rows)
+        drawInlineNote(rows: rows)
         drawDecorationForegrounds(rows: rows)
         drawFoldPlaceholders(rows: rows)
         drawMarkedText(rows: rows)
