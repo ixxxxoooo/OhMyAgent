@@ -104,6 +104,8 @@ struct FileTabView: View {
     @Environment(\.tabIsActive) private var isActive
     /// IDE 窗口里的宿主(非 nil 时脏标记、跳转与项目根改走 IDE 窗口;Agent 窗口里为 nil)
     @Environment(\.ideFileHost) var ideHost
+    /// Agent 窗口标签组的就绪登记(切换文件不闪屏,见 `EditorSwapGate`)
+    @Environment(\.editorSwapGate) private var swapGate
     @AppStorage(ClientPrefs.Key.editorLSP) private var lspEnabled = true
     @State private var lsp: EditorLSPController?
     /// 原生编辑器的操作句柄(右键菜单据此执行剪切/粘贴/跳转定义等)
@@ -230,7 +232,7 @@ struct FileTabView: View {
             await startLanguageServer(doc)
         }
         .onDisappear {
-            ideHost?.markReady(path, false)
+            markReady(false)
             lsp?.detach()
             lsp = nil
             ideHost?.registerLSP(path, nil)
@@ -243,6 +245,11 @@ struct FileTabView: View {
             // 工作区内由文件系统事件驱动;工作区之外(含切换项目后的旧项目文件)低频轮询磁盘修改时间
             await WorkspaceWatchCenter.shared.follow(path, poll: .seconds(2)) { await store.checkExternalChange(path) }
         }
+    }
+
+    /// 上报编辑器首帧着色是否就绪(IDE 窗口走宿主,Agent 窗口走标签组的登记)。
+    private func markReady(_ ready: Bool) {
+        if let ideHost { ideHost.markReady(path, ready) } else { swapGate?.mark(path, ready: ready) }
     }
 
     /// 原生编辑器的语言智能回调(语言服务器就绪后才有内容)。
@@ -306,7 +313,7 @@ struct FileTabView: View {
                              services: nativeServices, servicesKey: nativeServicesKey,
                              onCaretChange: ideHost.map { host in { host.caret(path, $0) } })
                 .handle(editorHandle)
-                .onReady { ideHost?.markReady(path, true) }
+                .onReady { markReady(true) }
                 .agentHooks(agentHooks(doc, editorDocument: editorDocument))
                 .omContextMenu { nativeEditorMenu() }
                 .id(ObjectIdentifier(editorDocument))

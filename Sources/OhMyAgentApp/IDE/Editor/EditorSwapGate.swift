@@ -26,7 +26,7 @@ final class EditorSwapGate {
 /// 是否继续保留旧标签的纯判定。
 enum EditorSwapPolicy {
     /// 等待新编辑器就绪的最长时间(超时直接换,避免加载失败时界面卡住)
-    static let timeout: Duration = .milliseconds(200)
+    static let timeout: Duration = .milliseconds(500)
 
     /// 标签的视图槽位标识:文件标签按路径区分(预览标签原地换文件时新旧视图可共存),其余标签只按 id。
     /// - Parameter tab: 标签
@@ -44,6 +44,19 @@ enum EditorSwapPolicy {
         return EditorEngine.usesNative(for: SyntaxLanguage.detect(path: path))
     }
 
+    /// 正在显示的旧标签是否还值得保留:它仍在组里,或它被新激活的预览标签「原位替换」了
+    /// (预览替换会新建标签并顶掉旧标签,组内标签数不变;关闭标签则数量减少,不保留)。
+    /// - Parameters:
+    ///   - shownID: 正在显示的标签 id
+    ///   - siblingIDs: 显示该标签时组内的全部标签 id
+    ///   - currentIDs: 组内当前的全部标签 id
+    ///   - targetID: 新激活标签的 id
+    /// - Returns: 是否保留
+    static func isShownKeepable(shownID: UUID, siblingIDs: [UUID], currentIDs: [UUID], targetID: UUID) -> Bool {
+        if currentIDs.contains(shownID) { return true }
+        return currentIDs.count == siblingIDs.count && !siblingIDs.contains(targetID)
+    }
+
     /// 是否应继续显示旧标签。
     /// - Parameters:
     ///   - targetPath: 新激活标签的文件路径(非文件标签为 nil)
@@ -56,4 +69,9 @@ enum EditorSwapPolicy {
         guard let targetPath, let shownKey, shownAlive, shownKey != targetKey else { return false }
         return isHoldable(path: targetPath) && !ready.contains(targetPath)
     }
+}
+
+extension EnvironmentValues {
+    /// Agent 窗口标签组的就绪登记(IDE 窗口走 `ideFileHost.markReady`,此值为 nil)。
+    @Entry var editorSwapGate: EditorSwapGate?
 }

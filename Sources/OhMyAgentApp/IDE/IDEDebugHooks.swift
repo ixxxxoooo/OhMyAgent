@@ -67,6 +67,7 @@ enum IDEDebugHooks {
         }
         if let raw = env["OMA_IDE_OPEN_DIFF"], !raw.isEmpty { workspace.model.openDiff(absolute(raw)) }
         if let raw = env["OMA_IDE_EDITOR_ACTIONS"], !raw.isEmpty { await runEditorActions(raw) }
+        await IDESwitchProbe.run(workspace, env: env)
         if let raw = env["OMA_IDE_EDITOR_SWEEP"], let seconds = Double(raw), seconds > 0 { await runEditorSweep(seconds: seconds) }
     }
 

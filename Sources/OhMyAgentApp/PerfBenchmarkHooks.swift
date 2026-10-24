@@ -3,6 +3,7 @@
 // `OMA_SWITCH_SESSIONS=N` 依次冷打开 N 个历史会话,再在已挂载的会话标签之间循环切换若干轮;
 // 配合 `OMA_TOGGLE_LEFT/RIGHT`、`OMA_TOGGLE_COUNT` 与 `Scripts/perf-ui.sh` 汇总「侧栏切换/标签切换/时间线挂载/主线程卡顿」。
 
+import AppKit
 import Foundation
 import OMLog
 import WorkbenchKit
@@ -46,7 +47,17 @@ enum PerfBenchmarkHooks {
         for _ in 0..<50 where workbench.projects.isEmpty { try? await Task.sleep(for: .milliseconds(100)) }
         let plan = BenchmarkPlan.pick(from: workbench.projects, count: count)
         Log.perf.info("基准阶段", ["phase": "冷打开开始", "sessions": "\(plan.count)"])
+        // OMA_SWITCH_SAMPLE_OUT=目录:逐帧采样窗口并分析切换瞬间的中间帧(见 IDEFrameSampler)
+        let sampleDir = ProcessInfo.processInfo.environment["OMA_SWITCH_SAMPLE_OUT"]
+        let window = NSApp.windows.filter { $0.isVisible && $0.contentView != nil }.max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
+        let sampler = sampleDir == nil ? nil : window?.contentView.map { IDEFrameSampler(view: $0) }
+        defer {
+            if let sampler, let sampleDir {
+                try? sampler.finish(into: sampleDir).write(toFile: sampleDir + "/report.txt", atomically: true, encoding: .utf8)
+            }
+        }
         for item in plan {
+            sampler?.mark("冷打开 \(item.title ?? item.sessionId)")
             workbench.openHistory(project: item.projectID, sessionId: item.sessionId, title: item.title)
             // 留出连接与回放时间,让每次冷打开互不重叠
             try? await Task.sleep(for: .milliseconds(2500))
@@ -55,6 +66,7 @@ enum PerfBenchmarkHooks {
         Log.perf.info("基准阶段", ["phase": "热切换开始", "tabs": "\(tabs.count)"])
         for _ in 0..<max(rounds, 1) {
             for tab in tabs {
+                sampler?.mark("热切换 \(tab.title)")
                 workbench.activateTab(tab.id)
                 try? await Task.sleep(for: .milliseconds(500))
             }

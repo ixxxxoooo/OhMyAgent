@@ -12,9 +12,9 @@ struct IDEOutlineSection: View {
     let workspace: IDEWorkspace
     @AppStorage("ide.outlineExpanded") private var expanded = true
 
+    /// 大纲行:新文件的符号到位前继续显示上一个文件的,切换时区域尺寸与内容不跳变,只在到位时换字。
     private var rows: [(symbol: LSPSymbol, depth: Int)] {
-        guard workspace.outlinePath == workspace.model.activeFilePath else { return [] }
-        return workspace.outline.flatMap { $0.flattened() }
+        workspace.model.activeFilePath == nil ? [] : workspace.outline.flatMap { $0.flattened() }
     }
 
     var body: some View {
@@ -39,7 +39,7 @@ struct IDEOutlineSection: View {
                     Text(workspace.model.activeFilePath == nil ? String(localized: "没有打开的文件") : String(localized: "没有可显示的符号"))
                         .font(OMFonts.small)
                         .foregroundStyle(OMColors.tertiaryText)
-                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .frame(maxWidth: .infinity, minHeight: 200)
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 0) {

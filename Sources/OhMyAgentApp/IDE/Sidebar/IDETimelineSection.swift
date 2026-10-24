@@ -36,8 +36,9 @@ struct IDETimelineSection: View {
     let workspace: IDEWorkspace
     @AppStorage("ide.timelineExpanded") private var expanded = false
 
+    /// 提交列表:新文件的历史到位前继续显示上一个文件的,切换时区域尺寸与内容不跳变。
     private var commits: [GitCommit] {
-        workspace.timelinePath == workspace.model.activeFilePath ? workspace.timeline : []
+        workspace.model.activeFilePath == nil ? [] : workspace.timeline
     }
 
     var body: some View {
@@ -62,7 +63,7 @@ struct IDETimelineSection: View {
                     Text(workspace.model.activeFilePath == nil ? String(localized: "没有打开的文件") : String(localized: "没有提交历史"))
                         .font(OMFonts.small)
                         .foregroundStyle(OMColors.tertiaryText)
-                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .frame(maxWidth: .infinity, minHeight: 180)
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 0) {

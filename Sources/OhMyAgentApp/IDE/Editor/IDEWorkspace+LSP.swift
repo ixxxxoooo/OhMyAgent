@@ -41,8 +41,14 @@ extension IDEWorkspace {
     func refreshOutline() {
         outlineTask?.cancel()
         guard let path = model.activeFilePath, let controller = lspControllers[path], controller.isReady else {
-            outline = []
-            outlinePath = nil
+            // 语言服务器尚未就绪:先保留旧大纲避免切换时闪空,稍后仍无结果再清空
+            let stale = model.activeFilePath
+            outlineTask = Task { [weak self] in
+                try? await Task.sleep(for: .milliseconds(800))
+                guard !Task.isCancelled, let self, self.model.activeFilePath == stale, self.outlinePath != stale else { return }
+                self.outline = []
+                self.outlinePath = nil
+            }
             return
         }
         outlineTask = Task { [weak self] in

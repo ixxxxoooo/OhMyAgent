@@ -130,6 +130,8 @@ struct NativeEditorChromeDrawTests {
         let model = NativeEditorModel(document: EditorDocument(text: source), language: .swift)
         let view = OMEditorView(model: model, theme: EditorTheme.default, font: EditorFontPrefs.preferredFont)
         view.chrome = [.minimap, .stickyScroll, .folding, .overviewRuler]
+        // 本测试只验证绘制;语法着色未到位前正文不画(防闪),这里直接放行
+        view.syntaxPending = false
         view.setFrameSize(CGSize(width: 900, height: 600))
         view.model.setSelections(SelectionSet(caret: 330 * 40))
         view.scrollToLine(330)

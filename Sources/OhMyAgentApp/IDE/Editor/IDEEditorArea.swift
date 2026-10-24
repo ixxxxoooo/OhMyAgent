@@ -138,6 +138,8 @@ struct IDEEditorGroupView: View {
     @State private var size: CGSize = .zero
     /// 当前对用户可见的标签快照(新文件编辑器未就绪时保留旧标签,见 `EditorSwapGate`)
     @State private var shown: WorkbenchTab?
+    /// 显示 `shown` 时组内的标签 id(用于识别预览标签被原位替换)
+    @State private var shownSiblings: [UUID] = []
     @State private var holdTimeout: Task<Void, Never>?
 
     private var gate: EditorSwapGate { workspace.swapGate }
@@ -170,7 +172,8 @@ struct IDEEditorGroupView: View {
         if case .file(let path) = target.kind { targetPath = path }
         return EditorSwapPolicy.shouldHold(
             targetPath: targetPath, targetKey: EditorSwapPolicy.slotKey(target),
-            shownKey: shown.map(EditorSwapPolicy.slotKey), shownAlive: shown.map { old in group.tabs.contains { $0.id == old.id } } ?? false,
+            shownKey: shown.map(EditorSwapPolicy.slotKey),
+            shownAlive: shown.map { EditorSwapPolicy.isShownKeepable(shownID: $0.id, siblingIDs: shownSiblings, currentIDs: group.tabs.map(\.id), targetID: target.id) } ?? false,
             ready: gate.ready)
     }
 
@@ -179,7 +182,7 @@ struct IDEEditorGroupView: View {
         guard let target = activeTab else { shown = nil; return }
         if !isHolding {
             holdTimeout?.cancel()
-            if shown.map(EditorSwapPolicy.slotKey) != EditorSwapPolicy.slotKey(target) { shown = target }
+            if shown.map(EditorSwapPolicy.slotKey) != EditorSwapPolicy.slotKey(target) { show(target) }
             return
         }
         guard startTimeout else { return }
@@ -187,8 +190,14 @@ struct IDEEditorGroupView: View {
         holdTimeout = Task { @MainActor in
             try? await Task.sleep(for: EditorSwapPolicy.timeout)
             guard !Task.isCancelled else { return }
-            shown = activeTab
+            if let tab = activeTab { show(tab) }
         }
+    }
+
+    /// 把显示切到某标签,并记下此刻组内的标签 id。
+    private func show(_ tab: WorkbenchTab) {
+        shown = tab
+        shownSiblings = group.tabs.map(\.id)
     }
 
     private func focus() {
@@ -302,7 +311,7 @@ struct IDEGroupDropDelegate: DropDelegate {
     }
 }
 
-private extension WorkbenchTab {
+extension WorkbenchTab {
     /// ForEach 的槽位标识(见 `EditorSwapPolicy.slotKey`)。
     var slotID: String { EditorSwapPolicy.slotKey(self) }
 }

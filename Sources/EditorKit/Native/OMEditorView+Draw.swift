@@ -89,7 +89,7 @@ extension OMEditorView {
         drawIndentGuides(rows: rows)
         drawSelections(rows: rows)
         drawDecorationBackgrounds(rows: rows)
-        drawText(rows: rows, in: context)
+        if !syntaxPending { drawText(rows: rows, in: context) }
         drawInvisibles(rows: rows)
         drawDecorationForegrounds(rows: rows)
         drawFoldPlaceholders(rows: rows)

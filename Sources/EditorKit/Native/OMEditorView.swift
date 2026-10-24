@@ -69,6 +69,8 @@ public final class OMEditorView: NSView {
     var minimap: NativeMinimapView?
     /// 首批语法着色完成并绘制后调用一次(之后清空)。
     public var onFirstHighlight: (() -> Void)?
+    /// 首批语法着色尚未到位:此时只画底色与行号栏,不画无色的正文,避免「先出白字、颜色随后才跟上」的闪动
+    var syntaxPending = false
     /// 括号索引(彩色括号与括号匹配)。
     let brackets = NativeBracketStore()
     /// 粘性滚动当前显示的块头行与计算键(顶行、文档版本)。
@@ -162,6 +164,7 @@ public final class OMEditorView: NSView {
             guard let self else { return }
             self.cache.clear()
             self.minimap?.invalidateAll()
+            self.syntaxPending = false
             self.needsDisplay = true
             // 首批语法着色到位:先同步画完这一帧,再通知宿主(宿主据此把新编辑器换到前台,切换文件时不闪)
             if let ready = self.onFirstHighlight {
@@ -174,7 +177,17 @@ public final class OMEditorView: NSView {
             MainActor.assumeIsolated { self?.refreshTheme() }
         }
         updateGutterWidth()
+        syntaxPending = model.language != .plain && model.document.snapshot.length > 0
         reloadSyntax()
+        if syntaxPending {
+            // 兜底:语法引擎迟迟不出结果(解析失败、超大文件)时,正文照常显示
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(600))
+                guard let self, self.syntaxPending else { return }
+                self.syntaxPending = false
+                self.needsDisplay = true
+            }
+        }
     }
 
     @available(*, unavailable)

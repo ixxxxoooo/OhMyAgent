@@ -158,6 +158,11 @@ struct TabGroupView: View {
     @State private var zone: DockDropZone?
     /// 保活的标签(最近使用的若干个视图保持挂载,切换时不重建)
     @State private var keepAlive = TabKeepAlive()
+    /// 新文件编辑器首帧着色就绪前继续显示旧标签(见 `EditorSwapGate`)
+    @State private var gate = EditorSwapGate()
+    @State private var shown: WorkbenchTab?
+    @State private var shownSiblings: [UUID] = []
+    @State private var holdTimeout: Task<Void, Never>?
 
     private var isFocused: Bool { workbench.dock(host).focusedGroupID == group.id }
 
@@ -209,14 +214,23 @@ struct TabGroupView: View {
     /// 因此切换标签不再重建编辑器、重新高亮或重新连接语言服务器。
     @ViewBuilder
     private func content(size: CGSize) -> some View {
-        if group.active != nil {
+        if let target = group.active {
+            let holding = isHolding(target)
+            let mounted = keepAlive.mounted(in: group.tabs, active: group.activeID)
+            // 等待新编辑器就绪时,被保留的旧标签(可能是同一预览标签的旧路径)也要挂着
+            let kept: WorkbenchTab? = {
+                guard holding, let old = shown, !mounted.contains(where: { $0.slotID == old.slotID }) else { return nil }
+                return old
+            }()
+            let visibleKey = holding ? shown?.slotID : target.slotID
             ZStack {
-                ForEach(keepAlive.mounted(in: group.tabs, active: group.activeID)) { tab in
-                    let isActive = tab.id == group.activeID
+                ForEach(mounted + (kept.map { [$0] } ?? []), id: \.slotID) { tab in
+                    let isActive = tab.slotID == visibleKey
                     TabContentView(workbench: workbench, tab: tab)
                         // 隐藏的保活标签冻结在失活时的尺寸:窗口/侧栏宽度变化不再让每个隐藏会话重新排版,激活时才一次性恢复
                         .modifier(InactiveSizeFreeze(isActive: isActive, size: size))
-                        .environment(\.tabIsActive, isActive)
+                        .environment(\.tabIsActive, tab.id == group.activeID && tab.id != kept?.id)
+                        .environment(\.editorSwapGate, gate)
                         .opacity(isActive ? 1 : 0)
                         .allowsHitTesting(isActive)
                         // 隐藏标签退出控件焦点/键盘导航,减少 SwiftUI 焦点链遍历的节点数
@@ -224,6 +238,8 @@ struct TabGroupView: View {
                         .accessibilityHidden(!isActive)
                 }
             }
+            .onChange(of: group.active.map(EditorSwapPolicy.slotKey), initial: true) { settle(startTimeout: true) }
+            .onChange(of: gate.ready) { settle(startTimeout: false) }
             .onChange(of: group.activeID, initial: true) {
                 // 标签切换耗时:到下一个主循环(本轮布局/提交之后)为止
                 let span = Log.perf.span("标签切换", warnMs: 50, ["tab": group.active?.title ?? "-"])
@@ -237,6 +253,41 @@ struct TabGroupView: View {
             RightDockEmptyView(workbench: workbench)
         } else {
             WelcomeView(workbench: workbench)
+        }
+    }
+}
+
+extension TabGroupView {
+    /// 是否应继续显示旧标签:新激活的是原生编辑器文件且尚未就绪。
+    fileprivate func isHolding(_ target: WorkbenchTab) -> Bool {
+        var path: String?
+        if case .file(let value) = target.kind { path = value }
+        return EditorSwapPolicy.shouldHold(
+            targetPath: path, targetKey: target.slotID, shownKey: shown?.slotID,
+            shownAlive: shown.map { EditorSwapPolicy.isShownKeepable(shownID: $0.id, siblingIDs: shownSiblings, currentIDs: group.tabs.map(\.id), targetID: target.id) } ?? false,
+            ready: gate.ready)
+    }
+
+    /// 把显示切到某标签,并记下此刻组内的标签 id。
+    fileprivate func show(_ tab: WorkbenchTab) {
+        shown = tab
+        shownSiblings = group.tabs.map(\.id)
+    }
+
+    /// 激活标签变化或编辑器就绪后结算:不需要再等就换成激活标签;需要等则起超时兜底。
+    fileprivate func settle(startTimeout: Bool) {
+        guard let target = group.active else { shown = nil; return }
+        if !isHolding(target) {
+            holdTimeout?.cancel()
+            if shown?.slotID != target.slotID { show(target) }
+            return
+        }
+        guard startTimeout else { return }
+        holdTimeout?.cancel()
+        holdTimeout = Task { @MainActor in
+            try? await Task.sleep(for: EditorSwapPolicy.timeout)
+            guard !Task.isCancelled else { return }
+            if let tab = group.active { show(tab) }
         }
     }
 }
