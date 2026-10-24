@@ -112,6 +112,8 @@ struct FileTabView: View {
     @AppStorage(EditorBehaviorPrefs.minimapKey) private var minimapOn = true
     /// 自动换行(设置 → 编辑器 → 自动换行,默认开)
     @AppStorage(ClientPrefs.Key.editorWrap) private var wrapOn = true
+    /// 超过这个行数按大文件处理:不做软换行(整篇重排要几秒,会卡住主线程,如跳到 Swift 标准库接口文件)
+    @AppStorage(ClientPrefs.Key.editorLargeFileLines) private var largeFileLines = 20_000
     @State private var lsp: EditorLSPController?
     /// 原生编辑器的操作句柄(右键菜单据此执行剪切/粘贴/跳转定义等)
     @State private var editorHandle = NativeEditorHandle()
@@ -320,7 +322,7 @@ struct FileTabView: View {
     private func codeEditor(doc: FileDocument, text: String, markers: [Int: LineMarker]) -> some View {
         if let editorDocument = doc.ensureEditorDocument() {
             NativeCodeEditor(document: editorDocument, language: SyntaxLanguage.detect(path: path), isEditable: !doc.isReadOnly,
-                             revealLine: tab.line, markers: markers, diagnostics: lsp?.diagnostics ?? [], wrapsLines: wrapOn,
+                             revealLine: tab.line, markers: markers, diagnostics: lsp?.diagnostics ?? [], wrapsLines: wrapOn && editorDocument.lineCount <= largeFileLines,
                              chrome: ideHost == nil ? [] : editorChrome, filePath: path,
                              services: nativeServices, servicesKey: nativeServicesKey,
                              onCaretChange: ideHost.map { host in { host.caret(path, $0) } })
