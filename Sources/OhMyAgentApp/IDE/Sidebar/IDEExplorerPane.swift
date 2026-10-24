@@ -14,21 +14,27 @@ struct IDEExplorerPane: View {
     let workspace: IDEWorkspace
     @State private var hitBox = IDEExplorerHitBox()
     @State private var styleRevision = 0
+    /// 项目根文件夹是否展开(点击头部的项目名收起/展开整棵树,与 VS Code 一致)
+    @AppStorage("ide.explorerRootExpanded") private var rootExpanded = true
 
     var body: some View {
         if let root = workspace.root {
             let git = GitStore.shared.model(for: root)
             VStack(spacing: 0) {
                 toolbar(root: root)
-                IDEExplorerView(
-                    workspace: workspace,
-                    rows: workspace.tree.rows,
-                    decorations: git.decorationIndex,
-                    activePath: workspace.model.activeFilePath,
-                    styleRevision: styleRevision &+ Int(OMScale.ui * 100),
-                    hitBox: hitBox
-                )
-                .omContextMenu { menu(root: root) }
+                if rootExpanded {
+                    IDEExplorerView(
+                        workspace: workspace,
+                        rows: workspace.tree.rows,
+                        decorations: git.decorationIndex,
+                        activePath: workspace.model.activeFilePath,
+                        styleRevision: styleRevision &+ Int(OMScale.ui * 100),
+                        hitBox: hitBox
+                    )
+                    .omContextMenu { menu(root: root) }
+                } else {
+                    Spacer(minLength: 0)
+                }
                 IDEOutlineSection(workspace: workspace)
                 IDETimelineSection(workspace: workspace)
             }
@@ -48,10 +54,19 @@ struct IDEExplorerPane: View {
     /// 头部:工作区名 + 操作按钮(24pt 紧凑)。
     private func toolbar(root: String) -> some View {
         HStack(spacing: 2) {
-            Text((root as NSString).lastPathComponent.uppercased())
-                .font(OMFonts.caption)
+            Button { rootExpanded.toggle() } label: {
+                HStack(spacing: 4) {
+                    Image.om(rootExpanded ? "chevron-down" : "chevron-right", size: 12)
+                    Text((root as NSString).lastPathComponent.uppercased())
+                        .font(OMFonts.caption)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                }
                 .foregroundStyle(OMColors.secondaryText)
-                .lineLimit(1)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(rootExpanded ? String(localized: "收起项目文件夹") : String(localized: "展开项目文件夹"))
             Spacer(minLength: 4)
             iconButton("file-plus", String(localized: "新建文件")) { workspace.create(in: targetDirectory(root: root), isDirectory: false) }
             iconButton("folder-plus", String(localized: "新建文件夹")) { workspace.create(in: targetDirectory(root: root), isDirectory: true) }

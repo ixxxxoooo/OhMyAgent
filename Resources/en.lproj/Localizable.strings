@@ -2995,3 +2995,5 @@
 "重做" = "Redo";
 "剪切" = "Cut";
 "粘贴" = "Paste";
+"收起项目文件夹" = "Collapse project folder";
+"展开项目文件夹" = "Expand project folder";
