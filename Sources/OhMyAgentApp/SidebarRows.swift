@@ -192,11 +192,25 @@ extension WorkbenchModel {
     /// 会话模式(通用会话)默认展示的条数:整个侧栏只有这一个列表,可以放得更多。
     static let sidebarGeneralPreviewCount = 20
 
-    /// 某个列表默认展示的会话条数。
+    /// 某个列表默认展示的会话条数(没有可用高度信息时的固定值)。
     /// - Parameter mode: 列表类型(通用会话用更大的上限)
     /// - Returns: 条数
     static func sidebarPreviewCount(for mode: SessionLine.Mode) -> Int {
         mode == .general ? sidebarGeneralPreviewCount : sidebarPreviewCount
+    }
+
+    /// 按侧栏可用高度智能计算每个列表默认展示的会话条数:空间富裕多展示,紧张就少展示。
+    /// - Parameters:
+    ///   - viewport: 列表区可见高度(pt)
+    ///   - overhead: 会话行之外的固定行总高度(标题、项目头、置顶区、「显示更多」按钮等,含行间距)
+    ///   - lists: 共享这块空间的展开列表个数
+    ///   - range: 单个列表条数的上下限
+    /// - Returns: 每个列表默认展示的条数
+    static func adaptivePreviewCount(viewport: Double, overhead: Double, lists: Int, range: ClosedRange<Int>) -> Int {
+        guard lists > 0 else { return range.lowerBound }
+        let free = viewport - overhead - 16
+        let rows = Int(max(free, 0) / 32) / lists
+        return min(max(rows, range.lowerBound), range.upperBound)
     }
 
     /// 把侧栏展平为一维行数组(置顶 → 会话 → 工作区 → 各项目及其会话)。
@@ -204,9 +218,10 @@ extension WorkbenchModel {
     ///   - showArchived: 是否包含已归档会话
     ///   - expandedMore: 已点开「显示更多」的列表键(`general` 或项目 ID)
     ///   - scope: 行范围(会话模式 / 代码模式 / 全部)
+    ///   - viewport: 列表区可见高度;给定时「默认展示条数」按空间智能计算,nil 用固定值
     /// - Returns: 从上到下的行
     @MainActor
-    func sidebarRows(showArchived: Bool, expandedMore: Set<String>, scope: SidebarScope = .all) -> [SidebarRow] {
+    func sidebarRows(showArchived: Bool, expandedMore: Set<String>, scope: SidebarScope = .all, viewport: Double? = nil) -> [SidebarRow] {
         var rows: [SidebarRow] = []
         // 置顶:只有登记了置顶会话的项目才需要构造会话行;会话模式只含通用会话,代码模式只含工作区会话
         let pinned = projects.filter { !$0.pinnedSessions.isEmpty && scope.includes(chatArea: $0.isChatArea) }.flatMap {
@@ -218,11 +233,26 @@ extension WorkbenchModel {
                 rows.append(SidebarRow(id: "pin:\(item.id)", kind: .session(item, mode: .pinned, siblings: [], index: 0)))
             }
         }
+        // 智能条数:先估算固定行占用的高度,剩余空间平均分给各展开列表
+        var generalPreview = Self.sidebarGeneralPreviewCount
+        var treePreview = Self.sidebarPreviewCount
+        if let viewport {
+            let pinnedHeight = pinned.isEmpty ? 0 : Double(pinned.count + 1) * 32
+            let titleHeight = 32.0, moreHeight = 26.0
+            if !scope.includes(chatArea: false) {
+                generalPreview = Self.adaptivePreviewCount(viewport: viewport, overhead: pinnedHeight + titleHeight + moreHeight, lists: 1, range: 5...60)
+            } else {
+                let open = orderedProjects.filter { !$0.collapsed }.count
+                let overhead = pinnedHeight + titleHeight + Double(orderedProjects.count) * 32 + Double(open) * moreHeight
+                    + (scope.includes(chatArea: true) ? titleHeight + moreHeight + Double(Self.sidebarGeneralPreviewCount) * 32 : 0)
+                treePreview = Self.adaptivePreviewCount(viewport: viewport, overhead: overhead, lists: open, range: 3...15)
+            }
+        }
         if scope.includes(chatArea: true) {
             rows.append(SidebarRow(id: "title:general", kind: .title(.general)))
             if let entry = projects.first(where: \.isChatArea) {
                 appendSessions(of: entry, mode: .general, key: "general", indent: 8, showArchived: showArchived,
-                               expandedMore: expandedMore, emptyHint: .noGeneral, collapsed: false, into: &rows)
+                               expandedMore: expandedMore, emptyHint: .noGeneral, collapsed: false, preview: generalPreview, into: &rows)
             } else {
                 rows.append(SidebarRow(id: "hint:general", kind: .hint(.noGeneral, indent: 8)))
             }
@@ -234,7 +264,7 @@ extension WorkbenchModel {
             }
             for project in orderedProjects {
                 appendSessions(of: project, mode: .tree, key: project.id, indent: 16, showArchived: showArchived,
-                               expandedMore: expandedMore, emptyHint: .noSessions, collapsed: project.collapsed, into: &rows)
+                               expandedMore: expandedMore, emptyHint: .noSessions, collapsed: project.collapsed, preview: treePreview, into: &rows)
             }
         }
         return rows
@@ -244,9 +274,8 @@ extension WorkbenchModel {
     /// 折叠的项目只统计个数,不构造会话对象。
     @MainActor
     private func appendSessions(of project: ProjectEntry, mode: SessionLine.Mode, key: String, indent: CGFloat, showArchived: Bool,
-                                expandedMore: Set<String>, emptyHint: SidebarRow.HintKind, collapsed: Bool, into rows: inout [SidebarRow]) {
+                                expandedMore: Set<String>, emptyHint: SidebarRow.HintKind, collapsed: Bool, preview: Int, into rows: inout [SidebarRow]) {
         let expanded = expandedMore.contains(key)
-        let preview = Self.sidebarPreviewCount(for: mode)
         let limit = collapsed ? 0 : (expanded ? nil : preview)
         let list = sidebarSessionList(for: project, filter: .unpinned(showArchived: showArchived), limit: limit)
         if mode == .tree { rows.append(SidebarRow(id: "project:\(project.id)", kind: .project(project, count: list.total))) }

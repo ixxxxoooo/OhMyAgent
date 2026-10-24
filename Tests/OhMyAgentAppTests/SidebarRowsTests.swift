@@ -130,4 +130,13 @@ struct SidebarRowsTests {
         #expect(sessionIDs(codeRows, key: "general").isEmpty)
         #expect(SidebarScope(pane: .sessions) == .chat && SidebarScope(pane: .workspaces) == .code)
     }
+
+    @Test("智能条数:空间富裕多展示,紧张时回落到下限,不超过上限")
+    func adaptivePreviewCount() {
+        typealias M = WorkbenchModel
+        #expect(M.adaptivePreviewCount(viewport: 900, overhead: 100, lists: 1, range: 5...60) == 24)
+        #expect(M.adaptivePreviewCount(viewport: 300, overhead: 250, lists: 3, range: 3...15) == 3)
+        #expect(M.adaptivePreviewCount(viewport: 3000, overhead: 0, lists: 1, range: 3...15) == 15)
+        #expect(M.adaptivePreviewCount(viewport: 900, overhead: 0, lists: 0, range: 3...15) == 3)
+    }
 }

@@ -18,6 +18,8 @@ struct ProjectTreeView: View {
     @State private var showArchived = false
     /// 已点开「显示更多」的列表键
     @State private var expandedMore: Set<String> = []
+    /// 列表区可见高度(按 32pt 取整,避免拖动窗口时每个像素都重算行)
+    @State private var listHeight: Double?
 
     var body: some View {
         let _ = PanelToggleProbe.count("tree")
@@ -40,9 +42,10 @@ struct ProjectTreeView: View {
 
     /// 主操作 + 当前模式的列表(会话模式:置顶/会话;代码模式:置顶/工作区)。行数据(快照)在这里一次性生成;滚动只改窗口,不会重算。
     @ViewBuilder private var sessionsContent: some View {
-        let rows = workbench.sidebarRows(showArchived: showArchived, expandedMore: expandedMore, scope: SidebarScope(pane: workbench.layout.leftPane))
+        let rows = workbench.sidebarRows(showArchived: showArchived, expandedMore: expandedMore, scope: SidebarScope(pane: workbench.layout.leftPane), viewport: listHeight)
         navigation
         SidebarWindowedList(rows: rows) { row in rowView(row) }
+            .onGeometryChange(for: Double.self) { (($0.size.height / 32).rounded(.down)) * 32 } action: { listHeight = $0 }
     }
 
     /// 单行内容(窗口内才会被调用)。
@@ -298,13 +301,8 @@ private struct ProjectHeaderRow: View {
                     .accessibilityLabel("工作区另含 \(project.extraFolders.count) 个文件夹")
             }
             Spacer(minLength: 4)
-            // 固定 24pt 保留区:会话数 ⇄ 悬停「+」,互换不位移
+            // 固定 24pt 保留区:悬停才显示「+」(不再显示会话数)
             ZStack(alignment: .trailing) {
-                Text("\(count)")
-                    .font(OMFonts.caption)
-                    .monospacedDigit()
-                    .foregroundStyle(OMColors.tertiaryText)
-                    .opacity(hovering ? 0 : 1)
                 Button { workbench.newConversation(in: project.id) } label: {
                     Image.om("plus", size: 12)
                         .frame(width: 22, height: 22)
