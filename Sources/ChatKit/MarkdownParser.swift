@@ -194,6 +194,9 @@ public enum MarkdownParser {
                     rows.append(splitRow(rowLine))
                     index += 1
                 }
+                // GFM:数据行的单元格比表头多时,多出的部分被忽略(少了由渲染端补空格)。
+                // 否则单元格里一个没转义的竖线(哪怕在行内代码里)就会让整张表多出一列空白列,挤窄其余列
+                if !header.isEmpty { rows = rows.map { $0.count > header.count ? Array($0.prefix(header.count)) : $0 } }
                 add(.table(header: header, rows: rows, aligns: aligns), at: blockStart)
                 continue
             }
