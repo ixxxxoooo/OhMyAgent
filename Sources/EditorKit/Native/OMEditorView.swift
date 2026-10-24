@@ -96,6 +96,8 @@ public final class OMEditorView: NSView {
     public var highlightsUnicode = true { didSet { needsDisplay = true } }
     /// 鼠标是否悬停在行号栏(折叠箭头据此显示)。
     var gutterHovered = false
+    /// ⌘ 悬停时加下划线的单词(转到定义的链接样式);nil 为没有
+    var commandLinkWord: TextSpan?
     /// 查找条模型与宿主(⌘F 打开)。
     let findModel = EditorFindModel()
     var findHost: NSHostingView<EditorFindBar>?

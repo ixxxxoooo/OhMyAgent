@@ -41,11 +41,45 @@ extension OMEditorView {
         // 靠近右/下边缘时显示滚动条,方便抓取。
         if point.x > bounds.width - 14 || point.y > bounds.height - 14 { showScrollbars() }
         updateGutterHover(at: point)
+        updateCommandLink(at: point, flags: event.modifierFlags)
         languageController.mouseMoved(point)
+    }
+
+    /// 按下/松开 ⌘ 时按鼠标当前位置更新链接下划线(鼠标没动也要即时出现/消失)。
+    public override func flagsChanged(with event: NSEvent) {
+        super.flagsChanged(with: event)
+        guard let window else { return }
+        updateCommandLink(at: convert(window.mouseLocationOutsideOfEventStream, from: nil), flags: event.modifierFlags)
+    }
+
+    /// 按住 ⌘ 时给鼠标下的单词加下划线(同 VS Code:提示可点击转到定义);松开、移走或不在文本上就去掉。
+    /// - Parameters:
+    ///   - point: 鼠标在视图中的位置
+    ///   - flags: 当前修饰键
+    func updateCommandLink(at point: CGPoint, flags: NSEvent.ModifierFlags) {
+        var target: TextSpan?
+        let active = flags.intersection(.deviceIndependentFlagsMask)
+        if active.contains(.command), !active.contains(.option), !active.contains(.shift),
+           languageController.services.definition != nil || onCommandClick != nil,
+           point.x > gutterWidth, bounds.contains(point) {
+            let offset = offset(at: point)
+            let rect = caretRect(forOffset: offset)
+            if abs(point.x - rect.minX) < cache.columnWidth * 1.6, point.y >= rect.minY, point.y <= rect.maxY {
+                let word = CursorMotion.wordRange(at: offset, in: model.document.snapshot)
+                if word.length > 0 { target = word }
+            }
+        }
+        guard target != commandLinkWord else { return }
+        commandLinkWord = target
+        let decorations = target.map { [Decoration(id: 9_900_001, range: $0, kind: .link, removesWhenCollapsed: true)] } ?? []
+        model.decorations.replace(kinds: [.link], with: decorations)
+        cache.clear()
+        needsDisplay = true
     }
 
     public override func mouseExited(with event: NSEvent) {
         updateGutterHover(at: nil)
+        updateCommandLink(at: .zero, flags: [])
         languageController.mouseExited(convert(event.locationInWindow, from: nil))
     }
 
