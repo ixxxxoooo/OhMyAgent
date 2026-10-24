@@ -168,6 +168,36 @@ struct TabGroupView: View {
     /// 会话模式(中栏停靠区)不需要多标签:隐藏标签栏。
     private var hidesTabBar: Bool { host != .right && workbench.layout.leftPane == .sessions }
 
+    /// 会话模式的标题栏:当前会话名 + 下拉箭头,点击重命名。
+    private var sessionTitleHeader: some View {
+        let tab = group.active
+        let title = tab.map { workbench.displayTitle($0) } ?? ""
+        return HStack(spacing: 6) {
+            if !title.isEmpty {
+                Button {
+                    guard let tab, case .chat(let project, _) = tab.kind, let id = workbench.session(forTab: tab)?.sessionId,
+                          let name = ExplorerActions.prompt(title: String(localized: "重命名会话"), initial: title) else { return }
+                    workbench.renameSession(id, in: project, to: name)
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(title).font(OMFonts.title).foregroundStyle(OMColors.primaryText).lineLimit(1)
+                        Image.om("chevron-down", size: 12).foregroundStyle(OMColors.tertiaryText)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(String(localized: "重命名会话"))
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.leading, max(insets.leading, 0) + 16)
+        .padding(.trailing, max(insets.trailing, 0))
+        .frame(height: TitlebarMetrics.height)
+        .frame(maxWidth: .infinity)
+        .background(OMColors.surface)
+        .background(WindowDragArea())
+    }
+
     private var isFocused: Bool { workbench.dock(host).focusedGroupID == group.id }
 
     /// 标签栏为窗口顶部浮层(红绿灯、面板开关)让出的前/后边距:中栏在两侧都没有面板时才让位;
@@ -190,8 +220,8 @@ struct TabGroupView: View {
         let _ = PanelToggleProbe.count("tabGroup")
         VStack(spacing: 0) {
             if hidesTabBar {
-                // 会话模式只有侧栏会话列表一个入口,不显示标签栏;保留同高的标题栏区域(可拖动窗口)
-                OMColors.surface.frame(height: TitlebarMetrics.height).background(WindowDragArea())
+                // 会话模式只有侧栏会话列表一个入口,不显示标签栏;原位置显示当前会话名(同高的标题栏区域,可拖动窗口)
+                sessionTitleHeader
             } else {
                 TabBarView(
                     workbench: workbench, group: group, isFocused: isFocused,
