@@ -114,7 +114,6 @@ struct AppearancePage: View {
     @AppStorage(ClientPrefs.Key.settingsWidthCustom) private var settingsWidthCustom = SettingsContentWidth.customDefault
     @AppStorage(ClientPrefs.Key.workingVerbStyle) private var verbStyle = WorkingVerbStyle.classic.rawValue
     @AppStorage(ClientPrefs.Key.scrollbarVisibility) private var scrollbar = ScrollbarVisibility.custom.rawValue
-    @AppStorage(EditorBehaviorPrefs.minimapKey) private var minimap = true
     @AppStorage(ClientPrefs.Key.toolDensity) private var toolDensityRaw = ToolDensity.standard.rawValue
     @AppStorage(ClientPrefs.Key.chatCodeWrap) private var codeWrap = false
     @AppStorage(FontSmoothing.preferenceKey) private var fontSmoothing = FontSmoothing.system.rawValue
@@ -319,9 +318,6 @@ struct AppearancePage: View {
                     .pickerStyle(.segmented).labelsHidden().fixedSize()
                 }
                 Note("「跟随系统」沿用 macOS「显示滚动条」设置;「自动隐藏」仅在滚动时出现;「始终显示」常驻。").footnote()
-            }
-            SettingsCard("编辑器缩略图") {
-                SettingsToggleRow("显示缩略图", detail: "IDE 窗口的编辑器右侧显示按语法着色的代码缩略图,点击或拖动可快速滚动;开启时隐藏竖向滚动条。", isOn: $minimap)
             }
             SettingsCard("材质与动效") {
                 SettingsToggleRow("始终使用不透明材质", isOn: $appearance.alwaysOpaque)

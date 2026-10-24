@@ -107,6 +107,8 @@ struct FileTabView: View {
     /// Agent 窗口标签组的就绪登记(切换文件不闪屏,见 `EditorSwapGate`)
     @Environment(\.editorSwapGate) private var swapGate
     @AppStorage(ClientPrefs.Key.editorLSP) private var lspEnabled = true
+    /// 缩略图开关(设置 → 编辑器);原生与旧引擎共用
+    @AppStorage(EditorBehaviorPrefs.minimapKey) private var minimapOn = true
     @State private var lsp: EditorLSPController?
     /// 原生编辑器的操作句柄(右键菜单据此执行剪切/粘贴/跳转定义等)
     @State private var editorHandle = NativeEditorHandle()
@@ -252,6 +254,14 @@ struct FileTabView: View {
         if let ideHost { ideHost.markReady(path, ready) } else { swapGate?.mark(path, ready: ready) }
     }
 
+    /// IDE 窗口里编辑器的外围视图:缩略图受设置开关控制;关掉后用概览尺顶替(保留诊断/改动标记)。
+    private func editorChrome(native: Bool) -> EditorChrome {
+        var chrome: EditorChrome = [.stickyScroll, .folding]
+        if minimapOn { chrome.insert(.minimap) }
+        if native { chrome.insert(.overviewRuler) }
+        return chrome
+    }
+
     /// 原生编辑器的语言智能回调(语言服务器就绪后才有内容)。
     private var nativeServices: NativeLanguageServices {
         guard let lsp, case .ready = lsp.status else { return NativeLanguageServices() }
@@ -309,7 +319,7 @@ struct FileTabView: View {
         if EditorEngine.usesNative(for: SyntaxLanguage.detect(path: path)), let editorDocument = doc.ensureEditorDocument() {
             NativeCodeEditor(document: editorDocument, language: SyntaxLanguage.detect(path: path), isEditable: !doc.isReadOnly,
                              revealLine: tab.line, markers: markers, diagnostics: lsp?.diagnostics ?? [],
-                             chrome: ideHost == nil ? [] : [.minimap, .stickyScroll, .folding, .overviewRuler], filePath: path,
+                             chrome: ideHost == nil ? [] : editorChrome(native: true), filePath: path,
                              services: nativeServices, servicesKey: nativeServicesKey,
                              onCaretChange: ideHost.map { host in { host.caret(path, $0) } })
                 .handle(editorHandle)
@@ -322,7 +332,7 @@ struct FileTabView: View {
             CodeEditor(text: text, language: SyntaxLanguage.detect(path: path), isEditable: !doc.isReadOnly, revealLine: tab.line, markers: markers,
                        diagnostics: lsp?.diagnostics ?? [], features: lsp?.features ?? EditorLanguageFeatures(),
                        onReferenceSelection: { range in referenceSelection(range, text: doc.text ?? text) },
-                       chrome: ideHost == nil ? [] : [.minimap, .stickyScroll, .folding],
+                       chrome: ideHost == nil ? [] : editorChrome(native: false),
                        onCaretChange: ideHost.map { host in { host.caret(path, $0) } },
                        inlineNote: !doc.isDirty && !blameLines.isEmpty ? { blameNote($0) } : nil,
                        onChange: { newText in doc.text = newText })

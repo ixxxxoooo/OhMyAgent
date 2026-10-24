@@ -33,19 +33,17 @@ struct IDESearchPane: View {
     // MARK: 输入区
 
     private var inputs: some View {
-        VStack(spacing: 6) {
-            HStack(spacing: 4) {
-                Button { model.showsReplace.toggle() } label: { Image.om(model.showsReplace ? "chevron-down" : "chevron-right", size: 12) }
-                    .buttonStyle(.omIcon).omTooltip(String(localized: "切换替换")).accessibilityLabel(String(localized: "切换替换"))
+        HStack(alignment: .center, spacing: 2) {
+            Button { model.showsReplace.toggle() } label: { Image.om(model.showsReplace ? "chevron-down" : "chevron-right", size: 12) }
+                .buttonStyle(.omIcon).omTooltip(String(localized: "切换替换")).accessibilityLabel(String(localized: "切换替换"))
+                .frame(width: 18)
+            VStack(spacing: 6) {
                 field(String(localized: "搜索"), text: $model.query, focus: true) {
                     toggle("Aa", $model.caseSensitive, String(localized: "区分大小写"))
                     toggle("ab", $model.wholeWord, String(localized: "全词匹配"))
                     toggle(".*", $model.isRegex, String(localized: "正则表达式"))
                 }
-            }
-            if model.showsReplace {
-                HStack(spacing: 4) {
-                    Color.clear.frame(width: 24, height: 24)
+                if model.showsReplace {
                     field(String(localized: "替换"), text: $model.replacement, focus: false) {
                         Button { model.replaceAll() } label: { Image.om("list-checks", size: 14) }
                             .buttonStyle(.omIcon)
@@ -54,13 +52,11 @@ struct IDESearchPane: View {
                             .accessibilityLabel(String(localized: "全部替换"))
                     }
                 }
-            }
-            HStack(spacing: 4) {
-                Color.clear.frame(width: 24, height: 0)
                 field(String(localized: "要包含的文件(如 *.swift, Sources/**)"), text: $model.pathFilter, focus: false) { EmptyView() }
             }
         }
-        .padding(.horizontal, 8)
+        .padding(.leading, 4)
+        .padding(.trailing, 8)
         .padding(.vertical, 8)
     }
 

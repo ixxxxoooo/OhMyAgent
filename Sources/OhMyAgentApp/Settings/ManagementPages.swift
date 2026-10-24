@@ -23,6 +23,7 @@ struct EditorPage: View {
     @AppStorage(EditorBehaviorPrefs.currentLineKey) private var currentLine = true
     @AppStorage(EditorBehaviorPrefs.bracketMatchKey) private var bracketMatch = true
     @AppStorage(EditorBehaviorPrefs.stickyScrollKey) private var stickyScroll = true
+    @AppStorage(EditorBehaviorPrefs.minimapKey) private var minimap = true
     @AppStorage(EditorBehaviorPrefs.ghostCompletionKey) private var ghostCompletion = false
     @AppStorage(IDEAutoSaveMode.key) private var autoSave = IDEAutoSaveMode.off.rawValue
     private let appearance = AppearanceModel.shared
@@ -165,6 +166,7 @@ struct EditorPage: View {
                 SettingsToggleRow("自动闭合括号与引号", detail: "输入 ( [ { \" ' ` 时补全另一半,选中文本时输入会包裹选区。", isOn: $autoClose)
                 SettingsToggleRow("高亮当前行", isOn: $currentLine)
                 SettingsToggleRow("高亮配对括号", isOn: $bracketMatch)
+                SettingsToggleRow("显示缩略图", detail: "IDE 窗口的编辑器右侧显示按语法着色的代码缩略图,点击或拖动可快速滚动;开启时隐藏竖向滚动条。", isOn: $minimap)
                 SettingsToggleRow("粘性滚动", detail: "IDE 窗口的编辑器顶部固定显示当前所在的外层代码块标题(最多 3 行),点击跳转。", isOn: $stickyScroll)
                 SettingsToggleRow("幽灵补全(Tab 接受)", detail: "IDE 窗口里停止输入片刻后,用辅助模型在行尾给出灰色续写建议,Tab 接受、Esc 丢弃。会产生模型请求,默认关闭。", isOn: $ghostCompletion)
                 SettingsRow("自动保存", detail: "IDE 窗口里的文件修改后自动写盘;「失焦」指窗口失去键盘焦点时保存。") {
