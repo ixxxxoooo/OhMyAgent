@@ -89,14 +89,18 @@ final class IDEPaletteModel {
     private(set) var customItems: [IDEPaletteLocation]?
     /// 自定义列表的输入框占位文案
     private(set) var customPlaceholder = ""
+    /// 自定义列表为空时显示的文案(如「语言服务正在建立索引…」);nil 用默认的「没有匹配项」
+    private(set) var customEmptyMessage: String?
 
     /// 以自定义列表打开面板(查找引用、转到符号)。
     /// - Parameters:
     ///   - items: 列表
     ///   - placeholder: 输入框占位文案
-    func present(custom items: [IDEPaletteLocation], placeholder: String) {
+    ///   - emptyMessage: 列表为空时的提示;nil 为默认「没有匹配项」
+    func present(custom items: [IDEPaletteLocation], placeholder: String, emptyMessage: String? = nil) {
         customItems = items
         customPlaceholder = placeholder
+        customEmptyMessage = emptyMessage
         text = ""
         highlighted = 0
         focusToken += 1

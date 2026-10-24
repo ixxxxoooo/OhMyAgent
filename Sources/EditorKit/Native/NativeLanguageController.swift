@@ -19,6 +19,8 @@ private enum PopupMode {
     case completion
     case actions([NativeCodeActionItem])
     case locations([NativeLocation])
+    /// 只读提示(「索引中」「没有找到引用」):确认键只关闭
+    case info
 }
 
 @MainActor
@@ -40,6 +42,11 @@ public final class NativeLanguageController {
     private var completionTask: Task<Void, Never>?
     private var completionGeneration = 0
     private var autoTriggerTask: Task<Void, Never>?
+    /// 查找引用的重试任务(索引未就绪时轮询;选区/文档变化或再次查找时取消)
+    private var referencesTask: Task<Void, Never>?
+    /// 引用为空时的最大重试次数与间隔:包含声明时结果恒不为空,空即「索引还没建好」
+    public static let referenceRetries = 8
+    public static var referenceRetryInterval: Duration = .milliseconds(1500)
 
     // 悬停
     private var hoverCard: NativeInfoCardView?
@@ -141,6 +148,7 @@ public final class NativeLanguageController {
 
     /// 文档变化:过滤补全、刷新签名、排队内嵌提示/语义刷新。
     func documentChanged() {
+        referencesTask?.cancel()
         hideHover()
         lastPreparedVersion = -1
         if case .completion? = popupMode { refilterCompletion() }
@@ -151,6 +159,7 @@ public final class NativeLanguageController {
     /// 选区变化:关闭失效浮层并重新查询代码操作。
     func selectionChanged() {
         guard let view else { return }
+        referencesTask?.cancel()
         if case .completion? = popupMode {
             let head = view.model.selections.primary.head
             if head < popupAnchor || view.model.selections.isMulti { dismissPopup() }
@@ -270,6 +279,8 @@ public final class NativeLanguageController {
             guard items.indices.contains(index) else { return }
             dismissPopup()
             open(items[index])
+        case .info:
+            dismissPopup()
         }
     }
 
@@ -477,14 +488,40 @@ public final class NativeLanguageController {
     }
 
     /// 查找引用并以列表浮层展示。
+    /// 语言服务的代码索引是异步建立的:刚打开项目时结果可能为空(查引用包含声明本身,所以空必然是索引未就绪),
+    /// 此时显示「索引中」提示并自动重试,最终仍为空才提示「没有找到引用」。
     public func findReferences() {
         guard let view, let provider = services.references else { return }
         prepare()
         let target = view.model.selections.primary.head
-        Task { [weak self] in
-            let locations = await provider(target)
-            self?.presentLocations(locations, forceList: true)
+        referencesTask?.cancel()
+        referencesTask = Task { [weak self] in
+            var locations = await provider(target)
+            var attempt = 0
+            while locations.isEmpty, attempt < Self.referenceRetries, !Task.isCancelled {
+                if attempt == 0 { self?.showInfo(String(localized: "语言服务正在建立索引,稍后自动重试…")) }
+                try? await Task.sleep(for: Self.referenceRetryInterval)
+                guard !Task.isCancelled else { return }
+                attempt += 1
+                locations = await provider(target)
+            }
+            guard !Task.isCancelled, let self else { return }
+            if locations.isEmpty { self.showInfo(String(localized: "没有找到引用")) } else { self.presentLocations(locations, forceList: true) }
         }
+    }
+
+    /// 在光标处显示一行只读提示浮层(按任意键或移动光标关闭)。
+    private func showInfo(_ message: String) {
+        guard let view else { return }
+        dismissPopup()
+        popupMode = .info
+        popupAnchor = view.model.selections.primary.head
+        let list = ensurePopup()
+        list.maxVisible = 1
+        list.rows = [NativePopupRow(title: message, detail: nil, badge: nil)]
+        list.selected = 0
+        list.footer = nil
+        finishPopupLayout(list)
     }
 
     private func presentLocations(_ locations: [NativeLocation], forceList: Bool = false) {
@@ -686,6 +723,6 @@ public final class NativeLanguageController {
     /// 视图销毁:取消所有后台任务。
     func teardown() {
         completionTask?.cancel(); autoTriggerTask?.cancel(); hoverTask?.cancel(); signatureTask?.cancel()
-        codeActionTask?.cancel(); inlayTask?.cancel(); semanticTask?.cancel()
+        codeActionTask?.cancel(); inlayTask?.cancel(); semanticTask?.cancel(); referencesTask?.cancel()
     }
 }

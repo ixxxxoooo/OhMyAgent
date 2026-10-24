@@ -79,7 +79,18 @@ extension IDEWorkspace {
         guard let path = model.activeFilePath, let controller = activeLSP else { reportUnavailable(); return }
         let offset = caretOffset(in: controller, path: path)
         Task {
-            let locations = await controller.references(at: offset)
+            // 索引异步建立:查引用包含声明,空结果必然是索引未就绪 → 面板里提示「索引中」并自动重试
+            var locations = await controller.references(at: offset)
+            var attempt = 0
+            while locations.isEmpty, attempt < NativeLanguageController.referenceRetries {
+                if attempt == 0 {
+                    palette.present(custom: [], placeholder: String(localized: "引用"), emptyMessage: String(localized: "语言服务正在建立索引,稍后自动重试…"))
+                }
+                try? await Task.sleep(for: NativeLanguageController.referenceRetryInterval)
+                guard palette.isPresented else { return }   // 用户已关掉面板:不再重试,也不弹出结果
+                attempt += 1
+                locations = await controller.references(at: offset)
+            }
             let root = self.root ?? ""
             var cache: [String: [String]] = [:]
             let items = locations.compactMap { location -> IDEPaletteLocation? in
@@ -95,7 +106,11 @@ extension IDEWorkspace {
                 return IDEPaletteLocation(id: "\(target):\(line):\(location.range.start.character)", title: preview.isEmpty ? relative : preview,
                                           detail: "\(relative):\(line + 1)", icon: "file-code", path: target, line: line + 1)
             }
-            if items.isEmpty { OMDialog.alert(title: String(localized: "没有找到引用"), message: "", isError: false); return }
+            if items.isEmpty {
+                palette.dismiss()
+                OMDialog.alert(title: String(localized: "没有找到引用"), message: "", isError: false)
+                return
+            }
             palette.present(custom: items, placeholder: String(localized: "引用(\(items.count))"))
         }
     }

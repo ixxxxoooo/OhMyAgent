@@ -94,7 +94,7 @@ private struct IDEPaletteCard: View {
     @ViewBuilder
     private func list(_ items: [IDEPaletteItem]) -> some View {
         if items.isEmpty {
-            Text(palette.customItems == nil && palette.files.isEmpty && palette.query == .files("") ? String(localized: "正在建立文件索引…") : String(localized: "没有匹配项"))
+            Text(palette.customEmptyMessage ?? (palette.customItems == nil && palette.files.isEmpty && palette.query == .files("") ? String(localized: "正在建立文件索引…") : String(localized: "没有匹配项")))
                 .font(OMFonts.small)
                 .foregroundStyle(OMColors.tertiaryText)
                 .frame(maxWidth: .infinity, minHeight: 56)
