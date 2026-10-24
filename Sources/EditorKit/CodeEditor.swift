@@ -124,19 +124,3 @@ public struct CodeEditor: NSViewRepresentable {
     }
 }
 
-/// 编辑器光标状态(行、列均 1 起始;`selectedLength` 为选中的字符数)。
-public struct EditorCaret: Equatable, Sendable {
-    public var line: Int
-    public var column: Int
-    public var selectedLength: Int
-
-    /// - Parameters:
-    ///   - line: 行号
-    ///   - column: 列号
-    ///   - selectedLength: 选中字符数
-    public init(line: Int, column: Int, selectedLength: Int) {
-        self.line = line
-        self.column = column
-        self.selectedLength = selectedLength
-    }
-}
