@@ -25,6 +25,10 @@ public extension EditorBehaviorPrefs {
     static let minimapKey = "editor.minimap"
     /// 粘性滚动开关的键
     static let stickyScrollKey = "editor.stickyScroll"
+    /// 类型内联提示(灰色 `: Bool` 等)开关的键
+    static let inlayHintsKey = "editor.inlayHints"
+    /// 是否显示语言服务器的内联提示(默认关:灰色类型提示不是源码文本,容易被误认为多出的字符)。
+    static var inlayHints: Bool { UserDefaults.standard.object(forKey: inlayHintsKey) as? Bool ?? false }
     /// 幽灵补全(Tab 接受 AI 续写)开关的键
     static let ghostCompletionKey = "editor.ghostCompletion"
     /// 是否启用幽灵补全(默认关:每次停顿都会向模型发请求)。

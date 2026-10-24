@@ -146,7 +146,7 @@ extension EditorLSPController {
     // MARK: 内嵌提示 / 语义着色 / 格式化
 
     private func nativeInlayHints(in range: NSRange) async -> [NativeInlayHint] {
-        guard let handle else { return [] }
+        guard EditorBehaviorPrefs.inlayHints, let handle else { return [] }
         await flush()
         let index = LineIndex(text: currentText)
         let lspRange = LSPRange(start: LSPTextMapping.position(offset: range.location, in: index),

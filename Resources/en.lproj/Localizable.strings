@@ -3002,3 +3002,5 @@
 "语言服务正在建立索引,稍后自动重试…" = "The language server is indexing. Retrying shortly…";
 "引用" = "References";
 "这个提交没有改动该文件内容。" = "This commit made no content changes to this file.";
+"类型内联提示" = "Type inlay hints";
+"在变量名后用灰色字显示语言服务器推断的类型(如 `: Bool`),它不是源码文本。默认关闭。" = "Show types inferred by the language server in gray after variable names (e.g. `: Bool`). They are not source text. Off by default.";

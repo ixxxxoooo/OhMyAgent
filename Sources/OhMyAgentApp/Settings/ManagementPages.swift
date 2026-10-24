@@ -25,6 +25,7 @@ struct EditorPage: View {
     @AppStorage(EditorBehaviorPrefs.stickyScrollKey) private var stickyScroll = true
     @AppStorage(EditorBehaviorPrefs.minimapKey) private var minimap = true
     @AppStorage(EditorBehaviorPrefs.ghostCompletionKey) private var ghostCompletion = false
+    @AppStorage(EditorBehaviorPrefs.inlayHintsKey) private var inlayHints = false
     @AppStorage(IDEAutoSaveMode.key) private var autoSave = IDEAutoSaveMode.off.rawValue
     private let appearance = AppearanceModel.shared
     @State private var schemePickerShown = false
@@ -168,6 +169,7 @@ struct EditorPage: View {
                 SettingsToggleRow("高亮配对括号", isOn: $bracketMatch)
                 SettingsToggleRow("显示缩略图", detail: "IDE 窗口的编辑器右侧显示按语法着色的代码缩略图,点击或拖动可快速滚动;开启时隐藏竖向滚动条。", isOn: $minimap)
                 SettingsToggleRow("粘性滚动", detail: "IDE 窗口的编辑器顶部固定显示当前所在的外层代码块标题(最多 3 行),点击跳转。", isOn: $stickyScroll)
+                SettingsToggleRow("类型内联提示", detail: "在变量名后用灰色字显示语言服务器推断的类型(如 `: Bool`),它不是源码文本。默认关闭。", isOn: $inlayHints)
                 SettingsToggleRow("幽灵补全(Tab 接受)", detail: "IDE 窗口里停止输入片刻后,用辅助模型在行尾给出灰色续写建议,Tab 接受、Esc 丢弃。会产生模型请求,默认关闭。", isOn: $ghostCompletion)
                 SettingsRow("自动保存", detail: "IDE 窗口里的文件修改后自动写盘;「失焦」指窗口失去键盘焦点时保存。") {
                     Picker("", selection: $autoSave) {
