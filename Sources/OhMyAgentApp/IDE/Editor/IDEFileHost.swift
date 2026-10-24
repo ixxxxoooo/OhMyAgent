@@ -27,6 +27,8 @@ struct IDEFileHost {
     var caret: @MainActor (String, EditorCaret) -> Void
     /// 登记/注销某文件的语言服务器会话(IDE 命令:引用、符号、重命名、格式化经它访问)
     var registerLSP: @MainActor (String, EditorLSPController?) -> Void
+    /// 上报某文件的编辑器是否已完成首帧着色(切换文件时据此决定何时把新编辑器换到前台)
+    var markReady: @MainActor (String, Bool) -> Void
 }
 
 extension EnvironmentValues {

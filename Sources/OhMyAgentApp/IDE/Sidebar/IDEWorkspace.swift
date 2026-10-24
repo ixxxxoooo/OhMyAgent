@@ -37,6 +37,8 @@ final class IDEWorkspace {
     let search = IDESearchModel()
     /// 各文件标签最近上报的光标(状态栏显示活动文件的行列)
     var carets: [String: EditorCaret] = [:]
+    /// 切换文件时的就绪登记(新编辑器完成首帧着色前保留旧内容,不闪屏)
+    let swapGate = EditorSwapGate()
     /// 命令面板/快速打开(每窗口一份)
     let palette = IDEPaletteModel()
     /// Agent 面板所用会话的项目标识与槽位(每窗口一个专属槽位,不与 Agents Window 的会话标签冲突)

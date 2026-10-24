@@ -73,6 +73,16 @@ public struct NativeCodeEditor: NSViewRepresentable {
     public var agent = NativeAgentHooks()
     /// 外部操作句柄(宿主据此构建右键菜单);视图装入时绑定。
     public var handle: NativeEditorHandle?
+    /// 首批语法着色完成并绘制后的回调(只触发一次)。
+    public var onReady: (() -> Void)?
+
+    /// 返回带「就绪回调」的副本。
+    /// - Parameter action: 首帧着色完成后调用
+    public func onReady(_ action: @escaping () -> Void) -> NativeCodeEditor {
+        var copy = self
+        copy.onReady = action
+        return copy
+    }
 
     /// 返回绑定了操作句柄的副本。
     /// - Parameter handle: 句柄
@@ -137,6 +147,7 @@ public struct NativeCodeEditor: NSViewRepresentable {
         view.chrome = chrome
         context.coordinator.language = language
         handle?.view = view
+        view.onFirstHighlight = onReady
         sync(view, context.coordinator)
         return view
     }

@@ -136,6 +136,14 @@ struct IDEEditorGroupView: View {
     @State private var keepAlive = TabKeepAlive()
     @State private var zone: DockDropZone?
     @State private var size: CGSize = .zero
+    /// 当前对用户可见的标签快照(新文件编辑器未就绪时保留旧标签,见 `EditorSwapGate`)
+    @State private var shown: WorkbenchTab?
+    @State private var holdTimeout: Task<Void, Never>?
+
+    private var gate: EditorSwapGate { workspace.swapGate }
+    private var activeTab: WorkbenchTab? { group.tabs.first { $0.id == group.activeID } }
+    /// 激活标签的变化键(预览标签原地换文件时 id 不变,路径变)
+    private var activeKey: String { activeTab.map(EditorSwapPolicy.slotKey) ?? "" }
 
     private var isFocused: Bool { workspace.model.editor.focusedGroupID == group.id }
 
@@ -151,6 +159,36 @@ struct IDEEditorGroupView: View {
         .simultaneousGesture(TapGesture().onEnded { focus() })
         .onChange(of: group.activeID, initial: true) { _, id in keepAlive.activate(id, in: group.tabs) }
         .onChange(of: group.tabs.map(\.id)) { _, _ in keepAlive.activate(group.activeID, in: group.tabs) }
+        .onChange(of: activeKey, initial: true) { _, _ in settle(startTimeout: true) }
+        .onChange(of: gate.ready) { _, _ in settle(startTimeout: false) }
+    }
+
+    /// 当前是否应继续显示旧标签。
+    private var isHolding: Bool {
+        guard let target = activeTab else { return false }
+        var targetPath: String?
+        if case .file(let path) = target.kind { targetPath = path }
+        return EditorSwapPolicy.shouldHold(
+            targetPath: targetPath, targetKey: EditorSwapPolicy.slotKey(target),
+            shownKey: shown.map(EditorSwapPolicy.slotKey), shownAlive: shown.map { old in group.tabs.contains { $0.id == old.id } } ?? false,
+            ready: gate.ready)
+    }
+
+    /// 激活标签变化或编辑器就绪后结算:不需要再等就把显示换成激活标签;需要等则起超时兜底。
+    private func settle(startTimeout: Bool) {
+        guard let target = activeTab else { shown = nil; return }
+        if !isHolding {
+            holdTimeout?.cancel()
+            if shown.map(EditorSwapPolicy.slotKey) != EditorSwapPolicy.slotKey(target) { shown = target }
+            return
+        }
+        guard startTimeout else { return }
+        holdTimeout?.cancel()
+        holdTimeout = Task { @MainActor in
+            try? await Task.sleep(for: EditorSwapPolicy.timeout)
+            guard !Task.isCancelled else { return }
+            shown = activeTab
+        }
     }
 
     private func focus() {
@@ -162,16 +200,23 @@ struct IDEEditorGroupView: View {
 
     @ViewBuilder
     private var content: some View {
+        let holding = isHolding
         let mounted = group.tabs.filter { keepAlive.order.contains($0.id) || $0.id == group.activeID }
+        // 等待新编辑器就绪时,被保留的旧标签(可能是同一预览标签的旧路径)也要挂着
+        let kept: WorkbenchTab? = {
+            guard holding, let old = shown, !mounted.contains(where: { EditorSwapPolicy.slotKey($0) == EditorSwapPolicy.slotKey(old) }) else { return nil }
+            return old
+        }()
+        let visibleKey = holding ? shown.map(EditorSwapPolicy.slotKey) : activeTab.map(EditorSwapPolicy.slotKey)
         ZStack {
-            ForEach(mounted) { tab in
-                let active = tab.id == group.activeID
-                tabBody(tab, active: active)
-                    .opacity(active ? 1 : 0)
-                    .allowsHitTesting(active)
-                    .disabled(!active)
-                    .accessibilityHidden(!active)
-                    .zIndex(active ? 1 : 0)
+            ForEach(mounted + (kept.map { [$0] } ?? []), id: \.slotID) { tab in
+                let visible = EditorSwapPolicy.slotKey(tab) == visibleKey
+                tabBody(tab, active: tab.id == group.activeID && !(tab.id == kept?.id))
+                    .opacity(visible ? 1 : 0)
+                    .allowsHitTesting(visible)
+                    .disabled(!visible)
+                    .accessibilityHidden(!visible)
+                    .zIndex(visible ? 1 : 0)
             }
             if group.tabs.isEmpty { IDEEditorEmptyState() }
         }
@@ -255,4 +300,9 @@ struct IDEGroupDropDelegate: DropDelegate {
             workspace.model.editor = layout
         }
     }
+}
+
+private extension WorkbenchTab {
+    /// ForEach 的槽位标识(见 `EditorSwapPolicy.slotKey`)。
+    var slotID: String { EditorSwapPolicy.slotKey(self) }
 }

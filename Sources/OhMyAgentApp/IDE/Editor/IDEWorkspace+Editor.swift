@@ -44,7 +44,8 @@ extension IDEWorkspace {
                 self?.model.problems.set(problems, forFile: path)
             },
             caret: { [weak self] path, caret in self?.carets[path] = caret },
-            registerLSP: { [weak self] path, controller in self?.registerLSP(controller, for: path) }
+            registerLSP: { [weak self] path, controller in self?.registerLSP(controller, for: path) },
+            markReady: { [weak self] path, ready in self?.swapGate.mark(path, ready: ready) }
         )
     }
 

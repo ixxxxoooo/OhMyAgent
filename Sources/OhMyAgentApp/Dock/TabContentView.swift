@@ -230,6 +230,7 @@ struct FileTabView: View {
             await startLanguageServer(doc)
         }
         .onDisappear {
+            ideHost?.markReady(path, false)
             lsp?.detach()
             lsp = nil
             ideHost?.registerLSP(path, nil)
@@ -305,6 +306,7 @@ struct FileTabView: View {
                              services: nativeServices, servicesKey: nativeServicesKey,
                              onCaretChange: ideHost.map { host in { host.caret(path, $0) } })
                 .handle(editorHandle)
+                .onReady { ideHost?.markReady(path, true) }
                 .agentHooks(agentHooks(doc, editorDocument: editorDocument))
                 .omContextMenu { nativeEditorMenu() }
                 .id(ObjectIdentifier(editorDocument))

@@ -67,6 +67,8 @@ public final class OMEditorView: NSView {
     public var chrome: EditorChrome = [] { didSet { if chrome != oldValue { chromeDidChange() } } }
     /// 缩略图视图(启用时存在)。
     var minimap: NativeMinimapView?
+    /// 首批语法着色完成并绘制后调用一次(之后清空)。
+    public var onFirstHighlight: (() -> Void)?
     /// 括号索引(彩色括号与括号匹配)。
     let brackets = NativeBracketStore()
     /// 粘性滚动当前显示的块头行与计算键(顶行、文档版本)。
@@ -161,6 +163,12 @@ public final class OMEditorView: NSView {
             self.cache.clear()
             self.minimap?.invalidateAll()
             self.needsDisplay = true
+            // 首批语法着色到位:先同步画完这一帧,再通知宿主(宿主据此把新编辑器换到前台,切换文件时不闪)
+            if let ready = self.onFirstHighlight {
+                self.onFirstHighlight = nil
+                self.displayIfNeeded()
+                ready()
+            }
         }
         themeObserver = NotificationCenter.default.addObserver(forName: ThemeRuntime.didChange, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshTheme() }
