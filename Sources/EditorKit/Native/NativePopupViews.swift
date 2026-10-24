@@ -183,10 +183,13 @@ final class NativeInfoCardView: NSView {
         text = content
         needsDisplay = true
         let limit = Self.maxWidth - Self.padding * 2
-        let bounds = content.boundingRect(with: CGSize(width: limit, height: .greatestFiniteMagnitude),
-                                          options: [.usesLineFragmentOrigin, .usesFontLeading])
-        return CGSize(width: min(ceil(bounds.width) + Self.padding * 2 + 2, Self.maxWidth),
-                      height: min(ceil(bounds.height) + Self.padding * 2, Self.maxHeight))
+        let options: NSString.DrawingOptions = [.usesLineFragmentOrigin, .usesFontLeading]
+        let natural = content.boundingRect(with: CGSize(width: limit, height: .greatestFiniteMagnitude), options: options)
+        // 留几个点的余量:测得的最长行宽与绘制时的折行判定有亚像素差,不留余量最长的一行会被折断,
+        // 把后面的说明挤出卡片底部(悬浮卡片只剩声明、下面一片空白)
+        let width = min(ceil(natural.width) + Self.padding * 2 + 8, Self.maxWidth)
+        let fitted = content.boundingRect(with: CGSize(width: width - Self.padding * 2, height: .greatestFiniteMagnitude), options: options)
+        return CGSize(width: width, height: min(ceil(fitted.height) + Self.padding * 2, Self.maxHeight))
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -196,7 +199,10 @@ final class NativeInfoCardView: NSView {
         NSColor(OMColors.hairline).setStroke()
         background.lineWidth = 0.5
         background.stroke()
-        text.draw(with: bounds.insetBy(dx: Self.padding, dy: Self.padding), options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine])
+        // 与 setContent 的测量用同一组选项;绘制区高度放开(超出卡片的部分由视图边界裁掉),
+        // 否则 .truncatesLastVisibleLine 会在测量与绘制的行高差异下把后面的行整行吞掉
+        let area = CGRect(x: Self.padding, y: Self.padding, width: bounds.width - Self.padding * 2, height: 10_000)
+        text.draw(with: area, options: [.usesLineFragmentOrigin, .usesFontLeading])
     }
 
     /// 精简 Markdown 渲染:代码围栏、行内代码、标题、段落。
@@ -207,14 +213,22 @@ final class NativeInfoCardView: NSView {
         let dim = NSColor(OMColors.secondaryText)
         let result = NSMutableAttributedString()
         var inFence = false
+        var fenceLanguage = ""
+        var codeLines: [String] = []
         let lines = markdown.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n")
         var pendingBlank = false
         for raw in lines {
-            if raw.hasPrefix("```") { inFence.toggle(); continue }
-            if inFence {
-                result.append(NSAttributedString(string: raw + "\n", attributes: [.font: mono, .foregroundColor: color]))
+            if raw.hasPrefix("```") {
+                if inFence {
+                    result.append(highlighted(codeLines.joined(separator: "\n") + "\n", fence: fenceLanguage, mono: mono, color: color))
+                    codeLines = []
+                } else {
+                    fenceLanguage = String(raw.dropFirst(3)).trimmingCharacters(in: .whitespaces)
+                }
+                inFence.toggle()
                 continue
             }
+            if inFence { codeLines.append(raw); continue }
             if raw.trimmingCharacters(in: .whitespaces).isEmpty { pendingBlank = result.length > 0; continue }
             if pendingBlank { result.append(NSAttributedString(string: "\n", attributes: [.font: NSFont.systemFont(ofSize: 5)])); pendingBlank = false }
             var line = raw
@@ -226,7 +240,21 @@ final class NativeInfoCardView: NSView {
             result.append(inline(line, base: NSFont.systemFont(ofSize: base.pointSize, weight: weight), mono: mono, color: weight == .medium ? color : dim.blended(withFraction: 0.35, of: color) ?? dim))
             result.append(NSAttributedString(string: "\n", attributes: [.font: base]))
         }
+        if inFence, !codeLines.isEmpty { result.append(highlighted(codeLines.joined(separator: "\n") + "\n", fence: fenceLanguage, mono: mono, color: color)) }
         while result.length > 0, result.string.hasSuffix("\n") { result.deleteCharacters(in: NSRange(location: result.length - 1, length: 1)) }
+        return result
+    }
+
+    /// 围栏代码块:按围栏语言做语法着色(与编辑器同一套词法与主题色),识别不出语言时为纯前景色。
+    private static func highlighted(_ code: String, fence: String, mono: NSFont, color: NSColor) -> NSAttributedString {
+        let result = NSMutableAttributedString(string: code, attributes: [.font: mono, .foregroundColor: color])
+        let language = SyntaxLanguage.fromFence(fence.isEmpty ? nil : fence)
+        guard language != .plain else { return result }
+        let colors = EditorTheme.default.colors
+        let length = result.length
+        for span in SimpleLexer.lex(code, language: language) where span.length > 0 && span.location + span.length <= length {
+            if let tint = colors[span.kind] { result.addAttribute(.foregroundColor, value: tint, range: NSRange(location: span.location, length: span.length)) }
+        }
         return result
     }
 

@@ -171,6 +171,12 @@ enum IDEDebugHooks {
                     let parts = argument.split(separator: ":").compactMap { Int($0) }
                     if parts.count == 2 { native.goToLine(line: parts[0], column: parts[1]) }
                     native.languageController.debugShowHover(at: native.model.selections.primary.head)
+                case "snap":
+                    // snap:输出路径.png:把编辑器视图(含悬浮卡片等子视图)渲染成 PNG,验证悬浮/补全卡片的真实外观
+                    if let rep = native.bitmapImageRepForCachingDisplay(in: native.bounds) {
+                        native.cacheDisplay(in: native.bounds, to: rep)
+                        try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: argument))
+                    }
                 case "sig": native.languageController.triggerSignature()
                 case "actions": native.languageController.showCodeActions()
                 case "format": native.languageController.formatDocument()
