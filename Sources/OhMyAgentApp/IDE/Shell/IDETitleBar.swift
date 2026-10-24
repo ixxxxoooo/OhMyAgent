@@ -115,6 +115,9 @@ struct IDETitleBar: View {
             ) { model.toggleSidebar() }
                 .padding(.leading, TitlebarMetrics.trafficLightInset)
             Spacer(minLength: 8)
+            // 有新版本/下载中/待重启时显示(与 Agent 窗口侧栏底部同一个按钮),无更新时不占位
+            UpdateFooterButton()
+                .padding(.trailing, 4)
             TitleBarIconButton(
                 icon: "panel-bottom",
                 label: (model.panelVisible ? String(localized: "隐藏面板") : String(localized: "显示面板")) + " (\(shortcuts.binding(for: .togglePanel).display))",
