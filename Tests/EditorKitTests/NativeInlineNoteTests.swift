@@ -1,5 +1,5 @@
 // @author ixxxxoooo
-// 行尾内联提示(Git blame)测试:悬停行与光标行的行尾确实绘制出文字,其它行不画。
+// 行尾内联提示(Git blame)测试:只在光标所在行的行尾绘制文字,不跟随鼠标,其它行不画。
 
 import AppKit
 import EditorCore
@@ -36,14 +36,20 @@ struct NativeInlineNoteTests {
         return count
     }
 
-    @Test("悬停行行尾画出提示;离开后消失;其它行不画")
-    func hoverLineShowsNote() {
+    @Test("只在光标行画提示:光标移动跟着走,鼠标位置无关,无焦点时不画")
+    func caretLineOnly() {
         let view = makeView()
-        #expect(inkAfterLineEnd(view, line: 1) == 0)
-        view.hoverNoteLine = 1
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 300), styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentView = view
+        window.makeFirstResponder(view)
+        let rope = view.model.document.snapshot
+        view.model.setSelections(SelectionSet(caret: rope.lineStart(1)))
         #expect(inkAfterLineEnd(view, line: 1) > 20)
         #expect(inkAfterLineEnd(view, line: 0) == 0)
-        view.hoverNoteLine = nil
+        view.model.setSelections(SelectionSet(caret: rope.lineStart(0)))
+        #expect(inkAfterLineEnd(view, line: 0) > 20)
         #expect(inkAfterLineEnd(view, line: 1) == 0)
+        view.inlineNote = nil
+        #expect(inkAfterLineEnd(view, line: 0) == 0)
     }
 }

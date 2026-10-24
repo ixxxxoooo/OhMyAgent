@@ -41,13 +41,11 @@ extension OMEditorView {
         // 靠近右/下边缘时显示滚动条,方便抓取。
         if point.x > bounds.width - 14 || point.y > bounds.height - 14 { showScrollbars() }
         updateGutterHover(at: point)
-        updateHoverNoteLine(at: point)
         languageController.mouseMoved(point)
     }
 
     public override func mouseExited(with event: NSEvent) {
         updateGutterHover(at: nil)
-        updateHoverNoteLine(at: nil)
         languageController.mouseExited(convert(event.locationInWindow, from: nil))
     }
 

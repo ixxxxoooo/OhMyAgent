@@ -75,10 +75,6 @@ public final class OMEditorView: NSView {
     public var inlineNote: ((Int) -> String?)? {
         didSet { needsDisplay = true }
     }
-    /// 鼠标悬停所在的逻辑行(内联提示也显示在悬停行)
-    var hoverNoteLine: Int? {
-        didSet { if oldValue != hoverNoteLine, inlineNote != nil { needsDisplay = true } }
-    }
     /// 括号索引(彩色括号与括号匹配)。
     let brackets = NativeBracketStore()
     /// 粘性滚动当前显示的块头行与计算键(顶行、文档版本)。
