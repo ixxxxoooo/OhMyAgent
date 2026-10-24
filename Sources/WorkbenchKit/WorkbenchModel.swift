@@ -403,6 +403,7 @@ public final class WorkbenchModel {
         switch kind {
         case .chat(let p, _), .changes(let p), .subagent(let p, _), .history(let p, _), .agentTerminal(let p, _): return p == id
         case .file(let path), .diff(let path), .blame(let path): return path == id || path.hasPrefix(id + "/")
+        case .commitDiff(let root, _, _): return root == id || root.hasPrefix(id + "/")
         case .terminal, .preview: return false
         }
     }
@@ -479,6 +480,17 @@ public final class WorkbenchModel {
     @discardableResult
     public func openBlame(_ path: String) -> UUID {
         openTab(.blame(path: path), title: "Blame · " + (path as NSString).lastPathComponent)
+    }
+
+    /// 打开某个提交里单个文件的差异标签。
+    /// - Parameters:
+    ///   - root: 仓库根目录
+    ///   - commit: 提交哈希
+    ///   - path: 仓库内相对路径
+    @discardableResult
+    public func openCommitDiff(root: String, commit: String, path: String) -> UUID {
+        let title = (path as NSString).lastPathComponent + " @ " + String(commit.prefix(7))
+        return openTab(.commitDiff(root: root, commit: commit, path: path), title: title)
     }
 
     /// 关闭某项目全部子 Agent 标签(会话被替换后它们指向的工具调用已不存在)。

@@ -25,6 +25,12 @@ protocol SCMHost {
     /// 打开文件的逐行追溯标签。
     /// - Parameter path: 文件绝对路径
     func openBlame(_ path: String)
+    /// 打开某个提交里单个文件的差异标签。
+    /// - Parameters:
+    ///   - root: 仓库根目录
+    ///   - commit: 提交哈希
+    ///   - path: 仓库内相对路径
+    func openCommitDiff(root: String, commit: String, path: String)
     /// 生成提交说明用的轻量模型网关;没有可用会话时为 nil。
     var utilityGateway: (url: URL, alias: String)? { get }
 }
@@ -38,6 +44,7 @@ struct WorkbenchSCMHost: SCMHost {
     func openDiff(_ path: String) { workbench.openDiff(path) }
     func openHistory(project: String, path: String?) { workbench.openHistory(project: project, path: path) }
     func openBlame(_ path: String) { workbench.openBlame(path) }
+    func openCommitDiff(root: String, commit: String, path: String) { workbench.openCommitDiff(root: root, commit: commit, path: path) }
     var utilityGateway: (url: URL, alias: String)? { workbench.activeSession?.utilityGateway }
 }
 
@@ -50,5 +57,6 @@ struct IDESCMHost: SCMHost {
     func openDiff(_ path: String) { workspace.model.openDiff(path) }
     func openHistory(project: String, path: String?) { workspace.model.openHistory(project: project, path: path) }
     func openBlame(_ path: String) { workspace.model.openBlame(path) }
+    func openCommitDiff(root: String, commit: String, path: String) { workspace.model.openCommitDiff(root: root, commit: commit, path: path) }
     var utilityGateway: (url: URL, alias: String)? { workspace.agentSession?.utilityGateway }
 }

@@ -61,6 +61,7 @@ struct TabContentView: View {
             }
         case .history(let projectID, let path): GitHistoryTabView(workbench: workbench, projectID: projectID, path: path)
         case .blame(let path): GitBlameTabView(workbench: workbench, path: path)
+        case .commitDiff(let root, let commit, let path): GitCommitDiffTabView(root: root, commit: commit, path: path).id("\(commit)#\(path)")
         case .agentTerminal(let projectID, let terminalID): AgentTerminalTabView(workbench: workbench, projectID: projectID, terminalID: terminalID)
         case .terminal(let id):
             // 每个终端就是一个独立标签(不再合并成带终端列表的面板);常驻终端按标签自己的项目根启动,不跟随当前项目

@@ -95,6 +95,21 @@ public extension IDEWindowModel {
         return id
     }
 
+    /// 打开某个提交里单个文件的差异标签。
+    /// - Parameters:
+    ///   - root: 仓库根目录
+    ///   - commit: 提交哈希
+    ///   - path: 仓库内相对路径
+    @discardableResult
+    func openCommitDiff(root: String, commit: String, path: String) -> UUID? {
+        guard !root.isEmpty, !commit.isEmpty, !path.isEmpty else { return nil }
+        var layout = editor
+        let title = (path as NSString).lastPathComponent + " @ " + String(commit.prefix(7))
+        let id = layout.open(.commitDiff(root: root, commit: commit, path: path), title: title, preview: true)
+        editor = layout
+        return id
+    }
+
     /// 打开子 Agent 的只读完整会话标签(已打开则聚焦)。
     /// - Parameters:
     ///   - project: 项目 ID

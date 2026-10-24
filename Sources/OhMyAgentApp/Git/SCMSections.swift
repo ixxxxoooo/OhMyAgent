@@ -179,9 +179,6 @@ private struct GraphCommitDetail: View {
     let host: any SCMHost
     @State private var files: [GitFileChange] = []
     @State private var loaded = false
-    @State private var openFile: String?
-    @State private var diff: FileDiff?
-    @State private var binary = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -203,15 +200,11 @@ private struct GraphCommitDetail: View {
                 Text("这个提交没有文件改动(例如空的合并提交)。").font(OMFonts.caption).foregroundStyle(OMColors.tertiaryText)
                     .padding(.horizontal, 12).padding(.vertical, 4)
             }
-            ForEach(files) { file in
-                fileRow(file)
-                if openFile == file.path { inlineDiff }
-            }
+            ForEach(files) { file in fileRow(file) }
         }
         .padding(.bottom, 4)
         .background(OMColors.selectedFill)
         .task { await loadFiles() }
-        .task(id: openFile) { await loadDiff() }
     }
 
     private func fileRow(_ file: GitFileChange) -> some View {
@@ -228,27 +221,13 @@ private struct GraphCommitDetail: View {
             Text(kind?.badge ?? "").font(OMFonts.caption.weight(.medium)).foregroundStyle(color(kind))
         }
         .padding(.horizontal, 12).padding(.vertical, 3)
-        .background(openFile == file.path ? OMColors.selectedFill : .clear)
         .contentShape(Rectangle())
-        .onTapGesture { omWithAnimation { openFile = openFile == file.path ? nil : file.path } }
+        .onTapGesture { host.openCommitDiff(root: repo.root.path, commit: commit.hash, path: file.path) }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .omContextMenu {
             OMMenuItem("在编辑器中打开当前版本", icon: "file-text") { host.openFile(repo.root.path + "/" + file.path, preview: false) }
             OMMenuItem("文件历史", icon: "clock") { host.openHistory(project: repo.root.path, path: repo.root.path + "/" + file.path) }
-        }
-    }
-
-    @ViewBuilder
-    private var inlineDiff: some View {
-        if let diff {
-            // 侧栏较窄,正文自动换行;DiffView 自带 300 行软上限,无需再套滚动容器
-            DiffView(diff: diff)
-                .padding(.horizontal, 8).padding(.vertical, 4)
-        } else if binary {
-            Text("二进制文件,不显示差异。").font(OMFonts.caption).foregroundStyle(OMColors.secondaryText).padding(.horizontal, 12).padding(.vertical, 4)
-        } else {
-            OMSpinner(.small).frame(maxWidth: .infinity).padding(6)
         }
     }
 
@@ -264,18 +243,5 @@ private struct GraphCommitDetail: View {
     private func loadFiles() async {
         files = (try? await repo.files(in: commit.hash)) ?? []
         loaded = true
-    }
-
-    private func loadDiff() async {
-        diff = nil
-        binary = false
-        guard let openFile else { return }
-        do {
-            let result = try await repo.fileDiff(path: openFile, commit: commit.hash)
-            diff = result
-            binary = result == nil
-        } catch {
-            binary = false
-        }
     }
 }

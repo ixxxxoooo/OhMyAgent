@@ -130,6 +130,7 @@ func tabIcon(_ kind: TabKind) -> String {
         return id == WorkbenchModel.outputTabID ? "file-text" : "eye"
     case .history: return "git-graph"
     case .blame: return "user"
+    case .commitDiff: return "file-diff"
     }
 }
 

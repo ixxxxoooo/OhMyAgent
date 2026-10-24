@@ -68,7 +68,7 @@ extension WorkbenchTab {
     var keepAliveWeight: Int {
         switch kind {
         case .subagent: return 3
-        case .diff, .changes, .history: return 2
+        case .diff, .changes, .history, .commitDiff: return 2
         default: return 1
         }
     }

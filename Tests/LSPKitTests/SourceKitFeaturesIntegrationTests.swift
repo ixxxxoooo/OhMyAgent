@@ -9,7 +9,7 @@ import Testing
 
 @Suite("sourcekit-lsp 语言功能")
 struct SourceKitFeaturesIntegrationTests {
-    /// 故意写乱的代码:用于格式化;`Greeter` 被使用两次,用于引用与重命名;第 7 行有类型错误,用于代码操作。
+    /// 故意写乱的代码:用于格式化;`Greeter` 被使用两次,用于引用与重命名;第 8 行有未使用变量的警告,用于代码操作(必须能编译通过,否则不会生成索引)。
     private static let source = """
     public struct Greeter {
     public init() {}
@@ -35,6 +35,14 @@ struct SourceKitFeaturesIntegrationTests {
         let path = dir + "/A.swift"
         try Self.source.write(toFile: path, atomically: true, encoding: .utf8)
         guard let launch = LSPServerLocator.locate(.swift, projectRoot: root, workspaceRoot: root) else { return }
+        // 引用查询依赖代码索引(sourcekit-lsp 读构建产物里的 index store);临时包没编译过时引用恒为空,所以先编译一次。
+        let build = Process()
+        build.executableURL = URL(fileURLWithPath: "/usr/bin/swift")
+        build.arguments = ["build", "--package-path", root]
+        build.standardOutput = FileHandle.nullDevice
+        build.standardError = FileHandle.nullDevice
+        try build.run()
+        build.waitUntilExit()
 
         let client = LSPClient(transport: LSPStdioTransport(launch: launch), rootPath: root, label: "swift-features", requestTimeout: .seconds(30))
         try await client.start()
@@ -51,7 +59,7 @@ struct SourceKitFeaturesIntegrationTests {
             diagnostics = update.diagnostics
             break
         }
-        #expect(!diagnostics.isEmpty, "应先等到类型错误诊断,说明服务器已完成分析")
+        #expect(!diagnostics.isEmpty, "应先等到诊断,说明服务器已完成分析")
 
         // 引用:声明 + 两处使用(0 行声明,5、6 行使用)
         let refs = try await client.references(uri: uri, at: LSPPosition(line: 5, character: 14))
@@ -75,7 +83,7 @@ struct SourceKitFeaturesIntegrationTests {
             #expect(!edits.isEmpty, "乱缩进与多余空格的代码应产生格式化编辑")
         }
 
-        // 签名帮助:光标在 hello( 之后
+        // 签名帮助:光标在 hello( 之后(第 8 行)
         if await client.supports("signatureHelpProvider") {
             let help = try await client.signatureHelp(uri: uri, at: LSPPosition(line: 7, character: 29))
             #expect(help?.label.contains("hello") == true)

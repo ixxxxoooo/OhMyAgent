@@ -438,6 +438,7 @@ struct TabOverflowList: View {
         switch tab.kind {
         case .file(let path), .diff(let path), .blame(let path): return (path as NSString).abbreviatingWithTildeInPath
         case .chat(let id, _), .changes(let id), .history(let id, _): return (id as NSString).abbreviatingWithTildeInPath
+        case .commitDiff(_, let commit, let path): return path + " @ " + String(commit.prefix(7))
         case .subagent: return String(localized: "子 Agent 会话")
         case .terminal, .agentTerminal: return String(localized: "终端")
         case .preview: return String(localized: "预览")

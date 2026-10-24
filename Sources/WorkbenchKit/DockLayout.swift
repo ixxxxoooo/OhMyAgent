@@ -30,6 +30,8 @@ public enum TabKind: Codable, Hashable, Sendable {
     case history(projectID: String, path: String?)
     /// 文件逐行追溯(blame)
     case blame(path: String)
+    /// 某个提交里单个文件的差异(相对其父提交)
+    case commitDiff(root: String, commit: String, path: String)
 }
 
 
@@ -497,6 +499,7 @@ public struct DockLayout: Codable, Equatable, Sendable {
                 if hasRecord.contains(id) { return true }
                 return !blankKept.insert(id).inserted
             case .changes(let id), .history(let id, _): return !projectIDs.contains(id)
+            case .commitDiff(let root, _, _): return !projectIDs.contains { root == $0 || root.hasPrefix($0 + "/") }
             case .file(let path), .diff(let path), .blame(let path):
                 return !projectIDs.contains { path == $0 || path.hasPrefix($0 + "/") } || !FileManager.default.fileExists(atPath: path)
             }
