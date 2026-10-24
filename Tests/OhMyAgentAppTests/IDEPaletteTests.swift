@@ -57,7 +57,9 @@ struct IDEPaletteTests {
         let revision = workspace.palette.rankRevision
         workspace.palette.text = "file3100"
         let stale = workspace.palette.items(context: context, recents: [])
-        #expect(stale.map(\.id) == initial.map(\.id), "后台排序期间沿用上一次结果")
+        // 输入为空时前面多了模式入口行;比较文件结果本身
+        func fileIDs(_ items: [IDEPaletteItem]) -> [String] { items.filter { if case .file = $0 { true } else { false } }.map(\.id) }
+        #expect(fileIDs(stale) == fileIDs(initial), "后台排序期间沿用上一次结果")
         for _ in 0..<100 where workspace.palette.rankRevision == revision { try await Task.sleep(for: .milliseconds(20)) }
         #expect(workspace.palette.rankRevision != revision, "结果落地后修订号变化")
         let fresh = workspace.palette.items(context: context, recents: [])
