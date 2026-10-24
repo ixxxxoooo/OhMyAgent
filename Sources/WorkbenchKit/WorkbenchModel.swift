@@ -28,6 +28,8 @@ public final class WorkbenchModel {
     }
     /// 侧栏各模式离开时的工作区位置(见 `switchLeftPane`);只在本次运行内记忆
     var paneMemory: [LeftPane: PaneMemory] = [:]
+    /// 当前不在前台的那个侧栏模式的停靠区(会话模式与代码模式各有一套独立的标签系统,切换时整体对调)
+    var otherDocks: PaneDocks?
     public var layout: WorkbenchLayout { didSet { if layout != oldValue { scheduleSave() } } }
     /// 全部会话:每个会话标签对应一个独立的 SessionModel(按需创建,标签关闭时回收)
     public private(set) var conversations: [ConversationKey: SessionModel] = [:]
@@ -143,6 +145,13 @@ public final class WorkbenchModel {
         pendingRestores = Dictionary(records.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
         dock = (state.dock ?? DockLayout()).restoredForLaunch(projectIDs: aliveIDs, keepChats: Set(pendingRestores.keys))
         rightDock = (state.rightDock ?? DockLayout()).restoredForLaunch(projectIDs: aliveIDs, keepChats: Set(pendingRestores.keys), keepsPanels: true)
+        otherDocks = state.otherDocks.map {
+            PaneDocks(
+                dock: $0.dock.restoredForLaunch(projectIDs: aliveIDs, keepChats: Set(pendingRestores.keys)),
+                rightDock: $0.rightDock.restoredForLaunch(projectIDs: aliveIDs, keepChats: Set(pendingRestores.keys), keepsPanels: true),
+                rightVisible: $0.rightVisible
+            )
+        }
         applyLegacyMigration()
         self.healSessionCreationDates()
         log.info("工作台状态已加载", ["projects": "\(alive.count)", "selected": selected ?? "-"])
@@ -1290,6 +1299,7 @@ public final class WorkbenchModel {
         state.selectedProjectID = selectedProjectID
         state.dock = dock
         state.rightDock = rightDock
+        state.otherDocks = otherDocks
         state.chatSlots = chatSlotRecords()
         return state
     }

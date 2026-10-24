@@ -64,6 +64,11 @@ public extension WorkbenchModel {
     func closeTabsInAllDocks(where predicate: (WorkbenchTab) -> Bool) {
         dock.closeTabs(where: predicate)
         rightDock.closeTabs(where: predicate)
+        if otherDocks != nil {
+            otherDocks?.dock.closeTabs(where: predicate)
+            otherDocks?.rightDock.closeTabs(where: predicate)
+            reapConversations()
+        }
     }
 
     /// 文件/文件夹被移动后,让两个停靠区里指向旧路径的文件标签改指新路径。
@@ -73,6 +78,8 @@ public extension WorkbenchModel {
     func retargetFilesInAllDocks(from source: String, to destination: String) {
         dock.retargetFiles(from: source, to: destination)
         rightDock.retargetFiles(from: source, to: destination)
+        otherDocks?.dock.retargetFiles(from: source, to: destination)
+        otherDocks?.rightDock.retargetFiles(from: source, to: destination)
     }
 
     /// 旧布局(底部面板/终端侧栏/工具栏单视图)迁移:可见的终端、输出、工具视图变成右栏停靠区里的标签。启动时调用一次。
@@ -99,7 +106,7 @@ public extension WorkbenchModel {
     var oppositeTarget: OpenTarget { resolveHost(.auto) == .right ? .editor : .right }
 
     /// 两个停靠区里的全部标签(中栏在前)。
-    var allDockTabs: [WorkbenchTab] { dock.allTabs + rightDock.allTabs }
+    var allDockTabs: [WorkbenchTab] { dock.allTabs + rightDock.allTabs + (otherDocks.map { $0.dock.allTabs + $0.rightDock.allTabs } ?? []) }
 
     /// 标签所在的停靠区;不存在为 nil。
     /// - Parameter tabID: 标签 ID

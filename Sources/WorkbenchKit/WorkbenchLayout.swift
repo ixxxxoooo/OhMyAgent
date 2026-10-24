@@ -270,6 +270,8 @@ public struct WorkbenchState: Codable, Equatable, Sendable {
     public var dock: DockLayout?
     /// 右栏停靠布局(旧版本状态文件没有该字段)
     public var rightDock: DockLayout?
+    /// 不在前台的那个侧栏模式的停靠区(旧版本状态文件没有该字段)
+    public var otherDocks: PaneDocks?
     /// 退出时仍有内容的会话标签(旧版本状态文件没有该字段)
     public var chatSlots: [ChatSlotRecord]?
 
