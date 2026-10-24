@@ -170,7 +170,9 @@ struct TabGroupView: View {
 
     /// 会话模式的标题栏:只显示当前会话名,字号与会话正文一致。
     private var sessionTitleHeader: some View {
-        let title = group.active.map { workbench.displayTitle($0) } ?? ""
+        // 还没有标题的新会话显示「新对话」,避免标题栏整条空白
+        let raw = group.active.map { workbench.displayTitle($0) } ?? ""
+        let title = raw.isEmpty ? String(localized: "新对话") : raw
         return HStack(spacing: 0) {
             Text(title).font(OMFonts.reading).foregroundStyle(OMColors.primaryText).lineLimit(1)
             Spacer(minLength: 0)
