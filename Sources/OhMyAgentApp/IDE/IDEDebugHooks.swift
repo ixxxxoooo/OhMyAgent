@@ -21,6 +21,8 @@ import OMLog
 
 @MainActor
 enum IDEDebugHooks {
+    /// `resizewin` 动作的目标窗口
+    private static weak var resizeTarget: NSWindow?
     /// 按环境变量执行钩子(无相关变量时立即返回)。
     static func run() async {
         let env = ProcessInfo.processInfo.environment
@@ -118,6 +120,48 @@ enum IDEDebugHooks {
             let parts = token.split(separator: ":", maxSplits: 1).map(String.init)
             let argument = parts.count > 1 ? parts[1] : ""
             if parts.first == "wait" { try? await Task.sleep(for: .milliseconds(Int(argument) ?? 500)); continue }
+            if parts.first == "resizewin" {
+                // resizewin:宽度:把最大的可见窗口调到该宽度(保持左上角与高度),验证缩放后的重排
+                // 目标是第一个 IDE 窗口(应用里还有 Agents 主窗口,「最大的窗口」可能是它)
+                if resizeTarget == nil {
+                    let manager = IDEWindowManager.shared
+                    resizeTarget = manager.registry.windows.compactMap { manager.controller(for: $0)?.window }.first
+                }
+                if let window = resizeTarget, let width = Double(argument) {
+                    var frame = window.frame
+                    frame.size.width = CGFloat(width)
+                    window.setFrame(frame, display: true, animate: false)
+                }
+                continue
+            }
+            if parts.first == "snapwin" {
+                // snapwin:输出路径.png:把每个可见窗口整体渲染成 PNG(<路径>-<序号>.png;阅读页、预览等没有原生编辑器的界面用)
+                for (index, window) in NSApp.windows.filter({ $0.isVisible && $0.contentView != nil }).enumerated() {
+                    guard let view = window.contentView, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { continue }
+                    view.cacheDisplay(in: view.bounds, to: rep)
+                    let path = (argument as NSString).deletingPathExtension + "-\(index).png"
+                    try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+                    // 同时导出窗口里所有文本叶子里表格的真实尺寸与各列宽度(排查表格排版用)
+                    var report = ""
+                    func walk(_ node: NSView) {
+                        if let leaf = node as? OMLeafHostView, let storage = leaf.textView.textStorage {
+                            var cols = Set<String>()
+                            storage.enumerateAttribute(.paragraphStyle, in: NSRange(location: 0, length: storage.length)) { value, _, _ in
+                                guard let style = value as? NSParagraphStyle else { return }
+                                for block in style.textBlocks.compactMap({ $0 as? NSTextTableBlock }) where block.startingRow == 1 { cols.insert("c\(block.startingColumn)=\(Int(block.contentWidth))") }
+                            }
+                            if !cols.isEmpty {
+                                let container = leaf.textView.textContainer?.size.width ?? -1
+                                report += "leaf.frame=\(leaf.frame.size) contentSize=\(leaf.contentSize) textView.frame=\(leaf.textView.frame.size) container=\(container) cols=\(cols.sorted())\n"
+                            }
+                        }
+                        for child in node.subviews { walk(child) }
+                    }
+                    walk(view)
+                    try? report.write(toFile: (argument as NSString).deletingPathExtension + "-\(index).txt", atomically: true, encoding: .utf8)
+                }
+                continue
+            }
             // 文件刚打开时编辑器尚未创建:最多等 10 秒再执行动作(wait 之外的动作才需要编辑器)。
             for _ in 0..<100 where OMEditorView.activeEditor() == nil && firstNativeEditor() == nil {
                 try? await Task.sleep(for: .milliseconds(100))
