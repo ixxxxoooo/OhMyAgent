@@ -65,7 +65,7 @@ final class IDEFrameSampler: NSObject {
                 if c > 3 { run += 1; maxRun = max(maxRun, run) } else { run = 0 }
             }
             report += line + "  连续变化帧=\(maxRun)\n"
-            if maxRun >= 2 {
+            if maxRun >= 2 || ProcessInfo.processInfo.environment["OMA_SWITCH_DUMP_ALL"] == "1" {
                 for k in from...to {
                     guard let tiff = frames[k].image?.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else { continue }
                     try? png.write(to: URL(fileURLWithPath: "\(dir)/m\(index)_f\(k - from).png"))

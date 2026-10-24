@@ -16,6 +16,8 @@ struct IDEExplorerPane: View {
     @State private var styleRevision = 0
     /// 项目根文件夹是否展开(点击头部的项目名收起/展开整棵树,与 VS Code 一致)
     @AppStorage("ide.explorerRootExpanded") private var rootExpanded = true
+    /// 鼠标是否在头部行上(操作按钮只在悬停时显示,与 VS Code、标签页关闭按钮一致)
+    @State private var hoveringHeader = false
 
     var body: some View {
         if let root = workspace.root {
@@ -32,11 +34,11 @@ struct IDEExplorerPane: View {
                         hitBox: hitBox
                     )
                     .omContextMenu { menu(root: root) }
-                } else {
-                    Spacer(minLength: 0)
                 }
                 IDEOutlineSection(workspace: workspace)
                 IDETimelineSection(workspace: workspace)
+                // 收起项目文件夹后,大纲/时间线紧贴项目名往上排(与 VS Code 一致),剩余空白留在底部
+                if !rootExpanded { Spacer(minLength: 0) }
             }
             .task(id: root) { workspace.configureTree() }
             // 编辑器切换文件时,文件树自动展开并定位到它
@@ -68,17 +70,22 @@ struct IDEExplorerPane: View {
             .buttonStyle(.plain)
             .accessibilityLabel(rootExpanded ? String(localized: "收起项目文件夹") : String(localized: "展开项目文件夹"))
             Spacer(minLength: 4)
-            iconButton("file-plus", String(localized: "新建文件")) { workspace.create(in: targetDirectory(root: root), isDirectory: false) }
-            iconButton("folder-plus", String(localized: "新建文件夹")) { workspace.create(in: targetDirectory(root: root), isDirectory: true) }
-            iconButton("refresh-cw", String(localized: "刷新")) { ExplorerModel.shared.bump(); workspace.tree.refresh() }
-            iconButton("chevrons-down-up", String(localized: "全部折叠")) { workspace.tree.collapseAll() }
+            Group {
+                iconButton("file-plus", String(localized: "新建文件")) { workspace.create(in: targetDirectory(root: root), isDirectory: false) }
+                iconButton("folder-plus", String(localized: "新建文件夹")) { workspace.create(in: targetDirectory(root: root), isDirectory: true) }
+                iconButton("refresh-cw", String(localized: "刷新")) { ExplorerModel.shared.bump(); workspace.tree.refresh() }
+                iconButton("chevrons-down-up", String(localized: "全部折叠")) { workspace.tree.collapseAll() }
+            }
+            .opacity(hoveringHeader ? 1 : 0)
         }
         .padding(.horizontal, 12)
         .frame(height: 28)
+        .contentShape(Rectangle())
+        .onHover { hoveringHeader = $0 }
     }
 
     private func iconButton(_ icon: String, _ title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) { Image.om(icon, size: 14) }
+        Button(action: action) { Image.om(icon, size: 14).foregroundStyle(OMColors.secondaryText) }
             .buttonStyle(.omIcon)
             .omTooltip(title)
             .accessibilityLabel(title)
