@@ -39,14 +39,15 @@ struct IDEShellView: View {
 
     /// 活动栏 + 侧栏 + 中间(编辑区/面板)+ Agent 面板。宽度由量到的总宽直接算死,不交给 HStack 协商。
     private func workArea(size: CGSize) -> some View {
-        let width = Double(size.width)
-        let agentShown = model.agentPaneVisible
-        let sidebarWidth = model.sidebarVisible
-            ? min(model.sidebarWidth, IDEMetrics.sidebarMax(window: width, agentWidth: agentShown ? model.agentPaneWidth : 0)) : 0
-        let agentWidth = agentShown
-            ? min(model.agentPaneWidth, IDEMetrics.agentMax(window: width, sidebarWidth: sidebarWidth)) : 0
+        // 窗口变窄时自动让出 Agent 面板/侧栏,变宽后恢复(不改写用户保存的可见性与宽度)
+        let layout = IDEResponsiveLayout.resolve(
+            window: Double(size.width), sidebarVisible: model.sidebarVisible, sidebarWidth: model.sidebarWidth,
+            agentVisible: model.agentPaneVisible, agentWidth: model.agentPaneWidth)
+        let agentShown = layout.agentShown
+        let sidebarWidth = layout.sidebarWidth
+        let agentWidth = layout.agentWidth
         // ⌥⌘E:Agent 面板最大化时只保留活动栏与对话
-        if agentShown, model.agentPaneMaximized {
+        if model.agentPaneVisible, model.agentPaneMaximized {
             return AnyView(HStack(spacing: 0) {
                 IDEActivityBar(model: model)
                 IDEAgentPane(workspace: workspace).environment(\.ideFileHost, workspace.fileHost).frame(maxWidth: .infinity)
@@ -54,7 +55,7 @@ struct IDEShellView: View {
         }
         return AnyView(HStack(spacing: 0) {
             IDEActivityBar(model: model)
-            if model.sidebarVisible {
+            if layout.sidebarShown {
                 IDESidebarPane(workspace: workspace).frame(width: sidebarWidth)
                 IDEResizer(model: model, kind: .sidebar, area: size)
             }
