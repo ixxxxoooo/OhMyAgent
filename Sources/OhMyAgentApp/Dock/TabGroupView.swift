@@ -165,6 +165,9 @@ struct TabGroupView: View {
     @State private var shownSiblings: [UUID] = []
     @State private var holdTimeout: Task<Void, Never>?
 
+    /// 会话模式(中栏停靠区)不需要多标签:隐藏标签栏。
+    private var hidesTabBar: Bool { host != .right && workbench.layout.leftPane == .sessions }
+
     private var isFocused: Bool { workbench.dock(host).focusedGroupID == group.id }
 
     /// 标签栏为窗口顶部浮层(红绿灯、面板开关)让出的前/后边距:中栏在两侧都没有面板时才让位;
@@ -186,10 +189,15 @@ struct TabGroupView: View {
     var body: some View {
         let _ = PanelToggleProbe.count("tabGroup")
         VStack(spacing: 0) {
-            TabBarView(
-                workbench: workbench, group: group, isFocused: isFocused,
-                leadingInset: insets.leading, trailingInset: insets.trailing
-            )
+            if hidesTabBar {
+                // 会话模式只有侧栏会话列表一个入口,不显示标签栏;保留同高的标题栏区域(可拖动窗口)
+                OMColors.surface.frame(height: TitlebarMetrics.height).background(WindowDragArea())
+            } else {
+                TabBarView(
+                    workbench: workbench, group: group, isFocused: isFocused,
+                    leadingInset: insets.leading, trailingInset: insets.trailing
+                )
+            }
             GeometryReader { proxy in
                 content(size: proxy.size)
                     .frame(width: proxy.size.width, height: proxy.size.height)
