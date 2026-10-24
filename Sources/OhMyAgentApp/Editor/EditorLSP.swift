@@ -156,7 +156,7 @@ final class EditorLSPController {
         let index = LineIndex(text: currentText)
         let offset = LSPTextMapping.offset(of: LSPPosition(line: parts[0], character: parts[1]), in: index)
         let hoverText = await hover(at: offset)
-        let completions = await completion(at: offset)
+        let completions = await nativeCompletion(at: offset)
         var definition = "-"
         if let handle, let first = try? await handle.client.definition(uri: handle.uri, at: LSPTextMapping.position(offset: offset, in: index)).first {
             definition = "\((first.uri as NSString).lastPathComponent):\(first.range.start.line + 1)"
@@ -223,17 +223,6 @@ final class EditorLSPController {
     }
 
     // MARK: 查询
-
-    /// 供编辑器使用的回调集合。服务器未就绪时返回空实现。
-    var features: EditorLanguageFeatures {
-        guard handle != nil else { return EditorLanguageFeatures() }
-        return EditorLanguageFeatures(
-            hover: { [weak self] offset in await self?.hover(at: offset) },
-            definition: { [weak self] offset in self?.jumpToDefinition(at: offset) },
-            completion: { [weak self] offset in await self?.completion(at: offset) ?? [] },
-            signatureHelp: { [weak self] offset in await self?.signatureHelp(at: offset) }
-        )
-    }
 
     // MARK: 扩展能力(IDE 命令:引用 / 符号 / 重命名 / 格式化)
 
@@ -360,16 +349,4 @@ final class EditorLSPController {
         }
     }
 
-    private func completion(at offset: Int) async -> [EditorCompletion] {
-        guard let handle else { return [] }
-        await flush()
-        let position = LSPTextMapping.position(offset: offset, in: LineIndex(text: currentText))
-        do {
-            let items = try await handle.client.completion(uri: handle.uri, at: position)
-            return items.sorted { $0.sortText < $1.sortText }.map { EditorCompletion(label: $0.label, insertText: $0.insertText) }
-        } catch {
-            Log.lsp.debug("补全失败", ["error": error.localizedDescription])
-            return []
-        }
-    }
 }

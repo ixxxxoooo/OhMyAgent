@@ -3,6 +3,7 @@
 // 窗口放在屏幕外且不抢焦点;每次让出若干个运行循环轮次,等延迟释放(`Task`/主队列)完成。
 
 import AppKit
+import EditorCore
 import EditorKit
 import IDEKit
 import Testing
@@ -85,7 +86,7 @@ struct IDELeakTests {
         var controller: IDEWindowController? = IDEWindowController(model: model, cascadeIndex: 0)
         controller?.window?.setFrameOrigin(NSPoint(x: -30_000, y: -30_000))
         controller?.window?.orderFront(nil)
-        let baseline = CodeEditorView.liveCount
+        let baseline = OMEditorView.liveCount
         func cycle(_ rounds: Int) async {
             for round in 0..<rounds {
                 for path in paths {
@@ -99,10 +100,10 @@ struct IDELeakTests {
         }
         await cycle(1)
         await drain(40)
-        let afterFirst = CodeEditorView.liveCount - baseline
+        let afterFirst = OMEditorView.liveCount - baseline
         await cycle(4)
         await drain(40)
-        let afterMore = CodeEditorView.liveCount - baseline
+        let afterMore = OMEditorView.liveCount - baseline
         controller?.window?.close()
         controller = nil
         // 保活预算 10 个标签,允许少量在途;关键是多轮切换后不增长
@@ -110,7 +111,7 @@ struct IDELeakTests {
         #expect(afterFirst <= 14, "首轮后存活编辑器 \(afterFirst) 个,超过保活预算")
         #expect(afterMore <= afterFirst + 2, "多轮切换后编辑器从 \(afterFirst) 增长到 \(afterMore):卸载的标签没有释放")
         await drain(40)
-        #expect(CodeEditorView.liveCount - baseline <= 2, "关闭窗口后仍有 \(CodeEditorView.liveCount - baseline) 个编辑器存活")
+        #expect(OMEditorView.liveCount - baseline <= 2, "关闭窗口后仍有 \(OMEditorView.liveCount - baseline) 个编辑器存活")
     }
 
     @Test("结束窗口全部终端:模型与 TerminalStore 都不再持有(关闭窗口时调用,防止 shell 残留)")
@@ -131,22 +132,21 @@ struct IDELeakTests {
         #expect(ids.allSatisfy { TerminalStore.shared.controllers[$0] == nil }, "终端控制器仍留在仓库里")
     }
 
-    @Test("编辑器视图及其 TextKit 2 排版管理器、文本存储从窗口移除后都可释放")
+    @Test("原生编辑器视图及其模型、文档从窗口移除后都可释放")
     func editorIsReleased() async {
-        weak var weakEditor: CodeEditorView?
-        weak var weakTextView: NSTextView?
-        weak var weakLayoutManager: NSTextLayoutManager?
-        weak var weakContentStorage: NSTextContentStorage?
+        weak var weakEditor: OMEditorView?
+        weak var weakModel: NativeEditorModel?
+        weak var weakDocument: EditorDocument?
         func run() {
-            let editor = CodeEditorView(isEditable: true)
+            let document = EditorDocument(text: String(repeating: "let value = 1\n", count: 500))
+            let model = NativeEditorModel(document: document, language: .swift)
+            let editor = OMEditorView(model: model, theme: EditorTheme.default, font: EditorFontPrefs.preferredFont)
             weakEditor = editor
-            weakTextView = editor.textView
-            weakLayoutManager = editor.textView.textLayoutManager
-            weakContentStorage = editor.textView.textContentStorage
+            weakModel = model
+            weakDocument = document
             let window = NSWindow(contentRect: NSRect(x: -30_000, y: -30_000, width: 600, height: 400), styleMask: [.borderless], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false
             window.contentView = editor
-            editor.setText(String(repeating: "let value = 1\n", count: 500), language: .swift)
             window.contentView?.layoutSubtreeIfNeeded()
             window.displayIfNeeded()
             window.contentView = nil
@@ -155,9 +155,8 @@ struct IDELeakTests {
         run()
         await drain(60)
         #expect(weakEditor == nil, "编辑器视图泄漏")
-        #expect(weakTextView == nil, "文本视图泄漏")
-        #expect(weakContentStorage == nil, "文本内容存储泄漏")
-        #expect(weakLayoutManager == nil, "TextKit 2 排版管理器泄漏")
+        #expect(weakModel == nil, "编辑器模型泄漏")
+        #expect(weakDocument == nil, "文档泄漏")
     }
 }
 

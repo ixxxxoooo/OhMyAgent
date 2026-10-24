@@ -179,23 +179,7 @@ struct GitFileDiffView: View {
                         Text(actionError).font(OMFonts.small).foregroundStyle(OMColors.danger)
                             .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 14).padding(.vertical, 6)
                     }
-                    if EditorEngine.current == .native2 {
-                        nativeDiff(diff)
-                    } else {
-                    ScrollViewReader { proxy in
-                        ScrollView {
-                            Group {
-                                if sideBySide { SideBySideDiffView(diff: diff, extraActions: hunkActions(for: diff)) }
-                                else { DiffView(diff: diff, extraActions: hunkActions(for: diff)) }
-                            }
-                            .padding(14)
-                        }
-                        .onChange(of: currentHunk) { _, index in
-                            guard diff.hunks.indices.contains(index) else { return }
-                            withAnimation(.easeInOut(duration: 0.2)) { proxy.scrollTo(diff.hunks[index].id, anchor: .top) }
-                        }
-                    }
-                    }
+                    nativeDiff(diff)
                 }
             }
         }

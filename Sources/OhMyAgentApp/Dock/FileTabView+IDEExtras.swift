@@ -89,7 +89,6 @@ extension FileTabView {
     func agentReviewBar(_ doc: FileDocument) -> some View {
         if let target = reviewTarget(doc) {
             let index = min(reviewIndex, target.hunks.count - 1)
-            let hunk = target.hunks[index]
             HStack(spacing: 8) {
                 Image.om("sparkles", size: 13).foregroundStyle(OMColors.accentText)
                 Text("Agent 更改 \(index + 1)/\(target.hunks.count)").font(OMFonts.small).foregroundStyle(OMColors.secondaryText)
@@ -100,12 +99,7 @@ extension FileTabView {
                     .buttonStyle(OMButtonStyle(.icon))
                     .omTooltip(String(localized: "下一处更改")).accessibilityLabel(String(localized: "下一处更改"))
                 Spacer()
-                // 原生引擎里逐块「保留 / 还原」在行内块头条上,这里只保留导航与整体操作
-                if !EditorEngine.usesNative(for: SyntaxLanguage.detect(path: path)) {
-                    Button("还原此块") { target.model.revert(target.change, hunks: [hunk.id]) }.buttonStyle(.omSecondary)
-                    Button("保留此块") { acceptedHunks.insert(AgentHunkKey.key(hunk)); reviewIndex = min(index, max(target.hunks.count - 2, 0)) }
-                        .buttonStyle(.omSecondary)
-                }
+                // 逐块「保留 / 还原」在编辑器行内块头条上,这里只保留导航与整体操作
                 Button("全部还原") { target.model.revert(target.change) }.buttonStyle(.omDestructive)
                 Button("全部保留") { target.hunks.forEach { acceptedHunks.insert(AgentHunkKey.key($0)) } }.buttonStyle(.omPrimary)
             }

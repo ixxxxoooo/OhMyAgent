@@ -84,7 +84,6 @@ let package = Package(
         .executableTarget(name: "FakeAgent", dependencies: ["ACPKit"]),
         // M0 spike
         .executableTarget(name: "ACPSpike", dependencies: ["ACPKit", "AgentHost"]),
-        .executableTarget(name: "EditorSpike", dependencies: ["EditorKit", "DemoKit", "OMLog"]),
         // 原生 Claude 适配器的 stdio 宿主(差分对照与联调用,不随应用分发)
         .executableTarget(name: "ClaudeACPHost", dependencies: ["ACPKit", "ClaudeAgentKit"]),
         // 测试

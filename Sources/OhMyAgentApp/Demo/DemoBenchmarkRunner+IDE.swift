@@ -5,6 +5,7 @@
 
 import AppKit
 import DemoKit
+import EditorCore
 import EditorKit
 import Darwin
 import Foundation
@@ -53,15 +54,16 @@ extension DemoBenchmarkRunner {
 
     // MARK: 编辑器
 
-    /// 屏幕外的编辑器窗口(不可见、不抢焦点)。
-    private func makeBenchEditor(wrap: Bool) -> (CodeEditorView, NSWindow) {
-        let editor = CodeEditorView(isEditable: true)
+    /// 屏幕外的原生编辑器窗口(不可见、不抢焦点)。
+    private func makeBenchEditor(text: String, wrap: Bool) -> (OMEditorView, NSWindow) {
+        let model = NativeEditorModel(document: EditorDocument(text: text), language: .swift)
+        let editor = OMEditorView(model: model, theme: EditorTheme.default, font: EditorFontPrefs.preferredFont)
         editor.chrome = [.minimap, .stickyScroll, .folding]
+        editor.wrapsLines = wrap
         let window = NSWindow(contentRect: NSRect(x: -30_000, y: -30_000, width: 1_000, height: 700), styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = editor
         window.orderFrontRegardless()
-        editor.wrapsLines = wrap
         return (editor, window)
     }
 
@@ -69,34 +71,36 @@ extension DemoBenchmarkRunner {
         currentStep = "编辑器:打开与输入"
         // 打开普通文件:到首个高亮帧
         do {
-            let (editor, window) = makeBenchEditor(wrap: true)
             let started = ContinuousClock.now
-            editor.setText(mediumText, language: .swift)
+            let (editor, window) = makeBenchEditor(text: mediumText, wrap: true)
+            var highlighted = false
+            editor.onFirstHighlight = { highlighted = true }
             window.contentView?.layoutSubtreeIfNeeded()
             window.displayIfNeeded()
-            let highlighted = await waitUntil(timeout: 5) { editor.highlightedRange.length > 0 }
+            _ = await waitUntil(timeout: 5) { highlighted }
             record("ide.open-file", started: started, detail: highlighted ? "Medium2k.swift(2000 行)" : "超时:没有出现高亮", failed: !highlighted)
             window.close()
         }
-        // 50k 行文件(不换行):装载到首次绘制
+        // 50k 行文件(不换行与换行各一遍):装载到首次绘制;输入与滚动
         var typing: [Double] = []
         var scrollAverage = 0.0
         for wrap in [false, true] {
-            let (editor, window) = makeBenchEditor(wrap: wrap)
             let started = ContinuousClock.now
-            editor.setText(bigText, language: .swift)
+            let (editor, window) = makeBenchEditor(text: bigText, wrap: wrap)
+            var highlighted = false
+            editor.onFirstHighlight = { highlighted = true }
             window.contentView?.layoutSubtreeIfNeeded()
             window.displayIfNeeded()
             if !wrap { record("ide.open-50k", started: started, detail: "Big50k.swift,不换行") }
-            _ = await waitUntil(timeout: 10) { editor.highlightedRange.length > 0 }
+            _ = await waitUntil(timeout: 10) { highlighted }
             try? await Task.sleep(for: .milliseconds(500))
             // 输入:在文件中部连续键入,每次量「插入 + 布局 + 绘制」
-            editor.goToLine(25_000)
+            editor.goToLine(line: 25_000, column: 1)
             window.displayIfNeeded()
             var samples: [Double] = []
             for _ in 0..<80 {
                 let t0 = ContinuousClock.now
-                editor.textView.insertText("x", replacementRange: editor.textView.selectedRange())
+                editor.model.insertText("x")
                 window.displayIfNeeded()
                 samples.append((ContinuousClock.now - t0).seconds * 1000)
                 try? await Task.sleep(for: .milliseconds(15))
@@ -107,10 +111,10 @@ extension DemoBenchmarkRunner {
             // 滚动:每步下移 12 行并绘制
             if !wrap {
                 var frames: [Double] = []
-                let step = (editor.textView.font?.pointSize ?? 12) * 1.6 * 12
+                let step = Double(editor.model.lineHeight) * 12
                 for index in 0..<200 {
                     let t0 = ContinuousClock.now
-                    editor.textView.scroll(NSPoint(x: 0, y: step * Double(index)))
+                    editor.scroll(y: CGFloat(step * Double(index)))
                     window.displayIfNeeded()
                     frames.append((ContinuousClock.now - t0).seconds * 1000)
                 }

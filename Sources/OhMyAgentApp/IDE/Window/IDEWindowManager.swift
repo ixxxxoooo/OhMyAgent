@@ -25,7 +25,7 @@ final class IDEWindowManager {
     private init() {
         registry = IDEWindowRegistry()
         // 编辑器里按 ⌃G:IDE 窗口弹出「转到行」输入
-        CodeEditorView.goToLineHandler = { [weak self] in self?.route(.goToLine) }
+        OMEditorView.goToLineHandler = { [weak self] in self?.route(.goToLine) }
     }
 
     // MARK: 查询

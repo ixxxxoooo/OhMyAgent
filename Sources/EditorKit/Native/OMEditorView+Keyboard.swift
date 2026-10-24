@@ -59,7 +59,7 @@ extension OMEditorView: NSUserInterfaceValidations {
         case (126, [cmd, opt]): model.addCursor(above: true)
         case (125, [cmd, opt]): model.addCursor(above: false)
         case (34, [opt, shift]): model.splitSelectionIntoLines()
-        case (5, [ctrl]): guard let handler = CodeEditorView.goToLineHandler else { return false }; handler()
+        case (5, [ctrl]): guard let handler = OMEditorView.goToLineHandler else { return false }; handler()
         case (33, [cmd, opt]): foldAtCaret()
         case (30, [cmd, opt]): unfoldAtCaret()
         case (124, [cmd, ctrl, shift]): model.expandSelection()

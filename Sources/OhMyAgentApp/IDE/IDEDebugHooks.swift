@@ -111,17 +111,6 @@ enum IDEDebugHooks {
         return found.first
     }
 
-    /// 在所有窗口里找第一个可见的代码编辑器(应用在后台时没有键盘焦点,`activeEditor` 为空)。
-    private static func firstEditor() -> CodeEditorView? {
-        func search(_ view: NSView) -> CodeEditorView? {
-            if let editor = view as? CodeEditorView, !editor.isHiddenOrHasHiddenAncestor { return editor }
-            for child in view.subviews { if let found = search(child) { return found } }
-            return nil
-        }
-        for window in NSApp.windows { if let content = window.contentView, let found = search(content) { return found } }
-        return nil
-    }
-
     /// 执行 `OMA_IDE_EDITOR_ACTIONS` 的动作序列(验证折叠、多光标等编辑器行为用)。
     private static func runEditorActions(_ raw: String) async {
         try? await Task.sleep(for: .milliseconds(1500))
@@ -130,7 +119,7 @@ enum IDEDebugHooks {
             let argument = parts.count > 1 ? parts[1] : ""
             if parts.first == "wait" { try? await Task.sleep(for: .milliseconds(Int(argument) ?? 500)); continue }
             // 文件刚打开时编辑器尚未创建:最多等 10 秒再执行动作(wait 之外的动作才需要编辑器)。
-            for _ in 0..<100 where OMEditorView.activeEditor() == nil && firstNativeEditor() == nil && firstEditor() == nil {
+            for _ in 0..<100 where OMEditorView.activeEditor() == nil && firstNativeEditor() == nil {
                 try? await Task.sleep(for: .milliseconds(100))
             }
             // 原生引擎(native2)的编辑器:动作经 `EditorRouter` 路由,并补充查找/空白渲染等原生专属动作。
@@ -186,22 +175,7 @@ enum IDEDebugHooks {
                 }
                 continue
             }
-            guard let editor = CodeEditorView.activeEditor() ?? firstEditor() else {
-                Log.app.warning("编辑器动作:没有活动编辑器", ["action": token])
-                continue
-            }
-            switch parts.first ?? "" {
-            case "goto": editor.goToLine(Int(argument) ?? 1)
-            case "foldline": editor.fold(line: max((Int(argument) ?? 1) - 1, 0))
-            case "fold": editor.perform(.fold)
-            case "unfold": editor.perform(.unfold)
-            case "foldAll": editor.perform(.foldAll)
-            case "unfoldAll": editor.perform(.unfoldAll)
-            case "nextOcc": editor.perform(.addNextOccurrence)
-            case "type": editor.textView.insertText(argument, replacementRange: editor.textView.selectedRange())
-            case "wait": try? await Task.sleep(for: .milliseconds(Int(argument) ?? 500))
-            default: Log.app.warning("编辑器动作:未知", ["action": token])
-            }
+            Log.app.warning("编辑器动作:没有活动编辑器", ["action": token])
             try? await Task.sleep(for: .milliseconds(300))
         }
     }

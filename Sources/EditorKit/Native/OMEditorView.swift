@@ -69,6 +69,10 @@ public final class OMEditorView: NSView {
     var minimap: NativeMinimapView?
     /// 首批语法着色完成并绘制后调用一次(之后清空)。
     public var onFirstHighlight: (() -> Void)?
+    /// 「转到行」(⌃G)的应用层处理(IDE 窗口设置为打开命令面板的行号模式);nil 时按键不处理
+    public static var goToLineHandler: (() -> Void)?
+    /// 当前存活的编辑器实例数(诊断与泄漏测试用:挂载/卸载标签后数量应回落到保活预算内)
+    public static var liveCount: Int { editorLiveCounter.load(ordering: .relaxed) }
     /// 首批语法着色尚未到位:此时只画底色与行号栏,不画无色的正文,避免「先出白字、颜色随后才跟上」的闪动
     var syntaxPending = false
     /// 行尾内联提示提供者(入参为 0 起始行号;返回 nil 不显示),如 Git blame
@@ -116,6 +120,11 @@ public final class OMEditorView: NSView {
     var wrapTask: Task<Void, Never>?
     /// 主题监听。
     nonisolated(unsafe) var themeObserver: NSObjectProtocol?
+    /// 偏好(字体族/字号)变化的观察者;设置页改字体后已打开的编辑器立即跟随
+    nonisolated(unsafe) var defaultsObserver: NSObjectProtocol?
+    /// 已应用的字体偏好(`UserDefaults` 任何变化都会通知,先比较再决定是否刷新)
+    var appliedFontFamily = EditorFontPrefs.preferredFamily
+    var appliedFontSize = EditorFontPrefs.preferredSize
 
     // MARK: 回调
 
@@ -177,6 +186,9 @@ public final class OMEditorView: NSView {
                 ready()
             }
         }
+        defaultsObserver = NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshFontFromPrefs() }
+        }
         themeObserver = NotificationCenter.default.addObserver(forName: ThemeRuntime.didChange, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshTheme() }
         }
@@ -200,6 +212,7 @@ public final class OMEditorView: NSView {
     deinit {
         editorLiveCounter.subtract(1, ordering: .relaxed)
         if let themeObserver { NotificationCenter.default.removeObserver(themeObserver) }
+        if let defaultsObserver { NotificationCenter.default.removeObserver(defaultsObserver) }
     }
 
     public override var isFlipped: Bool { true }
@@ -346,6 +359,16 @@ public final class OMEditorView: NSView {
         clampScroll()
         layoutZoneViews()
         needsDisplay = true
+    }
+
+    /// 字体族或字号偏好变化时更新字体与行高;其余偏好变化(通知会在任何偏好变化时触发)直接返回。
+    func refreshFontFromPrefs() {
+        let family = EditorFontPrefs.preferredFamily
+        let size = EditorFontPrefs.preferredSize
+        guard family != appliedFontFamily || size != appliedFontSize else { return }
+        appliedFontFamily = family
+        appliedFontSize = size
+        apply(theme: theme, font: EditorFontPrefs.preferredFont)
     }
 
     private func refreshTheme() {

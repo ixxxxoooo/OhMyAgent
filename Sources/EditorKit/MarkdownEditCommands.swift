@@ -1,9 +1,7 @@
 // @author ixxxxoooo
-// Markdown 所见即所得编辑的基础交互(纯函数,便于测试):
-// - 任务框:点击 `[ ]` / `[x]` 切换勾选;
-// - 链接:⌘ 点击取出链接目标;
+// Markdown 源码编辑的基础交互(纯函数,便于测试):
 // - 列表续行:在列表项末尾按回车自动续出下一项,空项回车结束列表。
-// 所有范围均为 UTF-16 偏移,与 NSTextStorage 一致。
+// 所有范围均为 UTF-16 偏移。原先的任务框点击切换、链接 ⌘ 点击只服务已删除的就地渲染,一并移除。
 
 import Foundation
 
@@ -20,8 +18,6 @@ public enum MarkdownEditCommands {
     /// 列表项行:缩进、引用前缀、标记(`-`/`*`/`+`/`1.`/`1)`)、可选任务框、正文。
     private static let listPattern = try? NSRegularExpression(
         pattern: #"^([ \t]*(?:>[ \t]*)*)([-*+]|\d{1,9}[.)])([ \t]+)(\[[ xX]\][ \t]+)?(.*)$"#)
-    /// 行内链接 `[文字](目标 "标题")`。
-    private static let linkPattern = try? NSRegularExpression(pattern: #"\[([^\]\n]*)\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"\n]*")?\s*\)"#)
 
     // MARK: 行工具
 
@@ -31,47 +27,6 @@ public enum MarkdownEditCommands {
         var start = 0, end = 0, contentsEnd = 0
         text.getLineStart(&start, end: &end, contentsEnd: &contentsEnd, for: NSRange(location: clamped, length: 0))
         return NSRange(location: start, length: contentsEnd - start)
-    }
-
-    // MARK: 任务框
-
-    /// 点击位置落在任务框上时,给出切换勾选的替换。
-    /// - Parameters:
-    ///   - text: 整篇文本
-    ///   - offset: 点击处的字符偏移
-    ///   - layout: 块布局(可选;提供时要求点击处位于列表块内,避开围栏代码里的 `- [ ]`)
-    /// - Returns: 替换(把 `[ ]` 与 `[x]` 互换);不在任务框上返回 nil
-    public static func toggleTask(in text: String, at offset: Int, layout: MarkdownLiveLayout? = nil) -> MarkdownEdit? {
-        guard offset >= 0, let listPattern else { return nil }
-        let ns = text as NSString
-        guard offset <= ns.length else { return nil }
-        if let layout, let index = layout.blockIndex(containing: offset), layout.blocks[index].kind != .list { return nil }
-        let line = lineRange(in: ns, at: offset)
-        guard let match = listPattern.firstMatch(in: text, range: line), match.range(at: 4).location != NSNotFound else { return nil }
-        let box = NSRange(location: match.range(at: 4).location, length: 3)
-        // 命中框本身(含左右各 1 个字符的容差,方便点击)
-        guard offset >= box.location - 1, offset <= NSMaxRange(box) else { return nil }
-        let current = ns.substring(with: box)
-        let next = current == "[ ]" ? "[x]" : "[ ]"
-        return MarkdownEdit(range: box, replacement: next, caret: NSMaxRange(box))
-    }
-
-    // MARK: 链接
-
-    /// 取点击位置所在链接的目标。
-    /// - Parameters:
-    ///   - text: 整篇文本
-    ///   - offset: 点击处的字符偏移
-    /// - Returns: 链接目标(未做 URL 解析);不在链接上返回 nil
-    public static func linkTarget(in text: String, at offset: Int) -> String? {
-        guard offset >= 0, let linkPattern else { return nil }
-        let ns = text as NSString
-        guard offset <= ns.length else { return nil }
-        let line = lineRange(in: ns, at: offset)
-        for match in linkPattern.matches(in: text, range: line) where offset >= match.range.location && offset <= NSMaxRange(match.range) {
-            return ns.substring(with: match.range(at: 2))
-        }
-        return nil
     }
 
     // MARK: 列表续行

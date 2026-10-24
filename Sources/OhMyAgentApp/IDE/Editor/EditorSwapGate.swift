@@ -36,12 +36,12 @@ enum EditorSwapPolicy {
         return tab.id.uuidString
     }
 
-    /// 目标文件是否由原生编辑器渲染(只有它会上报就绪;图片、PDF、Markdown 就地渲染不等待)。
+    /// 目标文件是否由原生编辑器渲染(只有它会上报就绪;图片、PDF 等二进制预览不等待)。
     /// - Parameter path: 文件路径
     /// - Returns: 是否值得等待
     static func isHoldable(path: String) -> Bool {
         if let kind = FilePreviewKind.of(path: path), kind.isBinary { return false }
-        return EditorEngine.usesNative(for: SyntaxLanguage.detect(path: path))
+        return true
     }
 
     /// 正在显示的旧标签是否还值得保留:它仍在组里,或它被新激活的预览标签「原位替换」了

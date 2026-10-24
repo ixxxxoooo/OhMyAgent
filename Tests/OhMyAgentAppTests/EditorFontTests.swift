@@ -3,6 +3,7 @@ import AppKit
 import ChatKit
 import EditorKit
 import Foundation
+import EditorCore
 import Testing
 
 /// 编辑器字体偏好:字号夹取、字体族解析与回退、行高换算、偏好键一致性。
@@ -56,21 +57,15 @@ struct EditorFontTests {
         #expect(style.lineSpacing > 0)
     }
 
-    @Test("应用新主题后,已有文本的字体与行高随之更新")
-    func applyThemeUpdatesExistingText() throws {
-        let view = CodeEditorView(isEditable: false)
-        view.setText("let a = 1\nlet b = 2\n", language: .swift)
-        var theme = EditorTheme.default
-        theme.font = EditorFontPrefs.font(family: "Menlo", size: 18)
-        view.apply(theme: theme)
-
-        #expect(view.textView.font?.familyName == "Menlo")
-        let storage = try #require(view.textView.textStorage)
-        let font = try #require(storage.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)
-        #expect(font.familyName == "Menlo")
-        #expect(font.pointSize == 18)
-        let style = try #require(storage.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)
-        #expect(style.lineSpacing == EditorFontPrefs.lineSpacing(for: theme.font))
+    @Test("apply(theme:font:) 后已有文本换成新字体与行高(原生编辑器)")
+    func applyThemeUpdatesExistingText() {
+        let model = NativeEditorModel(document: EditorDocument(text: "let a = 1\nlet b = 2\n"), language: .swift)
+        let view = OMEditorView(model: model, theme: EditorTheme.default, font: EditorFontPrefs.preferredFont)
+        let font = EditorFontPrefs.font(family: "Menlo", size: 18)
+        view.apply(theme: EditorTheme.default, font: font)
+        #expect(view.font.familyName == "Menlo")
+        #expect(view.font.pointSize == 18)
+        #expect(view.model.lineHeight == Double(EditorFontPrefs.lineHeight(for: font)))
     }
 
     @Test("偏好变化后,已打开的编辑器自动换成新字体与字号")
@@ -82,19 +77,16 @@ struct EditorFontTests {
             defaults.set(oldFamily, forKey: EditorFontPrefs.familyKey)
             defaults.set(oldSize, forKey: EditorFontPrefs.sizeKey)
         }
-        let view = CodeEditorView(isEditable: false)
-        view.setText("let a = 1\n", language: .swift)
+        let model = NativeEditorModel(document: EditorDocument(text: "let a = 1\n"), language: .swift)
+        let view = OMEditorView(model: model, theme: EditorTheme.default, font: EditorFontPrefs.preferredFont)
 
         defaults.set("Menlo", forKey: EditorFontPrefs.familyKey)
         defaults.set(17.0, forKey: EditorFontPrefs.sizeKey)
         // 通知回调会先切回主线程再刷新,稍等片刻
         try await Task.sleep(for: .milliseconds(150))
 
-        #expect(view.textView.font?.familyName == "Menlo")
-        #expect(view.textView.font?.pointSize == 17)
-        let storage = try #require(view.textView.textStorage)
-        let font = try #require(storage.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)
-        #expect(font.pointSize == 17)
+        #expect(view.font.familyName == "Menlo")
+        #expect(view.font.pointSize == 17)
     }
 
     @Test("预置字体第一项是系统等宽")

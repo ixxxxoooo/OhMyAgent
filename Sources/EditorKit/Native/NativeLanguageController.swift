@@ -384,7 +384,7 @@ public final class NativeLanguageController {
 
     private func showHover(word: TextSpan, offset: Int) async {
         guard let view, hoverWord == word else { return }
-        var content = NSMutableAttributedString()
+        let content = NSMutableAttributedString()
         let diagnostics = view.model.decorations.containing(offset: offset).filter {
             switch $0.kind {
             case .diagnosticError, .diagnosticWarning, .diagnosticInfo, .diagnosticHint: true

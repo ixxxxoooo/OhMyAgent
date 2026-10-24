@@ -272,9 +272,19 @@ extension OMEditorView {
                 NSRect(x: 0, y: item.y, width: 3, height: height).fill()
             }
             if let severity = diagnosticLines[item.line] {
-                CodeEditorView.color(for: severity).setFill()
+                Self.color(for: severity).setFill()
                 NSBezierPath(ovalIn: NSRect(x: 6, y: item.y + (lineHeight - 6) / 2, width: 6, height: 6)).fill()
             }
+        }
+    }
+
+    /// 诊断严重程度对应的颜色(行号栏圆点、下划线)。
+    static func color(for severity: EditorDiagnostic.Severity) -> NSColor {
+        switch severity {
+        case .error: return NSColor(OMColors.danger)
+        case .warning: return NSColor(OMColors.warning)
+        case .information: return NSColor(OMColors.accent2)
+        case .hint: return NSColor(OMColors.tertiaryText)
         }
     }
 

@@ -106,7 +106,7 @@ extension EditorLSPController {
 
     // MARK: 补全
 
-    private func nativeCompletion(at offset: Int) async -> [NativeCompletionItem] {
+    func nativeCompletion(at offset: Int) async -> [NativeCompletionItem] {
         guard let handle else { return [] }
         await flush()
         let index = LineIndex(text: currentText)

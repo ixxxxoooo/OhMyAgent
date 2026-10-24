@@ -38,4 +38,17 @@ struct NativeInfoCardTests {
         }
         #expect(inkInLastLine > 50, "卡片底部的说明行没有画出来")
     }
+
+    @Test("签名帮助:当前参数加粗并换成强调色;范围越界时不崩溃")
+    func signatureActiveParameter() {
+        let label = "f(a: Int, b: String)"
+        let range = (label as NSString).range(of: "b: String")
+        let text = NativeInfoCardView.render(signature: label, activeParameter: range, monoFont: mono)
+        #expect(text.string == label)
+        let active = text.attribute(.foregroundColor, at: range.location, effectiveRange: nil) as? NSColor
+        let normal = text.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
+        #expect(active != normal)
+        let bad = NativeInfoCardView.render(signature: label, activeParameter: NSRange(location: 100, length: 5), monoFont: mono)
+        #expect(bad.string == label)
+    }
 }

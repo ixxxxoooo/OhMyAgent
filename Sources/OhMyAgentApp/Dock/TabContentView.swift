@@ -256,10 +256,9 @@ struct FileTabView: View {
     }
 
     /// IDE 窗口里编辑器的外围视图:缩略图受设置开关控制;关掉后用概览尺顶替(保留诊断/改动标记)。
-    private func editorChrome(native: Bool) -> EditorChrome {
-        var chrome: EditorChrome = [.stickyScroll, .folding]
+    private var editorChrome: EditorChrome {
+        var chrome: EditorChrome = [.stickyScroll, .folding, .overviewRuler]
         if minimapOn { chrome.insert(.minimap) }
-        if native { chrome.insert(.overviewRuler) }
         return chrome
     }
 
@@ -314,13 +313,13 @@ struct FileTabView: View {
         }
     }
 
-    /// 编辑器本体:默认原生 rope 引擎(native2);Markdown 文件(就地渲染)或显式回退时用 TextKit 引擎。
+    /// 编辑器本体:原生 rope 引擎(所有文件类型,含 Markdown 的源码模式;Markdown 的阅读走 `MarkdownPreviewPage`)。
     @ViewBuilder
     private func codeEditor(doc: FileDocument, text: String, markers: [Int: LineMarker]) -> some View {
-        if EditorEngine.usesNative(for: SyntaxLanguage.detect(path: path)), let editorDocument = doc.ensureEditorDocument() {
+        if let editorDocument = doc.ensureEditorDocument() {
             NativeCodeEditor(document: editorDocument, language: SyntaxLanguage.detect(path: path), isEditable: !doc.isReadOnly,
                              revealLine: tab.line, markers: markers, diagnostics: lsp?.diagnostics ?? [],
-                             chrome: ideHost == nil ? [] : editorChrome(native: true), filePath: path,
+                             chrome: ideHost == nil ? [] : editorChrome, filePath: path,
                              services: nativeServices, servicesKey: nativeServicesKey,
                              onCaretChange: ideHost.map { host in { host.caret(path, $0) } })
                 .handle(editorHandle)
@@ -329,14 +328,6 @@ struct FileTabView: View {
                 .agentHooks(agentHooks(doc, editorDocument: editorDocument))
                 .omContextMenu { nativeEditorMenu() }
                 .id(ObjectIdentifier(editorDocument))
-        } else {
-            CodeEditor(text: text, language: SyntaxLanguage.detect(path: path), isEditable: !doc.isReadOnly, revealLine: tab.line, markers: markers,
-                       diagnostics: lsp?.diagnostics ?? [], features: lsp?.features ?? EditorLanguageFeatures(),
-                       onReferenceSelection: { range in referenceSelection(range, text: doc.text ?? text) },
-                       chrome: ideHost == nil ? [] : editorChrome(native: false),
-                       onCaretChange: ideHost.map { host in { host.caret(path, $0) } },
-                       inlineNote: !doc.isDirty && !blameLines.isEmpty ? { blameNote($0) } : nil,
-                       onChange: { newText in doc.text = newText })
         }
     }
 

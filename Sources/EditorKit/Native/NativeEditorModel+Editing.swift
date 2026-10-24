@@ -145,6 +145,17 @@ extension NativeEditorModel {
             let after = rope.unit(at: range.upperBound)
             let opener = before.flatMap { Unicode.Scalar($0) }.map(Character.init)
             let closer = after.flatMap { Unicode.Scalar($0) }.map(Character.init)
+            // Markdown 列表项行尾回车:续出下一项(空项回车则结束列表)
+            if language == .markdown, range.isEmpty {
+                let lineSpan = TextSpan(location: lineStart, length: rope.lineLength(line))
+                let lineText = rope.string(in: lineSpan)
+                let column = range.location - lineStart
+                if let edit = MarkdownEditCommands.continueList(in: lineText, selection: NSRange(location: column, length: 0)) {
+                    plans.append(EditPlan(range: TextSpan(location: lineStart + edit.range.location, length: edit.range.length),
+                                          text: edit.replacement, caretOffset: edit.caret - edit.range.location))
+                    continue
+                }
+            }
             let pairs: [Character: Character] = ["{": "}", "(": ")", "[": "]"]
             let wantsExtra = (opener.map { pairs[$0] != nil } ?? false) || (language == .python && opener == ":")
             if let opener, let closer, pairs[opener] == closer {
