@@ -62,7 +62,13 @@ struct SourceKitFeaturesIntegrationTests {
         #expect(!diagnostics.isEmpty, "应先等到诊断,说明服务器已完成分析")
 
         // 引用:声明 + 两处使用(0 行声明,5、6 行使用)
-        let refs = try await client.references(uri: uri, at: LSPPosition(line: 5, character: 14))
+        // 索引由服务器异步加载:最多重试 20 秒
+        var refs: [LSPLocation] = []
+        for _ in 0..<20 {
+            refs = try await client.references(uri: uri, at: LSPPosition(line: 5, character: 14))
+            if !refs.isEmpty { break }
+            try await Task.sleep(for: .seconds(1))
+        }
         #expect(Set(refs.map(\.range.start.line)).isSuperset(of: [0, 5, 6]), "引用应覆盖声明与两处使用,实际 \(refs.map(\.range.start.line))")
 
         // 文档符号(大纲):结构体及其方法、顶层函数
