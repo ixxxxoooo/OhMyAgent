@@ -3,6 +3,7 @@
 
 import ChatKit
 import EditorKit
+import GitKit
 import SwiftUI
 
 /// IDE 文件宿主(值类型,闭包均在主线程调用)。
@@ -25,6 +26,8 @@ struct IDEFileHost {
     var report: @MainActor (String, [EditorDiagnostic], String) -> Void
     /// 上报某文件的光标状态(路径,光标)
     var caret: @MainActor (String, EditorCaret) -> Void
+    /// 上报某文件的逐行 blame(状态栏显示光标所在行的作者与时间;空数组表示没有)
+    var blame: @MainActor (String, [GitBlameLine]) -> Void
     /// 登记/注销某文件的语言服务器会话(IDE 命令:引用、符号、重命名、格式化经它访问)
     var registerLSP: @MainActor (String, EditorLSPController?) -> Void
     /// 上报某文件的编辑器是否已完成首帧着色(切换文件时据此决定何时把新编辑器换到前台)

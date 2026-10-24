@@ -6,6 +6,7 @@ import DesignSystem
 import EditorKit
 import IconKit
 import IDEKit
+import GitKit
 import SwiftUI
 
 /// 区域头部:标题 + 可选的右侧关闭按钮(24pt 紧凑)。
@@ -103,6 +104,10 @@ struct IDEStatusBar: View {
             if let path = model.activeFilePath {
                 // 语言服务器状态(原先显示在编辑区底部)
                 if let controller = workspace.lspControllers[path] { LSPStatusItem(controller: controller) }
+                if let note = Self.blameNote(workspace.blames[path], line: workspace.carets[path]?.line) {
+                    Label(note, om: "git-commit-horizontal").labelStyle(.titleAndIcon).lineLimit(1)
+                        .omTooltip(String(localized: "当前行最近一次修改"))
+                }
                 if let caret = workspace.carets[path] {
                     Button { workspace.openPalette(":") } label: {
                         Text(caret.selectedLength > 0
@@ -113,8 +118,15 @@ struct IDEStatusBar: View {
                     .omTooltip(String(localized: "转到行…"))
                     .accessibilityLabel(String(localized: "转到行…"))
                 }
-                Text(Self.languageName(for: path))
+                let text = FileDocumentStore.shared.documents[path]?.text
+                if let text {
+                    Text(Self.indentationLabel(of: text))
+                }
                 Text(verbatim: "UTF-8")
+                if let text {
+                    Text(verbatim: text.contains("\r\n") ? "CRLF" : "LF")
+                }
+                Label(Self.languageName(for: path), om: "braces").labelStyle(.titleAndIcon)
             }
         }
         .font(OMFonts.caption)
@@ -127,6 +139,40 @@ struct IDEStatusBar: View {
 }
 
 extension IDEStatusBar {
+    /// 光标所在行的 blame 文案:「作者, 相对时间」;未提交为「未提交的更改」;没有数据为 nil。
+    /// - Parameters:
+    ///   - lines: 文件的逐行 blame
+    ///   - line: 光标行(1 起始)
+    /// - Returns: 文案
+    static func blameNote(_ lines: [GitBlameLine]?, line: Int?) -> String? {
+        guard let lines, let line, let entry = lines.first(where: { $0.lineNumber == line }) else { return nil }
+        if entry.isUncommitted { return String(localized: "未提交的更改") }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        return "\(entry.author), \(formatter.localizedString(for: entry.date, relativeTo: Date()))"
+    }
+
+    /// 缩进方式文案:有行首制表符为「制表符」,否则取相邻缩进行的最常见缩进差(默认 4)显示为「空格: N」。
+    /// - Parameter text: 文件全文
+    /// - Returns: 文案
+    static func indentationLabel(of text: String) -> String {
+        var previous = 0
+        var tally: [Int: Int] = [:]
+        var tabs = 0
+        for (index, row) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
+            if index > 600 { break }
+            if row.first == "\t" { tabs += 1; continue }
+            let spaces = row.prefix { $0 == " " }.count
+            if spaces == row.count { continue }
+            let delta = abs(spaces - previous)
+            if delta > 0, delta <= 8 { tally[delta, default: 0] += 1 }
+            previous = spaces
+        }
+        if tabs > 0, tabs >= tally.values.reduce(0, +) { return String(localized: "制表符") }
+        let width = tally.max { $0.value < $1.value }?.key ?? 4
+        return String(localized: "空格: \(width)")
+    }
+
     /// 语言的展示名(未识别为纯文本)。
     static func languageName(for path: String) -> String {
         let language = SyntaxLanguage.detect(path: path)

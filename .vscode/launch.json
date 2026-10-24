@@ -1,0 +1,84 @@
+{
+  "configurations": [
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:OhMyAgent}",
+      "name": "Debug OhMyAgent",
+      "target": "OhMyAgent",
+      "configuration": "debug",
+      "preLaunchTask": "swift: Build Debug OhMyAgent"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:OhMyAgent}",
+      "name": "Release OhMyAgent",
+      "target": "OhMyAgent",
+      "configuration": "release",
+      "preLaunchTask": "swift: Build Release OhMyAgent"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:OhMyAgent}",
+      "name": "Debug FakeAgent",
+      "target": "FakeAgent",
+      "configuration": "debug",
+      "preLaunchTask": "swift: Build Debug FakeAgent"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:OhMyAgent}",
+      "name": "Release FakeAgent",
+      "target": "FakeAgent",
+      "configuration": "release",
+      "preLaunchTask": "swift: Build Release FakeAgent"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:OhMyAgent}",
+      "name": "Debug ClaudeACPHost",
+      "target": "ClaudeACPHost",
+      "configuration": "debug",
+      "preLaunchTask": "swift: Build Debug ClaudeACPHost"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:OhMyAgent}",
+      "name": "Release ClaudeACPHost",
+      "target": "ClaudeACPHost",
+      "configuration": "release",
+      "preLaunchTask": "swift: Build Release ClaudeACPHost"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:OhMyAgent}",
+      "name": "Debug ACPSpike",
+      "target": "ACPSpike",
+      "configuration": "debug",
+      "preLaunchTask": "swift: Build Debug ACPSpike"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:OhMyAgent}",
+      "name": "Release ACPSpike",
+      "target": "ACPSpike",
+      "configuration": "release",
+      "preLaunchTask": "swift: Build Release ACPSpike"
+    }
+  ]
+}

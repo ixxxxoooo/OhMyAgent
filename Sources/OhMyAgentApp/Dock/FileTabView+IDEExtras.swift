@@ -47,19 +47,22 @@ extension FileTabView {
     func loadBlame(_ doc: FileDocument) async {
         guard let root = blameRoot, !doc.isDirty, let text = doc.text, text.utf8.count <= 1_000_000 else {
             if !blameLines.isEmpty { blameLines = [] }
+            ideHost?.blame(path, [])
             return
         }
         let git = GitStore.shared.model(for: root)
         if git.repo == nil { await git.refresh(full: false) }
-        guard let repo = git.repo, let relative = repo.relativePath(of: path) else { blameLines = []; return }
+        guard let repo = git.repo, let relative = repo.relativePath(of: path) else { blameLines = []; ideHost?.blame(path, []); return }
         do {
             let lines = try await repo.blame(path: relative)
             guard !Task.isCancelled else { return }
             blameLines = lines
+            ideHost?.blame(path, lines)
         } catch {
             // 未被跟踪的新文件等:没有 blame 属正常,不当作错误
             Log.git.debug("blame 读取失败", ["file": (path as NSString).lastPathComponent, "error": "\(error)"])
             blameLines = []
+            ideHost?.blame(path, [])
         }
     }
 

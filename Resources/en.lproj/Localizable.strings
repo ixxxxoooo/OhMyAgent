@@ -3004,3 +3004,6 @@
 "这个提交没有改动该文件内容。" = "This commit made no content changes to this file.";
 "类型内联提示" = "Type inlay hints";
 "在变量名后用灰色字显示语言服务器推断的类型(如 `: Bool`),它不是源码文本。默认关闭。" = "Show types inferred by the language server in gray after variable names (e.g. `: Bool`). They are not source text. Off by default.";
+"当前行最近一次修改" = "Last change to this line";
+"制表符" = "Tabs";
+"空格: %lld" = "Spaces: %lld";

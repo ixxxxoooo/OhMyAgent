@@ -37,6 +37,8 @@ final class IDEWorkspace {
     let search = IDESearchModel()
     /// 各文件标签最近上报的光标(状态栏显示活动文件的行列)
     var carets: [String: EditorCaret] = [:]
+    /// 各文件标签最近上报的逐行 blame(状态栏显示光标所在行的作者与时间)
+    var blames: [String: [GitBlameLine]] = [:]
     /// 切换文件时的就绪登记(新编辑器完成首帧着色前保留旧内容,不闪屏)
     let swapGate = EditorSwapGate()
     /// 命令面板/快速打开(每窗口一份)
