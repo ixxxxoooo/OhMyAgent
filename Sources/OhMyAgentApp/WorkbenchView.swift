@@ -105,8 +105,8 @@ struct WorkbenchView: View {
         .onChange(of: workbench.layout.rightVisible) { _, visible in if !visible { workbench.rightExpanded = false } }
         .onChange(of: panelVisibilitySignature) { _, _ in PanelToggleProbe.begin(stamp: workbench.panelToggleStamp, window: actions.mainWindow) }
         .overlay(alignment: .topTrailing) {
-            // 右栏收起(且工具栏在右侧)时显示快捷竖条
-            if workbench.layout.side(of: .tools) == .right, !workbench.layout.isVisible(.tools) { RightRail(workbench: workbench) }
+            // 右栏收起(且工具栏在右侧)时显示快捷竖条;会话模式不显示
+            if workbench.layout.leftPane != .sessions, workbench.layout.side(of: .tools) == .right, !workbench.layout.isVisible(.tools) { RightRail(workbench: workbench) }
         }
         .overlay(alignment: .top) { TitlebarOverlay(workbench: workbench) }
         .overlay { TerminalDropOverlay() }

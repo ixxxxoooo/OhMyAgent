@@ -112,13 +112,17 @@ struct TitlebarOverlay: View {
             Spacer(minLength: 0)
             HStack(spacing: TitlebarMetrics.buttonSpacing) {
                 // 右侧由内向外:工具栏在项目栏内侧
+                // 会话模式(不绑定项目)不需要工具栏开关与 IDE 入口;右栏若已开着仍保留开关,以便关闭
+                let chatMode = workbench.layout.leftPane == .sessions
                 ForEach(toggles(on: .right).reversed()) { column in
-                    // 「扩展」按钮紧贴工具栏开关的内侧,只在右栏打开时显示
-                    if column == .tools, workbench.layout.isVisible(.tools) { expandButton }
-                    toggleButton(column, side: .right)
+                    if !(chatMode && column == .tools && !workbench.layout.isVisible(.tools)) {
+                        // 「扩展」按钮紧贴工具栏开关的内侧,只在右栏打开时显示
+                        if column == .tools, workbench.layout.isVisible(.tools) { expandButton }
+                        toggleButton(column, side: .right)
+                    }
                 }
                 // 最外侧:切到 IDE 窗口(⌃⌘I;⌥ 点击新开窗口)
-                ModeSwitchButton(target: .ide)
+                if !chatMode { ModeSwitchButton(target: .ide) }
             }
             .padding(.trailing, 8)
         }
