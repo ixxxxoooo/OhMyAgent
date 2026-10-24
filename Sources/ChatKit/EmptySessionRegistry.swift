@@ -39,6 +39,25 @@ public enum EmptySessionRegistry {
         persist()
     }
 
+    /// 是否为「引擎自动建出、从未有过对话」的占位会话:标题是 OpenCode 默认的
+    /// `New session - <UTC 创建时间>`,且最后更新时间与标题里的创建时间相差不超过 5 秒。
+    /// 有过对话的会话更新时间会明显晚于创建时间,不会被误判。
+    /// - Parameters:
+    ///   - title: 会话标题
+    ///   - updatedAt: 最后更新时间(ISO8601);缺失时按占位处理
+    /// - Returns: 是否应当隐藏
+    public static func isPlaceholder(title: String?, updatedAt: String?) -> Bool {
+        guard let title, title.hasPrefix(placeholderPrefix) else { return false }
+        let stamp = String(title.dropFirst(placeholderPrefix.count)).trimmingCharacters(in: .whitespaces)
+        let format = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+        guard let created = try? Date(stamp, strategy: format) else { return false }
+        guard let updatedAt, !updatedAt.isEmpty else { return true }
+        guard let updated = (try? Date(updatedAt, strategy: format)) ?? (try? Date(updatedAt, strategy: .iso8601)) else { return false }
+        return abs(updated.timeIntervalSince(created)) <= 5
+    }
+
+    private static let placeholderPrefix = "New session - "
+
     private static func persist() { UserDefaults.standard.set(ids, forKey: key) }
 
     /// 仅测试使用:清空登记。

@@ -91,6 +91,7 @@ extension WorkbenchModel {
         refs.reserveCapacity(project.sessions.count + openModels.count)
         for (index, item) in project.sessions.enumerated() {
             guard !openIDs.contains(item.sessionId), !EmptySessionRegistry.isHidden(item.sessionId),
+                  !EmptySessionRegistry.isPlaceholder(title: item.title, updatedAt: item.updatedAt),
                   !deleted.contains(item.sessionId), keep(item.sessionId) else { continue }
             refs.append(SessionRef(key: item.stableKey, sessionId: item.sessionId, source: .cached(index)))
         }

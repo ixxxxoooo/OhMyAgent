@@ -230,7 +230,8 @@ enum HubCandidateBuilder {
         // 会话:各项目已缓存的非归档会话,按更新时间新→旧
         var sessions: [(Date, HubCandidate)] = []
         for project in workbench.projects {
-            for cached in project.sessions where !project.archivedSessions.contains(cached.sessionId) && !EmptySessionRegistry.isHidden(cached.sessionId) {
+            for cached in project.sessions where !project.archivedSessions.contains(cached.sessionId) && !EmptySessionRegistry.isHidden(cached.sessionId)
+                && !EmptySessionRegistry.isPlaceholder(title: cached.title, updatedAt: cached.updatedAt) {
                 let date = HubDates.parse(cached.updatedAt ?? cached.firstSeenAt)
                 let title = (cached.title?.isEmpty == false ? cached.title : nil) ?? String(localized: "新对话")
                 let keywords = ["会话", "对话", "session", "chat"]

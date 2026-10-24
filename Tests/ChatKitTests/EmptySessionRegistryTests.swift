@@ -32,4 +32,14 @@ struct EmptySessionRegistryTests {
         let stored = UserDefaults.standard.stringArray(forKey: "session.emptyIDs") ?? []
         #expect(stored.count == 500 && stored.last == "id519")
     }
+
+    @Test("占位会话判定:默认标题且更新时间≈创建时间")
+    func placeholderDetection() {
+        let title = "New session - 2026-10-24T04:21:58.228Z"
+        #expect(EmptySessionRegistry.isPlaceholder(title: title, updatedAt: "2026-10-24T04:21:58.300Z"))
+        #expect(EmptySessionRegistry.isPlaceholder(title: title, updatedAt: nil))
+        #expect(!EmptySessionRegistry.isPlaceholder(title: title, updatedAt: "2026-10-24T05:00:00.000Z"))   // 有过对话
+        #expect(!EmptySessionRegistry.isPlaceholder(title: "梳理项目", updatedAt: nil))
+        #expect(!EmptySessionRegistry.isPlaceholder(title: nil, updatedAt: nil))
+    }
 }

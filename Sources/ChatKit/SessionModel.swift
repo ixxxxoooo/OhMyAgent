@@ -1438,7 +1438,7 @@ public final class SessionModel {
             guard let result = try? await client.listSessions(cwd: cwd) else { return }
             let overrides = ClientPrefs.sessionTitleOverrides()
             let generated = ClientPrefs.generatedSessionTitles()
-            let visible = result.sessions.filter { !EmptySessionRegistry.isHidden($0.sessionId) }
+            let visible = result.sessions.filter { !EmptySessionRegistry.isHidden($0.sessionId) && !EmptySessionRegistry.isPlaceholder(title: $0.title, updatedAt: $0.updatedAt) }
             // 仅当两者都有明确且不等的更新时间时倒序排;若均无更新时间则尊重 Agent 原生返回的原始顺序
             let sorted = visible.sorted { lhs, rhs in
                 if let lu = lhs.updatedAt, let ru = rhs.updatedAt, !lu.isEmpty, !ru.isEmpty, lu != ru {
