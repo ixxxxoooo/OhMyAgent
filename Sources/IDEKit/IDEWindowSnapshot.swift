@@ -57,8 +57,8 @@ public enum IDEMetrics {
     public static let titleBarHeight: Double = 35
     /// 状态栏高度
     public static let statusBarHeight: Double = 22
-    /// 窗口最小尺寸
-    public static let windowMinWidth: Double = 640
+    /// 窗口最小尺寸(宽度只需容得下「活动栏 + Agent 面板最小宽」加标题栏按钮;更窄的布局由自适应收起侧栏与编辑区)
+    public static let windowMinWidth: Double = 480
     public static let windowMinHeight: Double = 420
     /// 窗口默认尺寸
     public static let windowDefaultWidth: Double = 1280

@@ -47,7 +47,7 @@ struct IDEShellView: View {
         let sidebarWidth = layout.sidebarWidth
         let agentWidth = layout.agentWidth
         // ⌥⌘E 最大化,或窗口窄到放不下编辑区时:只保留活动栏与对话
-        if model.agentPaneVisible, model.agentPaneMaximized {
+        if layout.agentShown, model.agentPaneMaximized || !layout.editorShown {
             return AnyView(HStack(spacing: 0) {
                 IDEActivityBar(model: model)
                 IDEAgentPane(workspace: workspace).environment(\.ideFileHost, workspace.fileHost).frame(maxWidth: .infinity)
