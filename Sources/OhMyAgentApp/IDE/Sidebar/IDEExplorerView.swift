@@ -22,18 +22,8 @@ enum IDEExplorerMetrics {
 /// 行视图:选中/悬停底色取主题令牌,圆角取 `OMRadius.tag`。
 final class IDEExplorerRowView: NSTableRowView {
     var isHovered = false { didSet { if isHovered != oldValue { needsDisplay = true } } }
-    private var tracking: NSTrackingArea?
-
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let tracking { removeTrackingArea(tracking) }
-        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self)
-        addTrackingArea(area)
-        tracking = area
-    }
-
-    override func mouseEntered(with event: NSEvent) { isHovered = true }
-    override func mouseExited(with event: NSEvent) { isHovered = false }
+    // 悬停由表格按鼠标位置统一计算(见 `IDEExplorerTable.refreshHover`):
+    // 行视图会被复用,靠行内的进入/离开事件会在滚动、快速移动时漏掉「离开」,留下一整片残留的悬停底色。
 
     override func drawBackground(in dirtyRect: NSRect) {
         guard isHovered, !isSelected else { return }
@@ -119,6 +109,47 @@ final class IDEExplorerCell: NSView {
 /// 表格:增加键盘处理回调与「不抢焦点」的行为。
 final class IDEExplorerTable: NSTableView {
     var onKey: ((NSEvent) -> Bool)?
+    private var hoverTracking: NSTrackingArea?
+    private var scrollObserver: NSObjectProtocol?
+
+    /// 当前鼠标所在的行(没有为 -1)。
+    private(set) var hoveredRow = -1
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let hoverTracking { removeTrackingArea(hoverTracking) }
+        let area = NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self)
+        addTrackingArea(area)
+        hoverTracking = area
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if let scrollObserver { NotificationCenter.default.removeObserver(scrollObserver); self.scrollObserver = nil }
+        guard let clip = enclosingScrollView?.contentView else { return }
+        clip.postsBoundsChangedNotifications = true
+        // 滚动时鼠标没动但所在行变了:重新计算
+        scrollObserver = NotificationCenter.default.addObserver(forName: NSView.boundsDidChangeNotification, object: clip, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshHover() }
+        }
+    }
+
+    override func mouseMoved(with event: NSEvent) { refreshHover() }
+    override func mouseEntered(with event: NSEvent) { refreshHover() }
+    override func mouseExited(with event: NSEvent) { refreshHover(forceNone: true) }
+
+    /// 按当前鼠标位置重算悬停行,只让该行的行视图显示悬停底色。
+    /// - Parameter forceNone: 鼠标已离开表格时为 true
+    func refreshHover(forceNone: Bool = false) {
+        var target = -1
+        if !forceNone, let window {
+            let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
+            if bounds.contains(point) { target = row(at: point) }
+        }
+        hoveredRow = target
+        enumerateAvailableRowViews { view, row in (view as? IDEExplorerRowView)?.isHovered = row == target }
+    }
+
     override func keyDown(with event: NSEvent) {
         if onKey?(event) == true { return }
         super.keyDown(with: event)
@@ -273,7 +304,7 @@ struct IDEExplorerView: NSViewRepresentable {
             let id = NSUserInterfaceItemIdentifier("row")
             let view = (tableView.makeView(withIdentifier: id, owner: nil) as? IDEExplorerRowView) ?? IDEExplorerRowView()
             view.identifier = id
-            view.isHovered = false
+            view.isHovered = row == (tableView as? IDEExplorerTable)?.hoveredRow
             return view
         }
 
