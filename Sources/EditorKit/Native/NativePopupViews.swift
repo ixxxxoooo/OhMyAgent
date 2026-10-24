@@ -174,13 +174,27 @@ final class NativeInfoCardView: NSView {
     static let maxHeight: CGFloat = 300
     static let padding: CGFloat = 10
 
+    /// 内容总高度(含上下内边距);超过卡片高度时可滚动。
+    private var contentHeight: CGFloat = 0
+    /// 当前纵向滚动偏移(0...maxScroll)。
+    private var scrollOffset: CGFloat = 0
+    private var maxScroll: CGFloat { max(contentHeight - bounds.height, 0) }
+
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { false }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        clipsToBounds = true
+    }
+
+    required init?(coder: NSCoder) { nil }
 
     /// 设置内容并返回所需尺寸。
     @discardableResult
     func setContent(_ content: NSAttributedString) -> CGSize {
         text = content
+        scrollOffset = 0
         needsDisplay = true
         let limit = Self.maxWidth - Self.padding * 2
         let options: NSString.DrawingOptions = [.usesLineFragmentOrigin, .usesFontLeading]
@@ -189,7 +203,22 @@ final class NativeInfoCardView: NSView {
         // 把后面的说明挤出卡片底部(悬浮卡片只剩声明、下面一片空白)
         let width = min(ceil(natural.width) + Self.padding * 2 + 8, Self.maxWidth)
         let fitted = content.boundingRect(with: CGSize(width: width - Self.padding * 2, height: .greatestFiniteMagnitude), options: options)
-        return CGSize(width: width, height: min(ceil(fitted.height) + Self.padding * 2, Self.maxHeight))
+        contentHeight = ceil(fitted.height) + Self.padding * 2
+        return CGSize(width: width, height: min(contentHeight, Self.maxHeight))
+    }
+
+    /// 内容超出卡片高度时,滚轮/触控板在卡片内纵向滚动;不超出时把事件交还给编辑器。
+    override func scrollWheel(with event: NSEvent) {
+        guard maxScroll > 0 else { super.scrollWheel(with: event); return }
+        let next = min(max(scrollOffset - event.scrollingDeltaY * (event.hasPreciseScrollingDeltas ? 1 : 8), 0), maxScroll)
+        guard next != scrollOffset else { return }
+        scrollOffset = next
+        needsDisplay = true
+    }
+
+    override func layout() {
+        super.layout()
+        scrollOffset = min(scrollOffset, maxScroll)
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -201,14 +230,30 @@ final class NativeInfoCardView: NSView {
         background.stroke()
         // 与 setContent 的测量用同一组选项;绘制区高度放开(超出卡片的部分由视图边界裁掉),
         // 否则 .truncatesLastVisibleLine 会在测量与绘制的行高差异下把后面的行整行吞掉
-        let area = CGRect(x: Self.padding, y: Self.padding, width: bounds.width - Self.padding * 2, height: 10_000)
+        NSGraphicsContext.saveGraphicsState()
+        background.addClip()
+        let area = CGRect(x: Self.padding, y: Self.padding - scrollOffset, width: bounds.width - Self.padding * 2, height: 10_000)
         text.draw(with: area, options: [.usesLineFragmentOrigin, .usesFontLeading])
+        NSGraphicsContext.restoreGraphicsState()
+        drawScrollIndicator()
+    }
+
+    /// 可滚动时在右缘画细滚动条指示。
+    private func drawScrollIndicator() {
+        guard maxScroll > 0 else { return }
+        let track = bounds.height - 8
+        let thumbHeight = max(track * bounds.height / contentHeight, 20)
+        let y = 4 + (track - thumbHeight) * (scrollOffset / maxScroll)
+        let thumb = NSBezierPath(roundedRect: CGRect(x: bounds.width - 6, y: y, width: 3, height: thumbHeight), xRadius: 1.5, yRadius: 1.5)
+        NSColor(OMColors.tertiaryText).withAlphaComponent(0.6).setFill()
+        thumb.fill()
     }
 
     /// 精简 Markdown 渲染:代码围栏、行内代码、标题、段落。
     static func render(markdown: String, monoFont: NSFont) -> NSAttributedString {
-        let base = NSFont.systemFont(ofSize: 12 * OMScale.ui)
-        let mono = NSFont.monospacedSystemFont(ofSize: max(monoFont.pointSize - 1, 10), weight: .regular)
+        // 字号与编辑器代码字号一致
+        let base = NSFont.systemFont(ofSize: monoFont.pointSize)
+        let mono = NSFont.monospacedSystemFont(ofSize: monoFont.pointSize, weight: .regular)
         let color = NSColor(OMColors.primaryText)
         let dim = NSColor(OMColors.secondaryText)
         let result = NSMutableAttributedString()
@@ -288,7 +333,7 @@ final class NativeInfoCardView: NSView {
 
     /// 签名帮助的富文本:当前参数加粗并用强调色。
     static func render(signature: String, activeParameter: NSRange?, monoFont: NSFont) -> NSAttributedString {
-        let mono = NSFont.monospacedSystemFont(ofSize: max(monoFont.pointSize - 1, 10), weight: .regular)
+        let mono = NSFont.monospacedSystemFont(ofSize: monoFont.pointSize, weight: .regular)
         let result = NSMutableAttributedString(string: signature, attributes: [.font: mono, .foregroundColor: NSColor(OMColors.secondaryText)])
         if let range = activeParameter, range.location >= 0, NSMaxRange(range) <= result.length {
             result.addAttributes([.font: NSFont.monospacedSystemFont(ofSize: mono.pointSize, weight: .medium),

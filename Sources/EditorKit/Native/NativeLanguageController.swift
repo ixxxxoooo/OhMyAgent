@@ -396,7 +396,7 @@ public final class NativeLanguageController {
             guard let message = item.payload else { continue }
             let color: Color = item.kind == .diagnosticError ? OMColors.danger : (item.kind == .diagnosticWarning ? OMColors.warning : OMColors.accent)
             content.append(NSAttributedString(string: message + "\n", attributes: [
-                .font: NSFont.systemFont(ofSize: 12 * OMScale.ui), .foregroundColor: NSColor(color),
+                .font: NSFont.systemFont(ofSize: mono.pointSize), .foregroundColor: NSColor(color),
             ]))
         }
         if let hover = services.hover {
