@@ -15,6 +15,11 @@ enum IDESwitchProbe {
     ///   - workspace: IDE 工作区
     ///   - env: 环境变量
     static func run(_ workspace: IDEWorkspace, env: [String: String]) async {
+        if let zone = env["OMA_IDE_SPLIT"], let group = workspace.model.editor.focusedGroupID as UUID? {
+            // OMA_IDE_SPLIT=right|bottom:等文件打开后拆分聚焦组(验证拆分编辑器用)
+            try? await Task.sleep(for: .seconds(2))
+            workspace.splitGroup(group, zone: zone == "bottom" ? .bottom : .right)
+        }
         guard let raw = env["OMA_IDE_SWITCH"], !raw.isEmpty, let base = workspace.root else { return }
         let paths = raw.split(separator: "|").map { String($0) }.map { $0.hasPrefix("/") ? $0 : base + "/" + $0 }
         guard paths.count > 1 else { return }

@@ -2997,3 +2997,5 @@
 "粘贴" = "Paste";
 "收起项目文件夹" = "Collapse project folder";
 "展开项目文件夹" = "Expand project folder";
+"向右拆分编辑器" = "Split Editor Right";
+"关闭已保存" = "Close Saved";

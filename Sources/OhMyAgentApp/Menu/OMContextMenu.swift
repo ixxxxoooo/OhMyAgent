@@ -203,7 +203,7 @@ final class OMContextMenuCenter {
 
     // MARK: 弹出与关闭
 
-    private func present(entries: [MenuEntry], in window: NSWindow, at screenPoint: NSPoint) {
+    func present(entries: [MenuEntry], in window: NSWindow, at screenPoint: NSPoint) {
         dismiss()
         parent = window
         let content = OMContextMenuCard(entries: entries, onDismiss: { OMContextMenuCenter.shared.dismiss() }, onHeight: { OMContextMenuCenter.shared.heightChanged($0) })

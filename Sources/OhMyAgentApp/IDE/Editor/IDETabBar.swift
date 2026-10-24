@@ -39,6 +39,54 @@ struct IDETabBar: View {
     @State private var tabsWidth: CGFloat = 0
 
     var body: some View {
+        HStack(spacing: 0) {
+            tabsStrip
+            actions
+        }
+        .frame(height: IDETabMetrics.height)
+        .background(OMColors.sidebar)
+        .overlay(alignment: .bottom) { Rectangle().fill(OMColors.hairline).frame(height: 1) }
+        .overlay { if isDropTargeted { Rectangle().strokeBorder(OMColors.accent, lineWidth: 1) } }
+        .onDrop(of: [.plainText], isTargeted: $isDropTargeted) { providers in
+            Self.loadTabID(from: providers) { id in
+                var layout = workspace.model.editor
+                layout.move(id, toGroup: group.id)
+                workspace.model.editor = layout
+            }
+        }
+    }
+
+    /// 标签栏右侧:拆分编辑器、更多操作(同 VS Code)。
+    private var actions: some View {
+        HStack(spacing: 2) {
+            actionButton("columns-2", String(localized: "向右拆分编辑器")) { workspace.splitGroup(group.id, zone: .right) }
+            actionButton("ellipsis", String(localized: "更多操作")) { showMore() }
+        }
+        .padding(.horizontal, 6)
+        .disabled(group.active == nil)
+    }
+
+    private func actionButton(_ icon: String, _ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) { Image.om(icon, size: 14).foregroundStyle(OMColors.secondaryText) }
+            .buttonStyle(.omIcon)
+            .omTooltip(title)
+            .accessibilityLabel(title)
+    }
+
+    /// 在点击处弹出「更多操作」菜单。
+    private func showMore() {
+        guard let event = NSApp.currentEvent, let window = event.window else { return }
+        let groupID = group.id
+        let workspace = workspace
+        let entries = OMMenuItem("向右拆分", icon: "columns-2") { workspace.splitGroup(groupID, zone: .right) }.menuEntries
+            + OMMenuItem("向下拆分", icon: "rows-2") { workspace.splitGroup(groupID, zone: .bottom) }.menuEntries
+            + OMMenuDivider().menuEntries
+            + OMMenuItem("关闭已保存", icon: "x") { workspace.closeSavedTabs(in: groupID) }.menuEntries
+            + OMMenuItem("关闭全部", icon: "x") { workspace.closeAllTabs(in: groupID) }.menuEntries
+        OMContextMenuCenter.shared.present(entries: entries, in: window, at: window.convertPoint(toScreen: event.locationInWindow))
+    }
+
+    private var tabsStrip: some View {
         GeometryReader { geo in ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 0) {
@@ -61,17 +109,6 @@ struct IDETabBar: View {
                 withAnimation(OMMotion.standard) { proxy.scrollTo(id) }
             }
         } }
-        .frame(height: IDETabMetrics.height)
-        .background(OMColors.sidebar)
-        .overlay(alignment: .bottom) { Rectangle().fill(OMColors.hairline).frame(height: 1) }
-        .overlay { if isDropTargeted { Rectangle().strokeBorder(OMColors.accent, lineWidth: 1) } }
-        .onDrop(of: [.plainText], isTargeted: $isDropTargeted) { providers in
-            Self.loadTabID(from: providers) { id in
-                var layout = workspace.model.editor
-                layout.move(id, toGroup: group.id)
-                workspace.model.editor = layout
-            }
-        }
     }
 
     /// 从拖放内容里异步取出标签标识。

@@ -183,6 +183,21 @@ struct DockLayoutTests {
         #expect(ignored.ratios == after.ratios)
     }
 
+    @Test("拆分编辑器:同一文件在新分屏里出现副本,原标签留在原组;单标签组也能拆")
+    func splitDuplicateKeepsOriginal() {
+        var dock = DockLayout()
+        let id = dock.open(.file(path: "/p/a.swift"), title: "a.swift")
+        let source = dock.focusedGroupID
+        let copy = dock.splitDuplicate(id, zone: .right)
+        #expect(copy != nil && copy != id)
+        #expect(dock.groups.count == 2)
+        #expect(dock.group(source)?.tabs.map(\.id) == [id])
+        #expect(dock.focusedGroup?.active?.id == copy)
+        #expect(dock.allTabs.filter { $0.kind == .file(path: "/p/a.swift") }.count == 2)
+        #expect(dock.splitDuplicate(id, zone: .center) == nil)
+        #expect(dock.splitDuplicate(UUID(), zone: .right) == nil)
+    }
+
     @Test("落点几何:中心与四个边缘")
     func dropZones() {
         let size = CGSize(width: 400, height: 300)

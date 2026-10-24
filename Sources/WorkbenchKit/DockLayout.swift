@@ -389,6 +389,23 @@ public struct DockLayout: Codable, Equatable, Sendable {
         collapseEmptyGroups()
     }
 
+    /// 拆分编辑器(同 VS Code「向右/向下拆分」):在该标签所在组的边缘新建分屏,放入同一内容的**副本**标签,
+    /// 原标签留在原组,因此同一文件可以同时出现在两栏(共享同一份文档)。
+    /// - Parameters:
+    ///   - tabID: 要拆分的标签
+    ///   - zone: 新分屏的方向(`.center` 无意义,忽略)
+    /// - Returns: 新标签的 id;标签不存在或落点非法返回 nil
+    @discardableResult
+    public mutating func splitDuplicate(_ tabID: UUID, zone: DockDropZone) -> UUID? {
+        guard zone != .center, let loc = location(of: tabID), let source = tab(tabID) else { return nil }
+        let copy = WorkbenchTab(kind: source.kind, title: source.title, isPreview: false, line: source.line)
+        let fresh = TabGroup(tabs: [copy])
+        let axis: DockAxis = (zone == .left || zone == .right) ? .horizontal : .vertical
+        root = Self.insert(newGroup: fresh, beside: loc.group, axis: axis, before: zone == .left || zone == .top, in: root)
+        focusedGroupID = fresh.id
+        return copy.id
+    }
+
     /// 与另一份布局相比,是否只有分屏比例不同(组、标签、聚焦与最大化状态、分屏结构均相同)。
     /// 用于拖分隔条时跳过会话回收与导航记录。
     /// - Parameter other: 另一份布局

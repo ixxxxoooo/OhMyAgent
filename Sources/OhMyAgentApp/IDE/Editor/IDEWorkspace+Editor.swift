@@ -195,6 +195,31 @@ extension IDEWorkspace {
         for tab in group.tabs where tab.id != tabID && !tab.isPinned { requestClose(tab.id) }
     }
 
+    /// 关闭某组里没有未保存修改的标签(固定标签保留)。
+    /// - Parameter groupID: 组
+    func closeSavedTabs(in groupID: UUID) {
+        guard let group = model.editor.group(groupID) else { return }
+        for tab in group.tabs where !tab.isPinned && !tab.isDirty { requestClose(tab.id) }
+    }
+
+    /// 关闭某组的全部标签(固定标签保留;有未保存修改的逐个询问)。
+    /// - Parameter groupID: 组
+    func closeAllTabs(in groupID: UUID) {
+        guard let group = model.editor.group(groupID) else { return }
+        for tab in group.tabs where !tab.isPinned { requestClose(tab.id) }
+    }
+
+    /// 拆分编辑器:把某组的当前标签在新分屏里再显示一份(同一文件两栏同时显示,共享文档)。
+    /// - Parameters:
+    ///   - groupID: 要拆分的组
+    ///   - zone: 新分屏方向(`.right` 向右、`.bottom` 向下)
+    func splitGroup(_ groupID: UUID, zone: DockDropZone) {
+        var layout = model.editor
+        guard let active = layout.group(groupID)?.active else { return }
+        layout.splitDuplicate(active.id, zone: zone)
+        model.editor = layout
+    }
+
     /// 关闭聚焦组的当前标签(⌘W)。
     /// - Returns: 是否处理了(没有标签时返回 false,由调用方关窗口)
     @discardableResult
