@@ -46,7 +46,7 @@ struct IDEShellView: View {
         let agentShown = layout.agentShown
         let sidebarWidth = layout.sidebarWidth
         let agentWidth = layout.agentWidth
-        // ⌥⌘E:Agent 面板最大化时只保留活动栏与对话
+        // ⌥⌘E 最大化,或窗口窄到放不下编辑区时:只保留活动栏与对话
         if model.agentPaneVisible, model.agentPaneMaximized {
             return AnyView(HStack(spacing: 0) {
                 IDEActivityBar(model: model)
