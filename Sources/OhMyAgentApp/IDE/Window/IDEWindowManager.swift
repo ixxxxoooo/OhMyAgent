@@ -139,6 +139,7 @@ final class IDEWindowManager {
     /// 启动时恢复上次打开的 IDE 窗口(最近使用的最后显示,落在最前)。
     /// 融合模式:上次退出时停在 Agent 模式就不恢复 IDE 窗口(它们已被隐藏);停在编辑器模式则恢复并隐藏 Agent 窗口(两个窗口不叠在一起)。
     func restoreWindows() {
+        defer { launchRestoreDone = true }
         let models = registry.windows
         guard !models.isEmpty else { return }
         let fusion = FusionMode.shared.isEnabled
@@ -154,7 +155,8 @@ final class IDEWindowManager {
     /// 记住当前所处模式,供下次启动恢复(仅融合模式)。
     /// - Parameter isIDE: 当前是否在 IDE(编辑器)模式
     func rememberLaunchMode(isIDE: Bool) {
-        guard FusionMode.shared.isEnabled else { return }
+        // 启动恢复完成前不写:启动时 Agent 窗口会先成为键盘窗口,写入会把「上次的模式」覆盖掉,恢复就读到错值
+        guard launchRestoreDone, FusionMode.shared.isEnabled else { return }
         UserDefaults.standard.set(isIDE, forKey: Self.fusionLastIDEKey)
     }
 
@@ -162,6 +164,9 @@ final class IDEWindowManager {
     private var startsInEditorMode: Bool {
         FusionMode.shared.isEnabled && UserDefaults.standard.bool(forKey: Self.fusionLastIDEKey) && !registry.windows.isEmpty
     }
+
+    /// 启动恢复(`restoreWindows`)是否已走完;之前不记录模式变化
+    private var launchRestoreDone = false
 
     /// 启动时只执行一次的标记:Agent 窗口首次登记时是否已按「编辑器模式」处理过
     private var launchHideHandled = false
