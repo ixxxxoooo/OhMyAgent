@@ -65,6 +65,9 @@ final class WindowContext {
     }
 
     private func update(_ new: WindowContextKind) {
-        if kind != new { kind = new }
+        guard kind != new else { return }
+        kind = new
+        // 融合模式:当前停在哪个模式就记哪个,下次启动只开这一种窗口(不依赖切换入口是否都记录了)
+        IDEWindowManager.shared.rememberLaunchMode(isIDE: isIDE)
     }
 }

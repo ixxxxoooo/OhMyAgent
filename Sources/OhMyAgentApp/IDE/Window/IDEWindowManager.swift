@@ -151,6 +151,13 @@ final class IDEWindowManager {
         if fusion { Task { await hideMainWindowWhenReady() } }
     }
 
+    /// 记住当前所处模式,供下次启动恢复(仅融合模式)。
+    /// - Parameter isIDE: 当前是否在 IDE(编辑器)模式
+    func rememberLaunchMode(isIDE: Bool) {
+        guard FusionMode.shared.isEnabled else { return }
+        UserDefaults.standard.set(isIDE, forKey: Self.fusionLastIDEKey)
+    }
+
     /// 启动时是否会恢复到编辑器模式(融合模式、上次停在编辑器、且有可恢复的 IDE 窗口)。
     private var startsInEditorMode: Bool {
         FusionMode.shared.isEnabled && UserDefaults.standard.bool(forKey: Self.fusionLastIDEKey) && !registry.windows.isEmpty
