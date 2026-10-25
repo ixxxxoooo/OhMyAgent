@@ -47,7 +47,7 @@ struct WorkbenchView: View {
             transaction.disablesAnimations = true
             withTransaction(transaction) { workbench.layout = copy }
         }
-        .background(WindowFocusReader(onWindow: { window in actions.mainWindow = window; WindowChrome.apply(to: window) }, onChange: { key in
+        .background(WindowFocusReader(onWindow: { window in actions.mainWindow = window; WindowChrome.apply(to: window); IDEWindowManager.shared.hideMainWindowIfLaunchingIntoEditor(window) }, onChange: { key in
             windowIsKey = key
             if let window = actions.mainWindow { WindowChrome.apply(to: window) }
             updateFocus()

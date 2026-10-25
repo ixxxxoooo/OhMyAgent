@@ -151,6 +151,23 @@ final class IDEWindowManager {
         if fusion { Task { await hideMainWindowWhenReady() } }
     }
 
+    /// 启动时是否会恢复到编辑器模式(融合模式、上次停在编辑器、且有可恢复的 IDE 窗口)。
+    private var startsInEditorMode: Bool {
+        FusionMode.shared.isEnabled && UserDefaults.standard.bool(forKey: Self.fusionLastIDEKey) && !registry.windows.isEmpty
+    }
+
+    /// 启动时只执行一次的标记:Agent 窗口首次登记时是否已按「编辑器模式」处理过
+    private var launchHideHandled = false
+
+    /// Agent 窗口一创建就隐藏(启动将恢复到编辑器模式时),避免它先闪现、等 IDE 窗口就绪后才被 `hideMainWindowWhenReady` 隐藏。
+    /// - Parameter window: 刚登记的 Agent 窗口
+    func hideMainWindowIfLaunchingIntoEditor(_ window: NSWindow) {
+        guard !launchHideHandled else { return }
+        launchHideHandled = true
+        guard startsInEditorMode else { return }
+        window.orderOut(nil)
+    }
+
     /// 融合模式启动恢复到编辑器模式后,等 Agent 窗口登记完成再把它隐藏(最多等 6 秒)。
     private func hideMainWindowWhenReady() async {
         for _ in 0..<60 {
