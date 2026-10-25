@@ -177,14 +177,20 @@ final class IDEWindowManager {
         guard !launchHideHandled else { return }
         launchHideHandled = true
         guard startsInEditorMode else { return }
-        window.orderOut(nil)
+        // 只置透明、不 orderOut:SwiftUI 窗口随后还会自己前置,orderOut 挡不住,窗口会先可见一下再淡出;
+        // 透明窗口前置也看不见,等 IDE 窗口就绪后由 `hideMainWindowWhenReady` 真正隐藏并还原透明度
+        window.alphaValue = 0
+        window.animationBehavior = .none
     }
 
     /// 融合模式启动恢复到编辑器模式后,等 Agent 窗口登记完成再把它隐藏(最多等 6 秒)。
     private func hideMainWindowWhenReady() async {
         for _ in 0..<60 {
             if let window = AppActions.shared.mainWindow {
+                window.animationBehavior = .none
                 window.orderOut(nil)
+                window.alphaValue = 1
+                window.animationBehavior = .default
                 return
             }
             try? await Task.sleep(for: .milliseconds(100))

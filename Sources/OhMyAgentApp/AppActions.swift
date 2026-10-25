@@ -372,7 +372,7 @@ final class AppActions {
         if let window = mainWindow ?? Self.sceneMainWindow() {
             if let frame { window.adoptFusionFrame(frame) }
             let reveal = source.flatMap { $0 !== window ? $0 : nil }
-            if reveal != nil { window.beginFusionReveal() }
+            if reveal != nil { window.beginFusionReveal() } else { window.alphaValue = 1 }
             if window.isMiniaturized { window.deminiaturize(nil) }
             window.makeKeyAndOrderFront(nil)
             if let reveal { window.finishFusionReveal(replacing: reveal) }
