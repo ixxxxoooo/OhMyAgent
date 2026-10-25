@@ -32,6 +32,11 @@ struct ChatView: View {
     @State private var followScroll = FrameCoalescedAction()
     /// 视口空白自愈(见 `TimelineBlankGuard`)
     @State private var blankGuard = TimelineBlankGuard()
+    /// 时间线宽度变化(收起/展开侧栏、拖动分栏)后的重排世代:宽度稳定后递增,让已物化的行按新宽度整体重排,
+    /// 避免 `LazyVStack` 沿用旧宽度下的行位置与高度而出现文字互相叠压
+    @State private var relayoutEpoch = 0
+    @State private var relayoutTask: Task<Void, Never>?
+    @State private var lastTimelineWidth: CGFloat = 0
     /// 标签是否可见:保活标签重新显示时检查一次空白
     @Environment(\.tabIsActive) private var tabActive
     @AppStorage(ClientPrefs.Key.toolDensity) private var toolDensityRaw = ToolDensity.standard.rawValue
@@ -167,6 +172,19 @@ struct ChatView: View {
         }
     }
 
+    /// 时间线宽度变化后安排一次整体重排(等宽度稳定 150ms 后执行,拖动期间不反复重建)。
+    /// - Parameter width: 滚动容器当前宽度
+    private func scheduleRelayout(width: CGFloat) {
+        defer { lastTimelineWidth = width }
+        guard lastTimelineWidth > 0, abs(width - lastTimelineWidth) >= 1 else { return }
+        relayoutTask?.cancel()
+        relayoutTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(150))
+            guard !Task.isCancelled else { return }
+            relayoutEpoch &+= 1
+        }
+    }
+
     private var timeline: some View {
         let slice = itemsCache.windowed(for: model.timeline, density: toolDensity, visibleTurns: visibleTurns)
         let items = slice.items
@@ -195,12 +213,14 @@ struct ChatView: View {
                 Color.clear.frame(height: 8).id("bottom")
             }
             .scrollTargetLayout()
+            .id(relayoutEpoch)
             .frame(maxWidth: contentMaxWidth)
             .padding(.horizontal, 20)
             .padding(.top, 12)
             .frame(maxWidth: .infinity)
         }
         .coordinateSpace(.named(chatScrollSpace))
+        .onGeometryChange(for: CGFloat.self) { $0.size.width.rounded() } action: { width in scheduleRelayout(width: width) }
         .onScrollTargetVisibilityChange(idType: UUID.self, threshold: 0.01) { ids in sticky.updateVisible(ids) }
         .overlay { TimelineEdgeFadeHost(model: edgeFade) }
         .overlay(alignment: .top) { StickyUserOverlay(model: model, state: sticky, maxWidth: contentMaxWidth) }
