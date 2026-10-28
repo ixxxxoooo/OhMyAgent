@@ -2,7 +2,7 @@
 // IDE 侧栏「源代码管理」视图:与 Agent 窗口右栏共用同一套 `SCMContent`(分支切换、拉取/推送、
 // 提交与修补、AI 提交说明、stash、冲突解决、变更分组、提交图谱);差异/文件/历史标签落到 IDE 窗口。
 // 工作区根目录本身不是仓库、但其一级子目录里有仓库时(如 KB/bigdata-kb、KB/bigdata-kb-fe),
-// 顶部出现仓库切换条,各仓库独立显示自己的改动。
+// 各仓库按可折叠分区上下排列,独立显示自己的改动。
 
 import DesignSystem
 import GitKit
@@ -13,44 +13,57 @@ struct IDESCMPane: View {
     let workspace: IDEWorkspace
     /// 根目录下含 `.git` 的一级子目录(根目录自身是仓库时为空)
     @State private var nestedRepos: [String] = []
-    /// 当前查看的子仓库(nil 取第一个)
-    @State private var chosenRepo: String?
-    @State private var pickerShown = false
+    /// 已折叠的子仓库
+    @State private var collapsed: Set<String> = []
 
     var body: some View {
         if let root = workspace.root {
-            let active = chosenRepo.flatMap { nestedRepos.contains($0) ? $0 : nil } ?? nestedRepos.first ?? root
-            VStack(spacing: 0) {
-                if nestedRepos.count > 1 || (nestedRepos.count == 1 && nestedRepos[0] != root) {
-                    repoBar(active: active)
-                    Divider()
+            Group {
+                if nestedRepos.isEmpty {
+                    SCMContent(host: IDESCMHost(workspace: workspace), model: GitStore.shared.model(for: root))
+                } else {
+                    nestedList
                 }
-                SCMContent(host: IDESCMHost(workspace: workspace), model: GitStore.shared.model(for: active))
-                    .id(active)
             }
+            .id(root)
             .task(id: root) { nestedRepos = await Self.discoverNestedRepos(in: root) }
         }
     }
 
-    /// 仓库切换条:显示当前仓库名,点击弹出 `OMPickList`。
-    private func repoBar(active: String) -> some View {
-        Button { pickerShown.toggle() } label: {
+    /// 多个子仓库:各自一个可折叠分区,独立显示分支、提交框与改动。
+    private var nestedList: some View {
+        VStack(spacing: 0) {
+            ForEach(nestedRepos, id: \.self) { path in
+                let open = !collapsed.contains(path)
+                repoHeader(path: path, open: open)
+                if open {
+                    SCMContent(host: IDESCMHost(workspace: workspace), model: GitStore.shared.model(for: path))
+                        .id(path)
+                        .frame(maxHeight: .infinity)
+                }
+                Divider()
+            }
+            if collapsed.count == nestedRepos.count { Spacer(minLength: 0) }
+        }
+    }
+
+    /// 子仓库标题行:点击折叠/展开。
+    private func repoHeader(path: String, open: Bool) -> some View {
+        Button {
+            if open { collapsed.insert(path) } else { collapsed.remove(path) }
+        } label: {
             HStack(spacing: 6) {
+                Image.om(open ? "chevron-down" : "chevron-right", size: 12).foregroundStyle(OMColors.tertiaryText)
                 Image.om("folder-git-2", size: 12)
-                Text(verbatim: (active as NSString).lastPathComponent).font(OMFonts.small.weight(.medium)).lineLimit(1)
-                Image.om("chevron-down", size: 10).foregroundStyle(OMColors.tertiaryText)
+                Text(verbatim: (path as NSString).lastPathComponent).font(OMFonts.small.weight(.medium)).lineLimit(1)
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 12).frame(height: 28)
+            .background(OMColors.subtleFill)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("切换仓库")
-        .omPicker(isPresented: $pickerShown,
-                  entries: nestedRepos.map { PickEntry(id: $0, title: ($0 as NSString).lastPathComponent, subtitle: ($0 as NSString).abbreviatingWithTildeInPath, icon: "folder-git-2") },
-                  selectedID: active, placeholder: String(localized: "搜索文件夹"), placement: .below, width: 280, showsSearch: nestedRepos.count > 6) { entry in
-            chosenRepo = entry.id
-        }
+        .accessibilityLabel(Text(verbatim: (path as NSString).lastPathComponent))
     }
 
     /// 根目录自身不是仓库时,列出含 `.git` 的一级子目录(按名称排序,跳过隐藏目录)。
