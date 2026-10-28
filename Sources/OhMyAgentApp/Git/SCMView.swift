@@ -60,6 +60,8 @@ struct SCMContent: View {
     @AppStorage(ClientPrefs.Key.scmAICommitMessage) private var aiCommitMessage = true
     let host: any SCMHost
     @Bindable var model: GitModel
+    /// 是否在变更列表底部显示提交图谱(多仓库时由外层共用一个图谱,此处关闭)
+    var showsGraph = true
     @State private var branchShown = false
     @State private var commitMenuShown = false
 
@@ -447,7 +449,7 @@ struct SCMContent: View {
                     }
                     ForEach(untracked) { change in ChangeRow(host: host, model: model, change: change, section: .untracked) }
                 }
-                GitGraphSection(host: host, model: model)
+                if showsGraph { GitGraphSection(host: host, model: model) }
             }
             .padding(.vertical, 4)
         }

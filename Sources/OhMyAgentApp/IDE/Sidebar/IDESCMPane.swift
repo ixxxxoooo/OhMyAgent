@@ -15,6 +15,9 @@ struct IDESCMPane: View {
     @State private var nestedRepos: [String] = []
     /// 已折叠的子仓库
     @State private var collapsed: Set<String> = []
+    /// 共用提交图谱当前查看的仓库(nil 取第一个)
+    @State private var graphRepo: String?
+    @State private var graphPickerShown = false
 
     var body: some View {
         if let root = workspace.root {
@@ -37,14 +40,44 @@ struct IDESCMPane: View {
                 let open = !collapsed.contains(path)
                 repoHeader(path: path, open: open)
                 if open {
-                    SCMContent(host: IDESCMHost(workspace: workspace), model: GitStore.shared.model(for: path))
+                    SCMContent(host: IDESCMHost(workspace: workspace), model: GitStore.shared.model(for: path), showsGraph: false)
                         .id(path)
                         .frame(maxHeight: .infinity)
                 }
                 Divider()
             }
             if collapsed.count == nestedRepos.count { Spacer(minLength: 0) }
+            sharedGraph
         }
+    }
+
+    /// 所有仓库共用一个提交图谱(对标 VS Code):顶部仓库选择条切换查看哪个仓库的历史。
+    private var sharedGraph: some View {
+        let active = graphRepo.flatMap { nestedRepos.contains($0) ? $0 : nil } ?? nestedRepos[0]
+        return VStack(spacing: 0) {
+            Button { graphPickerShown.toggle() } label: {
+                HStack(spacing: 6) {
+                    Image.om("folder-git-2", size: 12)
+                    Text(verbatim: (active as NSString).lastPathComponent).font(OMFonts.small.weight(.medium)).lineLimit(1)
+                    Image.om("chevron-down", size: 10).foregroundStyle(OMColors.tertiaryText)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 12).frame(height: 28)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("切换仓库")
+            .omPicker(isPresented: $graphPickerShown,
+                      entries: nestedRepos.map { PickEntry(id: $0, title: ($0 as NSString).lastPathComponent, subtitle: ($0 as NSString).abbreviatingWithTildeInPath, icon: "folder-git-2") },
+                      selectedID: active, placeholder: String(localized: "搜索文件夹"), placement: .below, width: 280, showsSearch: nestedRepos.count > 6) { entry in
+                graphRepo = entry.id
+            }
+            ScrollView {
+                GitGraphSection(host: IDESCMHost(workspace: workspace), model: GitStore.shared.model(for: active))
+                    .id(active)
+            }
+        }
+        .frame(maxHeight: .infinity)
     }
 
     /// 子仓库标题行:点击折叠/展开。
