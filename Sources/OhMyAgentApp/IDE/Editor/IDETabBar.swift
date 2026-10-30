@@ -156,7 +156,12 @@ private struct IDETabItem: View {
         .onTapGesture { activate() }
         .simultaneousGesture(TapGesture(count: 2).onEnded { keepOpen() })
         .background(MiddleClickCatcher { workspace.requestClose(tab.id) })
-        .onDrag { NSItemProvider(object: IDETabTransfer.encode(tab.id) as NSString) }
+        .onDrag {
+            // 记下文件路径,拖到 Agent 面板输入框时按「引用该文件」处理
+            DockDrag.shared.begin(tab.id)
+            if case .file(let path) = tab.kind { DockDrag.shared.filePath = path }
+            return NSItemProvider(object: IDETabTransfer.encode(tab.id) as NSString)
+        }
         .omContextMenu { menu }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(tab.title)
