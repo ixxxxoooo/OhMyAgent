@@ -254,6 +254,10 @@ struct TabItemView: View {
         .opacity(DockDrag.shared.tabID == tab.id ? 0 : 1)
         .onDrag {
             DockDrag.shared.begin(tab.id)
+            switch tab.kind {
+            case .file(let path), .diff(let path), .blame(let path): DockDrag.shared.filePath = path
+            default: DockDrag.shared.filePath = nil
+            }
             return NSItemProvider(object: (DockDrag.prefix + tab.id.uuidString) as NSString)
         } preview: {
             TabDragPreview(title: workbench.displayTitle(tab), tab: tab)

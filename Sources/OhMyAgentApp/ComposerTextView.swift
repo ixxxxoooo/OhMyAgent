@@ -222,7 +222,7 @@ final class SubmitTextView: NSTextView {
         guard enabled != dragIntakeEnabled else { return }
         dragIntakeEnabled = enabled
         if enabled {
-            registerForDraggedTypes([.fileURL] + ImageIntake.acceptedTypes.map { NSPasteboard.PasteboardType($0.identifier) })
+            registerForDraggedTypes([.fileURL, .string] + ImageIntake.acceptedTypes.map { NSPasteboard.PasteboardType($0.identifier) })
         } else {
             unregisterDraggedTypes()
         }
@@ -231,11 +231,38 @@ final class SubmitTextView: NSTextView {
     /// 拖拽进入/离开文本区(文本区自己注册了拖放,拖到文字上时 SwiftUI 卡片收不到事件,靠它把状态回报给卡片高亮)
     var onDragTargeted: ((Bool) -> Void)?
 
+    /// 正在拖拽的内容里,输入框能接收的类型:图片、文件 URL,或从标签栏拖来的文件标签。
+    /// - Parameter board: 拖拽粘贴板
+    /// - Returns: 能接收返回 true
+    private func canAcceptDrag(_ board: NSPasteboard) -> Bool {
+        if acceptsImages(), ImageIntake.hasImage(board) { return true }
+        if onFileURLs != nil, ImageIntake.hasFileURLs(board) || Self.draggedTabFileURL(board) != nil { return true }
+        return false
+    }
+
+    /// 标签栏拖来的文件标签对应的文件 URL(粘贴板是应用内标签载荷且该标签是文件类时)。
+    /// - Parameter board: 拖拽粘贴板
+    /// - Returns: 文件 URL;不是标签拖拽返回 nil
+    private static func draggedTabFileURL(_ board: NSPasteboard) -> URL? {
+        guard let text = board.string(forType: .string), text.hasPrefix(DockDrag.prefix),
+              let path = DockDrag.shared.filePath else { return nil }
+        return URL(fileURLWithPath: path)
+    }
+
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        let board = sender.draggingPasteboard
-        if acceptsImages(), ImageIntake.hasImage(board) { onDragTargeted?(true); return .copy }
-        if onFileURLs != nil, ImageIntake.hasFileURLs(board) { onDragTargeted?(true); return .copy }
+        if canAcceptDrag(sender.draggingPasteboard) { onDragTargeted?(true); return .copy }
         return super.draggingEntered(sender)
+    }
+
+    /// 拖动过程中持续声明接收:NSTextView 默认实现对文件 URL 会改回「拒绝」,
+    /// 出现虚线框却松手没反应就是这里。
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        if canAcceptDrag(sender.draggingPasteboard) { return .copy }
+        return super.draggingUpdated(sender)
+    }
+
+    override func prepareForDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        canAcceptDrag(sender.draggingPasteboard) ? true : super.prepareForDragOperation(sender)
     }
 
     override func draggingExited(_ sender: NSDraggingInfo?) {
@@ -260,7 +287,8 @@ final class SubmitTextView: NSTextView {
             }
         }
         if onFileURLs != nil {
-            let files = ImageIntake.nonImageFileURLs(from: board)
+            var files = ImageIntake.nonImageFileURLs(from: board)
+            if files.isEmpty, let tabFile = Self.draggedTabFileURL(board) { files = [tabFile] }
             if !files.isEmpty {
                 onFileURLs?(files)
                 handled = true

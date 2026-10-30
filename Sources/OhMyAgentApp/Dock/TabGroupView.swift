@@ -16,6 +16,8 @@ final class DockDrag {
     static let shared = DockDrag()
     /// 正在被拖拽的标签(源标签据此隐藏,避免与拖影重叠成「重影」)
     var tabID: UUID?
+    /// 正在被拖拽的标签对应的文件路径(文件/差异/追溯标签),输入框据此把标签拖进来当作文件引用
+    var filePath: String?
     @ObservationIgnored private var watcher: Task<Void, Never>?
 
     /// 拖拽开始:记录标签,并监视鼠标左键抬起。SwiftUI 没有「拖拽结束」回调,
@@ -32,6 +34,7 @@ final class DockDrag {
             try? await Task.sleep(for: .milliseconds(400))
             guard !Task.isCancelled else { return }
             self?.tabID = nil
+            self?.filePath = nil
             self?.toolsPane = nil
             self?.session = nil
         }

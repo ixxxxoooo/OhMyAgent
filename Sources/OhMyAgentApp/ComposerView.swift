@@ -6,6 +6,7 @@ import ACPKit
 import ChatKit
 import DesignSystem
 import SwiftUI
+import UniformTypeIdentifiers
 import WorkbenchKit
 
 /// 输入区视图。
@@ -112,7 +113,13 @@ struct ComposerView: View {
                     .allowsHitTesting(false)
             }
         }
-        .onDrop(of: [.fileURL, .image], isTargeted: $cardDropTargeted) { providers in
+        .onDrop(of: [.fileURL, .image, .plainText], isTargeted: $cardDropTargeted) { providers in
+            // 从标签栏拖来的文件标签:载荷是应用内标签 id,文件路径在 DockDrag 里
+            if let path = DockDrag.shared.filePath, providers.contains(where: { $0.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) }),
+               !providers.contains(where: { $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) }) {
+                insertMentions(for: [URL(fileURLWithPath: path)])
+                return true
+            }
             Task { @MainActor in
                 let dropped = await ImageIntake.split(from: providers)
                 for image in dropped.images { model.addAttachment(image) }
