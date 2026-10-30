@@ -23,7 +23,7 @@ struct ModeSwitchButton: View {
         let shortcut = ShortcutStore.shared.binding(for: .switchWindowMode).display
         Button(action: perform) {
             HStack(spacing: 4) {
-                Text(title)
+                Text(title).lineLimit(1).fixedSize()
                 Image.om("external-link", size: 12)
             }
             .frame(maxWidth: .infinity)

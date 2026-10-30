@@ -31,7 +31,7 @@ enum TitlebarMetrics {
 
     /// 模式切换按钮(Agent 窗口的「编辑器 ↗」、IDE 窗口的「Agents Window ↗」)的宽度:两个窗口共用同一个值,
     /// 标题栏右侧簇在两个窗口间切换时不跳动。
-    static let modeSwitchWidth: CGFloat = 124
+    static let modeSwitchWidth: CGFloat = 148
 
     /// 右上浮层(`toggles` 个面板开关 + 边距)占用的宽度:`toggles == 1` 时为 34;没有开关时为 0。
     /// - Parameters:
