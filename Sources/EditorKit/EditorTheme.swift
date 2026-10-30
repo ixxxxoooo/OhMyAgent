@@ -15,7 +15,7 @@ public struct EditorTheme {
     public var font: NSFont
     public var colors: [SyntaxKind: NSColor]
 
-    /// 用户设置的编辑器字号(键 `editor.fontSize`,默认 13,范围 11–20,对齐 kuku)。
+    /// 用户设置的编辑器字号(键 `editor.fontSize`,默认 14,范围 11–20,对齐 kuku)。
     public static var preferredFontSize: CGFloat { EditorFontPrefs.preferredSize }
 
     /// 编辑器段落样式:按字体换算行高(13pt 时 18pt),行号栏与正文逐行对齐。

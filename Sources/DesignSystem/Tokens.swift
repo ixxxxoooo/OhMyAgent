@@ -493,6 +493,10 @@ public enum OMDiffPalette {
 
 /// 字体缩放(由外观设置写入;只在主线程的界面刷新周期读取)。
 public enum OMScale {
+    /// 「界面字号 100%」对应的实际缩放(原 110% 的观感定义为标准)。
+    public static let uiBase: CGFloat = 1.1
+    /// 「时间线字号 100%」对应的实际缩放(原 105% 的观感定义为标准)。
+    public static let timelineBase: CGFloat = 1.05
     nonisolated(unsafe) public static var ui: CGFloat = 1
     nonisolated(unsafe) public static var timeline: CGFloat = 1
 }

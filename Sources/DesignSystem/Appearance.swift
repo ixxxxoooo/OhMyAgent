@@ -167,6 +167,12 @@ public final class AppearanceModel {
         themedDiff = bool("themedDiff", true)
         syntaxSchemeID = string("syntaxScheme") ?? SyntaxScheme.followThemeID
         syntaxOverrides = defaults.dictionary(forKey: Self.prefix + "syntaxOverrides") as? [String: String] ?? [:]
+        // 一次性迁移:旧版以 1.0 为基准,现把原「110% / 105%」的观感定义为 100%,已存的百分比按新基准折算
+        if !bool("fontBaseMigrated", false) {
+            defaults.set((double("uiFontScale", 1) / OMScale.uiBase * 100).rounded() / 100, forKey: Self.prefix + "uiFontScale")
+            defaults.set((double("timelineFontScale", 1) / OMScale.timelineBase * 100).rounded() / 100, forKey: Self.prefix + "timelineFontScale")
+            defaults.set(true, forKey: Self.prefix + "fontBaseMigrated")
+        }
         uiFontScale = double("uiFontScale", 1)
         timelineFontScale = double("timelineFontScale", 1)
         flowStyle = FlowStyle(rawValue: string("flowStyle") ?? "") ?? .classic
@@ -287,8 +293,8 @@ public final class AppearanceModel {
     }
 
     private func applyScale() {
-        OMScale.ui = CGFloat(min(max(uiFontScale, 0.85), 1.3))
-        OMScale.timeline = CGFloat(min(max(timelineFontScale, 0.85), 1.5))
+        OMScale.ui = CGFloat(min(max(uiFontScale, 0.85), 1.3)) * OMScale.uiBase
+        OMScale.timeline = CGFloat(min(max(timelineFontScale, 0.85), 1.5)) * OMScale.timelineBase
         fontRevision += 1
     }
 
