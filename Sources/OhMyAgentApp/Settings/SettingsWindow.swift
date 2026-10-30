@@ -11,6 +11,7 @@ import WorkbenchKit
 /// 设置页。
 enum SettingsPage: String, CaseIterable, Identifiable {
     case general, appearance, shortcuts
+    case customize
     case agent, providers, modelMapping, prompts, network, permissions, trust, agentExtensions
     case mcp, skills, subagents, hooks, plugins, memory
     case editor, terminal, browser, sourceControl, codeIntelligence
@@ -20,6 +21,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
     /// 设置搜索的附加关键词(页标题之外还能搜到的词)。
     var keywords: [String] {
         switch self {
+        case .customize: return ["customize", "自定义", "mcp", "技能", "插件", "子代理", "hooks", "规则"]
         case .mcp: return ["mcp", "model context protocol", "服务器", "工具", "server", "tools", "claude mcp"]
         case .skills: return ["skill", "skills", "技能", "命令", "斜杠", "command", "slash", "SKILL.md"]
         case .subagents: return ["agent", "subagent", "子代理", "子 agent", "代理", "agents"]
@@ -48,7 +50,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
     /// 侧栏分组(从上到下)。
     static let groups: [(title: String, pages: [SettingsPage])] = [
         (String(localized: "客户端"), [.general, .appearance, .shortcuts]),
-        ("Agent", [.agent, .providers, .modelMapping, .prompts, .network, .permissions, .trust, .agentExtensions]),
+        ("Agent", [.customize, .agent, .providers, .modelMapping, .prompts, .network, .permissions, .trust, .agentExtensions]),
         (String(localized: "工作台"), [.editor, .terminal, .browser, .sourceControl, .codeIntelligence]),
         (String(localized: "其他"), [.usage, .privacy, .advanced, .diagnostics, .about]),
     ]
@@ -58,6 +60,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .general: return String(localized: "通用")
         case .appearance: return String(localized: "外观")
         case .shortcuts: return String(localized: "快捷键")
+        case .customize: return String(localized: "自定义")
         case .agent: return String(localized: "Agent 与模型")
         case .providers: return String(localized: "模型提供商")
         case .modelMapping: return String(localized: "Claude Code 模型映射")
@@ -90,6 +93,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .general: return "gearshape"
         case .appearance: return "paintbrush"
         case .shortcuts: return "keyboard"
+        case .customize: return "sliders-horizontal"
         case .agent: return "cpu"
         case .providers: return "server.rack"
         case .modelMapping: return "arrow.triangle.swap"

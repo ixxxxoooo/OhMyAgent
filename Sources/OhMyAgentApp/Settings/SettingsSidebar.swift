@@ -158,6 +158,7 @@ struct SettingsPageHost: View, Equatable {
         switch page {
         case .general: GeneralPage()
         case .appearance: AppearancePage()
+        case .customize: CustomizePage(workbench: workbench)
         case .agent: AgentModelPage(model: model)
         case .providers: ModelProvidersPage()
         case .modelMapping: ModelMappingPage()
